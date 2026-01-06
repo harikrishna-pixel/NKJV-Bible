@@ -2168,6 +2168,7 @@ class floatingButtonState extends State<floatingButton>
                             value: matchedSelectedVoice,
                             isExpanded: true,
                             underline: const SizedBox(),
+                            dropdownColor: Colors.white,
                             icon: Icon(
                               Icons.keyboard_arrow_down,
                               color: CommanColor.lightDarkPrimary(context),
@@ -2180,7 +2181,7 @@ class floatingButtonState extends State<floatingButton>
                                 child: Text(
                                   isDefault ? "$displayName (Default)" : displayName,
                                   style: TextStyle(
-                                    color: CommanColor.lightDarkPrimary(context),
+                                    color: Colors.black,
                                     letterSpacing: BibleInfo.letterSpacing,
                                     fontSize: BibleInfo.fontSizeScale * 16,
                                     fontWeight: FontWeight.w500,

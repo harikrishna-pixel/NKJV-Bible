@@ -5,6 +5,7 @@ import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/background_api_service.dart';
 import 'package:biblebookapp/services/statsig/statsig_service.dart';
+import 'package:biblebookapp/view/screens/authenitcation/view/otp_screen.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 import 'package:biblebookapp/view/screens/notification_info_screen.dart';
 import 'package:biblebookapp/view/screens/onboarding_guidance_screen.dart';

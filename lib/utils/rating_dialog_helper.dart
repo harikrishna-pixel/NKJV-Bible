@@ -62,7 +62,7 @@ class RatingDialogHelper {
         final isDark = themeProvider.themeMode == ThemeMode.dark;
         return Dialog(
           backgroundColor: isDark
-              ? CommanColor.darkPrimaryColor
+              ? CommanColor.white
               : CommanColor.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),

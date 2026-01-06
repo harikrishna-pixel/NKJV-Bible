@@ -481,7 +481,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
-                ? CommanColor.lightDarkPrimary(context)
+                ? (isDark
+                    ? Colors.white
+                    : CommanColor.lightDarkPrimary(context))
                 : (isDark
                     ? Colors.white.withOpacity(0.1)
                     : Colors.grey.shade200),

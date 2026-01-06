@@ -98,7 +98,7 @@ class Images {
 
   static String wallpaperPlaceHolder(BuildContext context) {
     return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? 'assets/light_modes/Wallpaper.png'
+        ? 'assets/dark_modes/Wallpaper.png'
         : 'assets/dark_modes/Wallpaper.png';
   }
 
@@ -129,7 +129,7 @@ class Images {
 
   static String imagesPlaceHolder(BuildContext context) {
     return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? 'assets/light_modes/image (2).png'
+        ? 'assets/dark_modes/image (2).png'
         : 'assets/dark_modes/image (2).png';
   }
 

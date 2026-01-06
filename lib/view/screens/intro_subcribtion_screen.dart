@@ -643,6 +643,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         return _ExitOfferBottomSheetContent(
           exitOffer: exitOffer,
           lifetimePrice: lifetimePrice,
+          originalLifetimePrice: originalLifetimePrice,
           screenWidth: screenWidth,
           initialMinutes: initialMinutes,
           initialSeconds: initialSeconds,
@@ -1884,12 +1885,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               border: Border.all(
                 color: isSelected
                     ? (CommanColor.isDarkTheme(context)
-                        ? const Color(0xFFD4C5B0)
+                        ? Colors.white
                         : const Color(0xFF6B5642))
                     : (CommanColor.isDarkTheme(context)
-                        ? const Color(0xFFC4B5A0)
+                        ? const Color(0xFFC4B5A0).withOpacity(0.3)
                         : const Color(0xFFC4B5A0)),
-                width: 2,
+                width: isSelected ? 2 : 1,
               ),
               borderRadius: BorderRadius.circular(12),
             ),
@@ -2118,6 +2119,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 class _ExitOfferBottomSheetContent extends StatefulWidget {
   final GetAudioModelDataSubFields exitOffer;
   final String lifetimePrice;
+  final String originalLifetimePrice;
   final double screenWidth;
   final int initialMinutes;
   final int initialSeconds;
@@ -2127,6 +2129,7 @@ class _ExitOfferBottomSheetContent extends StatefulWidget {
   const _ExitOfferBottomSheetContent({
     required this.exitOffer,
     required this.lifetimePrice,
+    required this.originalLifetimePrice,
     required this.screenWidth,
     required this.initialMinutes,
     required this.initialSeconds,
@@ -2272,14 +2275,39 @@ class _ExitOfferBottomSheetContentState
                             ),
                           ),
                           const SizedBox(height: 8),
-                          Text(
-                            widget.lifetimePrice,
-                            style: TextStyle(
-                              fontSize: widget.screenWidth > 450 ? 32 : 28,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
-                          ),
+                          // Original price with strike-through (if different from discounted price)
+                          if (widget.originalLifetimePrice != widget.lifetimePrice &&
+                              widget.originalLifetimePrice.isNotEmpty) ...[
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      widget.originalLifetimePrice,
+                                      style: TextStyle(
+                                        fontSize: widget.screenWidth > 450 ? 20 : 18,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.black87.withOpacity(0.6),
+                                        decoration: TextDecoration.lineThrough,
+                                        decorationThickness: 2,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      widget.lifetimePrice,
+                                      style: TextStyle(
+                                        fontSize: widget.screenWidth > 450 ? 32 : 28,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+
+                                  ],
+                                )
+
+
+                          ],
+                          // Discounted price
+
                           const SizedBox(height: 8),
                           const Text(
                             "One-Time Blessing. Lifetime Access.",

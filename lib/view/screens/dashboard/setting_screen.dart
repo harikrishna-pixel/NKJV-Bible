@@ -1413,8 +1413,9 @@ class _SettingScreenState extends State<SettingScreen>
                       await SharPreferences.setString('OpenAd', '1');
                       // Check actual internet access (not just network interface)
                       // This is more reliable than Connectivity() which can give false negatives
-                      final hasInternet = await InternetConnection().hasInternetAccess;
-                      
+                      final hasInternet =
+                      await InternetConnection().hasInternetAccess;
+
                       // Only show toast if actually offline - don't show when online
                       if (!hasInternet) {
                         Constants.showToast('Check Your Internet Connection');
@@ -1832,8 +1833,9 @@ class _SettingScreenState extends State<SettingScreen>
   Future<void> _showPremiumThemeDialog(BuildContext context) async {
     final screenWidth = MediaQuery.of(context).size.width;
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    final oldPaperColor = themeProvider.backgroundColor; // Get old paper theme color (Color(0xFFF3E5C2))
-    
+    final oldPaperColor = themeProvider
+        .backgroundColor; // Get old paper theme color (Color(0xFFF3E5C2))
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1844,7 +1846,9 @@ class _SettingScreenState extends State<SettingScreen>
           ),
           backgroundColor: oldPaperColor, // Use old paper theme color
           child: Container(
-            width: screenWidth > 450 ? screenWidth * 0.5 : screenWidth * 0.85, // Make dialog wider
+            width: screenWidth > 450
+                ? screenWidth * 0.5
+                : screenWidth * 0.85, // Make dialog wider
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1880,7 +1884,8 @@ class _SettingScreenState extends State<SettingScreen>
                       child: ElevatedButton(
                         onPressed: () => Navigator.pop(context),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: oldPaperColor, // Use old paper theme color
+                          backgroundColor:
+                          oldPaperColor, // Use old paper theme color
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -1908,11 +1913,17 @@ class _SettingScreenState extends State<SettingScreen>
                           // The subscription screen will handle any connectivity issues if needed
                           Navigator.pop(context);
                           // Use constants as fallback when SharedPreferences are empty (first time loading)
-                          final sixMonthPlan = await SharPreferences.getString('sixMonthPlan') ?? BibleInfo.sixMonthPlanid;
-                          final oneYearPlan = await SharPreferences.getString('oneYearPlan') ?? BibleInfo.oneYearPlanid;
-                          final lifeTimePlan = await SharPreferences.getString('lifeTimePlan') ?? BibleInfo.lifeTimePlanid;
+                          final sixMonthPlan =
+                              await SharPreferences.getString('sixMonthPlan') ??
+                                  BibleInfo.sixMonthPlanid;
+                          final oneYearPlan =
+                              await SharPreferences.getString('oneYearPlan') ??
+                                  BibleInfo.oneYearPlanid;
+                          final lifeTimePlan =
+                              await SharPreferences.getString('lifeTimePlan') ??
+                                  BibleInfo.lifeTimePlanid;
                           Get.to(
-                            () => SubscriptionScreen(
+                                () => SubscriptionScreen(
                               sixMonthPlan: sixMonthPlan,
                               oneYearPlan: oneYearPlan,
                               lifeTimePlan: lifeTimePlan,
@@ -1923,7 +1934,8 @@ class _SettingScreenState extends State<SettingScreen>
                           );
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF8B5E3C), // Dark brown
+                          backgroundColor:
+                          const Color(0xFF8B5E3C), // Dark brown
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -1978,80 +1990,89 @@ class _SettingScreenState extends State<SettingScreen>
           ],
         ),
         actions: [
-          ElevatedButton(
-            onPressed: () async {
-              await SharPreferences.setString('OpenAd', '1');
-              await openAppSettings(); // Opens settings
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    await SharPreferences.setString('OpenAd', '1');
+                    await openAppSettings(); // Opens settings
 
-              if (context.mounted) {
-                Navigator.pop(context);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF875736), // Brown
-              padding: EdgeInsets.symmetric(
-                  vertical: screenWidth < 380
-                      ? 11
-                      : screenWidth > 450
-                      ? 13
-                      : 12,
-                  horizontal: screenWidth < 380
-                      ? 14.0
-                      : screenWidth > 450
-                      ? 21.0
-                      : 20),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF875736), // Brown
+                    padding: EdgeInsets.symmetric(
+                        vertical: screenWidth < 380
+                            ? 11
+                            : screenWidth > 450
+                            ? 13
+                            : 12,
+                        horizontal: screenWidth < 380
+                            ? 14.0
+                            : screenWidth > 450
+                            ? 21.0
+                            : 20),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Settings',
+                    style: TextStyle(
+                      fontSize: screenWidth < 380
+                          ? 14.0
+                          : screenWidth > 450
+                          ? 17
+                          : 16,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
               ),
-            ),
-            child: Text(
-              'Open Settings',
-              style: TextStyle(
-                fontSize: screenWidth < 380
-                    ? 14.0
-                    : screenWidth > 450
-                    ? 17
-                    : 16,
-                color: Colors.white,
+              SizedBox(
+                width: 10,
               ),
-            ),
-          ),
-          SizedBox(
-            width: 5,
-          ),
-          ElevatedButton(
-            onPressed: () {
-              //  openAppSettings(); // Opens settings
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: CommanColor.lightGrey1, // Brown
-              padding: EdgeInsets.symmetric(
-                  vertical: screenWidth < 380
-                      ? 11
-                      : screenWidth > 450
-                      ? 13
-                      : 12,
-                  horizontal: screenWidth < 380
-                      ? 14.0
-                      : screenWidth > 450
-                      ? 21.0
-                      : 20),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    //  openAppSettings(); // Opens settings
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: CommanColor.lightGrey1, // Brown
+                    padding: EdgeInsets.symmetric(
+                        vertical: screenWidth < 380
+                            ? 11
+                            : screenWidth > 450
+                            ? 13
+                            : 12,
+                        horizontal: screenWidth < 380
+                            ? 14.0
+                            : screenWidth > 450
+                            ? 21.0
+                            : 20),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      fontSize: screenWidth < 380
+                          ? 14.0
+                          : screenWidth > 450
+                          ? 17
+                          : 16,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
               ),
-            ),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                fontSize: screenWidth < 380
-                    ? 14.0
-                    : screenWidth > 450
-                    ? 17
-                    : 16,
-                color: Colors.black,
-              ),
-            ),
+            ],
           ),
           // TextButton(
           //   onPressed: () => Navigator.pop(context), // Dismiss
@@ -2260,22 +2281,50 @@ class _ThemeDialogState extends State<ThemeDialog> {
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.brown),
                 onPressed: () async {
-                  final provider = Provider.of<ThemeProvider>(context, listen: false);
+                  final provider =
+                  Provider.of<ThemeProvider>(context, listen: false);
                   if (_selectedTheme == provider.currentCustomTheme) {
                     Constants.showToast("This theme is already applied");
                     return;
                   }
 
-                  // Check subscription before setting theme
-                  final downloadProvider = Provider.of<DownloadProvider>(context, listen: false);
-                  final subscriptionPlan = await downloadProvider.getSubscriptionPlan();
-                  final hasSubscriptionPlan = subscriptionPlan != null && 
-                                              subscriptionPlan.isNotEmpty && 
-                                              ['platinum', 'gold', 'silver'].contains(subscriptionPlan.toLowerCase());
-                  // Also check if ads are disabled, which indicates premium access
-                  final adsDisabled = !downloadProvider.adEnabled;
-                  final isSubscribed = hasSubscriptionPlan || adsDisabled;
-                  
+                  // Check subscription before setting theme - same logic as intro subscription screen
+                  // When user subscribes, disableAd() is called which sets expiry date in isRewardAdViewTime
+                  bool isSubscribed = false;
+
+                  // First check subscription plan
+                  final downloadProvider =
+                  Provider.of<DownloadProvider>(context, listen: false);
+                  final subscriptionPlan =
+                  await downloadProvider.getSubscriptionPlan();
+                  final hasSubscriptionPlan = subscriptionPlan != null &&
+                      subscriptionPlan.isNotEmpty &&
+                      ['platinum', 'gold', 'silver']
+                          .contains(subscriptionPlan.toLowerCase());
+
+                  // Must have subscription plan AND valid expiry date
+                  if (hasSubscriptionPlan) {
+                    try {
+                      final expiryDateString = await SharPreferences.getString(
+                          SharPreferences.isRewardAdViewTime);
+                      if (expiryDateString != null &&
+                          expiryDateString.isNotEmpty) {
+                        final expiryDate = DateTime.parse(expiryDateString);
+                        final currentTime = DateTime.now();
+                        final diffDays =
+                            expiryDate.difference(currentTime).inDays;
+                        // Subscription is valid if expiry date is today or in the future (>= 0)
+                        // This includes lifetime subscriptions (>365 days)
+                        isSubscribed = diffDays >= 0;
+                      }
+                      // If no expiry date, user is not subscribed (don't use closead as bypass)
+                    } catch (e) {
+                      debugPrint("Error checking subscription expiry: $e");
+                      // If error parsing expiry date, user is not subscribed
+                      isSubscribed = false;
+                    }
+                  }
+
                   if (!isSubscribed) {
                     // Close theme dialog and show premium dialog
                     Navigator.pop(context);
