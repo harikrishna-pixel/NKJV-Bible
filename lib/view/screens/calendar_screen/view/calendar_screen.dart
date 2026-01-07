@@ -165,6 +165,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                                   fontWeight: FontWeight.w700,
                                   color: CommanColor.weekendColor(context))),
                           onDaySelected: calendarBloc.onDaySelected,
+                          onPageChanged: calendarBloc.onPageChanged,
                           calendarBuilders: CalendarBuilders(
                             todayBuilder: (context, day, focusedDay) {
                               return cellWidget(day);

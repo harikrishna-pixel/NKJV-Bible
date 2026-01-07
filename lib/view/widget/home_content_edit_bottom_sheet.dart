@@ -19,6 +19,7 @@ import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/remove_add-screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/setting_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
@@ -42,6 +43,7 @@ import '../constants/colors.dart';
 import 'package:screenshot/screenshot.dart';
 import '../constants/theme_provider.dart';
 import '../screens/intro_subcribtion_screen.dart';
+import '../screens/chat/chat_screen.dart';
 
 // Future<dynamic> homeContentEditBottomSheet(BuildContext context,
 //     {String? verNum,
@@ -4632,7 +4634,7 @@ class HomeContentEditBottomSheetState
               ),
               const SizedBox(height: 15),
               SizedBox(
-                width: MediaQuery.of(context).size.width * 0.5,
+                width: MediaQuery.of(context).size.width * 0.75,
                 child: Row(
                   mainAxisAlignment: screenWidth > 450
                       ? MainAxisAlignment.center
@@ -4643,6 +4645,8 @@ class HomeContentEditBottomSheetState
                     _buildResetButton(),
                     if (screenWidth > 450) const SizedBox(width: 20),
                     _buildShareButton(),
+                    if (screenWidth > 450) const SizedBox(width: 20),
+                    _buildAskButton(),
                   ],
                 ),
               ),
@@ -5627,6 +5631,47 @@ class HomeContentEditBottomSheetState
         ),
         Text(
           "Share",
+          style: TextStyle(
+            color: CommanColor.lightDarkPrimary(context),
+            letterSpacing: BibleInfo.letterSpacing,
+            fontSize: BibleInfo.fontSizeScale * screenWidth > 450 ? 16 : 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAskButton() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () {
+            // Close the bottom sheet
+            Navigator.pop(context);
+            // Navigate to chat screen with verse context
+            Get.to(
+              () => ChatScreen(
+                verseContext: {
+                  'verseText': controller.printText.value,
+                  'book': controller.selectedBook.value,
+                  'chapter': controller.selectedChapter.value.toString(),
+                  'verse': widget.verNum.toString(),
+                },
+              ),
+              transition: Transition.cupertinoDialog,
+              duration: const Duration(milliseconds: 300),
+            );
+          },
+          child: Icon(
+            CupertinoIcons.chat_bubble_2,
+            color: CommanColor.lightDarkPrimary(context),
+            size: screenWidth > 450 ? 50 : 40,
+          ),
+        ),
+        Text(
+          "Ask",
           style: TextStyle(
             color: CommanColor.lightDarkPrimary(context),
             letterSpacing: BibleInfo.letterSpacing,

@@ -30,7 +30,10 @@ class LoginScreen extends HookConsumerWidget {
     // debugPrint("sz current width - $screenWidth ");
     return Scaffold(
         resizeToAvoidBottomInset: false,
-        body: Container(
+        body: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: Container(
           height: MediaQuery.of(context).size.height,
           width: MediaQuery.of(context).size.width,
           decoration:
@@ -261,9 +264,11 @@ class LoginScreen extends HookConsumerWidget {
                     ],
                   ),
                 ),
-              ))
-            ],
+              )
+              )],
           ),
-        ));
+        ),
+      ),
+    );
   }
 }

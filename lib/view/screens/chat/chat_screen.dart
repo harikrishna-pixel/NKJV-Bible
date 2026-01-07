@@ -33,8 +33,10 @@ import 'package:permission_handler/permission_handler.dart';
 
 class ChatScreen extends StatefulWidget {
   final String? historyDateKey;
+  final Map<String, String>?
+      verseContext; // Verse context: verseText, book, chapter, verse
 
-  const ChatScreen({super.key, this.historyDateKey});
+  const ChatScreen({super.key, this.historyDateKey, this.verseContext});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -47,9 +49,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
   String? _currentConversationId;
-  static const String _baseUrl = 'https://my-backend-one-eta.vercel.app/api/gemini';
+  static const String _baseUrl =
+      'https://my-backend-one-eta.vercel.app/api/gemini';
   int? _selectedTopicIndex; // Track which topic button is selected
-  int? _selectedExampleQuestionIndex; // Track which example question button is tapped
+  int?
+      _selectedExampleQuestionIndex; // Track which example question button is tapped
   String _introAnswerLength = 'small';
 
   // Speech to text
@@ -65,12 +69,30 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   // Topic-based questions
   final List<Map<String, String>> _topicQuestions = [
-    {'topic': 'I feel anxious', 'question': 'Show me verses that calm anxiety..'},
-    {'topic': 'I\'m confused', 'question': 'Show me verses about clarity and direction..'},
-    {'topic': 'I need strength', 'question': 'How can I stay strong spiritually?'},
-    {'topic': 'I feel lost', 'question': 'How does God guide me when I feel lost?'},
-    {'topic': 'I feel stuck', 'question': 'Encourage me when everything feels heavy..'},
-    {'topic': 'God\'s promises', 'question': 'What promises remind me I\'m not alone?'},
+    {
+      'topic': 'I feel anxious',
+      'question': 'Show me verses that calm anxiety..'
+    },
+    {
+      'topic': 'I\'m confused',
+      'question': 'Show me verses about clarity and direction..'
+    },
+    {
+      'topic': 'I need strength',
+      'question': 'How can I stay strong spiritually?'
+    },
+    {
+      'topic': 'I feel lost',
+      'question': 'How does God guide me when I feel lost?'
+    },
+    {
+      'topic': 'I feel stuck',
+      'question': 'Encourage me when everything feels heavy..'
+    },
+    {
+      'topic': 'God\'s promises',
+      'question': 'What promises remind me I\'m not alone?'
+    },
   ];
 
   @override
@@ -160,9 +182,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Future<void> _showChatIntroDialog() async {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
-    final isVintage = themeProvider.currentCustomTheme == AppCustomTheme.vintage;
+    final isVintage =
+        themeProvider.currentCustomTheme == AppCustomTheme.vintage;
     final screenWidth = MediaQuery.of(context).size.width;
-    
+
     // Load initial credits to display
     final initialCredits = await WalletService.getCredits();
 
@@ -175,267 +198,294 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setBottomSheetState) {
-            return ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.9,
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? CommanColor.darkPrimaryColor
-                      : Colors.white,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(24),
-                    topRight: Radius.circular(24),
-                  ),
-                ),
-                child: SingleChildScrollView(
-                  physics: const ClampingScrollPhysics(),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                    // Header Section with Gradient
-                    Container(
-                      width: double.infinity,
+            return TweenAnimationBuilder<double>(
+                duration: const Duration(milliseconds: 800),
+                curve: Curves.easeOutCubic,
+                tween: Tween(begin: 0.0, end: 1.0),
+                builder: (context, value, child) {
+                  return Transform.translate(
+                    offset: Offset(0, (1 - value) * 50),
+                    child: Opacity(
+                      opacity: value,
+                      child: child,
+                    ),
+                  );
+                },
+                child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.9,
+                    ),
+                    child: Container(
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            CommanColor.lightDarkPrimary(context),
-                            CommanColor.lightDarkPrimary(context).withOpacity(0.8),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
+                        color: isDark
+                            ? CommanColor.darkPrimaryColor
+                            : Colors.white,
                         borderRadius: const BorderRadius.only(
                           topLeft: Radius.circular(24),
                           topRight: Radius.circular(24),
                         ),
                       ),
-                      padding: EdgeInsets.symmetric(
-                        vertical: screenWidth > 450 ? 28 : 24,
-                        horizontal: screenWidth > 450 ? 24 : 20,
-                      ),
-                      child: Column(
-                        children: [
+                      child: SingleChildScrollView(
+                        physics: const ClampingScrollPhysics(),
+                        child:
+                            Column(mainAxisSize: MainAxisSize.min, children: [
+                          // Header Section with Gradient
                           Container(
-                            padding: const EdgeInsets.all(16),
+                            width: double.infinity,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.stars_rounded,
-                              color: Colors.white,
-                              size: screenWidth > 450 ? 36 : 32,
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          Text(
-                            'Welcome to Bible Chat',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: screenWidth > 450 ? 22 : 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Choose your preferred answer style',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.9),
-                              fontSize: screenWidth > 450 ? 15 : 14,
-                              fontWeight: FontWeight.w400,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 16),
-                          // Credits display
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: screenWidth > 450 ? 16 : 14,
-                              vertical: screenWidth > 450 ? 10 : 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.3),
-                                width: 1,
+                              gradient: LinearGradient(
+                                colors: [
+                                  CommanColor.lightDarkPrimary(context),
+                                  CommanColor.lightDarkPrimary(context)
+                                      .withOpacity(0.8),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(24),
+                                topRight: Radius.circular(24),
                               ),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
+                            padding: EdgeInsets.symmetric(
+                              vertical: screenWidth > 450 ? 28 : 24,
+                              horizontal: screenWidth > 450 ? 24 : 20,
+                            ),
+                            child: Column(
                               children: [
-                                Icon(
-                                  Icons.account_balance_wallet,
-                                  color: Colors.white,
-                                  size: screenWidth > 450 ? 20 : 18,
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.stars_rounded,
+                                    color: Colors.white,
+                                    size: screenWidth > 450 ? 36 : 32,
+                                  ),
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(height: 14),
                                 Text(
-                                  'You have $initialCredits credits',
+                                  'Welcome to Bible Chat',
                                   style: TextStyle(
                                     color: Colors.white,
+                                    fontSize: screenWidth > 450 ? 22 : 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Choose your preferred answer style',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.9),
                                     fontSize: screenWidth > 450 ? 15 : 14,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 16),
+                                // Credits display
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: screenWidth > 450 ? 16 : 14,
+                                    vertical: screenWidth > 450 ? 10 : 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.3),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.account_balance_wallet,
+                                        color: Colors.white,
+                                        size: screenWidth > 450 ? 20 : 18,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'You have $initialCredits credits',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: screenWidth > 450 ? 15 : 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    
-                    // Content Section
-                    Padding(
-                      padding: EdgeInsets.all(screenWidth > 450 ? 24 : 20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Info Card
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? Colors.white.withOpacity(0.05)
-                                  : CommanColor.lightDarkPrimary(context).withOpacity(0.05),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: isDark
-                                    ? Colors.white.withOpacity(0.1)
-                                    : CommanColor.lightDarkPrimary(context).withOpacity(0.1),
-                              ),
-                            ),
-                            child: Row(
+
+                          // Content Section
+                          Padding(
+                            padding:
+                                EdgeInsets.all(screenWidth > 450 ? 24 : 20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(
-                                  Icons.lightbulb_outline,
-                                  color: CommanColor.lightDarkPrimary(context),
-                                  size: 20,
+                                // Info Card
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: isDark
+                                        ? Colors.white.withOpacity(0.05)
+                                        : CommanColor.lightDarkPrimary(context)
+                                            .withOpacity(0.05),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: isDark
+                                          ? Colors.white.withOpacity(0.1)
+                                          : CommanColor.lightDarkPrimary(
+                                                  context)
+                                              .withOpacity(0.1),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.lightbulb_outline,
+                                        color: CommanColor.lightDarkPrimary(
+                                            context),
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          'Each answer uses credits. You can change this anytime in your Wallet.',
+                                          style: TextStyle(
+                                            color:
+                                                CommanColor.whiteBlack(context)
+                                                    .withOpacity(0.8),
+                                            fontSize:
+                                                screenWidth > 450 ? 14 : 13,
+                                            height: 1.5,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    'Each answer uses credits. You can change this anytime in your Wallet.',
-                                    style: TextStyle(
-                                      color: CommanColor.whiteBlack(context).withOpacity(0.8),
-                                      fontSize: screenWidth > 450 ? 14 : 13,
-                                      height: 1.5,
+                                const SizedBox(height: 20),
+
+                                // Answer Length Options
+                                Text(
+                                  'Select Answer Length',
+                                  style: TextStyle(
+                                    color: CommanColor.whiteBlack(context),
+                                    fontSize: screenWidth > 450 ? 17 : 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                _buildIntroAnswerLengthOption(
+                                  context,
+                                  screenWidth,
+                                  isDark,
+                                  'small',
+                                  'Short Answer',
+                                  'Quick & concise response',
+                                  20,
+                                  setBottomSheetState,
+                                ),
+                                const SizedBox(height: 12),
+                                _buildIntroAnswerLengthOption(
+                                  context,
+                                  screenWidth,
+                                  isDark,
+                                  'medium',
+                                  'Medium Answer',
+                                  'Balanced explanation',
+                                  50,
+                                  setBottomSheetState,
+                                ),
+                                const SizedBox(height: 12),
+                                _buildIntroAnswerLengthOption(
+                                  context,
+                                  screenWidth,
+                                  isDark,
+                                  'large',
+                                  'Full Study',
+                                  'Detailed & comprehensive',
+                                  100,
+                                  setBottomSheetState,
+                                ),
+                                const SizedBox(height: 24),
+
+                                // Action Button
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.transparent,
+                                      shadowColor: Colors.transparent,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        side: isDark
+                                            ? const BorderSide(
+                                                color: Colors.white, width: 1.5)
+                                            : BorderSide.none,
+                                      ),
+                                      padding: EdgeInsets.zero, // IMPORTANT
+                                    ),
+                                    onPressed: () async {
+                                      final prefs =
+                                          await SharedPreferences.getInstance();
+                                      await prefs.setBool(
+                                          'chat_intro_seen', true);
+                                      if (mounted) {
+                                        Navigator.pop(context);
+                                      }
+                                    },
+                                    child: Ink(
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(16),
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            Color(0xFF763201),
+                                            Color(0xFFD5821F),
+                                            Color(0xFF763201),
+                                          ],
+                                        ),
+                                      ),
+                                      child: Container(
+                                        alignment: Alignment.center,
+                                        padding: EdgeInsets.symmetric(
+                                          vertical: screenWidth > 450 ? 16 : 14,
+                                        ),
+                                        child: Text(
+                                          'Got it, Let\'s Chat!',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize:
+                                                screenWidth > 450 ? 17 : 16,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          
-                          // Answer Length Options
-                          Text(
-                            'Select Answer Length',
-                            style: TextStyle(
-                              color: CommanColor.whiteBlack(context),
-                              fontSize: screenWidth > 450 ? 17 : 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          _buildIntroAnswerLengthOption(
-                            context,
-                            screenWidth,
-                            isDark,
-                            'small',
-                            'Short Answer',
-                            'Quick & concise response',
-                            20,
-                            setBottomSheetState,
-                          ),
-                          const SizedBox(height: 12),
-                          _buildIntroAnswerLengthOption(
-                            context,
-                            screenWidth,
-                            isDark,
-                            'medium',
-                            'Medium Answer',
-                            'Balanced explanation',
-                            50,
-                            setBottomSheetState,
-                          ),
-                          const SizedBox(height: 12),
-                          _buildIntroAnswerLengthOption(
-                            context,
-                            screenWidth,
-                            isDark,
-                            'large',
-                            'Full Study',
-                            'Detailed & comprehensive',
-                            100,
-                            setBottomSheetState,
-                          ),
-                          const SizedBox(height: 24),
-                          
-                          // Action Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: isDark
-                                ? const BorderSide(color: Colors.white, width: 1.5)
-                                : BorderSide.none,
-                          ),
-                          padding: EdgeInsets.zero, // IMPORTANT
-                        ),
-                        onPressed: () async {
-                          final prefs = await SharedPreferences.getInstance();
-                          await prefs.setBool('chat_intro_seen', true);
-                          if (mounted) {
-                            Navigator.pop(context);
-                          }
-                        },
-                        child: Ink(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            gradient: const LinearGradient(
-                              colors: [
-                                Color(0xFF763201),
-                                Color(0xFFD5821F),
-                                Color(0xFF763201),
-                              ],
-                            ),
-                          ),
-                          child: Container(
-                            alignment: Alignment.center,
-                            padding: EdgeInsets.symmetric(
-                              vertical: screenWidth > 450 ? 16 : 14,
-                            ),
-                            child: Text(
-                              'Got it, Let\'s Chat!',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: screenWidth > 450 ? 17 : 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
 
-                    SizedBox(height: MediaQuery.of(context).viewInsets.bottom + 10),
-                        ],
+                                SizedBox(
+                                    height: MediaQuery.of(context)
+                                            .viewInsets
+                                            .bottom +
+                                        10),
+                              ],
+                            ),
+                          ),
+                        ]),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            );
+                    )));
           },
         );
       },
@@ -475,9 +525,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               ? (isDark
                   ? CommanColor.lightDarkPrimary(context).withOpacity(0.15)
                   : CommanColor.lightDarkPrimary(context).withOpacity(0.08))
-              : (isDark
-                  ? Colors.white.withOpacity(0.03)
-                  : Colors.grey.shade50),
+              : (isDark ? Colors.white.withOpacity(0.03) : Colors.grey.shade50),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
@@ -557,7 +605,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     ? CommanColor.lightDarkPrimary(context)
                     : (isDark
                         ? Colors.white.withOpacity(0.1)
-                        : CommanColor.lightDarkPrimary(context).withOpacity(0.1)),
+                        : CommanColor.lightDarkPrimary(context)
+                            .withOpacity(0.1)),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -597,7 +646,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             });
             // Only show error if it's not a permission error (to avoid spam)
             if (!error.errorMsg.toLowerCase().contains('permission')) {
-              Constants.showToast('Speech recognition error: ${error.errorMsg}', 5000);
+              Constants.showToast(
+                  'Speech recognition error: ${error.errorMsg}', 5000);
             }
           }
         },
@@ -627,7 +677,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       await _showInsufficientCreditsDialog();
       return;
     }
-    
+
     if (_speech == null) {
       _speech = stt.SpeechToText();
     }
@@ -655,13 +705,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 });
                 // Check if it's a permission error and handle it
                 final errorMsg = error.errorMsg.toLowerCase();
-                if (errorMsg.contains('permission') || 
+                if (errorMsg.contains('permission') ||
                     errorMsg.contains('denied') ||
                     errorMsg.contains('not authorized')) {
                   // Permission was denied, check status and handle
                   _handlePermissionError();
                 } else {
-                  Constants.showToast('Speech recognition error: ${error.errorMsg}', 5000);
+                  Constants.showToast(
+                      'Speech recognition error: ${error.errorMsg}', 5000);
                 }
               }
             },
@@ -747,7 +798,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     // Check microphone permission status (works for both iOS and Android)
     // On iOS, speech recognition also requires microphone access
     final micStatus = await Permission.microphone.status;
-    
+
     if (micStatus.isGranted) {
       // Permission is granted, but initialization failed - might be a different issue
       // Reset and try again
@@ -760,7 +811,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       await Future.delayed(const Duration(milliseconds: 200));
       return _startListening();
     }
-    
+
     // Permission not granted
     if (micStatus.isPermanentlyDenied) {
       // Check status again in case user just enabled it in settings
@@ -780,7 +831,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         return;
       }
     }
-    
+
     // Permission not granted and not permanently denied, try to request it
     final newStatus = await Permission.microphone.request();
     if (!newStatus.isGranted) {
@@ -790,7 +841,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       // If denied but not permanently, silently return - user can try again
       return;
     }
-    
+
     // Permission was just granted, try initializing again
     if (mounted) {
       setState(() {
@@ -811,7 +862,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final isTablet = screenWidth > 600;
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -893,7 +944,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               const SizedBox(height: 8),
               // Instructions
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(12),
@@ -1046,7 +1098,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           : _messages.first.text,
       'messageCount': _messages.length,
     };
-    await prefs.setString('chat_meta_$_currentConversationId', jsonEncode(conversationMeta));
+    await prefs.setString(
+        'chat_meta_$_currentConversationId', jsonEncode(conversationMeta));
   }
 
   String _getTodayKey() {
@@ -1082,7 +1135,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final chatCost = await WalletService.getChatCost();
     final success = await WalletService.deductCredits(chatCost);
     if (success) {
-      Constants.showToast('Used $chatCost credits for this response', 5000);
+      // Show credit debit message only the first time
+      final prefs = await SharedPreferences.getInstance();
+      final creditDebitShown =
+          prefs.getBool('chat_credit_debit_shown') ?? false;
+      if (!creditDebitShown) {
+        Constants.showToast('Used $chatCost credits for this response', 5000);
+        await prefs.setBool('chat_credit_debit_shown', true);
+      }
       // Refresh credits display immediately after deduction
       _loadCreditsFromLocal();
     }
@@ -1091,10 +1151,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Future<void> _showInsufficientCreditsDialog() async {
     final credits = await WalletService.getCredits();
     final chatCost = await WalletService.getChatCost();
-    final isDark = Provider.of<ThemeProvider>(context, listen: false).themeMode == ThemeMode.dark;
-    
+    final isDark =
+        Provider.of<ThemeProvider>(context, listen: false).themeMode ==
+            ThemeMode.dark;
+
     if (!mounted) return;
-    
+
     await showCupertinoDialog(
       context: context,
       barrierDismissible: false,
@@ -1163,7 +1225,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void _showNewChatBottomSheet() {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
-    final isVintage = themeProvider.currentCustomTheme == AppCustomTheme.vintage;
+    final isVintage =
+        themeProvider.currentCustomTheme == AppCustomTheme.vintage;
     final screenWidth = MediaQuery.of(context).size.width;
 
     showModalBottomSheet(
@@ -1177,9 +1240,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
         decoration: BoxDecoration(
-          color: isDark
-              ? CommanColor.darkPrimaryColor
-              : CommanColor.white,
+          color: isDark ? CommanColor.darkPrimaryColor : CommanColor.white,
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(25),
             topRight: Radius.circular(25),
@@ -1217,7 +1278,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   width: screenWidth > 450 ? 70 : 60,
                   height: screenWidth > 450 ? 70 : 60,
                   decoration: BoxDecoration(
-                    color: CommanColor.lightDarkPrimary(context).withOpacity(0.15),
+                    color:
+                        CommanColor.lightDarkPrimary(context).withOpacity(0.15),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -1264,7 +1326,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           side: BorderSide(
                             color: isDark
                                 ? CommanColor.white.withOpacity(0.3)
-                                : CommanColor.lightDarkPrimary(context).withOpacity(0.5),
+                                : CommanColor.lightDarkPrimary(context)
+                                    .withOpacity(0.5),
                             width: 1.5,
                           ),
                           shape: RoundedRectangleBorder(
@@ -1304,7 +1367,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           _startNewChat();
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: CommanColor.lightDarkPrimary(context),
+                          backgroundColor:
+                              CommanColor.lightDarkPrimary(context),
                           padding: EdgeInsets.symmetric(
                             vertical: screenWidth > 450 ? 16 : 14,
                           ),
@@ -1398,26 +1462,31 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
       // Get selected answer length
       final answerLength = await WalletService.getAnswerLength();
-      
+
       // Build answer length instruction based on selection
       String answerLengthInstruction = '';
       switch (answerLength) {
         case 'small':
-          answerLengthInstruction = 'IMPORTANT: Provide a SHORT and concise answer. Keep your response brief (2-3 sentences maximum). Be direct and to the point.';
+          answerLengthInstruction =
+              'IMPORTANT: Provide a SHORT and concise answer. Keep your response brief (2-3 sentences maximum). Be direct and to the point.';
           break;
         case 'medium':
-          answerLengthInstruction = 'IMPORTANT: Provide a MEDIUM-length answer. Give a balanced response with some context and explanation (4-6 sentences). Include relevant details but stay focused.';
+          answerLengthInstruction =
+              'IMPORTANT: Provide a MEDIUM-length answer. Give a balanced response with some context and explanation (4-6 sentences). Include relevant details but stay focused.';
           break;
         case 'large':
-          answerLengthInstruction = 'IMPORTANT: Provide a FULL and comprehensive answer. Give a detailed response with thorough context, explanations, and relevant information (8+ sentences). Include historical context, theological meanings, and practical applications when relevant.';
+          answerLengthInstruction =
+              'IMPORTANT: Provide a FULL and comprehensive answer. Give a detailed response with thorough context, explanations, and relevant information (8+ sentences). Include historical context, theological meanings, and practical applications when relevant.';
           break;
         default:
-          answerLengthInstruction = 'Provide an appropriate answer based on the question.';
+          answerLengthInstruction =
+              'Provide an appropriate answer based on the question.';
       }
 
       // Build conversation context from history
       // Include system instruction and conversation history in the prompt
-      String conversationContext = '''You are a knowledgeable and respectful assistant for the Geneva Bible, one of the most historically significant English translations of the Bible. Follow these guidelines:
+      String conversationContext =
+          '''You are a knowledgeable and respectful assistant for the Geneva Bible, one of the most historically significant English translations of the Bible. Follow these guidelines:
 
 1. Provide accurate biblical information, interpretations, and explanations based on the Geneva Bible
 2. Help users understand verses, chapters, and biblical concepts with clarity and respect
@@ -1450,8 +1519,22 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
         }
       }
 
+      // Add verse context if available
+      String userMessageWithContext = message;
+      if (widget.verseContext != null) {
+        final verseText = widget.verseContext!['verseText'] ?? '';
+        final book = widget.verseContext!['book'] ?? '';
+        final chapter = widget.verseContext!['chapter'] ?? '';
+        final verse = widget.verseContext!['verse'] ?? '';
+
+        // Prepend verse information to the user's question
+        userMessageWithContext = 'Reference: $book $chapter:$verse\n'
+            'Verse: $verseText\n\n'
+            'Question: $message';
+      }
+
       // Add the current user message
-      conversationContext += '\nUser: ${message}\n';
+      conversationContext += '\nUser: ${userMessageWithContext}\n';
       conversationContext += 'Assistant:';
 
       // Build request body with simple prompt format - exactly as API expects
@@ -1554,12 +1637,14 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
           final body = response.body;
           if (body.contains('"text"')) {
             try {
-              final textMatch = RegExp(r'"text"\s*:\s*"([^"]+)"').firstMatch(body);
+              final textMatch =
+                  RegExp(r'"text"\s*:\s*"([^"]+)"').firstMatch(body);
               if (textMatch != null) {
                 responseText = textMatch.group(1) ?? responseText;
               }
             } catch (_) {
-              responseText = 'Sorry, I could not generate a response. Please try again.';
+              responseText =
+                  'Sorry, I could not generate a response. Please try again.';
             }
           } else if (body.isNotEmpty && !body.startsWith('{')) {
             // If body is not JSON, use it directly
@@ -1594,10 +1679,13 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                 // Try output structure first
                 if (data['output'] != null) return extractText(data['output']);
                 // Try common response fields
-                if (data['response'] != null) return extractText(data['response']);
+                if (data['response'] != null)
+                  return extractText(data['response']);
                 if (data['text'] != null) return extractText(data['text']);
-                if (data['content'] != null) return extractText(data['content']);
-                if (data['message'] != null) return extractText(data['message']);
+                if (data['content'] != null)
+                  return extractText(data['content']);
+                if (data['message'] != null)
+                  return extractText(data['message']);
                 // Try candidates
                 if (data['candidates'] != null && data['candidates'] is List) {
                   return extractText(data['candidates']);
@@ -1617,21 +1705,26 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
               }
               return null;
             }
+
             final extracted = extractText(responseData);
-            if (extracted != null && extracted.isNotEmpty &&
+            if (extracted != null &&
+                extracted.isNotEmpty &&
                 !extracted.toLowerCase().contains('candidates') &&
                 !extracted.toLowerCase().contains('usageMetadata') &&
                 !extracted.startsWith('{')) {
               responseText = extracted.trim();
             } else {
               // If still no valid text, log the full response for debugging
-              debugPrint('Failed to extract text from response. Full response: ${response.body}');
-              responseText = 'Sorry, I could not generate a response. Please try again.';
+              debugPrint(
+                  'Failed to extract text from response. Full response: ${response.body}');
+              responseText =
+                  'Sorry, I could not generate a response. Please try again.';
             }
           } catch (e) {
             debugPrint('Error parsing response: $e');
             debugPrint('Response body: ${response.body}');
-            responseText = 'Sorry, I could not generate a response. Please try again.';
+            responseText =
+                'Sorry, I could not generate a response. Please try again.';
           }
         }
 
@@ -1657,7 +1750,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
         // Scroll to top when answer comes to show at top of answer
         _scrollToTop();
         await _saveChatHistory();
-        
+
         // Ensure keyboard stays dismissed after response - additional safeguard
         Future.delayed(const Duration(milliseconds: 100), () {
           if (mounted) {
@@ -1666,7 +1759,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
           }
         });
       } else {
-        String errorMessage = 'Failed to get response from API (Status: ${response.statusCode})';
+        String errorMessage =
+            'Failed to get response from API (Status: ${response.statusCode})';
 
         try {
           if (response.body.isNotEmpty) {
@@ -1691,15 +1785,15 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
           ));
           _isLoading = false;
         });
-        
+
         // Ensure keyboard stays dismissed immediately after setState
         FocusScope.of(context).unfocus();
         _messageFocusNode.unfocus();
-        
+
         // Scroll to top when answer comes to show at top of answer
         _scrollToTop();
         await _saveChatHistory();
-        
+
         // Keep keyboard dismissed after error response - additional safeguard
         Future.delayed(const Duration(milliseconds: 100), () {
           if (mounted) {
@@ -1719,15 +1813,15 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
         ));
         _isLoading = false;
       });
-      
+
       // Ensure keyboard stays dismissed immediately after setState
       FocusScope.of(context).unfocus();
       _messageFocusNode.unfocus();
-      
+
       // Scroll to top when answer comes to show at top of answer
       _scrollToTop();
       await _saveChatHistory();
-      
+
       // Keep keyboard dismissed after error - additional safeguard
       Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted) {
@@ -1742,7 +1836,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
     // Use double post-frame callback to ensure ListView has fully rendered the new message
     WidgetsBinding.instance.addPostFrameCallback((_) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients && _scrollController.position.maxScrollExtent > 0) {
+        if (_scrollController.hasClients &&
+            _scrollController.position.maxScrollExtent > 0) {
           // Scroll to bottom to show the latest response
           _scrollController.animateTo(
             _scrollController.position.maxScrollExtent,
@@ -1775,12 +1870,15 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
     final screenWidth = MediaQuery.of(context).size.width;
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
-    final isVintage = themeProvider.currentCustomTheme == AppCustomTheme.vintage;
+    final isVintage =
+        themeProvider.currentCustomTheme == AppCustomTheme.vintage;
 
     return Scaffold(
       backgroundColor: isVintage
           ? (isDark ? CommanColor.black : themeProvider.backgroundColor)
-          : (isDark ? CommanColor.darkPrimaryColor : themeProvider.backgroundColor),
+          : (isDark
+              ? CommanColor.darkPrimaryColor
+              : themeProvider.backgroundColor),
       // appBar: AppBar(
       //   backgroundColor: isVintage
       //       ? (isDark ? CommanColor.black : themeProvider.backgroundColor)
@@ -1904,15 +2002,18 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
       body: Container(
         decoration: isVintage
             ? BoxDecoration(
-          color: isDark ? CommanColor.black : themeProvider.backgroundColor,
-          image: DecorationImage(
-            image: AssetImage(Images.bgImage(context)),
-            fit: BoxFit.cover,
-          ),
-        )
+                color:
+                    isDark ? CommanColor.black : themeProvider.backgroundColor,
+                image: DecorationImage(
+                  image: AssetImage(Images.bgImage(context)),
+                  fit: BoxFit.cover,
+                ),
+              )
             : BoxDecoration(
-          color: isDark ? CommanColor.darkPrimaryColor : themeProvider.backgroundColor,
-        ),
+                color: isDark
+                    ? CommanColor.darkPrimaryColor
+                    : themeProvider.backgroundColor,
+              ),
         child: SafeArea(
           bottom: false,
           child: Column(
@@ -1952,50 +2053,50 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Credits display (loaded from local storage)
-                        // Container(
-                        //   padding: EdgeInsets.symmetric(
-                        //     horizontal: screenWidth > 450 ? 10 : 8,
-                        //     vertical: screenWidth > 450 ? 6 : 4,
-                        //   ),
-                        //   decoration: BoxDecoration(
-                        //     color: isDark
-                        //         ? CommanColor.darkPrimaryColor.withOpacity(0.5)
-                        //         : CommanColor.lightDarkPrimary(context).withOpacity(0.1),
-                        //     borderRadius: BorderRadius.circular(8),
-                        //   ),
-                        //   child: Row(
-                        //     mainAxisSize: MainAxisSize.min,
-                        //     children: [
-                        //       Icon(
-                        //         Icons.account_balance_wallet,
-                        //         size: screenWidth > 450 ? 18 : 16,
-                        //         color: isDark
-                        //             ? Colors.white
-                        //             : CommanColor.lightDarkPrimary(context),
-                        //       ),
-                        //       const SizedBox(width: 4),
-                        //       Text(
-                        //         '$_currentCredits',
-                        //         style: TextStyle(
-                        //           color: isDark
-                        //               ? Colors.white
-                        //               : CommanColor.lightDarkPrimary(context),
-                        //           fontSize: screenWidth > 450 ? 14 : 12,
-                        //           fontWeight: FontWeight.w600,
-                        //         ),
-                        //       ),
-                        //     ],
-                        //   ),
-                        // ),
-                        const SizedBox(width: 4),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: screenWidth > 450 ? 8 : 6,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? CommanColor.darkPrimaryColor.withOpacity(0.6)
+                                : CommanColor.lightDarkPrimary(context)
+                                    .withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.account_balance_wallet,
+                                size: screenWidth > 450 ? 16 : 14,
+                                color: isDark
+                                    ? Colors.white
+                                    : CommanColor.lightDarkPrimary(context),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$_currentCredits',
+                                style: TextStyle(
+                                  color: isDark
+                                      ? Colors.white
+                                      : CommanColor.lightDarkPrimary(context),
+                                  fontSize: screenWidth > 450 ? 13 : 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
                         // Wallet icon button
                         IconButton(
                           icon: Icon(
                             Icons.account_balance_wallet,
-                            color:isDark
-                          ? Colors.white
-                              : CommanColor.lightDarkPrimary(context),
+                            color: isDark
+                                ? Colors.white
+                                : CommanColor.lightDarkPrimary(context),
                           ),
                           tooltip: 'Wallet',
                           onPressed: () {
@@ -2015,8 +2116,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                             icon: Icon(
                               Icons.add_circle_outline,
                               color: isDark
-    ? Colors.white
-        : CommanColor.lightDarkPrimary(context),
+                                  ? Colors.white
+                                  : CommanColor.lightDarkPrimary(context),
                             ),
                             tooltip: 'New Chat',
                             onPressed: () {
@@ -2039,7 +2140,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                           tooltip: 'Chat History',
                           onPressed: () {
                             Get.to(
-                                  () => const ChatHistoryScreen(),
+                              () => const ChatHistoryScreen(),
                               transition: Transition.cupertinoDialog,
                               duration: const Duration(milliseconds: 300),
                             );
@@ -2052,79 +2153,108 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
               ),
               // Main content area - Result Section with distinct background
               Expanded(
-                child: Container(
-                  color: Colors.transparent, // Remove grey background - use transparent
-                  child: _messages.isEmpty
-                      ? SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: screenWidth > 450 ? 20 : 16,
-                      vertical: screenWidth > 450 ? 14 : 12,
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        SizedBox(height: screenWidth > 450 ? 10 : 5),
-                        Transform.translate(
-                          offset: const Offset(0, -10),
-                          child: Container(
-                            width: screenWidth > 450 ? 140 : 130,
-                            height: screenWidth > 450 ? 140 : 130,
-                            decoration: const BoxDecoration(
-                              color: Colors.transparent, // Transparent background for illustration
+                child: GestureDetector(
+                  onTap: () {
+                    // Dismiss keyboard when tapping outside the typing pad
+                    FocusScope.of(context).unfocus();
+                    _messageFocusNode.unfocus();
+                  },
+                  child: Container(
+                    color: Colors
+                        .transparent, // Remove grey background - use transparent
+                    child: _messages.isEmpty
+                        ? SingleChildScrollView(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: screenWidth > 450 ? 20 : 16,
+                              vertical: screenWidth > 450 ? 14 : 12,
                             ),
-                            child: Image.asset(
-                              "assets/chat_img.png",
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) {
-                                // Fallback to icon if image doesn't load
-                                return Icon(
-                                  Icons.chat_bubble_outline,
-                                  size: 100,
-                                  color: CommanColor.whiteBlack(context).withOpacity(0.5),
-                                );
-                              },
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              children: [
+                                // Show verse context if available
+                                if (widget.verseContext != null)
+                                  _buildVerseContext(screenWidth, isDark),
+                                if (widget.verseContext != null)
+                                  const SizedBox(height: 20),
+                                SizedBox(height: screenWidth > 450 ? 10 : 5),
+                                Transform.translate(
+                                  offset: const Offset(0, -10),
+                                  child: Container(
+                                    width: screenWidth > 450 ? 140 : 130,
+                                    height: screenWidth > 450 ? 140 : 130,
+                                    decoration: const BoxDecoration(
+                                      color: Colors
+                                          .transparent, // Transparent background for illustration
+                                    ),
+                                    child: Image.asset(
+                                      "assets/chat_img.png",
+                                      fit: BoxFit.contain,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                        // Fallback to icon if image doesn't load
+                                        return Icon(
+                                          Icons.chat_bubble_outline,
+                                          size: 100,
+                                          color: CommanColor.whiteBlack(context)
+                                              .withOpacity(0.5),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 5),
+                                Text(
+                                  'Faith Answers',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: CommanColor.whiteBlack(context)
+                                        .withOpacity(0.7),
+                                    fontSize: screenWidth > 450 ? 26 : 23,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                      bottom:
+                                          20), // Add bottom padding to prevent text from being hidden
+                                  child: Text(
+                                    widget.verseContext != null
+                                        ? 'Ask questions about this verse...'
+                                        : 'Get Guidance Based On Your Need...',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: CommanColor.whiteBlack(context)
+                                          .withOpacity(0.5),
+                                      fontSize: screenWidth > 450 ? 16 : 15,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
+                          )
+                        : ListView.builder(
+                            controller: _scrollController,
+                            padding:
+                                EdgeInsets.all(screenWidth > 450 ? 20 : 16),
+                            itemCount: _messages.length + (_isLoading ? 1 : 0),
+                            itemBuilder: (context, index) {
+                              if (index == _messages.length) {
+                                return _buildLoadingIndicator();
+                              }
+                              return _buildMessageBubble(
+                                  _messages[index], screenWidth);
+                            },
                           ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          'Faith Answers',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: CommanColor.whiteBlack(context).withOpacity(0.7),
-                            fontSize: screenWidth > 450 ? 26 : 23,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 20), // Add bottom padding to prevent text from being hidden
-                          child: Text(
-                            'Get Guidance Based On Your Need...',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: CommanColor.whiteBlack(context).withOpacity(0.5),
-                              fontSize: screenWidth > 450 ? 16 : 15,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                      : ListView.builder(
-                    controller: _scrollController,
-                    padding: EdgeInsets.all(screenWidth > 450 ? 20 : 16),
-                    itemCount: _messages.length + (_isLoading ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index == _messages.length) {
-                        return _buildLoadingIndicator();
-                      }
-                      return _buildMessageBubble(_messages[index], screenWidth);
-                    },
                   ),
                 ),
               ),
               // Show default questions only when there are no messages
-              if (_messages.isEmpty) _buildDefaultQuestions(screenWidth, isDark),
+              if (_messages.isEmpty)
+                widget.verseContext != null
+                    ? _buildVerseSuggestedQuestions(screenWidth, isDark)
+                    : _buildDefaultQuestions(screenWidth, isDark)
+              else
+                _buildFollowUpSuggestions(screenWidth, isDark),
               _buildInputArea(screenWidth, isDark),
             ],
           ),
@@ -2179,29 +2309,34 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                     color: isSelected
                         ? CommanColor.lightDarkPrimary(context)
                         : (isDark
-                        ? CommanColor.darkPrimaryColor.withOpacity(0.6)
-                        : (themeProvider.currentCustomTheme == AppCustomTheme.vintage
-                        ? themeProvider.backgroundColor
-                        : CommanColor.backgrondcolor)),
+                            ? CommanColor.darkPrimaryColor.withOpacity(0.6)
+                            : (themeProvider.currentCustomTheme ==
+                                    AppCustomTheme.vintage
+                                ? themeProvider.backgroundColor
+                                : CommanColor.backgrondcolor)),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: isSelected
-                          ? (isDark 
-                              ? const Color(0xFFFFD700) // Light yellow in dark mode when tapped
+                          ? (isDark
+                              ? const Color(
+                                  0xFFFFD700) // Light yellow in dark mode when tapped
                               : CommanColor.lightDarkPrimary(context))
                           : (isDark
-                          ? Colors.white // White border initially in dark mode
-                          : CommanColor.lightDarkPrimary(context).withOpacity(0.3)),
+                              ? Colors
+                                  .white // White border initially in dark mode
+                              : CommanColor.lightDarkPrimary(context)
+                                  .withOpacity(0.3)),
                       width: isSelected ? 2 : (isDark ? 2.5 : 1),
                     ),
                     boxShadow: isSelected
                         ? [
-                      BoxShadow(
-                        color: CommanColor.lightDarkPrimary(context).withOpacity(0.3),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      )
-                    ]
+                            BoxShadow(
+                              color: CommanColor.lightDarkPrimary(context)
+                                  .withOpacity(0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            )
+                          ]
                         : null,
                   ),
                   child: Center(
@@ -2213,7 +2348,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                             ? CommanColor.white
                             : CommanColor.whiteBlack(context),
                         fontSize: screenWidth > 450 ? 14 : 12,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.w500,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -2224,75 +2360,423 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
             },
           ),
           SizedBox(height: screenWidth > 450 ? 12 : 4),
-          // Question buttons with brown background
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              'What does God say about fear?',
-              'How do I forgive someone who hurt me?',
-              'What is God\'s purpose for my life?',
-            ].asMap().entries.map((entry) {
-              final index = entry.key;
-              final question = entry.value;
-              final isTapped = _selectedExampleQuestionIndex == index;
-              return Padding(
-                padding: EdgeInsets.only(bottom: screenWidth > 450 ? 12 : 10),
-                child: InkWell(
-                  onTap: () {
-                    setState(() {
-                      _selectedTopicIndex = null; // Reset topic selection
-                      _selectedExampleQuestionIndex = index; // Track tapped question
-                    });
-                    // Directly send the message without showing in text field
-                    _messageController.text = question;
-                    _sendMessage();
-                    // Reset selection after a short delay
-                    Future.delayed(const Duration(milliseconds: 300), () {
-                      if (mounted) {
+          // Question buttons as horizontal slider with hyperlink icon
+          SizedBox(
+            height: screenWidth > 450 ? 64 : 58,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  'What does God say about fear?',
+                  'How do I forgive someone who hurt me?',
+                  'What is God\'s purpose for my life?',
+                ].asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final question = entry.value;
+                  final isTapped = _selectedExampleQuestionIndex == index;
+                  return Padding(
+                    padding: EdgeInsets.only(
+                        right: screenWidth > 450 ? 10 : 8,
+                        bottom: screenWidth > 450 ? 4 : 2),
+                    child: InkWell(
+                      onTap: () {
                         setState(() {
-                          _selectedExampleQuestionIndex = null;
+                          _selectedTopicIndex = null; // Reset topic selection
+                          _selectedExampleQuestionIndex =
+                              index; // Track tapped question
                         });
-                      }
-                    });
-                  },
-                  child: Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.symmetric(
-                      horizontal: screenWidth > 450 ? 20 : 16,
-                      vertical: screenWidth > 450 ? 16 : 14,
-                    ),
-                    decoration: BoxDecoration(
-                      color: CommanColor.lightDarkPrimary(context),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isTapped && isDark
-                            ? const Color(0xFFFFD700) // Light yellow border when tapped in dark mode
-                            : (isDark
-                            ? Colors.white // White border initially in dark mode
-                            : CommanColor.lightDarkPrimary(context).withOpacity(0.3)),
-                        width: isTapped && isDark ? 3 : (isDark ? 3 : 1),
+                        // Directly send the message without showing in text field
+                        _messageController.text = question;
+                        _sendMessage();
+                        // Reset selection after a short delay
+                        Future.delayed(const Duration(milliseconds: 300), () {
+                          if (mounted) {
+                            setState(() {
+                              _selectedExampleQuestionIndex = null;
+                            });
+                          }
+                        });
+                      },
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: screenWidth > 450 ? 18 : 14,
+                          vertical: screenWidth > 450 ? 14 : 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: CommanColor.lightDarkPrimary(context),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isTapped && isDark
+                                ? const Color(
+                                    0xFFFFD700) // Light yellow border when tapped in dark mode
+                                : (isDark
+                                    ? Colors
+                                        .white // White border initially in dark mode
+                                    : CommanColor.lightDarkPrimary(context)
+                                        .withOpacity(0.3)),
+                            width: isTapped && isDark ? 3 : (isDark ? 3 : 1),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: CommanColor.lightDarkPrimary(context)
+                                  .withOpacity(0.25),
+                              blurRadius: 3,
+                              offset: const Offset(0, 2),
+                            )
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.link,
+                              size: screenWidth > 450 ? 18 : 16,
+                              color: CommanColor.white,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              question,
+                              textAlign: TextAlign.start,
+                              style: TextStyle(
+                                color: CommanColor.white,
+                                fontSize: screenWidth > 450 ? 16 : 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: CommanColor.lightDarkPrimary(context).withOpacity(0.3),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        )
-                      ],
                     ),
-                    child: Text(
-                      question,
-                      textAlign: TextAlign.start,
-                      style: TextStyle(
-                        color: CommanColor.white,
-                        fontSize: screenWidth > 450 ? 17 : 14.5,
-                        fontWeight: FontWeight.w500,
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFollowUpSuggestions(double screenWidth, bool isDark) {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    // Find last AI response
+    final lastAi = _messages.lastWhere(
+      (m) => !m.isUser,
+      orElse: () =>
+          ChatMessage(text: '', isUser: false, timestamp: DateTime.now()),
+    );
+    if (lastAi.text.isEmpty) return const SizedBox.shrink();
+
+    final suggestions = _getFollowUpList(lastAi.text);
+    if (suggestions.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: EdgeInsets.only(
+        left: screenWidth > 450 ? 20 : 16,
+        right: screenWidth > 450 ? 20 : 16,
+        top: screenWidth > 450 ? 8 : 6,
+        bottom: screenWidth > 450 ? 8 : 12,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Suggested for this answer',
+            style: TextStyle(
+              color: CommanColor.whiteBlack(context).withOpacity(0.7),
+              fontSize: screenWidth > 450 ? 15 : 13.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: screenWidth > 450 ? 64 : 58,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: suggestions.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final question = entry.value;
+                  final isTapped = _selectedExampleQuestionIndex == index;
+                  return Padding(
+                    padding: EdgeInsets.only(
+                        right: screenWidth > 450 ? 10 : 8,
+                        bottom: screenWidth > 450 ? 4 : 2),
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          _selectedTopicIndex = null;
+                          _selectedExampleQuestionIndex = index;
+                        });
+                        _messageController.text = question;
+                        _sendMessage();
+                        Future.delayed(const Duration(milliseconds: 300), () {
+                          if (mounted) {
+                            setState(() {
+                              _selectedExampleQuestionIndex = null;
+                            });
+                          }
+                        });
+                      },
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: screenWidth > 450 ? 18 : 14,
+                          vertical: screenWidth > 450 ? 14 : 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: CommanColor.lightDarkPrimary(context),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isTapped && isDark
+                                ? const Color(0xFFFFD700)
+                                : (isDark
+                                    ? Colors.white
+                                    : CommanColor.lightDarkPrimary(context)
+                                        .withOpacity(0.3)),
+                            width: isTapped && isDark ? 3 : (isDark ? 3 : 1),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: CommanColor.lightDarkPrimary(context)
+                                  .withOpacity(0.25),
+                              blurRadius: 3,
+                              offset: const Offset(0, 2),
+                            )
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.link,
+                              size: screenWidth > 450 ? 18 : 16,
+                              color: CommanColor.white,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              question,
+                              textAlign: TextAlign.start,
+                              style: TextStyle(
+                                color: CommanColor.white,
+                                fontSize: screenWidth > 450 ? 16 : 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<String> _getFollowUpList(String answer) {
+    final lower = answer.toLowerCase();
+    if (lower.contains('fear') || lower.contains('anxious')) {
+      return [
+        'What does God say about fear?',
+        'How to trust God when I am afraid?',
+        'Verses to calm anxiety?',
+      ];
+    }
+    if (lower.contains('forgive') || lower.contains('hurt')) {
+      return [
+        'How do I forgive someone who hurt me?',
+        'What verses teach about forgiveness?',
+        'How do I heal after being hurt?',
+      ];
+    }
+    if (lower.contains('purpose') || lower.contains('plan')) {
+      return [
+        'What is God\'s purpose for my life?',
+        'How do I discern God\'s plan?',
+        'How to stay faithful to God\'s calling?',
+      ];
+    }
+    // Fallback to general prompts
+    return [
+      'What does God say about fear?',
+      'How do I forgive someone who hurt me?',
+      'What is God\'s purpose for my life?',
+    ];
+  }
+
+  Widget _buildVerseContext(double screenWidth, bool isDark) {
+    if (widget.verseContext == null) return const SizedBox.shrink();
+
+    final verseText = widget.verseContext!['verseText'] ?? '';
+    final book = widget.verseContext!['book'] ?? '';
+    final chapter = widget.verseContext!['chapter'] ?? '';
+    final verse = widget.verseContext!['verse'] ?? '';
+
+    return Container(
+      margin: EdgeInsets.only(bottom: screenWidth > 450 ? 16 : 12),
+      padding: EdgeInsets.all(screenWidth > 450 ? 16 : 14),
+      decoration: BoxDecoration(
+        color: isDark
+            ? CommanColor.darkPrimaryColor.withOpacity(0.8)
+            : CommanColor.lightDarkPrimary(context).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withOpacity(0.2)
+              : CommanColor.lightDarkPrimary(context).withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.book,
+                size: screenWidth > 450 ? 20 : 18,
+                color: CommanColor.lightDarkPrimary(context),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '$book $chapter:$verse',
+                style: TextStyle(
+                  color: CommanColor.lightDarkPrimary(context),
+                  fontSize: screenWidth > 450 ? 16 : 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            verseText,
+            style: TextStyle(
+              color: CommanColor.whiteBlack(context),
+              fontSize: screenWidth > 450 ? 15 : 14,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVerseSuggestedQuestions(double screenWidth, bool isDark) {
+    if (widget.verseContext == null) return const SizedBox.shrink();
+
+    // Generate suggested questions based on the verse
+    final suggestedQuestions = [
+      'Explain this verse',
+      'What does this verse mean for my daily life?',
+      'How can I apply this teaching?',
+    ];
+
+    return Container(
+      padding: EdgeInsets.only(
+        left: screenWidth > 450 ? 20 : 16,
+        right: screenWidth > 450 ? 20 : 16,
+        top: screenWidth > 450 ? 12 : 8,
+        bottom: screenWidth > 450 ? 8 : 30,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Suggested Questions:',
+            style: TextStyle(
+              color: CommanColor.whiteBlack(context).withOpacity(0.7),
+              fontSize: screenWidth > 450 ? 16 : 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: screenWidth > 450 ? 50 : 40,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: suggestedQuestions.length,
+              itemBuilder: (context, index) {
+                final question = suggestedQuestions[index];
+                final isSelected = _selectedExampleQuestionIndex == index;
+                return Padding(
+                  padding: EdgeInsets.only(right: screenWidth > 450 ? 10 : 8),
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        _selectedTopicIndex = null;
+                        _selectedExampleQuestionIndex = index;
+                        _messageController.text = question;
+                      });
+                      _sendMessage();
+                      Future.delayed(const Duration(milliseconds: 300), () {
+                        if (mounted) {
+                          setState(() {
+                            _selectedExampleQuestionIndex = null;
+                          });
+                        }
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: screenWidth > 450 ? 16 : 12,
+                        vertical: screenWidth > 450 ? 10 : 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? CommanColor.lightDarkPrimary(context)
+                            : (isDark
+                                ? CommanColor.darkPrimaryColor.withOpacity(0.6)
+                                : CommanColor.lightDarkPrimary(context)
+                                    .withOpacity(0.1)),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSelected
+                              ? (isDark
+                                  ? Colors.white
+                                  : CommanColor.lightDarkPrimary(context))
+                              : (isDark
+                                  ? Colors.white.withOpacity(0.3)
+                                  : CommanColor.lightDarkPrimary(context)
+                                      .withOpacity(0.2)),
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            question,
+                            style: TextStyle(
+                              color: isSelected
+                                  ? Colors.white
+                                  : CommanColor.whiteBlack(context),
+                              fontSize: screenWidth > 450 ? 14 : 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Icon(
+                            Icons.link,
+                            size: screenWidth > 450 ? 16 : 14,
+                            color: isSelected
+                                ? Colors.white
+                                : CommanColor.whiteBlack(context)
+                                    .withOpacity(0.7),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ),
-              );
-            }).toList(),
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -2301,7 +2785,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
 
   Widget _buildLoadingIndicator() {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isDark = Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark;
+    final isDark =
+        Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -2337,16 +2822,14 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
               ),
             ),
             child: _WaveLoader(
-              color: isDark
-                  ? Colors.white
-                  : CommanColor.lightDarkPrimary(context),
+              color:
+                  isDark ? Colors.white : CommanColor.lightDarkPrimary(context),
             ),
           ),
         ],
       ),
     );
   }
-
 
   // Function to parse verse reference and extract book, chapter, verse
   Map<String, dynamic>? _parseVerseReference(String verseRef) {
@@ -2362,7 +2845,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
         // Normalize book name (remove numbers, capitalize first letter)
         bookName = bookName.replaceAll(RegExp(r'^[1-3]\s+'), '').trim();
         if (bookName.isNotEmpty) {
-          bookName = bookName[0].toUpperCase() + bookName.substring(1).toLowerCase();
+          bookName =
+              bookName[0].toUpperCase() + bookName.substring(1).toLowerCase();
         }
         final chapter = int.tryParse(match.group(2) ?? '');
         final verse = int.tryParse(match.group(3) ?? '');
@@ -2381,21 +2865,23 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
   }
 
   // Function to parse text and highlight verse references with clickable links
-  List<TextSpan> _parseTextWithVerseHighlights(String text, bool isUser, double screenWidth, BuildContext context) {
+  List<TextSpan> _parseTextWithVerseHighlights(
+      String text, bool isUser, double screenWidth, BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
-    final baseColor = isUser
-        ? CommanColor.white
-        : CommanColor.whiteBlack(context);
+    final baseColor =
+        isUser ? CommanColor.white : CommanColor.whiteBlack(context);
     // Use a brighter, more visible color for verse highlighting
     // For AI responses (isUser = false): use yellow in light mode, white in dark mode
     // For user messages: use the same colors
-    final highlightColor = isDark 
-        ? Colors.white  // White color for dark mode - highly visible against dark background
-        : (isUser 
-            ? CommanColor.white  // Keep white for user messages in light mode
-            : Colors.brown);  // Light yellow/gold color for AI responses in light mode - visible against light beige background
-    
+    final highlightColor = isDark
+        ? Colors
+            .white // White color for dark mode - highly visible against dark background
+        : (isUser
+            ? CommanColor.white // Keep white for user messages in light mode
+            : Colors
+                .brown); // Light yellow/gold color for AI responses in light mode - visible against light beige background
+
     // Pattern to match verse references like "John 3:16", "Genesis 1:1-3", "1 Corinthians 13:4-7", "John 3:16, 17", etc.
     // Matches: Book name (with optional number prefix) + chapter:verse (with optional verse range or comma-separated verses)
     // More specific pattern to avoid matching standalone numbers
@@ -2403,10 +2889,10 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
       r'\b([1-3]?\s?[A-Za-z]{2,}\s+)?(\d{1,3}):(\d{1,3})(?:-(\d{1,3}))?(?:\s*,\s*(\d{1,3}))?',
       caseSensitive: false,
     );
-    
+
     List<TextSpan> spans = [];
     int lastIndex = 0;
-    
+
     for (Match match in versePattern.allMatches(text)) {
       // Add text before the match
       if (match.start > lastIndex) {
@@ -2419,11 +2905,11 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
           ),
         ));
       }
-      
+
       // Parse verse reference for navigation
       final verseRef = match.group(0) ?? '';
       final verseData = _parseVerseReference(verseRef);
-      
+
       // Add highlighted clickable verse reference
       TapGestureRecognizer? recognizer;
       if (verseData != null && !isUser) {
@@ -2433,7 +2919,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
             final bookName = verseData['bookName'] as String;
             final chapter = verseData['chapter'] as int;
             final verse = verseData['verse'] as int;
-            
+
             // Get book number from database using book name
             int? bookNum;
             try {
@@ -2444,7 +2930,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                   "SELECT book_num FROM book WHERE title = ? LIMIT 1",
                   [bookName],
                 );
-                
+
                 // If no exact match, try case-insensitive search
                 if (result.isEmpty) {
                   final caseInsensitiveResult = await db.rawQuery(
@@ -2452,7 +2938,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                     [bookName],
                   );
                   if (caseInsensitiveResult.isNotEmpty) {
-                    bookNum = int.tryParse(caseInsensitiveResult[0]['book_num'].toString());
+                    bookNum = int.tryParse(
+                        caseInsensitiveResult[0]['book_num'].toString());
                   }
                 } else {
                   bookNum = int.tryParse(result[0]['book_num'].toString());
@@ -2461,7 +2948,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
             } catch (e) {
               debugPrint('Error getting book number: $e');
             }
-            
+
             // Save selected book and book number
             await SharPreferences.setString(
               SharPreferences.selectedBook,
@@ -2477,34 +2964,36 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
               SharPreferences.selectedChapter,
               chapter.toString(),
             );
-            
+
             // Navigate to HomeScreen with verse details
             Get.to(() => HomeScreen(
-              From: "chat",
-              selectedVerseNumForRead: verse.toString(),
-              selectedBookForRead: bookNum?.toString() ?? "",
-              selectedChapterForRead: chapter.toString(),
-              selectedBookNameForRead: bookName,
-              selectedVerseForRead: "",
-            ));
+                  From: "chat",
+                  selectedVerseNumForRead: verse.toString(),
+                  selectedBookForRead: bookNum?.toString() ?? "",
+                  selectedChapterForRead: chapter.toString(),
+                  selectedBookNameForRead: bookName,
+                  selectedVerseForRead: "",
+                ));
           };
       }
-      
+
       spans.add(TextSpan(
         text: verseRef,
         style: TextStyle(
           color: highlightColor,
           fontSize: screenWidth > 450 ? 18 : 16,
           height: 1.4,
-          fontWeight: isDark ? FontWeight.w700 : FontWeight.w600, // Bolder in dark mode for better visibility
+          fontWeight: isDark
+              ? FontWeight.w700
+              : FontWeight.w600, // Bolder in dark mode for better visibility
           decoration: TextDecoration.underline,
         ),
         recognizer: recognizer,
       ));
-      
+
       lastIndex = match.end;
     }
-    
+
     // Add remaining text
     if (lastIndex < text.length) {
       spans.add(TextSpan(
@@ -2516,7 +3005,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
         ),
       ));
     }
-    
+
     // If no verse references found, return the whole text as a single span
     if (spans.isEmpty) {
       spans.add(TextSpan(
@@ -2528,7 +3017,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
         ),
       ));
     }
-    
+
     return spans;
   }
 
@@ -2545,7 +3034,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
       ),
       child: Row(
         mainAxisAlignment:
-        isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isUser) ...[
@@ -2564,10 +3053,11 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                 color: isUser
                     ? CommanColor.lightDarkPrimary(context)
                     : (isDark
-                    ? CommanColor.darkPrimaryColor.withOpacity(0.5)
-                    : (themeProvider.currentCustomTheme == AppCustomTheme.vintage
-                    ? themeProvider.backgroundColor.withOpacity(0.9)
-                    : CommanColor.backgrondcolor.withOpacity(0.9))),
+                        ? CommanColor.darkPrimaryColor.withOpacity(0.5)
+                        : (themeProvider.currentCustomTheme ==
+                                AppCustomTheme.vintage
+                            ? themeProvider.backgroundColor.withOpacity(0.9)
+                            : CommanColor.backgrondcolor.withOpacity(0.9))),
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(20),
                   topRight: const Radius.circular(20),
@@ -2587,7 +3077,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                         fontSize: screenWidth > 450 ? 18 : 18,
                         fontWeight: FontWeight.w500,
                       ),
-                      children: _parseTextWithVerseHighlights(message.text, isUser, screenWidth, context),
+                      children: _parseTextWithVerseHighlights(
+                          message.text, isUser, screenWidth, context),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -2600,7 +3091,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                         style: TextStyle(
                           color: isUser
                               ? CommanColor.white.withOpacity(0.7)
-                              : CommanColor.whiteBlack(context).withOpacity(0.5),
+                              : CommanColor.whiteBlack(context)
+                                  .withOpacity(0.5),
                           fontSize: screenWidth > 450 ? 12 : 10,
                         ),
                       ),
@@ -2611,17 +3103,21 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                           children: [
                             InkWell(
                               onTap: () async {
-                                await Clipboard.setData(ClipboardData(text: message.text));
-                                Constants.showToast('Message copied to clipboard', 5000);
+                                await Clipboard.setData(
+                                    ClipboardData(text: message.text));
+                                Constants.showToast(
+                                    'Message copied to clipboard', 5000);
                               },
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 4),
                                 child: Container(
                                   padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
-                                      color: CommanColor.lightDarkPrimary(context),
+                                      color:
+                                          CommanColor.lightDarkPrimary(context),
                                       width: 1.4,
                                     ),
                                   ),
@@ -2629,7 +3125,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                     "assets/Bookmark icons/Frame 3630.png",
                                     height: screenWidth > 450 ? 18 : 15,
                                     width: screenWidth > 450 ? 18 : 15,
-                                    color: CommanColor.whiteBlack(context).withOpacity(0.7),
+                                    color: CommanColor.whiteBlack(context)
+                                        .withOpacity(0.7),
                                   ),
                                 ),
                               ),
@@ -2651,20 +3148,23 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                 );
                               },
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 4),
                                 child: Container(
                                   padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
-                                      color: CommanColor.lightDarkPrimary(context),
+                                      color:
+                                          CommanColor.lightDarkPrimary(context),
                                       width: 1.4,
                                     ),
                                   ),
                                   child: Icon(
                                     Icons.share,
                                     size: screenWidth > 450 ? 18 : 15,
-                                    color: CommanColor.whiteBlack(context).withOpacity(0.7),
+                                    color: CommanColor.whiteBlack(context)
+                                        .withOpacity(0.7),
                                   ),
                                 ),
                               ),
@@ -2681,7 +3181,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
             const SizedBox(width: 8),
             CircleAvatar(
               radius: screenWidth > 450 ? 18 : 16,
-              backgroundColor: CommanColor.lightDarkPrimary(context).withOpacity(
+              backgroundColor:
+                  CommanColor.lightDarkPrimary(context).withOpacity(
                 isDark ? 0.25 : 0.15,
               ),
               child: Image.asset(
@@ -2705,7 +3206,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
     return "$text\n\nRead more at: $storeLink";
   }
 
-  void _showMessageOptions(BuildContext context, ChatMessage message, double screenWidth, bool isDark) {
+  void _showMessageOptions(BuildContext context, ChatMessage message,
+      double screenWidth, bool isDark) {
     // Get theme provider values with listen: false to avoid provider errors
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final primaryColor = themeProvider.themeMode == ThemeMode.dark
@@ -2715,12 +3217,14 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
         ? CommanColor.white
         : CommanColor.black;
 
-    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final RenderBox overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox;
 
     showMenu(
       context: context,
       position: RelativeRect.fromRect(
-        Rect.fromLTWH(overlay.size.width / 2 - 100, overlay.size.height / 2, 200, 0),
+        Rect.fromLTWH(
+            overlay.size.width / 2 - 100, overlay.size.height / 2, 200, 0),
         Offset.zero & overlay.size,
       ),
       color: isDark ? CommanColor.darkPrimaryColor : CommanColor.white,
@@ -2778,7 +3282,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
             onTap: () async {
               // Check and show rating dialog on first share
               await RatingDialogHelper.showRatingDialogOnFirstShare(context);
-              
+
               // Get screen size for sharePositionOrigin (required on iOS)
               final screenSize = MediaQuery.of(context).size;
               final sharePositionOrigin = Rect.fromLTWH(
@@ -2799,7 +3303,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
 
   Widget _buildInputArea(double screenWidth, bool isDark) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final isVintage = themeProvider.currentCustomTheme == AppCustomTheme.vintage;
+    final isVintage =
+        themeProvider.currentCustomTheme == AppCustomTheme.vintage;
     final bool hasText = _messageController.text.trim().isNotEmpty;
     final Color sendBgColor = !_isLoading
         ? CommanColor.lightDarkPrimary(context)
@@ -2812,9 +3317,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
       decoration: BoxDecoration(
         color: isDark
             ? CommanColor.darkPrimaryColor
-            : (isVintage
-                ? Colors.brown[50]
-                : Colors.grey[50]),
+            : (isVintage ? Colors.brown[50] : Colors.grey[50]),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.08),
@@ -2836,9 +3339,10 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                 decoration: BoxDecoration(
                   color: isDark
                       ? const Color(0xFF2A2A2A)
-                      : (themeProvider.currentCustomTheme == AppCustomTheme.vintage
-                      ? Colors.brown[100]
-                      : Colors.white),
+                      : (themeProvider.currentCustomTheme ==
+                              AppCustomTheme.vintage
+                          ? Colors.brown[100]
+                          : Colors.white),
                   borderRadius: BorderRadius.circular(30),
                   border: Border.all(
                     color: isDark
@@ -2865,7 +3369,11 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                     fontSize: screenWidth > 450 ? 15 : 13,
                   ),
                   decoration: InputDecoration(
-                    hintText: _isListening ? 'Listening...' : (_isLoading ? 'Seeking guidance...' : "I'm Here to Help..." ),
+                    hintText: _isListening
+                        ? 'Listening...'
+                        : (_isLoading
+                            ? 'Seeking guidance...'
+                            : "Ask anything here..."),
                     hintStyle: TextStyle(
                       color: CommanColor.whiteBlack(context).withOpacity(0.5),
                       fontSize: screenWidth > 450 ? 15 : 13,
@@ -2880,26 +3388,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
               ),
             ),
             const SizedBox(width: 8),
-            // Voice input button
-            Container(
-              decoration: BoxDecoration(
-                color: !_isLoading
-                    ? (_isListening
-                        ? Colors.green
-                        : CommanColor.lightDarkPrimary(context).withOpacity(0.7))
-                    : Colors.grey.withOpacity(0.3),
-                shape: BoxShape.circle,
-              ),
-              child: IconButton(
-                icon: _isListening
-                    ? Image.asset("assets/microphone.png", color: CommanColor.white,
-                  width: screenWidth > 450 ? 24 : 20,)
-                    : Image.asset("assets/microphone.png", color: CommanColor.white,
-                  width: screenWidth > 450 ? 24 : 20,),
-                onPressed: _isLoading ? null : _startListening,
-                tooltip: _isListening ? 'Stop listening' : 'Voice input',
-              ),
-            ),
+            // Voice input button temporarily hidden
+            const SizedBox(width: 0, height: 0),
             const SizedBox(width: 8),
             Container(
               decoration: BoxDecoration(
@@ -2909,17 +3399,20 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
               child: IconButton(
                 icon: _isLoading
                     ? SizedBox(
-                  width: 15,
-                  height: 15,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 1,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      CommanColor.white,
-                    ),
-                  ),
-                )
-                    : Image.asset("assets/send-2.png", color: CommanColor.white,
-                  width: screenWidth > 450 ? 24 : 20,),
+                        width: 15,
+                        height: 15,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            CommanColor.white,
+                          ),
+                        ),
+                      )
+                    : Image.asset(
+                        "assets/send-2.png",
+                        color: CommanColor.white,
+                        width: screenWidth > 450 ? 24 : 20,
+                      ),
                 onPressed: (!_isLoading && hasText) ? _sendMessage : null,
               ),
             ),
@@ -2979,7 +3472,7 @@ class _WaveLoaderState extends State<_WaveLoader>
     super.initState();
     _controllers = List.generate(
       3,
-          (index) => AnimationController(
+      (index) => AnimationController(
         vsync: this,
         duration: const Duration(milliseconds: 600),
       ),

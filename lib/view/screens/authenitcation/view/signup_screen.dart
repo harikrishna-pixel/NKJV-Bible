@@ -28,7 +28,10 @@ class SignupScreen extends HookConsumerWidget {
     double screenWidth = MediaQuery.of(context).size.width;
     return Scaffold(
         resizeToAvoidBottomInset: false,
-        body: Stack(
+        body: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: Stack(
           children: [
             Positioned.fill(
               child: p.Provider.of<ThemeProvider>(context).currentCustomTheme ==
@@ -455,6 +458,6 @@ class SignupScreen extends HookConsumerWidget {
               ),
             ),
           ],
-        ));
+        )));
   }
 }

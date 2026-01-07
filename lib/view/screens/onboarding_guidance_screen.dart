@@ -29,17 +29,6 @@ class OnboardingGuidanceScreen extends StatelessWidget {
             ),
             child: Column(
               children: [
-                SizedBox(height: 3,),
-                Padding(
-                  padding:  EdgeInsets.only(left: 8.0),
-                  child: Align(
-                    alignment: AlignmentGeometry.topLeft,
-                      child: GestureDetector(
-                        onDoubleTap: (){
-                          Navigator.pop(context);
-                        },
-                          child: Icon(Icons.arrow_back_ios,color: Colors.black,size: 20,))),
-                ),
                 const SizedBox(height: 50),
                 Image.asset(
                   'assets/chat.png',

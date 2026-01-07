@@ -654,6 +654,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           },
           onMaybeLater: () {
             _isExitOfferShowing = false; // Reset flag when dismissed
+            // Mark cooldown active so home icon can show dot for 10 minutes
+            SharPreferences.setBoolean('exit_offer_cooldown_active', true);
             Navigator.of(context).pop();
             _navigateAwayFromPaywall();
           },

@@ -44,7 +44,7 @@ class WelcomeScreen extends StatelessWidget {
                   SizedBox(height: 30,),
                   // Title
                   Text(
-                    "Begin Your Daily Bible Journey!",
+                    "Begin Your Daily \n Bible Journey!",
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: isTablet ? 34 : 30,
@@ -146,15 +146,15 @@ class WelcomeScreen extends StatelessWidget {
                   Spacer(
                     flex: 1,
                   ),
-                  Text(
-                    "Designed to help you grow daily in God’s Word",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: isTablet ? 18 : 13,
-                      fontStyle: FontStyle.normal,
-                      color: Colors.black87,
-                    ),
-                  ),
+                  // Text(
+                  //   "Designed to help you grow daily in God’s Word",
+                  //   textAlign: TextAlign.center,
+                  //   style: TextStyle(
+                  //     fontSize: isTablet ? 18 : 13,
+                  //     fontStyle: FontStyle.normal,
+                  //     color: Colors.black87,
+                  //   ),
+                  // ),
 
                 ],
               ),

@@ -49,8 +49,21 @@ class WallpaperLibraryWidget extends HookConsumerWidget {
                         style: CommanStyle.placeholderText(context),
                       ),
                       SizedBox(height: 20,),
-                      Text(" View ",
-                          style: CommanStyle.placeholderText(context)),
+                      Container(
+                        height: 40,
+                        width: 70,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            width: 2,
+                            color: CommanColor.lightDarkPrimary300(context)
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(" View ",
+                              style: CommanStyle.placeholderText(context)),
+                        ),
+                      ),
                     ],
                   ),
                 ),

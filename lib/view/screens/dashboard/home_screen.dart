@@ -977,6 +977,7 @@ class _HomeScreenState extends State<HomeScreen>
   bool _hasInitialized = false;
   bool _showUI = true; // Track UI visibility for scroll-based hide/show
   BuildContext? _bottomSheetContext; // Track bottom sheet context to dismiss it
+  bool _exitOfferCooldownActive = false; // Dot indicator flag
 
   // dailyverse
   static const int _targetSeconds =
@@ -999,6 +1000,7 @@ class _HomeScreenState extends State<HomeScreen>
     _hasInitialized = true;
 
     await _loadFontSize();
+    await _refreshExitOfferCooldown();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
 //  await _checkAndShowVerse();
@@ -1008,6 +1010,28 @@ class _HomeScreenState extends State<HomeScreen>
 
     // _initializeAds();
     loadAds();
+  }
+
+  Future<void> _refreshExitOfferCooldown() async {
+    final prefs = await SharedPreferences.getInstance();
+    final active = prefs.getBool('exit_offer_cooldown_active') ?? false;
+    final ts = await SharPreferences.getString('exit_offer_first_shown_time');
+    bool show = active;
+    if (active && ts != null) {
+      try {
+        final firstShown = DateTime.parse(ts);
+        final diff = DateTime.now().difference(firstShown).inMinutes;
+        if (diff >= 10) {
+          await prefs.setBool('exit_offer_cooldown_active', false);
+          show = false;
+        }
+      } catch (_) {}
+    }
+    if (mounted) {
+      setState(() {
+        _exitOfferCooldownActive = show;
+      });
+    }
   }
 
   Future<void> _handleAppLaunchCount() async {
@@ -1467,9 +1491,6 @@ class _HomeScreenState extends State<HomeScreen>
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                   vertical: 10, horizontal: 12),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.5),
-                              ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
@@ -2820,12 +2841,32 @@ class _HomeScreenState extends State<HomeScreen>
                                                   "Check your Internet Connection");
                                             }
                                           },
-                                          child: Image.asset(
-                                            'assets/no-ad.png',
-                                            height: screenWidth > 450 ? 40 : 24,
-                                            width: screenWidth > 450 ? 40 : 24,
-                                            color:
-                                                CommanColor.whiteBlack(context),
+                                          child: Stack(
+                                            clipBehavior: Clip.none,
+                                            children: [
+                                              Image.asset(
+                                                'assets/no-ad.png',
+                                                height:
+                                                    screenWidth > 450 ? 40 : 24,
+                                                width:
+                                                    screenWidth > 450 ? 40 : 24,
+                                                color: CommanColor.whiteBlack(
+                                                    context),
+                                              ),
+                                              if (_exitOfferCooldownActive)
+                                                Positioned(
+                                                  right: -2,
+                                                  top: -2,
+                                                  child: Container(
+                                                    width: 10,
+                                                    height: 10,
+                                                    decoration: const BoxDecoration(
+                                                      color: Colors.red,
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
                                           ),
                                         ))
                                 : Visibility(
@@ -2838,11 +2879,31 @@ class _HomeScreenState extends State<HomeScreen>
                                             .showExitOfferFromHomeScreen(
                                                 context, controller);
                                       },
-                                      child: Image.asset(
-                                        'assets/no-ad.png',
-                                        height: screenWidth > 450 ? 35 : 24,
-                                        width: screenWidth > 450 ? 35 : 24,
-                                        color: CommanColor.whiteBlack(context),
+                                      child: Stack(
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          Image.asset(
+                                            'assets/no-ad.png',
+                                            height:
+                                                screenWidth > 450 ? 35 : 24,
+                                            width: screenWidth > 450 ? 35 : 24,
+                                            color:
+                                                CommanColor.whiteBlack(context),
+                                          ),
+                                          if (_exitOfferCooldownActive)
+                                            Positioned(
+                                              right: -2,
+                                              top: -2,
+                                              child: Container(
+                                                width: 10,
+                                                height: 10,
+                                                decoration: const BoxDecoration(
+                                                  color: Colors.red,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
                                       ),
                                     ),
                                   ),

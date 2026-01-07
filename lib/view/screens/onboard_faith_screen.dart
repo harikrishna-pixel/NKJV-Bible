@@ -814,7 +814,7 @@ class _OnboardingThemeSelectionScreenState
                               child: Text(
                                 'Preview',
                                 style: TextStyle(
-                                  fontSize: isTablet ? 16 : 14,
+                                  fontSize: isTablet ? 18 : 16,
                                   fontWeight: FontWeight.w600,
                                   color: const Color(0xFF7A5435),
                                 ),
@@ -851,7 +851,7 @@ class _OnboardingThemeSelectionScreenState
                                 'And the Spirit of God moved upon the face of the waters.',
                                 style: TextStyle(
                                   height: 1.4,
-                                  fontSize: 14,
+                                  fontSize: 15.5,
                                   color: Color(0xFF2E2C2B),
                                   fontWeight: FontWeight.w500,
                                 ),

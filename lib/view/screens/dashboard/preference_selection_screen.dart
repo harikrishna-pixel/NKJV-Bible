@@ -1091,48 +1091,271 @@ class FaithJourneyDialog {
         final mq = MediaQuery.of(ctx).size;
         final isTablet = mq.width > 600;
         final screenWidth = MediaQuery.of(context).size.width;
+
+        Widget buildStep(String text, bool done) {
+          return Padding(
+            padding: EdgeInsets.symmetric(
+                vertical: isTablet ? 10 : 8, horizontal: isTablet ? 6 : 4),
+            child: Row(
+              children: [
+                Icon(
+                  done ? Icons.check_circle : Icons.hourglass_bottom_rounded,
+                  color:
+                      done ? const Color(0xFF7AA36D) : const Color(0xFFB3854A),
+                  size: isTablet ? 26 : 22,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    text,
+                    style: TextStyle(
+                      fontSize: isTablet ? 18 : 16,
+                      color: const Color(0xFF7B5536),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
         return Center(
           child: Container(
-            width: isTablet ? mq.width * 0.4 : mq.width * 0.8,
-            padding: EdgeInsets.all(isTablet ? 24 : 16),
+            width: isTablet ? mq.width * 0.5 : mq.width * 0.9,
+            padding: EdgeInsets.symmetric(
+              horizontal: isTablet ? 28 : 20,
+              vertical: isTablet ? 26 : 20,
+            ),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
+              gradient: const LinearGradient(
+                colors: [Color(0xFFF6EBDD), Color(0xFFEBDDC9)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: const Color(0xFFD2C1A8), width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.10),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  "Preparing Your Journey",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: isTablet ? 26 : 22,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF7B5536),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "We're aligning scripture with your\nheart and daily needs.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: screenWidth < 380
+                        ? 14
+                        : isTablet
+                            ? 18
+                            : 16,
+                    color: const Color(0xFF7B5536),
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isTablet ? 18 : 14,
+                    vertical: isTablet ? 16 : 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF9F1E4),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFFD8C8AF)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      buildStep("Understanding Your Goals", true),
+                      buildStep("Selecting Verse Topics", true),
+                      buildStep("Preparing Prayer Guidance", true),
+                      buildStep("Getting Your Daily Verse Ready", false),
+                      const SizedBox(height: 10),
+                      LinearProgressIndicator(
+                        value: 1.0, // show fully loaded per request
+                        backgroundColor: const Color(0xFFE8D8C4),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          Color(0xFFD69A32),
+                        ),
+                        minHeight: 6,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  "Designed to help you grow daily in God's Word.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: isTablet ? 17 : 15,
+                    color: const Color(0xFF7B5536),
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    height: isTablet ? 58 : 48,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [
+                          Color(0xFF763201),
+                          Color(0xFFD5821F),
+                          Color(0xFF763201),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.12),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      "Continue",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: isTablet ? 20 : 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Follow-up dialog when user taps Continue
+  static Future<void> showNextStepDialog(BuildContext context) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        final mq = MediaQuery.of(ctx).size;
+        final isTablet = mq.width > 600;
+        return Center(
+          child: Container(
+            width: isTablet ? mq.width * 0.45 : mq.width * 0.85,
+            padding: EdgeInsets.all(isTablet ? 24 : 18),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFF6EBDD), Color(0xFFEBDDC9)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFFD2C1A8), width: 1.1),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.10),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox(height: isTablet ? 20 : 10),
-                // CircularProgressIndicator(
-                //   color: Colors.brown,
-                //   strokeWidth: 3,
-                // ),
-                CustomLoadingIndicator(
-                  size: 80,
-                  color: Colors.brown,
-                ),
-                SizedBox(height: isTablet ? 24 : 16),
                 Text(
-                  "Building Your Faith Journey...",
+                  "Your journey is ready",
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: isTablet ? 20 : 16,
-                    fontWeight: FontWeight.bold,
-                    color: CommanColor.black,
+                    fontSize: isTablet ? 24 : 20,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF7B5536),
                   ),
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 10),
                 Text(
-                  "Thanks for sharing your heart with us.\n  We're setting up your Bible journey\nbased on your goals and chosen topics.\nPlease hold on a moment...",
+                  "Start now or continue exploring.",
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: screenWidth < 380
-                        ? 12
-                        : isTablet
-                            ? 16
-                            : 14,
-                    color: CommanColor.black,
+                    fontSize: isTablet ? 17 : 15,
+                    color: const Color(0xFF7B5536),
                   ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFB16A1E)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: EdgeInsets.symmetric(
+                            vertical: isTablet ? 14 : 12,
+                          ),
+                        ),
+                        child: Text(
+                          "Continue",
+                          style: TextStyle(
+                            color: const Color(0xFF7B5536),
+                            fontSize: isTablet ? 18 : 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(
+                            vertical: isTablet ? 14 : 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          backgroundColor: const Color(0xFFB16A1E),
+                          foregroundColor: Colors.white,
+                          elevation: 2,
+                        ),
+                        child: Text(
+                          "Start Now",
+                          style: TextStyle(
+                            fontSize: isTablet ? 18 : 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -1206,20 +1429,20 @@ class FaithJourneyDialog {
                           await SharPreferences.getString('lifeTimePlan') ??
                               BibleInfo.lifeTimePlanid;
                       Get.offAll(() => SubscriptionScreen(
-                        sixMonthPlan: sixMonthPlan,
-                        oneYearPlan: oneYearPlan,
-                        lifeTimePlan: lifeTimePlan,
-                        checkad: 'onboard',
-                      ));
+                            sixMonthPlan: sixMonthPlan,
+                            oneYearPlan: oneYearPlan,
+                            lifeTimePlan: lifeTimePlan,
+                            checkad: 'onboard',
+                          ));
                     } else {
                       Get.offAll(() => HomeScreen(
-                        From: "splash",
-                        selectedVerseNumForRead: "",
-                        selectedBookForRead: "",
-                        selectedChapterForRead: "",
-                        selectedBookNameForRead: "",
-                        selectedVerseForRead: "",
-                      ));
+                            From: "splash",
+                            selectedVerseNumForRead: "",
+                            selectedBookForRead: "",
+                            selectedChapterForRead: "",
+                            selectedBookNameForRead: "",
+                            selectedVerseForRead: "",
+                          ));
                     }
                   },
                   style: ElevatedButton.styleFrom(
@@ -1238,7 +1461,6 @@ class FaithJourneyDialog {
                           Color(0xFFD5821F),
                           Color(0xFF763201),
                         ],
-
                       ),
                       borderRadius: BorderRadius.circular(20),
                     ),
@@ -1258,7 +1480,6 @@ class FaithJourneyDialog {
                     ),
                   ),
                 ),
-
               ],
             ),
           ),
