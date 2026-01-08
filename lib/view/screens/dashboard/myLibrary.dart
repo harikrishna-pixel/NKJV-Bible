@@ -841,12 +841,12 @@ class _LibraryScreenState extends State<LibraryScreen>
                                                   context)),
                                       child: Row(
                                         mainAxisAlignment:
-                                            MainAxisAlignment.spaceAround,
+                                            MainAxisAlignment.spaceEvenly,
                                         children: [
                                           Image.asset(
                                             Images.wallpaper,
-                                            height: screenWidth > 450 ? 22 : 18,
-                                            width: screenWidth > 450 ? 22 : 18,
+                                            width: 20,
+                                            height: 15,
                                             color: selectedTap == 5
                                                 ? Colors.white
                                                 : CommanColor.whiteAndDark(
@@ -854,7 +854,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                             colorBlendMode: BlendMode.srcATop,
                                           ),
                                           Text(
-                                            " Wallpapers",
+                                            "Wallpapers",
                                             style: selectedTap == 5
                                                 ? CommanStyle.white12400.copyWith(
                                                     fontSize: screenWidth > 450
@@ -911,8 +911,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                                         children: [
                                           Image.asset(
                                             Images.quote,
-                                            height: screenWidth > 450 ? 22 : 18,
-                                            width: screenWidth > 450 ? 22 : 18,
+                                            width: 20,
+                                            height: 15,
                                             color: selectedTap == 6
                                                 ? Colors.white
                                                 : CommanColor.whiteAndDark(

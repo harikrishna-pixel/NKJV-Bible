@@ -504,7 +504,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                 ),
                                 SizedBox(height: mheight * 0.03),
                                 Text(
-                                  '₹My Library Status'.toUpperCase(),
+                                  'My Library Status'.toUpperCase(),
                                   style: const TextStyle(
                                       letterSpacing: BibleInfo.letterSpacing,
                                       fontSize: BibleInfo.fontSizeScale * 18,

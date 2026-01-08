@@ -33,6 +33,7 @@ class _WalletScreenState extends State<WalletScreen> {
   List<ProductDetails> _products = [];
   bool _isAvailable = false;
   String? _loadingProductId; // Track which specific product is loading
+  String? _selectedProductId; // Track which product is selected/tapped
   int _currentCredits = 0;
   List<Map<String, dynamic>> _coinPacks = [];
   Timer? _creditsTimer;
@@ -55,8 +56,11 @@ class _WalletScreenState extends State<WalletScreen> {
     _checkConnectivityAndShowToast();
     // Initialize and load credits immediately from local storage (works offline)
     _initializeCredits();
+    // Initialize coin packs with constants immediately so UI shows data right away
+    _loadCoinPacksFromConstants();
+    // Then try to load from API/SharedPreferences (will update if available)
     _loadCoinPacks();
-    _initStoreInfo();
+    _initStoreInfoIfOnline(); // Only initialize store if online
     _loadRewardedAd(); // Load rewarded ad for watch ad feature
     _loadAnswerLength(); // Load current answer length preference
     // Refresh credits every second to show real-time updates
@@ -248,12 +252,23 @@ class _WalletScreenState extends State<WalletScreen> {
         final packs = <Map<String, dynamic>>[];
 
         coinPacksMap.forEach((identifier, data) {
+          // Determine which price constant to use based on identifier
+          String priceFromConstants = '';
+          if (identifier == BibleInfo.coinPack1Id) {
+            priceFromConstants = BibleInfo.coinPack1Price;
+          } else if (identifier == BibleInfo.coinPack2Id) {
+            priceFromConstants = BibleInfo.coinPack2Price;
+          } else if (identifier == BibleInfo.coinPack3Id) {
+            priceFromConstants = BibleInfo.coinPack3Price;
+          }
+
           packs.add({
             'identifier': identifier,
             'credits': data['credits'] ??
                 '0', // Credits from API response (sub_fields.item_1)
             'discount': data['discount'] ??
                 '0', // Discount from API response (sub_fields.value)
+            'price': priceFromConstants, // Price from constants as fallback
           });
         });
 
@@ -294,16 +309,19 @@ class _WalletScreenState extends State<WalletScreen> {
           'identifier': coinPack1Id,
           'credits': '100', // Default credits for pack 1
           'discount': '20', // Default discount for pack 1
+          'price': BibleInfo.coinPack1Price, // Price from constants
         },
         {
           'identifier': coinPack2Id,
           'credits': '500', // Default credits for pack 2
           'discount': '20', // Default discount for pack 2
+          'price': BibleInfo.coinPack2Price, // Price from constants
         },
         {
           'identifier': coinPack3Id,
           'credits': '1000', // Default credits for pack 3
           'discount': '20', // Default discount for pack 3
+          'price': BibleInfo.coinPack3Price, // Price from constants
         },
       ];
 
@@ -312,11 +330,31 @@ class _WalletScreenState extends State<WalletScreen> {
           _coinPacks = packs;
         });
         debugPrint(
-            'WalletScreen: Loaded coin packs from constants (offline mode)');
+            'WalletScreen: Loaded coin packs from constants (offline mode) - Count: ${packs.length}');
+        for (var pack in packs) {
+          debugPrint(
+              'WalletScreen: Pack - ${pack['identifier']}, Credits: ${pack['credits']}, Price: ${pack['price']}');
+        }
       }
     } catch (e) {
       debugPrint('Error loading coin packs from constants: $e');
     }
+  }
+
+  Future<void> _initStoreInfoIfOnline() async {
+    // Check connectivity first - skip if offline
+    final hasInternet = await InternetConnection().hasInternetAccess;
+    if (!hasInternet) {
+      // Offline - don't try to query products, just show coin packs from constants
+      if (mounted) {
+        setState(() {
+          _isAvailable = false; // Mark as unavailable when offline
+        });
+      }
+      return;
+    }
+
+    await _initStoreInfo();
   }
 
   Future<void> _initStoreInfo() async {
@@ -405,6 +443,7 @@ class _WalletScreenState extends State<WalletScreen> {
         if (mounted && _loadingProductId == productId) {
           setState(() {
             _loadingProductId = null; // Clear loading state for this product
+            _selectedProductId = null; // Clear selected state
           });
           // Cancel any pending timeout timer
           _purchaseTimeouts[productId]?.cancel();
@@ -414,6 +453,7 @@ class _WalletScreenState extends State<WalletScreen> {
         if (mounted && _loadingProductId == productId) {
           setState(() {
             _loadingProductId = null; // Clear loading state on error
+            _selectedProductId = null; // Clear selected state
           });
           // Cancel timeout timer
           _purchaseTimeouts[productId]?.cancel();
@@ -428,6 +468,7 @@ class _WalletScreenState extends State<WalletScreen> {
         if (mounted && _loadingProductId == productId) {
           setState(() {
             _loadingProductId = null;
+            _selectedProductId = null; // Clear selected state
           });
           // Cancel timeout timer
           _purchaseTimeouts[productId]?.cancel();
@@ -438,6 +479,7 @@ class _WalletScreenState extends State<WalletScreen> {
         if (mounted && _loadingProductId == productId) {
           setState(() {
             _loadingProductId = null;
+            _selectedProductId = null; // Clear selected state
           });
           // Cancel timeout timer
           _purchaseTimeouts[productId]?.cancel();
@@ -454,7 +496,7 @@ class _WalletScreenState extends State<WalletScreen> {
     // This checks actual internet access, not just network interface availability
     final hasInternet = await InternetConnection().hasInternetAccess;
     if (!hasInternet) {
-      Constants.showToast("Check your Internet connection");
+      Constants.showToast("No internet Connection");
       return;
     }
 
@@ -469,6 +511,7 @@ class _WalletScreenState extends State<WalletScreen> {
       if (mounted && _loadingProductId == productId) {
         setState(() {
           _loadingProductId = null; // Clear loading state after timeout
+          _selectedProductId = null; // Clear selected state
         });
         debugPrint('WalletScreen: Purchase timeout - clearing loading state');
         _purchaseTimeouts.remove(productId);
@@ -492,6 +535,7 @@ class _WalletScreenState extends State<WalletScreen> {
       if (mounted) {
         setState(() {
           _loadingProductId = null; // Clear loading state on error
+          _selectedProductId = null; // Clear selected state
         });
       }
       Constants.showToast('Error: $e');
@@ -642,6 +686,10 @@ class _WalletScreenState extends State<WalletScreen> {
               )
             : null,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        toolbarOpacity: 1.0,
+        bottomOpacity: 1.0,
         leading: IconButton(
           icon: Icon(
             Icons.arrow_back_ios_new,
@@ -673,127 +721,131 @@ class _WalletScreenState extends State<WalletScreen> {
                     ? CommanColor.darkPrimaryColor
                     : themeProvider.backgroundColor,
               ),
-        // Avoid extra top/bottom inset (especially on iPad with visible app bar)
+        // Avoid extra top inset (especially on iPad with visible app bar)
         child: SafeArea(
           top: false,
-          bottom: false,
-          child: SingleChildScrollView(
-            padding: EdgeInsets.only(
-              left: screenWidth > 450 ? 20 : 16,
-              right: screenWidth > 450 ? 20 : 16,
-              top: screenWidth > 450 ? 20 : 16,
-              bottom: screenWidth > 450
-                  ? 20 + MediaQuery.of(context).padding.bottom
-                  : 16 + MediaQuery.of(context).padding.bottom,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Current Credits Display
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(screenWidth > 450 ? 24 : 20),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? CommanColor.darkPrimaryColor.withOpacity(0.8)
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+          bottom: true, // Enable bottom safe area for iPad
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.only(
+                    left: screenWidth > 450 ? 20 : 16,
+                    right: screenWidth > 450 ? 20 : 16,
+                    top: screenWidth > 450 ? 20 : 16,
+                    bottom: screenWidth > 450 ? 20 : 16,
                   ),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Your Credits',
-                        style: TextStyle(
-                          color:
-                              CommanColor.whiteBlack(context).withOpacity(0.7),
-                          fontSize: screenWidth > 450 ? 16 : 14,
+                      // Current Credits Display
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.all(screenWidth > 450 ? 24 : 20),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? CommanColor.darkPrimaryColor.withOpacity(0.8)
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Your Credits',
+                              style: TextStyle(
+                                color: CommanColor.whiteBlack(context)
+                                    .withOpacity(0.7),
+                                fontSize: screenWidth > 450 ? 16 : 14,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '$_currentCredits',
+                              style: TextStyle(
+                                color: isDark
+                                    ? Colors.white
+                                    : CommanColor.lightDarkPrimary(context),
+                                fontSize: screenWidth > 450 ? 48 : 40,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 24),
+
+                      // Answer Length Selection Section
                       Text(
-                        '$_currentCredits',
+                        'Answer Length',
                         style: TextStyle(
-                          color: isDark
-                              ? Colors.white
-                              : CommanColor.lightDarkPrimary(context),
-                          fontSize: screenWidth > 450 ? 48 : 40,
+                          color: CommanColor.whiteBlack(context),
+                          fontSize: screenWidth > 450 ? 20 : 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      _buildAnswerLengthCard(context, screenWidth, isDark),
+                      const SizedBox(height: 24),
+
+                      // Free Credits Section
+                      Text(
+                        'Free Credits',
+                        style: TextStyle(
+                          color: CommanColor.whiteBlack(context),
+                          fontSize: screenWidth > 450 ? 20 : 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildFreeCreditCard(
+                        context,
+                        screenWidth,
+                        isDark,
+                        icon: Icons.monetization_on,
+                        title: '20 Credits',
+                        subtitle: 'Every 15 min',
+                        buttonText: _claimCooldownSeconds > 0
+                            ? 'Wait ${_claimCooldownSeconds ~/ 60}m ${(_claimCooldownSeconds % 60).toString().padLeft(2, '0')}s'
+                            : 'Claim',
+                        onTap: _claimFreeCredits,
+                        // isDisabled: _claimCooldownSeconds > 0,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildFreeCreditCard(
+                        context,
+                        screenWidth,
+                        isDark,
+                        icon: Icons.card_giftcard,
+                        title: 'Gift Credits',
+                        subtitle: 'Get 50 credits \n(2 ads per day)',
+                        buttonText: 'Watch Ad',
+                        onTap: _watchAdForCredits,
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Buy Credits Section
+                      Text(
+                        'Buy Credits',
+                        style: TextStyle(
+                          color: CommanColor.whiteBlack(context),
+                          fontSize: screenWidth > 450 ? 20 : 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ..._buildBuyCreditCards(context, screenWidth, isDark),
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
-
-                // Answer Length Selection Section
-                Text(
-                  'Answer Length',
-                  style: TextStyle(
-                    color: CommanColor.whiteBlack(context),
-                    fontSize: screenWidth > 450 ? 20 : 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _buildAnswerLengthCard(context, screenWidth, isDark),
-                const SizedBox(height: 24),
-
-                // Free Credits Section
-                Text(
-                  'Free Credits',
-                  style: TextStyle(
-                    color: CommanColor.whiteBlack(context),
-                    fontSize: screenWidth > 450 ? 20 : 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _buildFreeCreditCard(
-                  context,
-                  screenWidth,
-                  isDark,
-                  icon: Icons.monetization_on,
-                  title: '20 Credits',
-                  subtitle: 'Every 15 min',
-                  buttonText: _claimCooldownSeconds > 0
-                      ? 'Wait ${_claimCooldownSeconds ~/ 60}m ${(_claimCooldownSeconds % 60).toString().padLeft(2, '0')}s'
-                      : 'Claim',
-                  onTap: _claimFreeCredits,
-                  // isDisabled: _claimCooldownSeconds > 0,
-                ),
-                const SizedBox(height: 12),
-                _buildFreeCreditCard(
-                  context,
-                  screenWidth,
-                  isDark,
-                  icon: Icons.card_giftcard,
-                  title: 'Gift Credits',
-                  subtitle: 'Get 50 credits \n(2 ads per day)',
-                  buttonText: 'Watch Ad',
-                  onTap: _watchAdForCredits,
-                ),
-                const SizedBox(height: 32),
-
-                // Buy Credits Section
-                Text(
-                  'Buy Credits',
-                  style: TextStyle(
-                    color: CommanColor.whiteBlack(context),
-                    fontSize: screenWidth > 450 ? 20 : 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ..._buildBuyCreditCards(context, screenWidth, isDark),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -920,10 +972,24 @@ class _WalletScreenState extends State<WalletScreen> {
     final widgets = <Widget>[];
 
     // Match products with coin packs
+    debugPrint(
+        'WalletScreen: Building credit cards - _coinPacks count: ${_coinPacks.length}');
+
+    // If _coinPacks is empty, use constants directly
+    if (_coinPacks.isEmpty) {
+      debugPrint('WalletScreen: _coinPacks is empty, loading from constants');
+      _loadCoinPacksFromConstants();
+      return widgets; // Return empty for now, will rebuild after setState
+    }
+
     for (var pack in _coinPacks) {
       final identifier = pack['identifier'] as String;
       final credits = pack['credits']?.toString() ?? '0';
       final discount = pack['discount']?.toString() ?? '0';
+      // Read price directly from pack - this will be the latest value since we're iterating over _coinPacks
+      final priceFromConstants = (pack['price']?.toString() ?? '').trim();
+      debugPrint(
+          'WalletScreen: Building card for $identifier - Credits: $credits, Price: "$priceFromConstants", isEmpty: ${priceFromConstants.isEmpty}, _coinPacks.length: ${_coinPacks.length}');
 
       ProductDetails? product;
       try {
@@ -938,149 +1004,221 @@ class _WalletScreenState extends State<WalletScreen> {
       final isBestValue =
           false; // Remove default selection - only show when actually selected
 
+      final isSelected = _selectedProductId == identifier;
+
       widgets.add(
         Padding(
+          key: ValueKey('credit_card_$identifier'), // Add key to force rebuild
           padding: const EdgeInsets.only(bottom: 12),
-          child: Container(
-            padding: EdgeInsets.all(screenWidth > 450 ? 16 : 14),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? CommanColor.darkPrimaryColor.withOpacity(0.8)
-                  : Colors.white,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: (_loadingProductId == product?.id)
+                  ? null
+                  : () async {
+                      // Check if offline and product is null
+                      final hasInternet =
+                          await InternetConnection().hasInternetAccess;
+                      if (!hasInternet || product == null) {
+                        Constants.showToast("No internet Connection");
+                        return;
+                      }
+                      if (!_isAvailable) return;
+                      setState(() {
+                        _selectedProductId = identifier;
+                      });
+                      _buyCoinPack(product!);
+                    },
               borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: screenWidth > 450 ? 50 : 45,
-                  height: screenWidth > 450 ? 50 : 45,
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? CommanColor.lightDarkPrimary(context).withOpacity(0.2)
-                        : CommanColor.lightDarkPrimary(context)
-                            .withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.monetization_on,
-                    color: isDark
-                        ? Colors.white
-                        : CommanColor.lightDarkPrimary(context),
-                    size: screenWidth > 450 ? 28 : 24,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '$credits Credits', // Credits amount from API response (sub_fields.item_1)
-                        style: TextStyle(
-                          color: CommanColor.whiteBlack(context),
-                          fontSize: screenWidth > 450 ? 18 : 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    ElevatedButton(
-                      onPressed: (_loadingProductId != null ||
-                              !_isAvailable ||
-                              product == null)
-                          ? null
-                          : () => _buyCoinPack(product!),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: CommanColor.lightDarkPrimary(context),
-                        fixedSize: Size(
-                          screenWidth > 450 ? 150 : 130,
-                          screenWidth > 450 ? 46 : 42,
-                        ),
-                        padding: EdgeInsets.symmetric(
-                          horizontal: screenWidth > 450 ? 20 : 16,
-                          vertical: screenWidth > 450 ? 12 : 10,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          side: isDark
-                              ? const BorderSide(
-                                  color: Colors.white,
-                                  width: 1.5,
-                                )
-                              : BorderSide.none,
-                        ),
-                      ),
-                      child: (_loadingProductId == product?.id)
-                          ? SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
-                                ),
-                              ),
-                            )
-                          : Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.monetization_on,
-                                  color: Colors.amber.shade700, // Gold color
-                                  size: screenWidth > 450 ? 18 : 16,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  (product != null && product!.price.isNotEmpty)
-                                      ? product!
-                                          .price // IAP automatically provides price in user's local currency
-                                      : 'Loading...',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: screenWidth > 450 ? 14 : 13.5,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
+              child: Container(
+                padding: EdgeInsets.all(screenWidth > 450 ? 16 : 14),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? CommanColor.darkPrimaryColor.withOpacity(0.8)
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: isSelected
+                      ? Border.all(
+                          color: isDark
+                              ? Colors.white.withOpacity(0.5)
+                              : Colors.grey.withOpacity(0.5),
+                          width: 2,
+                        )
+                      : null,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
                     ),
-                    if (discount != '0' && discount.isNotEmpty)
-                      Positioned(
-                        top: -8,
-                        right: -8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.orange,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '$discount%',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: screenWidth > 450 ? 50 : 45,
+                      height: screenWidth > 450 ? 50 : 45,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? CommanColor.lightDarkPrimary(context)
+                                .withOpacity(0.2)
+                            : CommanColor.lightDarkPrimary(context)
+                                .withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.monetization_on,
+                        color: isDark
+                            ? Colors.white
+                            : CommanColor.lightDarkPrimary(context),
+                        size: screenWidth > 450 ? 28 : 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$credits Credits', // Credits amount from API response (sub_fields.item_1)
+                            style: TextStyle(
+                              color: CommanColor.whiteBlack(context),
+                              fontSize: screenWidth > 450 ? 18 : 16,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                        ),
+                        ],
                       ),
+                    ),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        IgnorePointer(
+                          ignoring:
+                              true, // Ignore button taps, parent InkWell handles it
+                          child: ElevatedButton(
+                            onPressed:
+                                () {}, // Empty handler to keep button enabled appearance
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor:
+                                  CommanColor.lightDarkPrimary(context),
+                              disabledBackgroundColor:
+                                  CommanColor.lightDarkPrimary(context),
+                              fixedSize: Size(
+                                screenWidth > 450 ? 150 : 130,
+                                screenWidth > 450 ? 46 : 42,
+                              ),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: screenWidth > 450 ? 20 : 16,
+                                vertical: screenWidth > 450 ? 12 : 10,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                side: isDark
+                                    ? const BorderSide(
+                                        color: Colors.white,
+                                        width: 1.5,
+                                      )
+                                    : BorderSide.none,
+                              ),
+                            ),
+                            child: (_loadingProductId == product?.id)
+                                ? SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.monetization_on,
+                                        color:
+                                            Colors.amber.shade700, // Gold color
+                                        size: screenWidth > 450 ? 18 : 16,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      // Use priceFromConstants directly - it's already read from the current pack
+                                      Text(
+                                        () {
+                                          // Determine display price
+                                          String displayPrice;
+                                          if (product != null &&
+                                              product.price.isNotEmpty) {
+                                            displayPrice = product.price;
+                                          } else if (priceFromConstants
+                                              .isNotEmpty) {
+                                            displayPrice = priceFromConstants;
+                                          } else {
+                                            // Fallback: try to get price from constants directly
+                                            String fallbackPrice = '';
+                                            if (identifier ==
+                                                BibleInfo.coinPack1Id) {
+                                              fallbackPrice =
+                                                  BibleInfo.coinPack1Price;
+                                            } else if (identifier ==
+                                                BibleInfo.coinPack2Id) {
+                                              fallbackPrice =
+                                                  BibleInfo.coinPack2Price;
+                                            } else if (identifier ==
+                                                BibleInfo.coinPack3Id) {
+                                              fallbackPrice =
+                                                  BibleInfo.coinPack3Price;
+                                            }
+                                            displayPrice =
+                                                fallbackPrice.isNotEmpty
+                                                    ? fallbackPrice
+                                                    : 'Loading...';
+                                          }
+
+                                          debugPrint(
+                                              'WalletScreen: Text for $identifier - priceFromConstants: "$priceFromConstants", product: ${product?.id}, displayPrice: "$displayPrice"');
+                                          return displayPrice;
+                                        }(),
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize:
+                                              screenWidth > 450 ? 14 : 13.5,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                        if (discount != '0' && discount.isNotEmpty)
+                          Positioned(
+                            top: -8,
+                            right: -8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.orange,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '$discount%',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
         ),

@@ -26,6 +26,11 @@ class BibleInfo {
   static String coinPack3Id =
       'com.balaklrapps.genevabible.coinspack3';
 
+  // Coin Pack Prices (for offline mode)
+  static String coinPack1Price = '\$4.99';
+  static String coinPack2Price = '\$9.99';
+  static String coinPack3Price = '\$19.99';
+
   static bool enableIAP = true;
 
   // enable-> true or disable-> false e-products here

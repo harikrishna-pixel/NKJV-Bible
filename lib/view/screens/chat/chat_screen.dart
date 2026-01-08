@@ -254,15 +254,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                             child: Column(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.all(16),
+                                  width: screenWidth > 450 ? 38 : 34,
+                                  height: screenWidth > 450 ? 38 : 34,
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    Icons.stars_rounded,
-                                    color: Colors.white,
-                                    size: screenWidth > 450 ? 36 : 32,
+                                    image: DecorationImage(image: AssetImage("assets/start_icon.png"))
                                   ),
                                 ),
                                 const SizedBox(height: 14),
@@ -2016,149 +2011,163 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
               ),
         child: SafeArea(
           bottom: false,
-          child: Column(
-            children: [
-              // Top bar with back button and actions
-              Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: screenWidth > 450 ? 8 : 4,
-                  vertical: screenWidth > 450 ? 8 : 4,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    IconButton(
-                      icon: Icon(
-                        Icons.arrow_back_ios_new,
-                        color: CommanColor.whiteBlack(context),
+          child: GestureDetector(
+            onTap: () {
+              // Dismiss keyboard when tapping anywhere on the screen
+              FocusScope.of(context).unfocus();
+              _messageFocusNode.unfocus();
+            },
+            behavior: HitTestBehavior.opaque,
+            child: Column(
+              children: [
+                // Top bar with back button and actions
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: screenWidth > 450 ? 8 : 4,
+                    vertical: screenWidth > 450 ? 8 : 4,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        icon: Icon(
+                          Icons.arrow_back_ios_new,
+                          color: CommanColor.whiteBlack(context),
+                        ),
+                        onPressed: () => Get.back(),
                       ),
-                      onPressed: () => Get.back(),
-                    ),
-                    // Show "Faith Chat" in center when messages exist
-                    if (_messages.isNotEmpty)
-                      Expanded(
-                        child: Center(
-                          child: Text(
-                            'Faith Chat',
-                            style: TextStyle(
-                              color: CommanColor.whiteBlack(context),
-                              fontSize: screenWidth > 450 ? 18 : 16,
-                              fontWeight: FontWeight.w600,
+                      // Show "Faith Chat" in center when messages exist
+                      if (_messages.isNotEmpty)
+                        Expanded(
+                          child: Center(
+                            child: Text(
+                              'Faith Chat',
+                              style: TextStyle(
+                                color: CommanColor.whiteBlack(context),
+                                fontSize: screenWidth > 450 ? 18 : 16,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                        ),
-                      )
-                    else
-                      Spacer(),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: screenWidth > 450 ? 8 : 6,
-                            vertical: 4,
+                        )
+                      else
+                        Spacer(),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              Get.to(
+                                    () => const WalletScreen(),
+                                transition: Transition.cupertinoDialog,
+                                duration: const Duration(milliseconds: 300),
+                              )?.then((_) {
+                                // Refresh credits when returning from wallet screen
+                                _loadCreditsFromLocal();
+                              });
+                            },
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: screenWidth > 450 ? 8 : 6,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? CommanColor.darkPrimaryColor
+                                        .withOpacity(0.6)
+                                    : CommanColor.lightDarkPrimary(context)
+                                        .withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.account_balance_wallet,
+                                    size: screenWidth > 450 ? 26 : 24,
+                                    color: isDark
+                                        ? Colors.white
+                                        : CommanColor.lightDarkPrimary(context),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '$_currentCredits',
+                                    style: TextStyle(
+                                      color: isDark
+                                          ? Colors.white
+                                          : CommanColor.lightDarkPrimary(context),
+                                      fontSize: screenWidth > 450 ? 13 : 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? CommanColor.darkPrimaryColor.withOpacity(0.6)
-                                : CommanColor.lightDarkPrimary(context)
-                                    .withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.account_balance_wallet,
-                                size: screenWidth > 450 ? 16 : 14,
+                          const SizedBox(width: 6),
+                          // Wallet icon button
+                          // IconButton(
+                          //   icon: Icon(
+                          //     Icons.account_balance_wallet,
+                          //     color: isDark
+                          //         ? Colors.white
+                          //         : CommanColor.lightDarkPrimary(context),
+                          //   ),
+                          //   tooltip: 'Wallet',
+                          //   onPressed: () {
+                          //     Get.to(
+                          //       () => const WalletScreen(),
+                          //       transition: Transition.cupertinoDialog,
+                          //       duration: const Duration(milliseconds: 300),
+                          //     )?.then((_) {
+                          //       // Refresh credits when returning from wallet screen
+                          //       _loadCreditsFromLocal();
+                          //     });
+                          //   },
+                          // ),
+                          // Show new chat icon when at least one response has been received
+                          if (_messages.any((msg) => !msg.isUser))
+                            IconButton(
+                              icon: Icon(
+                                Icons.add_circle_outline,
                                 color: isDark
                                     ? Colors.white
                                     : CommanColor.lightDarkPrimary(context),
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '$_currentCredits',
-                                style: TextStyle(
-                                  color: isDark
-                                      ? Colors.white
-                                      : CommanColor.lightDarkPrimary(context),
-                                  fontSize: screenWidth > 450 ? 13 : 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        // Wallet icon button
-                        IconButton(
-                          icon: Icon(
-                            Icons.account_balance_wallet,
-                            color: isDark
-                                ? Colors.white
-                                : CommanColor.lightDarkPrimary(context),
-                          ),
-                          tooltip: 'Wallet',
-                          onPressed: () {
-                            Get.to(
-                              () => const WalletScreen(),
-                              transition: Transition.cupertinoDialog,
-                              duration: const Duration(milliseconds: 300),
-                            )?.then((_) {
-                              // Refresh credits when returning from wallet screen
-                              _loadCreditsFromLocal();
-                            });
-                          },
-                        ),
-                        // Show new chat icon when at least one response has been received
-                        if (_messages.any((msg) => !msg.isUser))
+                              tooltip: 'New Chat',
+                              onPressed: () {
+                                if (_messages.isNotEmpty) {
+                                  _showNewChatBottomSheet();
+                                } else {
+                                  _startNewChat();
+                                }
+                              },
+                            ),
                           IconButton(
-                            icon: Icon(
-                              Icons.add_circle_outline,
+                            icon: Image.asset(
+                              "assets/message-time.png",
+                              width: 24,
+                              height: 24,
                               color: isDark
                                   ? Colors.white
                                   : CommanColor.lightDarkPrimary(context),
                             ),
-                            tooltip: 'New Chat',
+                            tooltip: 'Chat History',
                             onPressed: () {
-                              if (_messages.isNotEmpty) {
-                                _showNewChatBottomSheet();
-                              } else {
-                                _startNewChat();
-                              }
+                              Get.to(
+                                () => const ChatHistoryScreen(),
+                                transition: Transition.cupertinoDialog,
+                                duration: const Duration(milliseconds: 300),
+                              );
                             },
                           ),
-                        IconButton(
-                          icon: Image.asset(
-                            "assets/message-time.png",
-                            width: 24,
-                            height: 24,
-                            color: isDark
-                                ? Colors.white
-                                : CommanColor.lightDarkPrimary(context),
-                          ),
-                          tooltip: 'Chat History',
-                          onPressed: () {
-                            Get.to(
-                              () => const ChatHistoryScreen(),
-                              transition: Transition.cupertinoDialog,
-                              duration: const Duration(milliseconds: 300),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              // Main content area - Result Section with distinct background
-              Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    // Dismiss keyboard when tapping outside the typing pad
-                    FocusScope.of(context).unfocus();
-                    _messageFocusNode.unfocus();
-                  },
+                // Main content area - Result Section with distinct background
+                Expanded(
                   child: Container(
                     color: Colors
                         .transparent, // Remove grey background - use transparent
@@ -2247,16 +2256,16 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                           ),
                   ),
                 ),
-              ),
-              // Show default questions only when there are no messages
-              if (_messages.isEmpty)
-                widget.verseContext != null
-                    ? _buildVerseSuggestedQuestions(screenWidth, isDark)
-                    : _buildDefaultQuestions(screenWidth, isDark)
-              else
-                _buildFollowUpSuggestions(screenWidth, isDark),
-              _buildInputArea(screenWidth, isDark),
-            ],
+                // Show default questions only when there are no messages
+                if (_messages.isEmpty)
+                  widget.verseContext != null
+                      ? _buildVerseSuggestedQuestions(screenWidth, isDark)
+                      : _buildDefaultQuestions(screenWidth, isDark)
+                else
+                  _buildFollowUpSuggestions(screenWidth, isDark),
+                _buildInputArea(screenWidth, isDark),
+              ],
+            ),
           ),
         ),
       ),
@@ -3048,7 +3057,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
           ],
           Flexible(
             child: Container(
-              padding: EdgeInsets.all(screenWidth > 450 ? 16 : 12),
+              padding: EdgeInsets.all(screenWidth > 450 ? 16 : 14),
               decoration: BoxDecoration(
                 color: isUser
                     ? CommanColor.lightDarkPrimary(context)
@@ -3072,10 +3081,11 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                     text: TextSpan(
                       style: TextStyle(
                         color: isUser
-                            ? CommanColor.white.withOpacity(0.7)
+                            ? Colors.white
                             : CommanColor.whiteBlack(context).withOpacity(0.5),
-                        fontSize: screenWidth > 450 ? 18 : 18,
+                        fontSize: screenWidth > 450 ? 18 : 16,
                         fontWeight: FontWeight.w500,
+                        height: 1.4,
                       ),
                       children: _parseTextWithVerseHighlights(
                           message.text, isUser, screenWidth, context),
@@ -3090,10 +3100,10 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                         DateFormat('HH:mm').format(message.timestamp),
                         style: TextStyle(
                           color: isUser
-                              ? CommanColor.white.withOpacity(0.7)
+                              ? Colors.white.withOpacity(0.9)
                               : CommanColor.whiteBlack(context)
                                   .withOpacity(0.5),
-                          fontSize: screenWidth > 450 ? 12 : 10,
+                          fontSize: screenWidth > 450 ? 12 : 11,
                         ),
                       ),
                       // Show copy and share icons only for non-user messages (results)
@@ -3366,7 +3376,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                   },
                   style: TextStyle(
                     color: CommanColor.whiteBlack(context),
-                    fontSize: screenWidth > 450 ? 15 : 13,
+                    fontSize: screenWidth > 450 ? 15 : 14,
                   ),
                   decoration: InputDecoration(
                     hintText: _isListening
@@ -3376,7 +3386,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                             : "Ask anything here..."),
                     hintStyle: TextStyle(
                       color: CommanColor.whiteBlack(context).withOpacity(0.5),
-                      fontSize: screenWidth > 450 ? 15 : 13,
+                      fontSize: screenWidth > 450 ? 15 : 14,
                     ),
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(

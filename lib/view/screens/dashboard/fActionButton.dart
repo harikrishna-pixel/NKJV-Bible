@@ -71,9 +71,15 @@ class floatingButtonState extends State<floatingButton>
   String audioBaseUrl = "";
   int audioBookNum = 1;
   int audioChapterNum = 1;
-  int currentBookChapterCount = 1; // Track current book's chapter count for accurate completion checks
+  int currentBookChapterCount =
+      1; // Track current book's chapter count for accurate completion checks
   bool isPrevTTSEnabled = false;
   late AudioPlayer audioPlayer;
+
+  // Track if audio was playing when closed, to auto-resume on chapter change
+  bool _wasAudioPlayingBeforeClose = false;
+  // Store book name to preserve it when reopening
+  String? _storedBookName;
 
   // Add this for background audio
   late AudioHandler _audioHandler;
@@ -133,6 +139,54 @@ class floatingButtonState extends State<floatingButton>
         });
       }
     });
+
+    // Store initial book name
+    _storedBookName = widget.bookName;
+  }
+
+  @override
+  void didUpdateWidget(floatingButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // Check if chapter changed (swipe to next chapter)
+    final oldChapterNum = int.parse(oldWidget.chapterNum);
+    final newChapterNum = int.parse(widget.chapterNum);
+
+    if (oldChapterNum != newChapterNum) {
+      // Chapter changed - update audio chapter number
+      audioChapterNum = newChapterNum;
+      selectedChapter = newChapterNum;
+
+      // If audio was playing before close, auto-start it on new chapter
+      if (_wasAudioPlayingBeforeClose && !isAudioPlaying) {
+        // Update book name if it changed
+        if (widget.bookName != oldWidget.bookName) {
+          _storedBookName = widget.bookName;
+          audioBookNum = int.parse(widget.bookNum.toString()) + 1;
+          currentBookChapterCount = int.parse(widget.chapterCount.toString());
+        }
+
+        // Auto-start audio on new chapter
+        Future.delayed(const Duration(milliseconds: 300), () async {
+          if (mounted) {
+            await setAudio();
+            await audioPlayer.resume();
+            if (mounted) {
+              setState(() {
+                isAudioPlaying = true;
+              });
+            }
+          }
+        });
+      }
+    }
+
+    // Update book name if it changed
+    if (widget.bookName != oldWidget.bookName) {
+      _storedBookName = widget.bookName;
+      audioBookNum = int.parse(widget.bookNum.toString()) + 1;
+      currentBookChapterCount = int.parse(widget.chapterCount.toString());
+    }
   }
 
   Future<void> setupAudioPlayer() async {
@@ -177,12 +231,22 @@ class floatingButtonState extends State<floatingButton>
   }
 
   Future setAudio() async {
+    // Stop TTS if it's playing before starting audio
+    if (isSpeech && _isTtsInitialized) {
+      await _stop();
+      if (mounted) {
+        setState(() {
+          isSpeech = false;
+        });
+      }
+    }
+
     // Set release mode based on repeat flag - default to release (no loop)
     String? audioBasePath =
         widget.audioData?.data?.bibleAudioInfo?.audioBasepath;
     try {
-      await audioPlayer.setReleaseMode(
-          repeat ? ReleaseMode.loop : ReleaseMode.release);
+      await audioPlayer
+          .setReleaseMode(repeat ? ReleaseMode.loop : ReleaseMode.release);
       audioBaseUrl = "$audioBasePath/$audioBookNum/$audioChapterNum.mp3";
       log('Audio Base Url:$audioBaseUrl');
       await audioPlayer.setSourceUrl(audioBaseUrl).whenComplete(() {
@@ -201,7 +265,10 @@ class floatingButtonState extends State<floatingButton>
 
   bool isTTSLoop = false;
   bool shouldAutoAdvance = true; // Flag to control auto-advancement
-  bool isManualNavigation = false; // Flag to track manual navigation to prevent double increment
+  bool isManualNavigation =
+      false; // Flag to track manual navigation to prevent double increment
+  bool isManuallyPaused =
+      false; // Flag to prevent auto-restart when manually paused
   bool get isIOS => !kIsWeb && Platform.isIOS;
   bool get isAndroid => !kIsWeb && Platform.isAndroid;
   bool get isWindows => !kIsWeb && Platform.isWindows;
@@ -263,6 +330,7 @@ class floatingButtonState extends State<floatingButton>
       if (mounted) {
         setState(() {
           ttsState = TtsState.playing;
+          isSpeech = true; // Sync isSpeech with TTS state
         });
       }
     });
@@ -271,6 +339,7 @@ class floatingButtonState extends State<floatingButton>
       if (mounted) {
         setState(() {
           ttsState = TtsState.stopped;
+          isSpeech = false; // Sync isSpeech with TTS state
         });
       }
     });
@@ -289,6 +358,13 @@ class floatingButtonState extends State<floatingButton>
       }
     });
     flutterTts.setCompletionHandler(() async {
+      // Don't auto-advance if manually paused
+      if (isManuallyPaused) {
+        debugPrint(
+            'Completion handler: TTS was manually paused, not auto-advancing');
+        return;
+      }
+
       // Only auto-advance if not manually stopped or navigated
       if (!shouldAutoAdvance) {
         return;
@@ -297,7 +373,8 @@ class floatingButtonState extends State<floatingButton>
       if (isManualNavigation) {
         if (mounted) {
           setState(() {
-            isManualNavigation = false; // Reset flag and allow future auto-advancement
+            isManualNavigation =
+                false; // Reset flag and allow future auto-advancement
           });
         }
         return;
@@ -328,13 +405,21 @@ class floatingButtonState extends State<floatingButton>
               await Future.delayed(const Duration(milliseconds: 50));
               // Load chapter content and wait for it to complete
               await setChapterContent();
-              if (mounted && selectedChapterContent.isNotEmpty && curretNo >= 0 && curretNo < selectedChapterContent.length) {
+              if (mounted &&
+                  selectedChapterContent.isNotEmpty &&
+                  curretNo >= 0 &&
+                  curretNo < selectedChapterContent.length) {
                 setState(() {
                   _newVoiceText = selectedChapterContent[curretNo].content;
                 });
                 // Wait for UI to update before speaking
                 await Future.delayed(const Duration(milliseconds: 50));
-                if (mounted && isSpeech && _newVoiceText != null && _newVoiceText!.isNotEmpty) {
+                // Don't auto-speak if manually paused
+                if (mounted &&
+                    !isManuallyPaused &&
+                    isSpeech &&
+                    _newVoiceText != null &&
+                    _newVoiceText!.isNotEmpty) {
                   _speak();
                 }
               }
@@ -350,7 +435,11 @@ class floatingButtonState extends State<floatingButton>
               });
               // Wait for UI to update before speaking
               await Future.delayed(const Duration(milliseconds: 50));
-              if (mounted && _newVoiceText != null && _newVoiceText!.isNotEmpty) {
+              // Don't auto-speak if manually paused
+              if (mounted &&
+                  !isManuallyPaused &&
+                  _newVoiceText != null &&
+                  _newVoiceText!.isNotEmpty) {
                 _speak();
               }
             }
@@ -373,7 +462,7 @@ class floatingButtonState extends State<floatingButton>
   }
 
   Future<dynamic> _getLanguages() async => await flutterTts.getLanguages;
-  
+
   Future<List<dynamic>> _getVoices() async {
     try {
       if (isAndroid || isIOS) {
@@ -388,7 +477,7 @@ class floatingButtonState extends State<floatingButton>
       return [];
     }
   }
-  
+
   String _getVoiceDisplayName(dynamic voice) {
     if (voice == null) return "Default";
     if (voice is Map) {
@@ -402,7 +491,7 @@ class floatingButtonState extends State<floatingButton>
     }
     return voice.toString();
   }
-  
+
   Future<void> _previewVoice() async {
     try {
       await _stop();
@@ -426,6 +515,7 @@ class floatingButtonState extends State<floatingButton>
       debugPrint("Error previewing voice: $e");
     }
   }
+
   checknetwork() async {
     await Future.delayed(Duration(milliseconds: 3000));
     await SharPreferences.setBoolean('closead', false);
@@ -458,6 +548,10 @@ class floatingButtonState extends State<floatingButton>
 
   Future _speak() async {
     try {
+      // Reset manual pause flag when TTS is manually started
+      isManuallyPaused = false;
+      shouldAutoAdvance = true; // Re-enable auto-advance when manually started
+
       // TTS works offline, no need to check internet connection
       // But handle any TTS errors gracefully
       await flutterTts.setVolume(volume);
@@ -491,20 +585,29 @@ class floatingButtonState extends State<floatingButton>
   }
 
   Future _stop() async {
-    // await Future.delayed(Duration(seconds: 2));
-    await SharPreferences.setBoolean('closead', true);
     if (!mounted) return;
-    if (mounted && _isTtsInitialized) {
+
+    // Stop TTS immediately without waiting for SharedPreferences
+    if (_isTtsInitialized) {
       try {
-        var result = await flutterTts.stop();
-        if (result == 1 && mounted) {
-          setState(() => ttsState = TtsState.stopped);
-        }
+        await flutterTts.stop();
+        debugPrint('_stop() called - TTS stopped');
       } catch (e) {
-        // Ignore errors if TTS is not available
-        debugPrint("TTS stop error: $e");
+        debugPrint("TTS stop error in _stop(): $e");
       }
     }
+
+    // Update state immediately
+    if (mounted) {
+      setState(() {
+        ttsState = TtsState.stopped;
+        isSpeech = false;
+      });
+      debugPrint('_stop() - State updated: isSpeech=false, ttsState=stopped');
+    }
+
+    // Update SharedPreferences in background (non-blocking)
+    SharPreferences.setBoolean('closead', true);
   }
 
   bool isInitialTime = true;
@@ -516,9 +619,11 @@ class floatingButtonState extends State<floatingButton>
     debugPrint(" audio  stopped ");
 
     if (!mounted) return;
-    
+
     if (isAudioPlaying) {
       try {
+        // Store that audio was playing before close
+        _wasAudioPlayingBeforeClose = true;
         await audioPlayer.stop();
         await SharPreferences.setBoolean('closead', true);
         // await audioPlayer.dispose();
@@ -527,10 +632,14 @@ class floatingButtonState extends State<floatingButton>
       }
     } else if (isSpeech && _isTtsInitialized) {
       try {
+        _wasAudioPlayingBeforeClose = false; // Reset if TTS was playing
         flutterTts.stop();
       } catch (e) {
         debugPrint("Error stopping TTS: $e");
       }
+    } else {
+      // Neither playing - reset flag
+      _wasAudioPlayingBeforeClose = false;
     }
   }
 
@@ -540,27 +649,27 @@ class floatingButtonState extends State<floatingButton>
       // Update shared preferences first
       await SharPreferences.setString(
           SharPreferences.selectedChapter, chapterNum.toString());
-      
+
       // Small delay to ensure SharedPreferences is fully written
       await Future.delayed(const Duration(milliseconds: 150));
-      
+
       // Update local selectedChapter to keep in sync
       if (mounted) {
         setState(() {
           selectedChapter = chapterNum;
         });
       }
-      
+
       // Update the reading screen via controller
       try {
         final controller = Get.find<DashBoardController>();
         // Update controller's observable values directly first to ensure UI updates immediately
         controller.selectedChapter.value = chapterNum.toString();
         controller.selectChapterChange.value = chapterNum;
-        
+
         // Also update the "ForRead" values which are used by getBookContentForRead
         controller.selectedChapterForRead.value = chapterNum.toString();
-        
+
         // Then call getSelectedChapterAndBook to load content from database
         // This method reads from SharedPreferences (which we just updated) and updates controller values
         controller.getSelectedChapterAndBook();
@@ -568,7 +677,7 @@ class floatingButtonState extends State<floatingButton>
         controller.getBookContentForRead();
         // Give enough time for all nested async operations to complete
         await Future.delayed(const Duration(milliseconds: 500));
-        
+
         // Final update to ensure values are set after database operations
         controller.selectedChapter.value = chapterNum.toString();
         controller.selectChapterChange.value = chapterNum;
@@ -593,9 +702,8 @@ class floatingButtonState extends State<floatingButton>
 
       // Query for the next book (book_num = currentBookNum + 1)
       final nextBookNum = currentBookNum + 1;
-      final result = await db.rawQuery(
-        "SELECT * FROM book WHERE book_num = $nextBookNum LIMIT 1"
-      );
+      final result = await db
+          .rawQuery("SELECT * FROM book WHERE book_num = $nextBookNum LIMIT 1");
 
       if (result.isNotEmpty) {
         return MainBookListModel.fromJson(result[0]);
@@ -609,42 +717,42 @@ class floatingButtonState extends State<floatingButton>
   }
 
   // Helper method to update reading screen for next book
-  Future<void> updateReadingScreenForNextBook(int bookNum, int chapterNum, String bookName, int chapterCount) async {
+  Future<void> updateReadingScreenForNextBook(
+      int bookNum, int chapterNum, String bookName, int chapterCount) async {
     try {
       // Update shared preferences for book and chapter - ensure all are saved
-      await SharPreferences.setString(
-          SharPreferences.selectedBook, bookName);
+      await SharPreferences.setString(SharPreferences.selectedBook, bookName);
       await SharPreferences.setString(
           SharPreferences.selectedChapter, chapterNum.toString());
       await SharPreferences.setString(
           SharPreferences.selectedBookNum, bookNum.toString());
-      
+
       // Small delay to ensure SharedPreferences is fully written
       await Future.delayed(const Duration(milliseconds: 150));
-      
+
       // Update local selectedChapter to keep in sync
       if (mounted) {
         setState(() {
           selectedChapter = chapterNum;
         });
       }
-      
+
       // Update the reading screen via controller
       if (Get.isRegistered<DashBoardController>()) {
         final controller = Get.find<DashBoardController>();
-        
+
         // Update controller's observable values directly first to ensure UI updates immediately
         controller.selectedBook.value = bookName;
         controller.selectedBookNum.value = bookNum.toString();
         controller.selectedChapter.value = chapterNum.toString();
         controller.selectChapterChange.value = chapterNum;
         controller.selectedBookChapterCount.value = chapterCount.toString();
-        
+
         // Also update the "ForRead" values which are used by getBookContentForRead
         controller.selectedBookNameForRead.value = bookName;
         controller.selectedBookNumForRead.value = bookNum.toString();
         controller.selectedChapterForRead.value = chapterNum.toString();
-        
+
         // Call getSelectedChapterAndBook to load content from database
         // This method reads from SharedPreferences (which we just updated) and updates controller values
         try {
@@ -654,7 +762,7 @@ class floatingButtonState extends State<floatingButton>
           controller.selectedChapter.value = chapterNum.toString();
           controller.selectChapterChange.value = chapterNum;
           controller.selectedBookChapterCount.value = chapterCount.toString();
-          
+
           // Now call getSelectedChapterAndBook to load content from database
           // This will read from SharedPreferences and ensure all data is loaded
           controller.getSelectedChapterAndBook();
@@ -662,7 +770,7 @@ class floatingButtonState extends State<floatingButton>
           controller.getBookContentForRead();
           // Give enough time for all nested async operations to complete
           await Future.delayed(const Duration(milliseconds: 600));
-          
+
           // One more update to ensure values are set after database operations
           controller.selectedBook.value = bookName;
           controller.selectedChapter.value = chapterNum.toString();
@@ -722,7 +830,9 @@ class floatingButtonState extends State<floatingButton>
               end = isInitialTime ? 0 : (_newVoiceText?.length ?? 0);
               selectedChapterContent.add(widget.contentList[i]);
               // Only set _newVoiceText if list is not empty and curretNo is valid
-              if (selectedChapterContent.isNotEmpty && curretNo >= 0 && curretNo < selectedChapterContent.length) {
+              if (selectedChapterContent.isNotEmpty &&
+                  curretNo >= 0 &&
+                  curretNo < selectedChapterContent.length) {
                 _newVoiceText = selectedChapterContent[curretNo].content;
               }
             });
@@ -741,7 +851,7 @@ class floatingButtonState extends State<floatingButton>
     _durationSubscription?.cancel();
     _playerStateSubscription = null;
     _durationSubscription = null;
-    
+
     // Stop TTS if running - safely check if flutterTts is initialized
     // Note: TTS handlers already check 'mounted' before calling setState, so they're safe
     if (isSpeech && _isTtsInitialized) {
@@ -753,7 +863,7 @@ class floatingButtonState extends State<floatingButton>
         debugPrint("TTS cleanup error: $e");
       }
     }
-    
+
     closeaudio();
     WidgetsBinding.instance.removeObserver(this);
     // audioPlayer.dispose();
@@ -796,7 +906,10 @@ class floatingButtonState extends State<floatingButton>
           ),
           child: GestureDetector(
             child: Center(
-                child: isSpeech || isAudioPlaying
+                child: (isSpeech ||
+                        isPlaying ||
+                        isAudioPlaying ||
+                        ttsState == TtsState.playing)
                     ? Icon(Icons.pause,
                         size: screenWidth > 450 ? 44 : 24,
                         color: CommanColor.darkModePrimaryWhite(context))
@@ -819,11 +932,36 @@ class floatingButtonState extends State<floatingButton>
                           )),
             onTap: () async {
               log('On Tap');
-              if (isSpeech) {
-                _stop();
-                setState(() {
-                  isSpeech = false;
-                });
+              // Check if TTS is playing - check both flag and actual state
+              final isTTSActive =
+                  isSpeech || isPlaying || ttsState == TtsState.playing;
+
+              if (isTTSActive) {
+                // Stop TTS - ensure it's actually stopped
+                debugPrint(
+                    'Pausing TTS - isSpeech: $isSpeech, isPlaying: $isPlaying, ttsState: $ttsState');
+                // Set flag to prevent auto-restart from completion handler
+                isManuallyPaused = true;
+                shouldAutoAdvance =
+                    false; // Disable auto-advance when manually paused
+
+                if (_isTtsInitialized) {
+                  try {
+                    await flutterTts.stop();
+                    debugPrint('TTS stop called successfully');
+                  } catch (e) {
+                    debugPrint("TTS stop error: $e");
+                  }
+                }
+                // Always update state regardless of stop result
+                if (mounted) {
+                  setState(() {
+                    ttsState = TtsState.stopped;
+                    isSpeech = false;
+                  });
+                  debugPrint(
+                      'TTS state updated - isSpeech: false, ttsState: stopped, isManuallyPaused: true');
+                }
               } else if (isAudioPlaying) {
                 await audioPlayer.stop();
                 setState(() {
@@ -977,7 +1115,10 @@ class floatingButtonState extends State<floatingButton>
             ),
             child: GestureDetector(
               child: Center(
-                  child: isSpeech || isAudioPlaying
+                  child: (isSpeech ||
+                          isPlaying ||
+                          isAudioPlaying ||
+                          ttsState == TtsState.playing)
                       ? Icon(Icons.pause,
                           size: 24,
                           color: CommanColor.darkModePrimaryWhite(context))
@@ -998,11 +1139,36 @@ class floatingButtonState extends State<floatingButton>
                               size: isOpenAudio == false ? 28 : 22,
                             )),
               onTap: () async {
-                if (isSpeech) {
-                  _stop();
-                  setState(() {
-                    isSpeech = false;
-                  });
+                // Check if TTS is playing - check both flag and actual state
+                final isTTSActive =
+                    isSpeech || isPlaying || ttsState == TtsState.playing;
+
+                if (isTTSActive) {
+                  // Stop TTS - ensure it's actually stopped
+                  debugPrint(
+                      'Pausing TTS (offline) - isSpeech: $isSpeech, isPlaying: $isPlaying, ttsState: $ttsState');
+                  // Set flag to prevent auto-restart from completion handler
+                  isManuallyPaused = true;
+                  shouldAutoAdvance =
+                      false; // Disable auto-advance when manually paused
+
+                  if (_isTtsInitialized) {
+                    try {
+                      await flutterTts.stop();
+                      debugPrint('TTS stop called successfully');
+                    } catch (e) {
+                      debugPrint("TTS stop error: $e");
+                    }
+                  }
+                  // Always update state regardless of stop result
+                  if (mounted) {
+                    setState(() {
+                      ttsState = TtsState.stopped;
+                      isSpeech = false;
+                    });
+                    debugPrint(
+                        'TTS state updated - isSpeech: false, ttsState: stopped, isManuallyPaused: true');
+                  }
                 } else if (isAudioPlaying) {
                   await audioPlayer.stop();
                   setState(() {
@@ -1148,7 +1314,17 @@ class floatingButtonState extends State<floatingButton>
                   });
                   // Update reading screen to match audio chapter - do this before loading audio
                   await updateReadingScreenChapter(audioChapterNum);
-                  
+
+                  // Stop TTS if it's playing
+                  if (isSpeech && _isTtsInitialized) {
+                    await _stop();
+                    if (context.mounted) {
+                      setState(() {
+                        isSpeech = false;
+                      });
+                    }
+                  }
+
                   // Additional delay to ensure UI updates before loading next audio
                   await Future.delayed(const Duration(milliseconds: 100));
 
@@ -1156,8 +1332,10 @@ class floatingButtonState extends State<floatingButton>
                   bool loadSuccess = false;
                   int retryCount = 0;
                   const maxRetries = 2;
-                  
-                  while (!loadSuccess && retryCount < maxRetries && context.mounted) {
+
+                  while (!loadSuccess &&
+                      retryCount < maxRetries &&
+                      context.mounted) {
                     try {
                       await audioPlayer.setSourceUrl(audioBaseUrl);
                       // ensure position and duration will update from streams
@@ -1167,18 +1345,21 @@ class floatingButtonState extends State<floatingButton>
                       if (context.mounted) {
                         setState(() {
                           isAudioPlaying = true;
-                          position = Duration.zero; // Reset position for new chapter
+                          position =
+                              Duration.zero; // Reset position for new chapter
                         });
                       }
                     } catch (e) {
                       retryCount++;
-                      debugPrint("Error loading next chapter audio (attempt $retryCount): $e");
+                      debugPrint(
+                          "Error loading next chapter audio (attempt $retryCount): $e");
                       if (retryCount < maxRetries) {
                         // Wait a bit before retrying
                         await Future.delayed(const Duration(milliseconds: 500));
                       } else {
                         // After max retries, still try to continue but log the error
-                        debugPrint("Failed to load next chapter after $maxRetries attempts, but continuing");
+                        debugPrint(
+                            "Failed to load next chapter after $maxRetries attempts, but continuing");
                         // Don't stop - let it try to continue
                         if (context.mounted) {
                           setState(() {
@@ -1189,7 +1370,7 @@ class floatingButtonState extends State<floatingButton>
                       }
                     }
                   }
-                  
+
                   // Clear the isNext guard after a delay, regardless of success/failure
                   Future.delayed(const Duration(milliseconds: 500), () {
                     if (mounted && context.mounted) {
@@ -1201,33 +1382,37 @@ class floatingButtonState extends State<floatingButton>
                   setState(() {
                     isNext = true; // prevent duplicate triggers
                   });
-                  
+
                   // Get current book number (0-indexed from widget.bookNum)
                   final currentBookNum = int.parse(widget.bookNum.toString());
-                  
+
                   // Try to get the next book
                   final nextBook = await getNextBook(currentBookNum);
-                  
-                  if (nextBook != null && nextBook.bookNum != null && nextBook.chapterCount != null) {
+
+                  if (nextBook != null &&
+                      nextBook.bookNum != null &&
+                      nextBook.chapterCount != null) {
                     // Next book exists - load first chapter of next book
                     final nextBookNum = nextBook.bookNum!.toInt();
                     final nextBookChapterCount = nextBook.chapterCount!.toInt();
                     final nextBookName = nextBook.title ?? "";
-                    
+
                     // Update audio book and chapter numbers
                     // audioBookNum is 1-indexed for URL (bookNum + 1)
                     setState(() {
                       audioBookNum = nextBookNum + 1;
                       audioChapterNum = 1;
-                      currentBookChapterCount = nextBookChapterCount; // Update chapter count for new book
+                      currentBookChapterCount =
+                          nextBookChapterCount; // Update chapter count for new book
                       audioBaseUrl =
                           "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$audioChapterNum.mp3";
                     });
-                    
+
                     // Update reading screen to match next book and first chapter
                     // Pass chapter count so it can be updated in the controller
-                    await updateReadingScreenForNextBook(nextBookNum, 1, nextBookName, nextBookChapterCount);
-                    
+                    await updateReadingScreenForNextBook(
+                        nextBookNum, 1, nextBookName, nextBookChapterCount);
+
                     // Force a small delay and then refresh controller to ensure UI updates
                     await Future.delayed(const Duration(milliseconds: 100));
                     if (Get.isRegistered<DashBoardController>()) {
@@ -1235,13 +1420,15 @@ class floatingButtonState extends State<floatingButton>
                       // Trigger update again to ensure UI reflects changes
                       controller.getSelectedChapterAndBook();
                     }
-                    
+
                     // Load next book's first chapter audio
                     bool loadSuccess = false;
                     int retryCount = 0;
                     const maxRetries = 2;
-                    
-                    while (!loadSuccess && retryCount < maxRetries && context.mounted) {
+
+                    while (!loadSuccess &&
+                        retryCount < maxRetries &&
+                        context.mounted) {
                       try {
                         await audioPlayer.setSourceUrl(audioBaseUrl);
                         // ensure position and duration will update from streams
@@ -1251,18 +1438,22 @@ class floatingButtonState extends State<floatingButton>
                         if (context.mounted) {
                           setState(() {
                             isAudioPlaying = true;
-                            position = Duration.zero; // Reset position for new book
+                            position =
+                                Duration.zero; // Reset position for new book
                           });
                         }
                       } catch (e) {
                         retryCount++;
-                        debugPrint("Error loading next book audio (attempt $retryCount): $e");
+                        debugPrint(
+                            "Error loading next book audio (attempt $retryCount): $e");
                         if (retryCount < maxRetries) {
                           // Wait a bit before retrying
-                          await Future.delayed(const Duration(milliseconds: 500));
+                          await Future.delayed(
+                              const Duration(milliseconds: 500));
                         } else {
                           // After max retries, stop audio
-                          debugPrint("Failed to load next book after $maxRetries attempts");
+                          debugPrint(
+                              "Failed to load next book after $maxRetries attempts");
                           if (context.mounted) {
                             setState(() {
                               isAudioPlaying = false;
@@ -1272,7 +1463,7 @@ class floatingButtonState extends State<floatingButton>
                         }
                       }
                     }
-                    
+
                     // Clear the isNext guard after a delay
                     Future.delayed(const Duration(milliseconds: 500), () {
                       if (mounted && context.mounted) {
@@ -1304,6 +1495,15 @@ class floatingButtonState extends State<floatingButton>
                 }
               } else if (repeat) {
                 // Repeat mode - restart current chapter
+                // Stop TTS if it's playing
+                if (isSpeech && _isTtsInitialized) {
+                  await _stop();
+                  if (context.mounted) {
+                    setState(() {
+                      isSpeech = false;
+                    });
+                  }
+                }
                 try {
                   await audioPlayer.setSourceUrl(audioBaseUrl);
                   // ensure position and duration will update from streams
@@ -1358,7 +1558,7 @@ class floatingButtonState extends State<floatingButton>
                   children: [
                     const SizedBox(width: 60),
                     Text(
-                      "${widget.bookName} - $audioChapterNum",
+                      "${_storedBookName ?? widget.bookName} - $audioChapterNum",
                       style: TextStyle(
                           color: CommanColor.lightDarkPrimary(context),
                           letterSpacing: BibleInfo.letterSpacing,
@@ -1495,6 +1695,15 @@ class floatingButtonState extends State<floatingButton>
                           });
                           // Update reading screen to match audio chapter
                           await updateReadingScreenChapter(audioChapterNum);
+                          // Stop TTS if it's playing
+                          if (isSpeech && _isTtsInitialized) {
+                            await _stop();
+                            if (context.mounted) {
+                              setState(() {
+                                isSpeech = false;
+                              });
+                            }
+                          }
                           try {
                             await audioPlayer.setSourceUrl(audioBaseUrl);
                             await audioPlayer.seek(Duration.zero);
@@ -1544,6 +1753,15 @@ class floatingButtonState extends State<floatingButton>
                             setState(() => isAudioPlaying = false);
                           }
                         } else {
+                          // Stop TTS if it's playing before starting audio
+                          if (isSpeech && _isTtsInitialized) {
+                            await _stop();
+                            if (context.mounted) {
+                              setState(() {
+                                isSpeech = false;
+                              });
+                            }
+                          }
                           await audioPlayer.resume();
                           if (context.mounted) {
                             setState(() => isAudioPlaying = true);
@@ -1608,6 +1826,15 @@ class floatingButtonState extends State<floatingButton>
                             });
                             // Update reading screen to match audio chapter
                             await updateReadingScreenChapter(audioChapterNum);
+                            // Stop TTS if it's playing
+                            if (isSpeech && _isTtsInitialized) {
+                              await _stop();
+                              if (context.mounted) {
+                                setState(() {
+                                  isSpeech = false;
+                                });
+                              }
+                            }
                             try {
                               await audioPlayer.setSourceUrl(audioBaseUrl);
                               await audioPlayer.seek(Duration.zero);
@@ -1967,7 +2194,7 @@ class floatingButtonState extends State<floatingButton>
   //                                         int.parse(widget.chapterCount)
   //                                     ? audioChapterNum++
   //                                     : audioChapterNum =₹
-  
+
   //                                         int.parse(widget.chapterCount);
   //                                 audioBaseUrl =
   //                                     "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath.toString()}/$audioBookNum/$audioChapterNum.mp3";
@@ -2015,11 +2242,13 @@ class floatingButtonState extends State<floatingButton>
     // Get voices if available
     if (availableVoices == null && (isAndroid || isIOS)) {
       availableVoices = await _getVoices();
-      if (availableVoices != null && availableVoices!.isNotEmpty && selectedVoice == null) {
+      if (availableVoices != null &&
+          availableVoices!.isNotEmpty &&
+          selectedVoice == null) {
         selectedVoice = availableVoices!.first;
       }
     }
-    
+
     return showModalBottomSheet(
       backgroundColor: Colors.black12,
       context: context,
@@ -2065,7 +2294,7 @@ class floatingButtonState extends State<floatingButton>
                     ],
                   ),
                   const SizedBox(height: 30),
-                  
+
                   // Voice Selection
                   Text(
                     "Voice",
@@ -2077,67 +2306,49 @@ class floatingButtonState extends State<floatingButton>
                     ),
                   ),
                   const SizedBox(height: 10),
-                  
+
                   // Voice Dropdown
                   FutureBuilder<List<dynamic>>(
                     future: _getVoices(),
                     builder: (context, snapshot) {
                       if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                        // Remove duplicates based on identifier (primary) or name+locale combination
+                        // Remove duplicates based on display name (what users see)
+                        // This prevents duplicate narrator names from appearing
                         List<dynamic> uniqueVoices = [];
-                        Set<String> seenKeys = {}; // Use a single set for all unique keys
-                        
+                        Set<String> seenDisplayNames =
+                            {}; // Track display names to prevent duplicates
+
                         for (var voice in snapshot.data!) {
-                          if (voice is Map) {
-                            String? identifier = voice['identifier']?.toString();
-                            String? name = voice['name']?.toString();
-                            String? locale = voice['locale']?.toString();
-                            
-                            // Create a unique key: prefer identifier, fallback to name+locale combination
-                            String uniqueKey;
-                            if (identifier != null && identifier.isNotEmpty) {
-                              uniqueKey = identifier;
-                            } else if (name != null && locale != null) {
-                              uniqueKey = '$name|$locale';
-                            } else if (name != null) {
-                              uniqueKey = name;
-                            } else if (locale != null) {
-                              uniqueKey = locale;
-                            } else {
-                              // If no identifier, name, or locale, use string representation
-                              uniqueKey = voice.toString();
-                            }
-                            
-                            // Only add if we haven't seen this unique key before
-                            if (!seenKeys.contains(uniqueKey)) {
-                              seenKeys.add(uniqueKey);
-                              uniqueVoices.add(voice);
-                            }
-                          } else {
-                            // For non-Map voices, check by string representation
-                            String voiceStr = voice.toString();
-                            if (!seenKeys.contains(voiceStr)) {
-                              seenKeys.add(voiceStr);
-                              uniqueVoices.add(voice);
-                            }
+                          // Get the display name that will be shown to users
+                          String displayName = _getVoiceDisplayName(voice);
+
+                          // Only add if we haven't seen this display name before
+                          // This ensures users don't see duplicate narrator names
+                          if (!seenDisplayNames.contains(displayName)) {
+                            seenDisplayNames.add(displayName);
+                            uniqueVoices.add(voice);
                           }
                         }
-                        
+
                         // If no unique voices found, use original list
                         if (uniqueVoices.isEmpty) {
                           uniqueVoices = snapshot.data!;
                         }
-                        
+
                         // Find matching selectedVoice by identifier
                         dynamic matchedSelectedVoice;
-                        if (selectedVoice != null && selectedVoice is Map && uniqueVoices.isNotEmpty) {
-                          String? selectedIdentifier = selectedVoice['identifier']?.toString();
+                        if (selectedVoice != null &&
+                            selectedVoice is Map &&
+                            uniqueVoices.isNotEmpty) {
+                          String? selectedIdentifier =
+                              selectedVoice['identifier']?.toString();
                           if (selectedIdentifier != null) {
                             try {
                               matchedSelectedVoice = uniqueVoices.firstWhere(
                                 (voice) {
                                   if (voice is Map) {
-                                    return voice['identifier']?.toString() == selectedIdentifier;
+                                    return voice['identifier']?.toString() ==
+                                        selectedIdentifier;
                                   }
                                   return false;
                                 },
@@ -2153,9 +2364,10 @@ class floatingButtonState extends State<floatingButton>
                           // If no selectedVoice or it's not a Map, use first voice
                           matchedSelectedVoice = uniqueVoices.first;
                         }
-                        
+
                         return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
                             border: Border.all(
                               color: CommanColor.lightGrey,
@@ -2179,7 +2391,9 @@ class floatingButtonState extends State<floatingButton>
                               return DropdownMenuItem<dynamic>(
                                 value: voice,
                                 child: Text(
-                                  isDefault ? "$displayName (Default)" : displayName,
+                                  isDefault
+                                      ? "$displayName (Default)"
+                                      : displayName,
                                   style: TextStyle(
                                     color: Colors.black,
                                     letterSpacing: BibleInfo.letterSpacing,
@@ -2209,12 +2423,16 @@ class floatingButtonState extends State<floatingButton>
                             },
                             selectedItemBuilder: (BuildContext context) {
                               return uniqueVoices.map<Widget>((voice) {
-                                String displayName = _getVoiceDisplayName(voice);
+                                String displayName =
+                                    _getVoiceDisplayName(voice);
                                 bool isDefault = voice == uniqueVoices.first;
                                 return Text(
-                                  isDefault ? "$displayName (Default)" : displayName,
+                                  isDefault
+                                      ? "$displayName (Default)"
+                                      : displayName,
                                   style: TextStyle(
-                                    color: CommanColor.lightDarkPrimary(context),
+                                    color:
+                                        CommanColor.lightDarkPrimary(context),
                                     letterSpacing: BibleInfo.letterSpacing,
                                     fontSize: BibleInfo.fontSizeScale * 16,
                                     fontWeight: FontWeight.w500,
@@ -2231,8 +2449,14 @@ class floatingButtonState extends State<floatingButton>
                           builder: (context, langSnapshot) {
                             if (langSnapshot.hasData) {
                               List langList = [];
-                              for (var i = 0; i < langSnapshot.data.length; i++) {
-                                if (langSnapshot.data[i].toString().split("-").first == "en") {
+                              for (var i = 0;
+                                  i < langSnapshot.data.length;
+                                  i++) {
+                                if (langSnapshot.data[i]
+                                        .toString()
+                                        .split("-")
+                                        .first ==
+                                    "en") {
                                   langList.add(langSnapshot.data[i]);
                                 }
                               }
@@ -2240,7 +2464,8 @@ class floatingButtonState extends State<floatingButton>
                                 language = langList[0];
                               }
                               return Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
                                 decoration: BoxDecoration(
                                   border: Border.all(
                                     color: CommanColor.lightGrey,
@@ -2255,22 +2480,30 @@ class floatingButtonState extends State<floatingButton>
                                   underline: const SizedBox(),
                                   icon: Icon(
                                     Icons.keyboard_arrow_down,
-                                    color: CommanColor.lightDarkPrimary(context),
+                                    color:
+                                        CommanColor.lightDarkPrimary(context),
                                   ),
                                   items: langList.map((lang) {
-                                    var languageConvert = LanguageLocal().getDisplayLanguage(
-                                      lang.toString().split("-").first
-                                    );
-                                    String displayName = languageConvert["name"] ?? lang.toString();
+                                    var languageConvert = LanguageLocal()
+                                        .getDisplayLanguage(
+                                            lang.toString().split("-").first);
+                                    String displayName =
+                                        languageConvert["name"] ??
+                                            lang.toString();
                                     bool isDefault = lang == langList[0];
                                     return DropdownMenuItem<String>(
                                       value: lang.toString(),
                                       child: Text(
-                                        isDefault ? "$displayName (Default)" : displayName,
+                                        isDefault
+                                            ? "$displayName (Default)"
+                                            : displayName,
                                         style: TextStyle(
-                                          color: CommanColor.lightDarkPrimary(context),
-                                          letterSpacing: BibleInfo.letterSpacing,
-                                          fontSize: BibleInfo.fontSizeScale * 16,
+                                          color: CommanColor.lightDarkPrimary(
+                                              context),
+                                          letterSpacing:
+                                              BibleInfo.letterSpacing,
+                                          fontSize:
+                                              BibleInfo.fontSizeScale * 16,
                                           fontWeight: FontWeight.w500,
                                         ),
                                       ),
@@ -2293,7 +2526,7 @@ class floatingButtonState extends State<floatingButton>
                     },
                   ),
                   const SizedBox(height: 20),
-                  
+
                   // Preview Voice Button
                   InkWell(
                     onTap: () async {
@@ -2329,7 +2562,7 @@ class floatingButtonState extends State<floatingButton>
                     ),
                   ),
                   const SizedBox(height: 30),
-                  
+
                   // Pitch Slider
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2368,7 +2601,8 @@ class floatingButtonState extends State<floatingButton>
                   SliderTheme(
                     data: SliderThemeData(
                       thumbColor: CommanColor.lightDarkPrimary(context),
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                      thumbShape:
+                          const RoundSliderThumbShape(enabledThumbRadius: 7),
                     ),
                     child: Slider(
                       activeColor: CommanColor.lightDarkPrimary(context),
@@ -2387,7 +2621,7 @@ class floatingButtonState extends State<floatingButton>
                     ),
                   ),
                   const SizedBox(height: 20),
-                  
+
                   // Speed Slider
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2426,7 +2660,8 @@ class floatingButtonState extends State<floatingButton>
                   SliderTheme(
                     data: SliderThemeData(
                       thumbColor: CommanColor.lightDarkPrimary(context),
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                      thumbShape:
+                          const RoundSliderThumbShape(enabledThumbRadius: 7),
                     ),
                     child: Slider(
                       activeColor: CommanColor.lightDarkPrimary(context),
@@ -2445,7 +2680,7 @@ class floatingButtonState extends State<floatingButton>
                     ),
                   ),
                   const SizedBox(height: 20),
-                  
+
                   // Volume Slider
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2475,7 +2710,8 @@ class floatingButtonState extends State<floatingButton>
                   SliderTheme(
                     data: SliderThemeData(
                       thumbColor: CommanColor.lightDarkPrimary(context),
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                      thumbShape:
+                          const RoundSliderThumbShape(enabledThumbRadius: 7),
                     ),
                     child: Slider(
                       activeColor: CommanColor.lightDarkPrimary(context),
@@ -2494,7 +2730,7 @@ class floatingButtonState extends State<floatingButton>
                     ),
                   ),
                   const SizedBox(height: 30),
-                  
+
                   // Reset to Default Button at bottom
                   InkWell(
                     onTap: () {
@@ -2596,7 +2832,7 @@ class floatingButtonState extends State<floatingButton>
                             width: 80,
                           ),
                           Text(
-                            "${widget.bookName} $selectedChapter - ${curretNo + 1}/${selectedChapterContent.length}",
+                            "${_storedBookName ?? widget.bookName} $selectedChapter - ${curretNo + 1}/${selectedChapterContent.length}",
                             style: TextStyle(
                                 color: CommanColor.lightDarkPrimary(context),
                                 letterSpacing: BibleInfo.letterSpacing,
@@ -2716,20 +2952,33 @@ class floatingButtonState extends State<floatingButton>
                                     setState(() {
                                       selectedChapter--;
                                       curretNo = 0;
-                                      isManualNavigation = true; // Mark as manual navigation to prevent double increment
-                                      shouldAutoAdvance = true; // Re-enable auto-advance after manual navigation
+                                      isManualNavigation =
+                                          true; // Mark as manual navigation to prevent double increment
+                                      shouldAutoAdvance =
+                                          true; // Re-enable auto-advance after manual navigation
                                     });
                                     // Wait for setState to complete
-                                    await Future.delayed(const Duration(milliseconds: 50));
+                                    await Future.delayed(
+                                        const Duration(milliseconds: 50));
                                     // Load chapter content and wait for it to complete
                                     await setChapterContent();
-                                    if (mounted && selectedChapterContent.isNotEmpty && curretNo >= 0 && curretNo < selectedChapterContent.length) {
+                                    if (mounted &&
+                                        selectedChapterContent.isNotEmpty &&
+                                        curretNo >= 0 &&
+                                        curretNo <
+                                            selectedChapterContent.length) {
                                       setState(() {
-                                        _newVoiceText = selectedChapterContent[curretNo].content;
+                                        _newVoiceText =
+                                            selectedChapterContent[curretNo]
+                                                .content;
                                       });
                                       // Wait for UI to update before speaking
-                                      await Future.delayed(const Duration(milliseconds: 50));
-                                      if (mounted && isSpeech && _newVoiceText != null && _newVoiceText!.isNotEmpty) {
+                                      await Future.delayed(
+                                          const Duration(milliseconds: 50));
+                                      if (mounted &&
+                                          isSpeech &&
+                                          _newVoiceText != null &&
+                                          _newVoiceText!.isNotEmpty) {
                                         _speak();
                                       }
                                     }
@@ -2747,21 +2996,31 @@ class floatingButtonState extends State<floatingButton>
                             onPressed: () async {
                               if (!mounted) return;
                               await _stop();
-                              if (curretNo > 0 && selectedChapterContent.isNotEmpty) {
+                              if (curretNo > 0 &&
+                                  selectedChapterContent.isNotEmpty) {
                                 // Go to previous verse in current chapter
                                 if (mounted) {
                                   setState(() {
                                     curretNo = curretNo - 1;
-                                    if (curretNo >= 0 && curretNo < selectedChapterContent.length) {
+                                    if (curretNo >= 0 &&
+                                        curretNo <
+                                            selectedChapterContent.length) {
                                       _newVoiceText =
-                                          selectedChapterContent[curretNo].content;
+                                          selectedChapterContent[curretNo]
+                                              .content;
                                     }
-                                    isManualNavigation = true; // Mark as manual navigation to prevent double increment
-                                    shouldAutoAdvance = true; // Re-enable auto-advance after manual navigation
+                                    isManualNavigation =
+                                        true; // Mark as manual navigation to prevent double increment
+                                    shouldAutoAdvance =
+                                        true; // Re-enable auto-advance after manual navigation
                                   });
                                   // Wait for UI to update before speaking
-                                  await Future.delayed(const Duration(milliseconds: 50));
-                                  if (mounted && isSpeech && _newVoiceText != null && _newVoiceText!.isNotEmpty) {
+                                  await Future.delayed(
+                                      const Duration(milliseconds: 50));
+                                  if (mounted &&
+                                      isSpeech &&
+                                      _newVoiceText != null &&
+                                      _newVoiceText!.isNotEmpty) {
                                     _speak();
                                   }
                                 }
@@ -2772,25 +3031,38 @@ class floatingButtonState extends State<floatingButton>
                                   _newVoiceText = null;
                                   setState(() {
                                     selectedChapter--;
-                                    curretNo = 0; // Reset to 0, will be set after content loads
-                                    isManualNavigation = true; // Mark as manual navigation to prevent double increment
-                                    shouldAutoAdvance = true; // Re-enable auto-advance after manual navigation
+                                    curretNo =
+                                        0; // Reset to 0, will be set after content loads
+                                    isManualNavigation =
+                                        true; // Mark as manual navigation to prevent double increment
+                                    shouldAutoAdvance =
+                                        true; // Re-enable auto-advance after manual navigation
                                   });
                                   // Wait for setState to complete
-                                  await Future.delayed(const Duration(milliseconds: 50));
+                                  await Future.delayed(
+                                      const Duration(milliseconds: 50));
                                   // Load chapter content and wait for it to complete
                                   await setChapterContent();
-                                  if (mounted && selectedChapterContent.isNotEmpty) {
+                                  if (mounted &&
+                                      selectedChapterContent.isNotEmpty) {
                                     setState(() {
-                                      curretNo = selectedChapterContent.length - 1;
-                                      if (curretNo >= 0 && curretNo < selectedChapterContent.length) {
+                                      curretNo =
+                                          selectedChapterContent.length - 1;
+                                      if (curretNo >= 0 &&
+                                          curretNo <
+                                              selectedChapterContent.length) {
                                         _newVoiceText =
-                                            selectedChapterContent[curretNo].content;
+                                            selectedChapterContent[curretNo]
+                                                .content;
                                       }
                                     });
                                     // Wait for UI to update before speaking
-                                    await Future.delayed(const Duration(milliseconds: 50));
-                                    if (mounted && isSpeech && _newVoiceText != null && _newVoiceText!.isNotEmpty) {
+                                    await Future.delayed(
+                                        const Duration(milliseconds: 50));
+                                    if (mounted &&
+                                        isSpeech &&
+                                        _newVoiceText != null &&
+                                        _newVoiceText!.isNotEmpty) {
                                       _speak();
                                     }
                                   }
@@ -2800,21 +3072,42 @@ class floatingButtonState extends State<floatingButton>
                             },
                           ),
                           InkWell(
-                              onTap: () {
+                              onTap: () async {
                                 if (!mounted) return;
                                 if (mounted) {
                                   setState(() {
                                     isInitialProgress = isInitialProgress + 1;
                                     isSpeech = !isSpeech;
+                                    // Reset manual pause flag when user manually starts TTS
                                     if (isSpeech) {
-                                      shouldAutoAdvance = true; // Re-enable auto-advance when playing
+                                      isManuallyPaused = false;
+                                      shouldAutoAdvance =
+                                          true; // Re-enable auto-advance when playing
                                     } else {
-                                      shouldAutoAdvance = false; // Disable auto-advance when paused
+                                      isManuallyPaused =
+                                          true; // Set manual pause flag when user pauses
+                                      shouldAutoAdvance =
+                                          false; // Disable auto-advance when paused
                                     }
                                   });
                                 }
 
-                                isSpeech == true ? _speak() : _stop();
+                                if (isSpeech == true) {
+                                  // Stop audio if it's playing before starting TTS
+                                  if (isAudioPlaying) {
+                                    await audioPlayer.stop();
+                                    if (mounted) {
+                                      setState(() {
+                                        isAudioPlaying = false;
+                                        _wasAudioPlayingBeforeClose =
+                                            false; // Reset flag since we stopped it
+                                      });
+                                    }
+                                  }
+                                  _speak();
+                                } else {
+                                  _stop();
+                                }
                                 if (isInitialTime == true && mounted) {
                                   setState(() {
                                     end = _newVoiceText?.length ?? 0;
@@ -2846,18 +3139,26 @@ class floatingButtonState extends State<floatingButton>
                             onPressed: () async {
                               await _stop();
                               if (mounted) {
-                                if (curretNo < selectedChapterContent.length - 1) {
+                                if (curretNo <
+                                    selectedChapterContent.length - 1) {
                                   // Move to next verse
                                   setState(() {
                                     curretNo = curretNo + 1;
                                     _newVoiceText =
-                                        selectedChapterContent[curretNo].content;
-                                    isManualNavigation = true; // Mark as manual navigation to prevent double increment
-                                    shouldAutoAdvance = true; // Re-enable auto-advance after manual navigation
+                                        selectedChapterContent[curretNo]
+                                            .content;
+                                    isManualNavigation =
+                                        true; // Mark as manual navigation to prevent double increment
+                                    shouldAutoAdvance =
+                                        true; // Re-enable auto-advance after manual navigation
                                   });
                                   // Wait for UI to update before speaking
-                                  await Future.delayed(const Duration(milliseconds: 50));
-                                  if (mounted && isSpeech && _newVoiceText != null && _newVoiceText!.isNotEmpty) {
+                                  await Future.delayed(
+                                      const Duration(milliseconds: 50));
+                                  if (mounted &&
+                                      isSpeech &&
+                                      _newVoiceText != null &&
+                                      _newVoiceText!.isNotEmpty) {
                                     _speak();
                                   }
                                 } else {
@@ -2866,14 +3167,19 @@ class floatingButtonState extends State<floatingButton>
                                   setState(() {
                                     curretNo = 0;
                                     if (selectedChapterContent.isNotEmpty) {
-                                      _newVoiceText = selectedChapterContent[0].content;
+                                      _newVoiceText =
+                                          selectedChapterContent[0].content;
                                     }
                                     isManualNavigation = true;
                                     shouldAutoAdvance = true;
                                   });
                                   // Wait for UI to update before speaking
-                                  await Future.delayed(const Duration(milliseconds: 50));
-                                  if (mounted && isSpeech && _newVoiceText != null && _newVoiceText!.isNotEmpty) {
+                                  await Future.delayed(
+                                      const Duration(milliseconds: 50));
+                                  if (mounted &&
+                                      isSpeech &&
+                                      _newVoiceText != null &&
+                                      _newVoiceText!.isNotEmpty) {
                                     _speak();
                                   }
                                 }
@@ -2898,20 +3204,33 @@ class floatingButtonState extends State<floatingButton>
                                     setState(() {
                                       selectedChapter++;
                                       curretNo = 0;
-                                      isManualNavigation = true; // Mark as manual navigation to prevent double increment
-                                      shouldAutoAdvance = true; // Re-enable auto-advance after manual navigation
+                                      isManualNavigation =
+                                          true; // Mark as manual navigation to prevent double increment
+                                      shouldAutoAdvance =
+                                          true; // Re-enable auto-advance after manual navigation
                                     });
                                     // Wait for setState to complete
-                                    await Future.delayed(const Duration(milliseconds: 50));
+                                    await Future.delayed(
+                                        const Duration(milliseconds: 50));
                                     // Load chapter content and wait for it to complete
                                     await setChapterContent();
-                                    if (mounted && selectedChapterContent.isNotEmpty && curretNo >= 0 && curretNo < selectedChapterContent.length) {
+                                    if (mounted &&
+                                        selectedChapterContent.isNotEmpty &&
+                                        curretNo >= 0 &&
+                                        curretNo <
+                                            selectedChapterContent.length) {
                                       setState(() {
-                                        _newVoiceText = selectedChapterContent[curretNo].content;
+                                        _newVoiceText =
+                                            selectedChapterContent[curretNo]
+                                                .content;
                                       });
                                       // Wait for UI to update before speaking
-                                      await Future.delayed(const Duration(milliseconds: 50));
-                                      if (mounted && isSpeech && _newVoiceText != null && _newVoiceText!.isNotEmpty) {
+                                      await Future.delayed(
+                                          const Duration(milliseconds: 50));
+                                      if (mounted &&
+                                          isSpeech &&
+                                          _newVoiceText != null &&
+                                          _newVoiceText!.isNotEmpty) {
                                         _speak();
                                       }
                                     }
@@ -2924,14 +3243,19 @@ class floatingButtonState extends State<floatingButton>
                                     setState(() {
                                       curretNo = 0;
                                       if (selectedChapterContent.isNotEmpty) {
-                                        _newVoiceText = selectedChapterContent[0].content;
+                                        _newVoiceText =
+                                            selectedChapterContent[0].content;
                                       }
                                       isManualNavigation = true;
                                       shouldAutoAdvance = true;
                                     });
                                     // Wait for UI to update before speaking
-                                    await Future.delayed(const Duration(milliseconds: 50));
-                                    if (mounted && isSpeech && _newVoiceText != null && _newVoiceText!.isNotEmpty) {
+                                    await Future.delayed(
+                                        const Duration(milliseconds: 50));
+                                    if (mounted &&
+                                        isSpeech &&
+                                        _newVoiceText != null &&
+                                        _newVoiceText!.isNotEmpty) {
                                       _speak();
                                     }
                                   }
@@ -2945,7 +3269,8 @@ class floatingButtonState extends State<floatingButton>
                                 if (context.mounted) {
                                   setState(() {
                                     isSpeech = false;
-                                    shouldAutoAdvance = false; // Prevent auto-advancement when stopped
+                                    shouldAutoAdvance =
+                                        false; // Prevent auto-advancement when stopped
                                   });
                                   _stop();
                                 }

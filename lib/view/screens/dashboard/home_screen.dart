@@ -1261,6 +1261,11 @@ class _HomeScreenState extends State<HomeScreen>
       return;
     }
 
+    // Additional check: ensure this route is actually current
+    if (!mounted || ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
+
     if (_isBottomSheetOpen) return;
 
     final prefs = await SharedPreferences.getInstance();
@@ -1349,8 +1354,10 @@ class _HomeScreenState extends State<HomeScreen>
         return;
       }
 
-      // Final check: ensure we're still on Reader screen before showing
-      if (widget.From.toString() != "Read") {
+      // Final check: ensure we're still on Reader screen and route is current before showing
+      if (widget.From.toString() != "Read" || 
+          !mounted || 
+          ModalRoute.of(context)?.isCurrent != true) {
         _isBottomSheetOpen = false;
         return;
       }
@@ -1870,7 +1877,12 @@ class _HomeScreenState extends State<HomeScreen>
   // Called when this route has been pushed and is now top (visible)
   @override
   void didPush() {
-    _onVisible();
+    // Only show verse on Reader screen (Home Screen)
+    if (widget.From.toString() == "Read" && 
+        mounted && 
+        ModalRoute.of(context)?.isCurrent == true) {
+      _onVisible();
+    }
   }
 
   // Called when another route has been pushed on top of this one
@@ -1894,7 +1906,12 @@ class _HomeScreenState extends State<HomeScreen>
   // Called when this route is again visible because the top route was popped
   @override
   void didPopNext() {
-    _onVisible();
+    // Only show verse on Reader screen (Home Screen)
+    if (widget.From.toString() == "Read" && 
+        mounted && 
+        ModalRoute.of(context)?.isCurrent == true) {
+      _onVisible();
+    }
   }
 
   @override
@@ -1924,6 +1941,11 @@ class _HomeScreenState extends State<HomeScreen>
 
     // Only start verse timer on Reader screen (From == "Read")
     if (widget.From.toString() != "Read") {
+      return;
+    }
+
+    // Additional check: ensure this route is actually current
+    if (!mounted || ModalRoute.of(context)?.isCurrent != true) {
       return;
     }
 
@@ -1966,6 +1988,16 @@ class _HomeScreenState extends State<HomeScreen>
 
   // Check whether accumulated visible time reached threshold
   void _checkElapsed() {
+    // Only check if we're on Reader screen and route is current
+    if (widget.From.toString() != "Read" || 
+        !mounted || 
+        ModalRoute.of(context)?.isCurrent != true) {
+      _stopwatch.stop();
+      _checkerTimer?.cancel();
+      _checkerTimer = null;
+      return;
+    }
+
     final elapsedSeconds = _stopwatch.elapsed.inSeconds;
     if (!_verseShown && elapsedSeconds >= _targetSeconds) {
       _verseShown = true;

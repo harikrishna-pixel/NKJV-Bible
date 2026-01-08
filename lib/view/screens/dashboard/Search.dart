@@ -899,10 +899,10 @@ class _SearchScreenState extends State<SearchScreen> {
                                           MediaQuery.of(context).size.height *
                                               0.13),
                                   Image.asset(
-                                    "assets/search_placeholder.png",
+                                    Images.searchPlaceHolder(context),
                                     height: 150,
                                     width: 150,
-                                    color: CommanColor.whiteBlack(context),
+                                    color: Colors.transparent.withOpacity(0.3),
                                   ),
                                   SizedBox(
                                     height: 10,

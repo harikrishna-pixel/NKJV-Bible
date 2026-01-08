@@ -91,9 +91,9 @@ class CalendarDataBloc extends ChangeNotifier {
     _isLoadingData = true;
     
     try {
-      final dbDatas = await DBHelper().getCalendarData();
-      final onlineDBData = (await downloadAndParseCsv())
-          .map((e) => e.copyWith(updateCanEdit: false));
+    final dbDatas = await DBHelper().getCalendarData();
+    final onlineDBData = (await downloadAndParseCsv())
+        .map((e) => e.copyWith(updateCanEdit: false));
     
       // Get list of deleted events from SharedPreferences
       final prefs = await SharedPreferences.getInstance();
@@ -297,7 +297,7 @@ class CalendarDataBloc extends ChangeNotifier {
           
           _justDeleted = true; // Set flag to prevent immediate reload
           notifyListeners();
-          Constants.showToast('Deleted Data Successfully');
+      Constants.showToast('Deleted Data Successfully');
           
           // Verify deletion by checking database
           final verifyDelete = await DBHelper().getCalendarData();
@@ -343,7 +343,7 @@ class CalendarDataBloc extends ChangeNotifier {
           }
         }
         _justDeleted = true; // Set flag to prevent immediate reload
-        notifyListeners();
+      notifyListeners();
         Constants.showToast('Deleted Data Successfully');
       }
     } catch (e) {

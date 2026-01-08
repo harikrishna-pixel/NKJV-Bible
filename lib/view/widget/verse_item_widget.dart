@@ -101,12 +101,12 @@ class _VerseItemWidgetState extends State<VerseItemWidget> {
   // }
 
   TextStyle _getTextStyle(
-    BuildContext context,
-    double screenWidth,
-    bool isTempSelected,
-    bool isHighlighted,
-    bool isUnderlined,
-  ) {
+      BuildContext context,
+      double screenWidth,
+      bool isTempSelected,
+      bool isHighlighted,
+      bool isUnderlined,
+      ) {
     final baseStyle = TextStyle(
       letterSpacing: BibleInfo.letterSpacing,
       fontSize: screenWidth > 450
@@ -232,7 +232,7 @@ class _VerseItemWidgetState extends State<VerseItemWidget> {
     final unescape = HtmlUnescape();
     final document = html_parser.parse(htmlContent);
     final normalized =
-        unescape.convert(document.body?.text ?? htmlContent).trim();
+    unescape.convert(document.body?.text ?? htmlContent).trim();
     return normalized.replaceAll("'", '').replaceAll('"', '');
     // return unescape.convert(document.body?.text ?? htmlContent).trim();
   }
