@@ -5,6 +5,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:biblebookapp/Model/get_audio_model.dart';
 import 'package:biblebookapp/utils/internet_speed_checker.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -681,8 +682,31 @@ class floatingButtonState extends State<floatingButton>
         // Final update to ensure values are set after database operations
         controller.selectedChapter.value = chapterNum.toString();
         controller.selectChapterChange.value = chapterNum;
+
+        // Update _storedBookName from controller or SharedPreferences
+        final updatedBookName = controller.selectedBook.value.isNotEmpty
+            ? controller.selectedBook.value
+            : await SharPreferences.getString(SharPreferences.selectedBook);
+        if (updatedBookName != null && updatedBookName.isNotEmpty && mounted) {
+          setState(() {
+            _storedBookName = updatedBookName;
+          });
+        }
       } catch (e) {
         debugPrint("DashBoardController not available or error: $e");
+        // Try to get book name from SharedPreferences as fallback
+        try {
+          final bookName =
+              await SharPreferences.getString(SharPreferences.selectedBook);
+          if (bookName != null && bookName.isNotEmpty && mounted) {
+            setState(() {
+              _storedBookName = bookName;
+            });
+          }
+        } catch (prefError) {
+          debugPrint(
+              "Error getting book name from SharedPreferences: $prefError");
+        }
         // Controller will be initialized when HomeScreen loads, and it will read from SharedPreferences
       }
     } catch (e, stackTrace) {
@@ -1265,7 +1289,40 @@ class floatingButtonState extends State<floatingButton>
           ]),
         );
 
-  Future audioPlayerBottomSheet() {
+  Future audioPlayerBottomSheet() async {
+    // Refresh _storedBookName from controller first (most current), then widget.bookName, then SharedPreferences
+    try {
+      // Always try to get from controller first (source of truth)
+      if (Get.isRegistered<DashBoardController>()) {
+        final controller = Get.find<DashBoardController>();
+        if (controller.selectedBook.value.isNotEmpty && mounted) {
+          setState(() {
+            _storedBookName = controller.selectedBook.value;
+          });
+        }
+      }
+      // Fallback to widget.bookName if controller doesn't have it
+      if ((_storedBookName == null || _storedBookName!.isEmpty) &&
+          widget.bookName.isNotEmpty &&
+          mounted) {
+        setState(() {
+          _storedBookName = widget.bookName;
+        });
+      }
+      // Fallback to SharedPreferences if both above are empty
+      if (_storedBookName == null || _storedBookName!.isEmpty) {
+        final bookName =
+            await SharPreferences.getString(SharPreferences.selectedBook);
+        if (bookName != null && bookName.isNotEmpty && mounted) {
+          setState(() {
+            _storedBookName = bookName;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Error refreshing book name: $e");
+    }
+
     // local flags/subscriptions that persist for the sheet's lifetime
     bool listenersAttached = false;
     StreamSubscription<Duration>? positionSub;
@@ -1330,6 +1387,14 @@ class floatingButtonState extends State<floatingButton>
 
                   // load next source, reset position and resume playback
                   bool loadSuccess = false;
+                  // Check internet connection before loading audio
+                  final hasInternet =
+                      await InternetConnection().hasInternetAccess;
+                  if (!hasInternet) {
+                    Constants.showToast("Check your internet connection.");
+                    return;
+                  }
+
                   int retryCount = 0;
                   const maxRetries = 2;
 
@@ -1413,12 +1478,27 @@ class floatingButtonState extends State<floatingButton>
                     await updateReadingScreenForNextBook(
                         nextBookNum, 1, nextBookName, nextBookChapterCount);
 
+                    // Update _storedBookName with the new book name
+                    if (mounted && nextBookName.isNotEmpty) {
+                      setState(() {
+                        _storedBookName = nextBookName;
+                      });
+                    }
+
                     // Force a small delay and then refresh controller to ensure UI updates
                     await Future.delayed(const Duration(milliseconds: 100));
                     if (Get.isRegistered<DashBoardController>()) {
                       final controller = Get.find<DashBoardController>();
                       // Trigger update again to ensure UI reflects changes
                       controller.getSelectedChapterAndBook();
+                    }
+
+                    // Check internet connection before loading audio
+                    final hasInternet =
+                        await InternetConnection().hasInternetAccess;
+                    if (!hasInternet) {
+                      Constants.showToast("Check your internet connection.");
+                      return;
                     }
 
                     // Load next book's first chapter audio
@@ -1557,13 +1637,29 @@ class floatingButtonState extends State<floatingButton>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const SizedBox(width: 60),
-                    Text(
-                      "${_storedBookName ?? widget.bookName} - $audioChapterNum",
-                      style: TextStyle(
-                          color: CommanColor.lightDarkPrimary(context),
-                          letterSpacing: BibleInfo.letterSpacing,
-                          fontSize: BibleInfo.fontSizeScale * 14,
-                          fontWeight: FontWeight.w600),
+                    Builder(
+                      builder: (context) {
+                        String bookName = '';
+                        if (widget.bookName.isNotEmpty) {
+                          bookName = widget.bookName;
+                        } else if (_storedBookName != null &&
+                            _storedBookName!.isNotEmpty) {
+                          bookName = _storedBookName!;
+                        } else if (Get.isRegistered<DashBoardController>()) {
+                          final controller = Get.find<DashBoardController>();
+                          if (controller.selectedBook.value.isNotEmpty) {
+                            bookName = controller.selectedBook.value;
+                          }
+                        }
+                        return Text(
+                          "$bookName - $audioChapterNum",
+                          style: TextStyle(
+                              color: CommanColor.lightDarkPrimary(context),
+                              letterSpacing: BibleInfo.letterSpacing,
+                              fontSize: BibleInfo.fontSizeScale * 14,
+                              fontWeight: FontWeight.w600),
+                        );
+                      },
                     ),
                     Row(
                       children: [
@@ -1695,6 +1791,23 @@ class floatingButtonState extends State<floatingButton>
                           });
                           // Update reading screen to match audio chapter
                           await updateReadingScreenChapter(audioChapterNum);
+                          // Refresh book name after chapter update
+                          try {
+                            if (Get.isRegistered<DashBoardController>()) {
+                              final controller =
+                                  Get.find<DashBoardController>();
+                              if (controller.selectedBook.value.isNotEmpty &&
+                                  mounted) {
+                                setState(() {
+                                  _storedBookName =
+                                      controller.selectedBook.value;
+                                });
+                              }
+                            }
+                          } catch (e) {
+                            debugPrint(
+                                "Error refreshing book name in Prev button: $e");
+                          }
                           // Stop TTS if it's playing
                           if (isSpeech && _isTtsInitialized) {
                             await _stop();
@@ -1753,6 +1866,14 @@ class floatingButtonState extends State<floatingButton>
                             setState(() => isAudioPlaying = false);
                           }
                         } else {
+                          // Check internet connection before playing audio
+                          final hasInternet =
+                              await InternetConnection().hasInternetAccess;
+                          if (!hasInternet) {
+                            Constants.showToast(
+                                "Check your internet connection.");
+                            return;
+                          }
                           // Stop TTS if it's playing before starting audio
                           if (isSpeech && _isTtsInitialized) {
                             await _stop();
@@ -1826,6 +1947,23 @@ class floatingButtonState extends State<floatingButton>
                             });
                             // Update reading screen to match audio chapter
                             await updateReadingScreenChapter(audioChapterNum);
+                            // Refresh book name after chapter update
+                            try {
+                              if (Get.isRegistered<DashBoardController>()) {
+                                final controller =
+                                    Get.find<DashBoardController>();
+                                if (controller.selectedBook.value.isNotEmpty &&
+                                    mounted) {
+                                  setState(() {
+                                    _storedBookName =
+                                        controller.selectedBook.value;
+                                  });
+                                }
+                              }
+                            } catch (e) {
+                              debugPrint(
+                                  "Error refreshing book name in Next button: $e");
+                            }
                             // Stop TTS if it's playing
                             if (isSpeech && _isTtsInitialized) {
                               await _stop();
@@ -2791,7 +2929,40 @@ class floatingButtonState extends State<floatingButton>
     );
   }
 
-  Future textToSpeechBottomSheet() {
+  Future textToSpeechBottomSheet() async {
+    // Refresh _storedBookName from widget.bookName first, then controller, then SharedPreferences
+    try {
+      // Always try to get from controller first (source of truth)
+      if (Get.isRegistered<DashBoardController>()) {
+        final controller = Get.find<DashBoardController>();
+        if (controller.selectedBook.value.isNotEmpty && mounted) {
+          setState(() {
+            _storedBookName = controller.selectedBook.value;
+          });
+        }
+      }
+      // Fallback to widget.bookName if controller doesn't have it
+      if ((_storedBookName == null || _storedBookName!.isEmpty) &&
+          widget.bookName.isNotEmpty &&
+          mounted) {
+        setState(() {
+          _storedBookName = widget.bookName;
+        });
+      }
+      // Fallback to SharedPreferences if both above are empty
+      if (_storedBookName == null || _storedBookName!.isEmpty) {
+        final bookName =
+            await SharPreferences.getString(SharPreferences.selectedBook);
+        if (bookName != null && bookName.isNotEmpty && mounted) {
+          setState(() {
+            _storedBookName = bookName;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Error refreshing book name: $e");
+    }
+
     if (widget.textToSpeechLoad == false) {
       return showModalBottomSheet(
         backgroundColor: Colors.black12,
@@ -2831,13 +3002,32 @@ class floatingButtonState extends State<floatingButton>
                           const SizedBox(
                             width: 80,
                           ),
-                          Text(
-                            "${_storedBookName ?? widget.bookName} $selectedChapter - ${curretNo + 1}/${selectedChapterContent.length}",
-                            style: TextStyle(
-                                color: CommanColor.lightDarkPrimary(context),
-                                letterSpacing: BibleInfo.letterSpacing,
-                                fontSize: BibleInfo.fontSizeScale * 14,
-                                fontWeight: FontWeight.w600),
+                          Builder(
+                            builder: (context) {
+                              String bookName = '';
+                              if (widget.bookName.isNotEmpty) {
+                                bookName = widget.bookName;
+                              } else if (_storedBookName != null &&
+                                  _storedBookName!.isNotEmpty) {
+                                bookName = _storedBookName!;
+                              } else if (Get.isRegistered<
+                                  DashBoardController>()) {
+                                final controller =
+                                    Get.find<DashBoardController>();
+                                if (controller.selectedBook.value.isNotEmpty) {
+                                  bookName = controller.selectedBook.value;
+                                }
+                              }
+                              return Text(
+                                "$bookName $selectedChapter - ${curretNo + 1}/${selectedChapterContent.length}",
+                                style: TextStyle(
+                                    color:
+                                        CommanColor.lightDarkPrimary(context),
+                                    letterSpacing: BibleInfo.letterSpacing,
+                                    fontSize: BibleInfo.fontSizeScale * 14,
+                                    fontWeight: FontWeight.w600),
+                              );
+                            },
                           ),
                           Row(
                             children: [
@@ -3137,7 +3327,22 @@ class floatingButtonState extends State<floatingButton>
                               width: 20,
                             ),
                             onPressed: () async {
-                              await _stop();
+                              // Save TTS playing state before moving to next verse
+                              final wasTTSPlaying =
+                                  isSpeech || ttsState == TtsState.playing;
+
+                              // Stop current TTS without resetting isSpeech state (for next verse continuation)
+                              if (_isTtsInitialized && wasTTSPlaying) {
+                                try {
+                                  await flutterTts.stop();
+                                  debugPrint(
+                                      'Next verse: Stopped current TTS, will continue with next verse');
+                                } catch (e) {
+                                  debugPrint(
+                                      "TTS stop error in next verse: $e");
+                                }
+                              }
+
                               if (mounted) {
                                 if (curretNo <
                                     selectedChapterContent.length - 1) {
@@ -3151,12 +3356,19 @@ class floatingButtonState extends State<floatingButton>
                                         true; // Mark as manual navigation to prevent double increment
                                     shouldAutoAdvance =
                                         true; // Re-enable auto-advance after manual navigation
+                                    // Preserve TTS playing state for automatic continuation
+                                    if (wasTTSPlaying) {
+                                      isSpeech = true;
+                                      ttsState = TtsState
+                                          .stopped; // Will be set to playing when _speak() starts
+                                    }
                                   });
                                   // Wait for UI to update before speaking
                                   await Future.delayed(
                                       const Duration(milliseconds: 50));
+                                  // Continue playing next verse if TTS was playing before
                                   if (mounted &&
-                                      isSpeech &&
+                                      wasTTSPlaying &&
                                       _newVoiceText != null &&
                                       _newVoiceText!.isNotEmpty) {
                                     _speak();
@@ -3172,12 +3384,19 @@ class floatingButtonState extends State<floatingButton>
                                     }
                                     isManualNavigation = true;
                                     shouldAutoAdvance = true;
+                                    // Preserve TTS playing state for automatic continuation
+                                    if (wasTTSPlaying) {
+                                      isSpeech = true;
+                                      ttsState = TtsState
+                                          .stopped; // Will be set to playing when _speak() starts
+                                    }
                                   });
                                   // Wait for UI to update before speaking
                                   await Future.delayed(
                                       const Duration(milliseconds: 50));
+                                  // Continue playing if TTS was playing before
                                   if (mounted &&
-                                      isSpeech &&
+                                      wasTTSPlaying &&
                                       _newVoiceText != null &&
                                       _newVoiceText!.isNotEmpty) {
                                     _speak();

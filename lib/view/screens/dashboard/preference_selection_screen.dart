@@ -545,10 +545,12 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                                 : Colors.transparent,
                             // Border with increased thickness when selected
                             border: Border.all(
-                              // Border stroke color: 9E9E9E in light mode, lighter grey in dark mode for visibility
-                              color: isDark
-                                  ? Colors.grey.shade400
-                                  : const Color(0xFF805531),
+                              // Border stroke color: yellow when selected in dark mode, otherwise use default colors
+                              color: selected && isDark
+                                  ? Colors.yellow // Yellow border for selected topics in dark mode
+                                  : (isDark
+                                      ? Colors.grey.shade400
+                                      : const Color(0xFF805531)),
                               width: selected
                                   ? 2.0
                                   : 1.0, // Increase thickness when selected
@@ -644,7 +646,14 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                                 setState(() {
                                   isLoading = true;
                                 });
-                                FaithJourneyDialog.showLoadingDialog(context);
+                                FaithJourneyDialog.showLoadingDialog(
+                                  context,
+                                  onContinue: () {
+                                    // Show success dialog when user taps Continue
+                                    FaithJourneyDialog.showSuccessDialog(context,
+                                        isFromOnboarding: !widget.isSetting);
+                                  },
+                                );
                                 debugPrint(
                                     "folders leng - ${BibleInfo.folders.length}");
                                 if (BibleInfo.folders.length == 1) {
@@ -696,9 +705,10 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                                   setState(() {
                                     isLoading = false;
                                   });
-                                  Navigator.pop(context); // Close loading
-                                  FaithJourneyDialog.showSuccessDialog(context,
-                                      isFromOnboarding: !widget.isSetting);
+                                  // Don't auto-dismiss - let user tap Continue button
+                                  // Navigator.pop(context); // Close loading
+                                  // Show success dialog after user dismisses loading dialog
+                                  // This will be handled when user taps Continue button
                                 } else {
                                   await loadBookContent(widget.selectedbible);
                                   await loadBookList(widget.selectedbible);
@@ -740,9 +750,9 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                                   setState(() {
                                     isLoading = false;
                                   });
-                                  Navigator.pop(context); // Close loading
-                                  FaithJourneyDialog.showSuccessDialog(context,
-                                      isFromOnboarding: !widget.isSetting);
+                                  // Don't auto-dismiss - let user tap Continue button
+                                  // Navigator.pop(context); // Close loading
+                                  // Success dialog will be shown when user taps Continue
                                 }
                                 // Get.offAll(() => HomeScreen(
                                 //       From: "splash",
@@ -1083,7 +1093,7 @@ Future<List<VerseBookContentModel>> _parseVerseContent(
 
 class FaithJourneyDialog {
   /// Show Loading Dialog
-  static Future<void> showLoadingDialog(BuildContext context) async {
+  static Future<void> showLoadingDialog(BuildContext context, {VoidCallback? onContinue}) async {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1215,6 +1225,10 @@ class FaithJourneyDialog {
                 GestureDetector(
                   onTap: () {
                     Navigator.of(ctx).pop();
+                    // Call the onContinue callback if provided
+                    if (onContinue != null) {
+                      onContinue();
+                    }
                   },
                   child: Container(
                     width: double.infinity,

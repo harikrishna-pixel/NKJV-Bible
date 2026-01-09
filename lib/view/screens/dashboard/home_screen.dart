@@ -1216,10 +1216,36 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _loadFontSize() async {
     final prefs = await SharedPreferences.getInstance();
     final value = prefs.getString(SharPreferences.selectedFontSize);
-    final data = await SharPreferences.getString(
+    var data = await SharPreferences.getString(
           SharPreferences.selectedBook,
         ) ??
         "";
+
+    // If book name is empty (first time), load default book from database
+    if (data.isEmpty) {
+      try {
+        final db = await DBHelper().db;
+        if (db != null) {
+          final result = await db.rawQuery(
+            "SELECT * FROM book WHERE book_num = ?",
+            [int.parse("0")],
+          );
+
+          if (result.isNotEmpty && result[0]["title"] != null) {
+            final title = result[0]["title"].toString();
+            data = title;
+            // Save to SharedPreferences for future use
+            await SharPreferences.setString(
+              SharPreferences.selectedBook,
+              title,
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('Error loading default book name: $e');
+      }
+    }
+
     if (mounted) {
       setState(() {
         selectedBookname = data;
@@ -1355,8 +1381,8 @@ class _HomeScreenState extends State<HomeScreen>
       }
 
       // Final check: ensure we're still on Reader screen and route is current before showing
-      if (widget.From.toString() != "Read" || 
-          !mounted || 
+      if (widget.From.toString() != "Read" ||
+          !mounted ||
           ModalRoute.of(context)?.isCurrent != true) {
         _isBottomSheetOpen = false;
         return;
@@ -1878,8 +1904,8 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void didPush() {
     // Only show verse on Reader screen (Home Screen)
-    if (widget.From.toString() == "Read" && 
-        mounted && 
+    if (widget.From.toString() == "Read" &&
+        mounted &&
         ModalRoute.of(context)?.isCurrent == true) {
       _onVisible();
     }
@@ -1907,8 +1933,8 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void didPopNext() {
     // Only show verse on Reader screen (Home Screen)
-    if (widget.From.toString() == "Read" && 
-        mounted && 
+    if (widget.From.toString() == "Read" &&
+        mounted &&
         ModalRoute.of(context)?.isCurrent == true) {
       _onVisible();
     }
@@ -1989,8 +2015,8 @@ class _HomeScreenState extends State<HomeScreen>
   // Check whether accumulated visible time reached threshold
   void _checkElapsed() {
     // Only check if we're on Reader screen and route is current
-    if (widget.From.toString() != "Read" || 
-        !mounted || 
+    if (widget.From.toString() != "Read" ||
+        !mounted ||
         ModalRoute.of(context)?.isCurrent != true) {
       _stopwatch.stop();
       _checkerTimer?.cancel();
@@ -2892,7 +2918,8 @@ class _HomeScreenState extends State<HomeScreen>
                                                   child: Container(
                                                     width: 10,
                                                     height: 10,
-                                                    decoration: const BoxDecoration(
+                                                    decoration:
+                                                        const BoxDecoration(
                                                       color: Colors.red,
                                                       shape: BoxShape.circle,
                                                     ),
@@ -2916,8 +2943,7 @@ class _HomeScreenState extends State<HomeScreen>
                                         children: [
                                           Image.asset(
                                             'assets/no-ad.png',
-                                            height:
-                                                screenWidth > 450 ? 35 : 24,
+                                            height: screenWidth > 450 ? 35 : 24,
                                             width: screenWidth > 450 ? 35 : 24,
                                             color:
                                                 CommanColor.whiteBlack(context),
@@ -3213,12 +3239,7 @@ class _HomeScreenState extends State<HomeScreen>
                           ],
                         ))
                       : controller.selectedBookContent.isEmpty
-                          ? Center(
-                              child: Text(
-                                "Content is Empty",
-                                style: CommanStyle.bw16500(context),
-                              ),
-                            )
+                          ? _buildEmptyContentWithChapters(controller)
                           : ListView.builder(
                               scrollDirection: controller.scrollDirection,
                               controller: controller.autoScrollController.value,
@@ -4340,34 +4361,61 @@ class _HomeScreenState extends State<HomeScreen>
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      GestureDetector(
-                          onTap: () {
-                            Get.to(ChatScreen());
-                          },
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: screenWidth > 600 ? 48 : screenWidth > 450 ? 40 : 32,
-                            ),
-                            child: Container(
-                                height: screenWidth > 600 ? 56 : screenWidth > 450 ? 50 : 35,
-                                width: screenWidth > 600 ? 56 : screenWidth > 450 ? 50 : 35,
-                                decoration: BoxDecoration(
-                                  color: CommanColor.whiteLightModePrimary(
-                                      context),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Center(
-                                  child:
-                                  Image.asset(
-                                    CommanColor.isDarkTheme(context)
-                                        ? "assets/dark_modes/new-dark_chat.png"
-                                        : "assets/Chat white.png",
-                                    width: screenWidth > 600 ? 26 : screenWidth > 450 ? 24 : 22,
-                                    height: screenWidth > 600 ? 26 : screenWidth > 450 ? 24 : 22,
+                      if (BibleInfo.chat == 1)
+                        GestureDetector(
+                            onTap: () {
+                              Get.to(ChatScreen());
+                            },
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: screenWidth > 600
+                                    ? 48
+                                    : screenWidth > 450
+                                        ? 40
+                                        : 32,
+                              ),
+                              child: Container(
+                                  height: screenWidth > 600
+                                      ? 56
+                                      : screenWidth > 450
+                                          ? 50
+                                          : 35,
+                                  width: screenWidth > 600
+                                      ? 56
+                                      : screenWidth > 450
+                                          ? 50
+                                          : 35,
+                                  decoration: BoxDecoration(
+                                    color: CommanColor.whiteLightModePrimary(
+                                        context),
+                                    shape: BoxShape.circle,
                                   ),
-                                )
-                            ),
-                          )),
+                                  child: Center(
+                                    child: Image.asset(
+                                      CommanColor.isDarkTheme(context)
+                                          ? "assets/dark_modes/new-dark_chat.png"
+                                          : "assets/Chat white.png",
+                                      width: screenWidth > 600
+                                          ? 26
+                                          : screenWidth > 450
+                                              ? 24
+                                              : 22,
+                                      height: screenWidth > 600
+                                          ? 26
+                                          : screenWidth > 450
+                                              ? 24
+                                              : 22,
+                                    ),
+                                  )),
+                            ))
+                      else
+                        SizedBox(
+                          width: screenWidth > 600
+                              ? 56 + (48 * 2)
+                              : screenWidth > 450
+                                  ? 50 + (40 * 2)
+                                  : 35 + (32 * 2),
+                        ),
                       floatingButton(
                         chapterNum: controller.selectedChapter.value,
                         bookName: controller.selectedBook.value,
@@ -4467,23 +4515,24 @@ class _HomeScreenState extends State<HomeScreen>
                             style: CommanStyle.bothPrimary16600(context),
                           ),
                         ),
-                        ListTile(
-                          dense: true,
-                          onTap: () async {
-                            Get.to(ChatScreen());
-                          },
-                          visualDensity:
-                              const VisualDensity(horizontal: 0, vertical: 0),
-                          leading: Image.asset(
-                            "assets/Chat icon.png",
-                            height: 24,
-                            width: 24,
+                        if (BibleInfo.chat == 1)
+                          ListTile(
+                            dense: true,
+                            onTap: () async {
+                              Get.to(ChatScreen());
+                            },
+                            visualDensity:
+                                const VisualDensity(horizontal: 0, vertical: 0),
+                            leading: Image.asset(
+                              "assets/Chat icon.png",
+                              height: 24,
+                              width: 24,
+                            ),
+                            title: Text(
+                              'Chat',
+                              style: CommanStyle.bothPrimary16600(context),
+                            ),
                           ),
-                          title: Text(
-                            'Chat',
-                            style: CommanStyle.bothPrimary16600(context),
-                          ),
-                        ),
                         ListTile(
                           dense: true,
                           onTap: () async {
@@ -6220,14 +6269,27 @@ class _HomeScreenState extends State<HomeScreen>
     // Maximum retries to prevent infinite loop
     if (retryCount > 20) {
       debugPrint('Timeout waiting for data to load for verse highlighting');
+      // If coming from chat and content is still empty after timeout, show chapters
+      if (widget.From.toString() == "chat" &&
+          !state.controller!.isFetchContent.value &&
+          state.controller!.selectedBookContent.isEmpty) {
+        _navigateToChapters(state.controller!);
+      }
       return;
     }
 
-    // Check if data is loaded, if not wait and retry
-    if (!state.controller!.isFetchContent.value &&
-        state.controller!.selectedBookContent.isNotEmpty) {
-      // Data is ready, scroll and highlight
-      _scrollAndHighlightVerse(state, verseIndex);
+    // Check if data is loaded
+    if (!state.controller!.isFetchContent.value) {
+      // Data loading is complete
+      if (state.controller!.selectedBookContent.isNotEmpty) {
+        // Data is ready, scroll and highlight
+        _scrollAndHighlightVerse(state, verseIndex);
+      } else {
+        // Content is empty - if from chat, navigate to chapters
+        if (widget.From.toString() == "chat") {
+          _navigateToChapters(state.controller!);
+        }
+      }
     } else {
       // Wait a bit and retry
       Future.delayed(const Duration(milliseconds: 500), () {
@@ -6237,6 +6299,47 @@ class _HomeScreenState extends State<HomeScreen>
         }
       });
     }
+  }
+
+  // Helper method to navigate to ChapterListScreen
+  void _navigateToChapters(DashBoardController controller) {
+    if (mounted) {
+      Get.to(
+        () => ChapterListScreen(
+          book_num: controller.selectedBookNum.value,
+          chapterCount: controller.selectedBookChapterCount.value,
+          selectedChapter: controller.selectedChapter.value,
+        ),
+      );
+    }
+  }
+
+  // Build empty content widget - show chapters if from chat
+  Widget _buildEmptyContentWithChapters(DashBoardController controller) {
+    // If coming from chat and content is empty, navigate to chapters
+    if (widget.From.toString() == "chat") {
+      // Use a post-frame callback to navigate after the widget is built
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && controller.selectedBookContent.isEmpty) {
+          // Navigate to ChapterListScreen
+          Get.to(
+            () => ChapterListScreen(
+              book_num: controller.selectedBookNum.value,
+              chapterCount: controller.selectedBookChapterCount.value,
+              selectedChapter: controller.selectedChapter.value,
+            ),
+          );
+        }
+      });
+    }
+
+    // Show empty content message (will be replaced by navigation if from chat)
+    return Center(
+      child: Text(
+        "Content is Empty",
+        style: CommanStyle.bw16500(context),
+      ),
+    );
   }
 
   // Helper method to scroll to verse and highlight it

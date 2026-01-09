@@ -97,6 +97,29 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     return null;
   }
 
+  /// Add six months to a given date (or current date if not provided)
+  /// Handles month overflow and day adjustments for months with fewer days
+  DateTime addSixMonths({DateTime? customDate}) {
+    final date = customDate ?? DateTime.now();
+    int year = date.year;
+    int month = date.month + 6;
+
+    if (month > 12) {
+      year += 1;
+      month -= 12;
+    }
+
+    int day = date.day;
+
+    // Adjust the day if it exceeds the number of days in the target month
+    int daysInNewMonth = DateTime(year, month + 1, 0).day;
+    if (day > daysInNewMonth) {
+      day = daysInNewMonth;
+    }
+
+    return DateTime(year, month, day);
+  }
+
   Future<void> _buyProduct(ProductDetails prod) async {
     // Check connectivity FIRST before showing loader
     final hasInternet = await InternetConnection().hasInternetAccess;
@@ -710,11 +733,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     final data = await SharPreferences.getBoolean('restorepurches');
     debugPrint("restore data 1 is $data");
     if (data == true) {
-    // Get DownloadProvider to set subscription plan
+      // Get DownloadProvider to set subscription plan
       DownloadProvider? downloadProvider;
       if (context != null) {
         downloadProvider =
-        Provider.of<DownloadProvider>(context, listen: false);
+            Provider.of<DownloadProvider>(context, listen: false);
       } else {
         // Try to get from Get.context as fallback
         final getContext = Get.context;
@@ -724,61 +747,61 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         }
       }
 
-    if (productId == widget.lifeTimePlan) {
-      await controller.disableAd(const Duration(days: 3650012345));
+      if (productId == widget.lifeTimePlan) {
+        await controller.disableAd(const Duration(days: 3650012345));
         // Set subscription plan to platinum for lifetime plan
         if (downloadProvider != null) {
           await downloadProvider.setSubscriptionPlan('platinum');
         }
-      await Future.delayed(Duration(seconds: 1));
-      EasyLoading.dismiss();
-      await SharPreferences.setBoolean('closead', true);
-      return Get.offAll(() => HomeScreen(
-            From: "premium",
-            selectedVerseNumForRead: "",
-            selectedBookForRead: "",
-            selectedChapterForRead: "",
-            selectedBookNameForRead: "",
-            selectedVerseForRead: "",
-          ));
-    } else if (productId == widget.oneYearPlan) {
-      final dur = DateTime(dateTime.year + 1, dateTime.month, dateTime.day);
-      final diff = dur.difference(DateTime.now());
-      await controller.disableAd(diff);
+        await Future.delayed(Duration(seconds: 1));
+        EasyLoading.dismiss();
+        await SharPreferences.setBoolean('closead', true);
+        return Get.offAll(() => HomeScreen(
+              From: "premium",
+              selectedVerseNumForRead: "",
+              selectedBookForRead: "",
+              selectedChapterForRead: "",
+              selectedBookNameForRead: "",
+              selectedVerseForRead: "",
+            ));
+      } else if (productId == widget.oneYearPlan) {
+        final dur = DateTime(dateTime.year + 1, dateTime.month, dateTime.day);
+        final diff = dur.difference(DateTime.now());
+        await controller.disableAd(diff);
         // Set subscription plan to gold for one year plan
         if (downloadProvider != null) {
           await downloadProvider.setSubscriptionPlan('gold');
         }
-      await Future.delayed(Duration(seconds: 1));
-      EasyLoading.dismiss();
-      await SharPreferences.setBoolean('closead', true);
-      return Get.offAll(() => HomeScreen(
-            From: "premium",
-            selectedVerseNumForRead: "",
-            selectedBookForRead: "",
-            selectedChapterForRead: "",
-            selectedBookNameForRead: "",
-            selectedVerseForRead: "",
-          ));
-    } else if (productId == widget.sixMonthPlan) {
-      final dur = addSixMonths(customDate: dateTime);
-      final diff = dur.difference(DateTime.now());
-      await controller.disableAd(diff);
+        await Future.delayed(Duration(seconds: 1));
+        EasyLoading.dismiss();
+        await SharPreferences.setBoolean('closead', true);
+        return Get.offAll(() => HomeScreen(
+              From: "premium",
+              selectedVerseNumForRead: "",
+              selectedBookForRead: "",
+              selectedChapterForRead: "",
+              selectedBookNameForRead: "",
+              selectedVerseForRead: "",
+            ));
+      } else if (productId == widget.sixMonthPlan) {
+        final dur = addSixMonths(customDate: dateTime);
+        final diff = dur.difference(DateTime.now());
+        await controller.disableAd(diff);
         // Set subscription plan to silver for six month plan
         if (downloadProvider != null) {
           await downloadProvider.setSubscriptionPlan('silver');
         }
-      await Future.delayed(Duration(seconds: 1));
-      EasyLoading.dismiss();
-      await SharPreferences.setBoolean('closead', true);
-      return Get.offAll(() => HomeScreen(
-            From: "premium",
-            selectedVerseNumForRead: "",
-            selectedBookForRead: "",
-            selectedChapterForRead: "",
-            selectedBookNameForRead: "",
-            selectedVerseForRead: "",
-          ));
+        await Future.delayed(Duration(seconds: 1));
+        EasyLoading.dismiss();
+        await SharPreferences.setBoolean('closead', true);
+        return Get.offAll(() => HomeScreen(
+              From: "premium",
+              selectedVerseNumForRead: "",
+              selectedBookForRead: "",
+              selectedChapterForRead: "",
+              selectedBookNameForRead: "",
+              selectedVerseForRead: "",
+            ));
       }
     }
     // final InAppPurchaseStoreKitPlatformAddition iosPlatformAddition =
@@ -819,75 +842,102 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             debugPrint("purchase data 5 is $data1");
             if (data1 == true) {
               if (Platform.isIOS) {
-                  //  var response =
+                //  var response =
                 http.post(
-                      Uri.parse(kDebugMode
-                          ? 'https://sandbox.itunes.apple.com/verifyReceipt'
-                          : 'https://buy.itunes.apple.com/verifyReceipt'),
-                      headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json',
-                      },
+                  Uri.parse(kDebugMode
+                      ? 'https://sandbox.itunes.apple.com/verifyReceipt'
+                      : 'https://buy.itunes.apple.com/verifyReceipt'),
+                  headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                  },
                   body: {
                     'receipt-data':
                         purchaseDetails.verificationData.localVerificationData,
-                        'exclude-old-transactions': true,
-                        'password': controller.sharedSecret
+                    'exclude-old-transactions': true,
+                    'password': controller.sharedSecret
                   },
-                    );
+                );
 
-                  // DebugConsole.log(
-                  //     "  purchases sucess frist : ${purchaseDetails.purchaseID}-productId:${purchaseDetails.productID}-date:${DateTime.now()} - ${response.body}");
+                // DebugConsole.log(
+                //     "  purchases sucess frist : ${purchaseDetails.purchaseID}-productId:${purchaseDetails.productID}-date:${DateTime.now()} - ${response.body}");
 
-                  // final data = parseHtmlAndExtractJson(response.body);
-                  await Future.delayed(Duration(seconds: 1));
-                  // DebugConsole.log(" purchases sucess - $data");
-                  await purchaseSubmit(
-                      receiptData:
-                          '${purchaseDetails.purchaseID}-productId:${purchaseDetails.productID}-date:${DateTime.now()}');
-                  final todayDate = DateTime.now();
-                  await SharPreferences.setBoolean("downloadreward", true);
-                  await Future.delayed(Duration(seconds: 1));
-                  if (purchaseDetails.productID == widget.sixMonthPlan) {
-                    final expiryDate = addSixMonths();
-                    final diff = expiryDate.difference(todayDate);
-                    await controller.disableAd(diff);
-                    await Future.delayed(Duration(seconds: 2));
-                    // Complete the purchase for iOS - critical to prevent infinite loading
-                    if (Platform.isIOS) {
-                      await _inAppPurchase.completePurchase(purchaseDetails);
-                    }
-                    EasyLoading.dismiss();
-                    await SharPreferences.setBoolean('closead', true);
+                // final data = parseHtmlAndExtractJson(response.body);
+                await Future.delayed(Duration(seconds: 1));
+                // DebugConsole.log(" purchases sucess - $data");
+                await purchaseSubmit(
+                    receiptData:
+                        '${purchaseDetails.purchaseID}-productId:${purchaseDetails.productID}-date:${DateTime.now()}');
+                final todayDate = DateTime.now();
+                await SharPreferences.setBoolean("downloadreward", true);
+                await Future.delayed(Duration(seconds: 1));
+                if (purchaseDetails.productID == widget.sixMonthPlan) {
+                  final expiryDate = addSixMonths();
+                  final diff = expiryDate.difference(todayDate);
+                  await controller.disableAd(diff);
+                  await Future.delayed(Duration(seconds: 2));
+                  // Complete the purchase for iOS - critical to prevent infinite loading
+                  if (Platform.isIOS) {
+                    await _inAppPurchase.completePurchase(purchaseDetails);
+                  }
+                  EasyLoading.dismiss();
+                  await SharPreferences.setBoolean('closead', true);
                   debugPrint("restore data 2");
                   return Get.offAll(() => HomeScreen(
-                            From: "premium",
-                            selectedVerseNumForRead: "",
-                            selectedBookForRead: "",
-                            selectedChapterForRead: "",
-                            selectedBookNameForRead: "",
-                            selectedVerseForRead: "",
-                          ));
-                  } else if (purchaseDetails.productID == widget.oneYearPlan) {
-                    await controller.disableAd(const Duration(days: 366));
-                    await Future.delayed(Duration(seconds: 2));
-                    // Complete the purchase for iOS - critical to prevent infinite loading
-                    if (Platform.isIOS) {
-                      await _inAppPurchase.completePurchase(purchaseDetails);
-                    }
-                    EasyLoading.dismiss();
-                    await SharPreferences.setBoolean('closead', true);
+                        From: "premium",
+                        selectedVerseNumForRead: "",
+                        selectedBookForRead: "",
+                        selectedChapterForRead: "",
+                        selectedBookNameForRead: "",
+                        selectedVerseForRead: "",
+                      ));
+                } else if (purchaseDetails.productID == widget.oneYearPlan) {
+                  await controller.disableAd(const Duration(days: 366));
+                  await Future.delayed(Duration(seconds: 2));
+                  // Complete the purchase for iOS - critical to prevent infinite loading
+                  if (Platform.isIOS) {
+                    await _inAppPurchase.completePurchase(purchaseDetails);
+                  }
+                  EasyLoading.dismiss();
+                  await SharPreferences.setBoolean('closead', true);
                   debugPrint("restore data 3 ");
                   return Get.offAll(() => HomeScreen(
-                            From: "premium",
-                            selectedVerseNumForRead: "",
-                            selectedBookForRead: "",
-                            selectedChapterForRead: "",
-                            selectedBookNameForRead: "",
-                            selectedVerseForRead: "",
-                          ));
-                  } else if (purchaseDetails.productID == widget.lifeTimePlan) {
+                        From: "premium",
+                        selectedVerseNumForRead: "",
+                        selectedBookForRead: "",
+                        selectedChapterForRead: "",
+                        selectedBookNameForRead: "",
+                        selectedVerseForRead: "",
+                      ));
+                } else if (purchaseDetails.productID == widget.lifeTimePlan) {
                   await controller.disableAd(const Duration(days: 3650012345));
+                  await Future.delayed(Duration(seconds: 2));
+                  // Complete the purchase for iOS - critical to prevent infinite loading
+                  if (Platform.isIOS) {
+                    await _inAppPurchase.completePurchase(purchaseDetails);
+                  }
+                  EasyLoading.dismiss();
+                  await SharPreferences.setBoolean('closead', true);
+                  debugPrint("restore data 4 ");
+                  return Get.offAll(() => HomeScreen(
+                        From: "premium",
+                        selectedVerseNumForRead: "",
+                        selectedBookForRead: "",
+                        selectedChapterForRead: "",
+                        selectedBookNameForRead: "",
+                        selectedVerseForRead: "",
+                      ));
+                } else {
+                  // Check if this is exit offer purchase
+                  final exitOfferId =
+                      await SharPreferences.getString('exitOfferPlan') ??
+                          BibleInfo.exitOfferPlanid;
+                  if (purchaseDetails.productID == exitOfferId ||
+                      (_exitOfferProduct != null &&
+                          purchaseDetails.productID == _exitOfferProduct!.id)) {
+                    // Handle exit offer purchase success
+                    await controller
+                        .disableAd(const Duration(days: 3650012345));
                     await Future.delayed(Duration(seconds: 2));
                     // Complete the purchase for iOS - critical to prevent infinite loading
                     if (Platform.isIOS) {
@@ -895,15 +945,41 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     }
                     EasyLoading.dismiss();
                     await SharPreferences.setBoolean('closead', true);
-                  debugPrint("restore data 4 ");
-                  return Get.offAll(() => HomeScreen(
-                            From: "premium",
-                            selectedVerseNumForRead: "",
-                            selectedBookForRead: "",
-                            selectedChapterForRead: "",
-                            selectedBookNameForRead: "",
-                            selectedVerseForRead: "",
-                          ));
+                    debugPrint(
+                        "exit offer purchase success - redirecting to home");
+                    return Get.offAll(() => HomeScreen(
+                          From: "premium",
+                          selectedVerseNumForRead: "",
+                          selectedBookForRead: "",
+                          selectedChapterForRead: "",
+                          selectedBookNameForRead: "",
+                          selectedVerseForRead: "",
+                        ));
+                  } else {
+                    // Fallback: If product ID doesn't match any known plan, treat as lifetime purchase
+                    // This ensures loader stops and redirects even for unexpected product IDs
+                    debugPrint(
+                        "Unknown product ID: ${purchaseDetails.productID}, treating as lifetime purchase");
+                    await controller
+                        .disableAd(const Duration(days: 3650012345));
+                    await Future.delayed(Duration(seconds: 2));
+                    // Complete the purchase for iOS - critical to prevent infinite loading
+                    if (Platform.isIOS) {
+                      await _inAppPurchase.completePurchase(purchaseDetails);
+                    }
+                    EasyLoading.dismiss();
+                    await SharPreferences.setBoolean('closead', true);
+                    debugPrint(
+                        "purchase success (fallback) - redirecting to home");
+                    return Get.offAll(() => HomeScreen(
+                          From: "premium",
+                          selectedVerseNumForRead: "",
+                          selectedBookForRead: "",
+                          selectedChapterForRead: "",
+                          selectedBookNameForRead: "",
+                          selectedVerseForRead: "",
+                        ));
+                  }
                 }
               }
             }
@@ -1025,7 +1101,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       final InAppPurchaseStoreKitPlatformAddition iosPlatformAddition =
           _inAppPurchase
               .getPlatformAddition<InAppPurchaseStoreKitPlatformAddition>();
-      await iosPlatformAddition.setDelegate(ExamplePaymentQueueDelegate());
+      // Set delegate to null - delegate is optional for querying products
+      // Purchase transactions will handle delegate setup separately if needed
+      await iosPlatformAddition.setDelegate(null);
 
       Set<String> ids = {
         widget.sixMonthPlan,
@@ -1463,7 +1541,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                         // Directly go back when coming from wallpaper (skip exit offer)
                                         Navigator.of(context).pop();
                                       },
-                      ),
+                                    ),
                                   ),
                                 )
                               : const SizedBox(),
@@ -1532,13 +1610,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       ),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
+                        children: [
                           Image.asset(
                             "assets/Line 217.png",
                             height: 20,
                             width: 20,
                             fit: BoxFit.fitWidth,
-                            ),
+                          ),
                           const SizedBox(width: 10),
                           Text(
                             "CHOOSE YOUR PREMIUM PLAN",
@@ -1546,7 +1624,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 1.2,
                                 color: CommanColor.whiteBlack(context)),
-                            ),
+                          ),
                           const SizedBox(width: 10),
                           Image.asset("assets/Line 216.png",
                               height: 20, width: 20),
@@ -1574,7 +1652,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                     width: 200,
                                     child: Center(
                                         child: Column(
-                        children: [
+                                      children: [
                                         const CircularProgressIndicator
                                             .adaptive(),
                                         Padding(
@@ -1588,20 +1666,20 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                     ))),
                               )
                             : Column(
-                              children: [
+                                children: [
                                   // First row: Two plans side by side
                                   if (_products.length >= 2)
                                     Row(
-                                  children: [
+                                      children: [
                                         Expanded(
                                           child: _buildPlanCard(0, controller),
-                                                ),
+                                        ),
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: _buildPlanCard(1, controller),
                                         ),
                                       ],
-                                      ),
+                                    ),
                                   const SizedBox(height: 15),
                                   // Second row: One plan full width
                                   if (_products.length >= 3)
@@ -1610,10 +1688,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                   if (_products.length == 1)
                                     _buildPlanCard(2, controller),
                                 ],
-                                  ),
-                                ),
+                              ),
+                      ),
 
-                                const SizedBox(height: 15),
+                      const SizedBox(height: 15),
                       Text("No Risk. No hidden charges",
                           style: TextStyle(
                               fontWeight: FontWeight.w600,
@@ -1636,21 +1714,21 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: SizedBox(
-                                  width: double.infinity,
-                                    child: ElevatedButton(
+                          width: double.infinity,
+                          child: ElevatedButton(
                             onPressed: () async {
                               await SharPreferences.setString('OpenAd', '1');
                               await SharPreferences.setBoolean(
                                   'startpurches', true);
                               _buyProduct(_products[selectedindex]);
                             },
-                                      style: ElevatedButton.styleFrom(
+                            style: ElevatedButton.styleFrom(
                               padding: EdgeInsets.zero, // REQUIRED for gradient
-                                        backgroundColor: Colors.transparent,
-                                        shadowColor: Colors.transparent,
-                                        shape: RoundedRectangleBorder(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                        ),
+                              ),
                             ),
                             child: Ink(
                               decoration: BoxDecoration(
@@ -1669,15 +1747,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                 alignment: Alignment.center,
                                 child: const Text(
                                   'Get Full Access',
-                                              style: TextStyle(
-                                                fontSize: 16,
+                                  style: TextStyle(
+                                    fontSize: 16,
                                     fontWeight: FontWeight.w600,
-                                                color: Colors.white,
-                                              ),
-                                            ),
-                                    ),
+                                    color: Colors.white,
                                   ),
                                 ),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
 
@@ -1689,13 +1767,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         },
                         child: Text(
                           "Continue Free Version",
-                                      style: TextStyle(
+                          style: TextStyle(
                             color: CommanColor.whiteBlack(context),
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
                             // decoration: TextDecoration.underline,
-                                ),
-                              ),
+                          ),
+                        ),
                       ),
 
                       // Footer links
@@ -2088,29 +2166,29 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       {List<String>? highlightWords}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 50),
-        child: Row(
+      child: Row(
         // mainAxisAlignment: MainAxisAlignment.center,
         // crossAxisAlignment: CrossAxisAlignment.center,
         // mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(image, width: 28, height: 28), // ✅ use image, not Icon
-            const SizedBox(width: 12),
+        children: [
+          Image.asset(image, width: 28, height: 28), // ✅ use image, not Icon
+          const SizedBox(width: 12),
           highlightWords != null && highlightWords.isNotEmpty
-                  ? RichText(
+              ? RichText(
                   textAlign: TextAlign.center,
-                      text: TextSpan(
-                        style: TextStyle(
+                  text: TextSpan(
+                    style: TextStyle(
                         fontSize: 14, color: CommanColor.whiteBlack(context)),
                     children:
                         _buildHighlightedText(text, highlightWords, context),
-                      ),
-                    )
-                  : Text(
-                      text,
+                  ),
+                )
+              : Text(
+                  text,
                   textAlign: TextAlign.center,
-                      style: TextStyle(
-                          fontSize: 14, color: CommanColor.whiteBlack(context)),
-          ),
+                  style: TextStyle(
+                      fontSize: 14, color: CommanColor.whiteBlack(context)),
+                ),
         ],
       ),
     );
@@ -2189,177 +2267,177 @@ class _ExitOfferBottomSheetContentState
       canPop:
           false, // Prevent back button dismissal on iPad - user must take action
       child: Container(
-      decoration: BoxDecoration(
-        color: CommanColor.white,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
+        decoration: BoxDecoration(
+          color: CommanColor.white,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
         ),
-      ),
-      child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Close button (X) at top right
-            Padding(
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Close button (X) at top right
+              Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(height: 10),
-                  // Red "LIMITED TIME OFFER" banner
-                  Container(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(height: 10),
+                    // Red "LIMITED TIME OFFER" banner
+                    Container(
                       width: 220,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
                         borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
+                      ),
+                      child: const Text(
                         "Special Faith Offer",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.2,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  const SizedBox(height: 12),
-                  // Description
-                  RichText(
-                    textAlign: TextAlign.center,
-                    text: TextSpan(
-                      style: TextStyle(
-                        fontSize: widget.screenWidth > 450 ? 16 : 18,
-                        color: Colors.black87,
-                        height: 1.4,
-                      ),
-                      children: [
+                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
+                    // Description
+                    RichText(
+                      textAlign: TextAlign.center,
+                      text: TextSpan(
+                        style: TextStyle(
+                          fontSize: widget.screenWidth > 450 ? 16 : 18,
+                          color: Colors.black87,
+                          height: 1.4,
+                        ),
+                        children: [
                           const TextSpan(
                             text: "Unlock every Premium Bible feature. Now ",
-                        ),
+                          ),
                           const TextSpan(
-                          text: "30% Off",
+                            text: "30% Off",
                             style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
+                          ),
                           const TextSpan(
                             text: " for the next 10 minutes",
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-                  // Purple offer box
-                  Container(
-                      width: 300,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                        color: Color(0XFFF1F1F1), // Light purple
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: const Color(0xFFCDCDCD),
-                        width: 1.5,
+                          ),
+                        ],
                       ),
                     ),
-                    child: Column(
-                      children: [
-                        const Text(
-                          "Lifetime Premium",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
+
+                    const SizedBox(height: 20),
+                    // Purple offer box
+                    Container(
+                      width: 300,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Color(0XFFF1F1F1), // Light purple
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFFCDCDCD),
+                          width: 1.5,
                         ),
-                        const SizedBox(height: 8),
+                      ),
+                      child: Column(
+                        children: [
+                          const Text(
+                            "Lifetime Premium",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
                           // Original price with strike-through (if different from discounted price)
-                          if (widget.originalLifetimePrice != widget.lifetimePrice &&
+                          if (widget.originalLifetimePrice !=
+                                  widget.lifetimePrice &&
                               widget.originalLifetimePrice.isNotEmpty) ...[
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      widget.originalLifetimePrice,
-                                      style: TextStyle(
-                                        fontSize: widget.screenWidth > 450 ? 20 : 18,
-                                        fontWeight: FontWeight.w500,
-                                        color: Colors.black87.withOpacity(0.6),
-                                        decoration: TextDecoration.lineThrough,
-                                        decorationThickness: 2,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                        Text(
-                          widget.lifetimePrice,
-                          style: TextStyle(
-                            fontSize: widget.screenWidth > 450 ? 32 : 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
-                        ),
-
-                                  ],
-                                )
-
-
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  widget.originalLifetimePrice,
+                                  style: TextStyle(
+                                    fontSize:
+                                        widget.screenWidth > 450 ? 20 : 18,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.black87.withOpacity(0.6),
+                                    decoration: TextDecoration.lineThrough,
+                                    decorationThickness: 2,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  widget.lifetimePrice,
+                                  style: TextStyle(
+                                    fontSize:
+                                        widget.screenWidth > 450 ? 32 : 28,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ],
+                            )
                           ],
                           // Discounted price
 
-                        const SizedBox(height: 8),
-                        const Text(
+                          const SizedBox(height: 8),
+                          const Text(
                             "One-Time Blessing. Lifetime Access.",
-                          style: TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
-                            color: Colors.blue,
-                            fontWeight: FontWeight.w600,
+                              color: Colors.blue,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.access_time,
-                              size: 16,
-                              color: Colors.red,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              "Offer ends in ${_countdownMinutes.toString().padLeft(2, '0')}:${_countdownSeconds.toString().padLeft(2, '0')}",
-                              style: const TextStyle(
-                                fontSize: 14,
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.access_time,
+                                size: 16,
                                 color: Colors.red,
-                                fontWeight: FontWeight.w600,
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
+                              const SizedBox(width: 4),
+                              Text(
+                                "Offer ends in ${_countdownMinutes.toString().padLeft(2, '0')}:${_countdownSeconds.toString().padLeft(2, '0')}",
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  // Unlock Bible Premium button (purple)
-                  SizedBox(
-                    width: 250,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        _countdownTimer?.cancel();
-                        widget.onUnlockPremium();
-                      },
-                      style: ElevatedButton.styleFrom(
+                    const SizedBox(height: 24),
+                    // Unlock Bible Premium button (purple)
+                    SizedBox(
+                      width: 250,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          _countdownTimer?.cancel();
+                          widget.onUnlockPremium();
+                        },
+                        style: ElevatedButton.styleFrom(
                           padding: EdgeInsets.zero, // REQUIRED for gradient
                           backgroundColor: Colors.transparent,
                           shadowColor: Colors.transparent,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 2,
                         ),
-                        elevation: 2,
-                      ),
                         child: Ink(
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
@@ -2374,38 +2452,38 @@ class _ExitOfferBottomSheetContentState
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             alignment: Alignment.center,
-                      child: Text(
-                        'Unlock Bible Premium',
-                        style: TextStyle(
-                          fontSize: widget.screenWidth > 450 ? 18 : 18,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                            child: Text(
+                              'Unlock Bible Premium',
+                              style: TextStyle(
+                                fontSize: widget.screenWidth > 450 ? 18 : 18,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                      ),
-                    ),
 
-                  const SizedBox(height: 12),
-                  // Maybe Later text
-                  TextButton(
-                    onPressed: () {
-                      _countdownTimer?.cancel();
-                      widget.onMaybeLater();
-                    },
-                    child: Text(
-                      "Maybe later",
-                      style: TextStyle(
-                        fontSize: widget.screenWidth > 450 ? 16 : 14,
-                        color: Colors.grey.shade600,
+                    const SizedBox(height: 12),
+                    // Maybe Later text
+                    TextButton(
+                      onPressed: () {
+                        _countdownTimer?.cancel();
+                        widget.onMaybeLater();
+                      },
+                      child: Text(
+                        "Maybe later",
+                        style: TextStyle(
+                          fontSize: widget.screenWidth > 450 ? 16 : 14,
+                          color: Colors.grey.shade600,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
           ),
         ),
       ),

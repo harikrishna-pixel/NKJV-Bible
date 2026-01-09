@@ -349,6 +349,7 @@ class _WalletScreenState extends State<WalletScreen> {
       if (mounted) {
         setState(() {
           _isAvailable = false; // Mark as unavailable when offline
+          _loadingProductId = null; // Clear any loading state when offline
         });
       }
       return;
@@ -496,7 +497,7 @@ class _WalletScreenState extends State<WalletScreen> {
     // This checks actual internet access, not just network interface availability
     final hasInternet = await InternetConnection().hasInternetAccess;
     if (!hasInternet) {
-      Constants.showToast("No internet Connection");
+      Constants.showToast("Check your internet connection.");
       return;
     }
 
@@ -1013,14 +1014,30 @@ class _WalletScreenState extends State<WalletScreen> {
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: (_loadingProductId == product?.id)
+              onTap: (_loadingProductId == product?.id && product != null)
                   ? null
                   : () async {
-                      // Check if offline and product is null
+                      // Check internet connection first before proceeding
                       final hasInternet =
                           await InternetConnection().hasInternetAccess;
-                      if (!hasInternet || product == null) {
-                        Constants.showToast("No internet Connection");
+                      if (!hasInternet) {
+                        // Clear any loading state when offline
+                        if (mounted) {
+                          setState(() {
+                            _loadingProductId = null;
+                          });
+                        }
+                        Constants.showToast("Check your internet connection.");
+                        return;
+                      }
+                      if (product == null) {
+                        // Clear any loading state when product is null
+                        if (mounted) {
+                          setState(() {
+                            _loadingProductId = null;
+                          });
+                        }
+                        Constants.showToast("Check your internet connection.");
                         return;
                       }
                       if (!_isAvailable) return;
@@ -1122,7 +1139,8 @@ class _WalletScreenState extends State<WalletScreen> {
                                     : BorderSide.none,
                               ),
                             ),
-                            child: (_loadingProductId == product?.id)
+                            child: (_loadingProductId == product?.id &&
+                                    product != null)
                                 ? SizedBox(
                                     width: 16,
                                     height: 16,

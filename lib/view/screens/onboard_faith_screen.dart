@@ -155,12 +155,12 @@ class _FaithOnboardingScreenState extends State<FaithOnboardingScreen> {
                 onThemeSelected: () {
                   debugPrint("folders leng - ${BibleInfo.folders.length}");
                   if (BibleInfo.folders.length == 1) {
-                    Get.to(() => PreferenceSelectionScreen(
+                    Get.off(() => PreferenceSelectionScreen(
                           isSetting: false,
                           selectedbible: BibleInfo.folders.first,
                         ));
                   } else {
-                    Get.to(() => BibleVersionsScreen(
+                    Get.off(() => BibleVersionsScreen(
                           from: 'onboard',
                         ));
                   }

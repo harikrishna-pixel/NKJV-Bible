@@ -13,6 +13,7 @@ import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/preference_selection_screen.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:get/get.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -27,6 +28,13 @@ class LoginScreen extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final loginState = ref.watch(loginBloc);
     double screenWidth = MediaQuery.of(context).size.width;
+    
+    // Check and clear fields if account was deleted
+    useMemoized(() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(loginBloc).checkAndClearIfNeeded();
+      });
+    });
     // debugPrint("sz current width - $screenWidth ");
     return Scaffold(
         resizeToAvoidBottomInset: false,

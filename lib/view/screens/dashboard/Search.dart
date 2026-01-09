@@ -1303,7 +1303,8 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                 searchController
                                                                     .text
                                                                     .toString(),
-                                                                screenWidth),
+                                                                screenWidth,
+                                                                fontSize),
                                                         style:
                                                             CommanStyle.bw14500(
                                                                     context)
@@ -1704,7 +1705,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   List<TextSpan> highlightOccurrences(
-      String source, String query, screenWidth) {
+      String source, String query, screenWidth, double fontSize) {
     if (query.isEmpty || !source.toLowerCase().contains(query.toLowerCase())) {
       return [TextSpan(text: source)];
     }
@@ -1724,9 +1725,7 @@ class _SearchScreenState extends State<SearchScreen> {
       children.add(TextSpan(
         text: " ${source.substring(match.start, match.end)} ",
         style: CommanStyle.searchTextStyle(context).copyWith(
-            fontSize: screenWidth > 450
-                ? BibleInfo.fontSizeScale * 23
-                : BibleInfo.fontSizeScale * 17),
+            fontSize: fontSize),
       ));
 
       if (i == matches.length - 1 && match.end != source.length) {

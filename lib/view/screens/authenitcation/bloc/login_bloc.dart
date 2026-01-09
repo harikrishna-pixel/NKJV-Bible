@@ -1,5 +1,6 @@
 import 'package:biblebookapp/controller/api_service.dart';
 import 'package:biblebookapp/core/notifiers/auth/auth.notifier.dart';
+import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -15,6 +16,27 @@ class LoginBloc extends ChangeNotifier {
   bool isLoading = false;
 
   AuthNotifier authNotifier = AuthNotifier();
+
+  // Clear email and password controllers
+  void clearFields() {
+    emailCon.clear();
+    passCon.clear();
+    notifyListeners();
+  }
+
+  // Check if user cache is empty and clear fields if needed
+  Future<void> checkAndClearIfNeeded() async {
+    final cacheNotifier = CacheNotifier();
+    final user = await cacheNotifier.readCache(key: 'user');
+    final userid = await cacheNotifier.readCache(key: 'userid');
+    final name = await cacheNotifier.readCache(key: 'name');
+    final authtoken = await cacheNotifier.readCache(key: 'authtoken');
+    
+    // If all cache keys are empty (account deleted), clear the fields
+    if (user == null && userid == null && name == null && authtoken == null) {
+      clearFields();
+    }
+  }
 
   Future login(context) async {
     isLoading = true;

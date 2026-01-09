@@ -139,15 +139,26 @@ class EditProfileScreenState extends State<EditProfileScreen> {
       if (dataname != null) {
         user1 = dataname;
         nameCon.text = user1.toString();
+      } else {
+        // Clear name field if cache is empty (account deleted)
+        user1 = '';
+        nameCon.clear();
       }
 
-      if (dataname != null) {
+      if (data != null && dataname != null) {
         email = data;
         emailCon.text = email.toString();
+      } else {
+        // Clear email field if cache is empty (account deleted)
+        email = '';
+        emailCon.clear();
       }
 
       if (datac != null) {
         addressCon.text = datac;
+      } else {
+        // Clear address field if cache is empty
+        addressCon.clear();
       }
     });
   }

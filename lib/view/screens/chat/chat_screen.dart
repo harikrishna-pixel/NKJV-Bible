@@ -257,8 +257,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                   width: screenWidth > 450 ? 38 : 34,
                                   height: screenWidth > 450 ? 38 : 34,
                                   decoration: BoxDecoration(
-                                    image: DecorationImage(image: AssetImage("assets/start_icon.png"))
-                                  ),
+                                      image: DecorationImage(
+                                          image: AssetImage(
+                                              "assets/start_icon.png"))),
                                 ),
                                 const SizedBox(height: 14),
                                 Text(
@@ -2058,7 +2059,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                           GestureDetector(
                             onTap: () {
                               Get.to(
-                                    () => const WalletScreen(),
+                                () => const WalletScreen(),
                                 transition: Transition.cupertinoDialog,
                                 duration: const Duration(milliseconds: 300),
                               )?.then((_) {
@@ -2095,7 +2096,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                     style: TextStyle(
                                       color: isDark
                                           ? Colors.white
-                                          : CommanColor.lightDarkPrimary(context),
+                                          : CommanColor.lightDarkPrimary(
+                                              context),
                                       fontSize: screenWidth > 450 ? 13 : 12,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -2185,43 +2187,47 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                   _buildVerseContext(screenWidth, isDark),
                                 if (widget.verseContext != null)
                                   const SizedBox(height: 20),
-                                SizedBox(height: screenWidth > 450 ? 10 : 5),
-                                Transform.translate(
-                                  offset: const Offset(0, -10),
-                                  child: Container(
-                                    width: screenWidth > 450 ? 140 : 130,
-                                    height: screenWidth > 450 ? 140 : 130,
-                                    decoration: const BoxDecoration(
-                                      color: Colors
-                                          .transparent, // Transparent background for illustration
-                                    ),
-                                    child: Image.asset(
-                                      "assets/chat_img.png",
-                                      fit: BoxFit.contain,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                        // Fallback to icon if image doesn't load
-                                        return Icon(
-                                          Icons.chat_bubble_outline,
-                                          size: 100,
-                                          color: CommanColor.whiteBlack(context)
-                                              .withOpacity(0.5),
-                                        );
-                                      },
+                                // Hide illustration image when opened from verse popup
+                                if (widget.verseContext == null) ...[
+                                  SizedBox(height: screenWidth > 450 ? 10 : 5),
+                                  Transform.translate(
+                                    offset: const Offset(0, -10),
+                                    child: Container(
+                                      width: screenWidth > 450 ? 140 : 130,
+                                      height: screenWidth > 450 ? 140 : 130,
+                                      decoration: const BoxDecoration(
+                                        color: Colors
+                                            .transparent, // Transparent background for illustration
+                                      ),
+                                      child: Image.asset(
+                                        "assets/chat_img.png",
+                                        fit: BoxFit.contain,
+                                        errorBuilder:
+                                            (context, error, stackTrace) {
+                                          // Fallback to icon if image doesn't load
+                                          return Icon(
+                                            Icons.chat_bubble_outline,
+                                            size: 100,
+                                            color:
+                                                CommanColor.whiteBlack(context)
+                                                    .withOpacity(0.5),
+                                          );
+                                        },
+                                      ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(height: 5),
-                                Text(
-                                  'Faith Answers',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: CommanColor.whiteBlack(context)
-                                        .withOpacity(0.7),
-                                    fontSize: screenWidth > 450 ? 26 : 23,
+                                  const SizedBox(height: 5),
+                                  Text(
+                                    'Faith Answers',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: CommanColor.whiteBlack(context)
+                                          .withOpacity(0.7),
+                                      fontSize: screenWidth > 450 ? 26 : 23,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 8),
+                                  const SizedBox(height: 8),
+                                ],
                                 Padding(
                                   padding: const EdgeInsets.only(
                                       bottom:
@@ -2369,7 +2375,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
             },
           ),
           SizedBox(height: screenWidth > 450 ? 12 : 4),
-          // Question buttons as horizontal slider with hyperlink icon
+          // Question buttons as horizontal slider with send arrow icon
           SizedBox(
             height: screenWidth > 450 ? 64 : 58,
             child: SingleChildScrollView(
@@ -2438,7 +2444,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.link,
+                              Icons.north_east,
                               size: screenWidth > 450 ? 18 : 16,
                               color: CommanColor.white,
                             ),
@@ -2491,7 +2497,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Suggested for this answer',
+            'Suggestions for this answer',
             style: TextStyle(
               color: CommanColor.whiteBlack(context).withOpacity(0.7),
               fontSize: screenWidth > 450 ? 15 : 13.5,
@@ -2587,34 +2593,363 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
   }
 
   List<String> _getFollowUpList(String answer) {
+    final bool hasVerseContext = widget.verseContext != null;
+
+    // Extract sentences from the response
+    final sentences = answer
+        .split(RegExp(r'[.!?]\s+'))
+        .where((s) => s.trim().isNotEmpty)
+        .toList();
+    if (sentences.isEmpty) {
+      return hasVerseContext
+          ? [
+              'Tell me more about this verse',
+              'How can I apply this verse in my life?',
+              'What else does this verse teach?',
+            ]
+          : [
+              'Can you explain more?',
+              'How can I apply this?',
+              'What else should I know?',
+            ];
+    }
+
+    // Analyze the entire response to extract key information
+    final allText = answer.toLowerCase();
+    final firstSentence = sentences[0].toLowerCase();
+
+    // Extract key phrases and nouns from the response
+    final keyPhrases = _extractKeyPhrases(answer, sentences);
+    final importantConcepts = _extractImportantConcepts(allText);
+
+    // Generate truly dynamic questions based on actual content
+    final List<String> dynamicQuestions = [];
+
+    // Priority 1: Generate questions from extracted key phrases
+    if (keyPhrases.isNotEmpty) {
+      for (var phrase in keyPhrases.take(2)) {
+        if (hasVerseContext) {
+          dynamicQuestions.add('Can you explain more about ${phrase}?');
+          dynamicQuestions.add('How does this verse relate to ${phrase}?');
+        } else {
+          dynamicQuestions.add('Can you explain more about ${phrase}?');
+          dynamicQuestions.add('How does this relate to ${phrase}?');
+        }
+        if (dynamicQuestions.length >= 3) break;
+      }
+    }
+
+    // Priority 2: Generate questions from detected concepts
+    if (dynamicQuestions.length < 3 && importantConcepts.isNotEmpty) {
+      for (var concept in importantConcepts.take(2)) {
+        if (hasVerseContext) {
+          if (!dynamicQuestions.any((q) => q.toLowerCase().contains(concept))) {
+            dynamicQuestions
+                .add('What does this verse teach about ${concept}?');
+          }
+        } else {
+          if (!dynamicQuestions.any((q) => q.toLowerCase().contains(concept))) {
+            dynamicQuestions.add('What does God say about ${concept}?');
+          }
+        }
+        if (dynamicQuestions.length >= 3) break;
+      }
+    }
+
+    // Priority 3: Generate questions based on response structure and patterns
+    if (dynamicQuestions.length < 3) {
+      // Check for specific action words or verbs
+      if (allText.contains('means') ||
+          allText.contains('meaning') ||
+          allText.contains('signifies') ||
+          allText.contains('represents')) {
+        dynamicQuestions.add(hasVerseContext
+            ? 'What is the deeper meaning of this verse?'
+            : 'What is the deeper meaning?');
+      }
+
+      if (allText.contains('teach') ||
+          allText.contains('shows') ||
+          allText.contains('reveals') ||
+          allText.contains('demonstrates')) {
+        dynamicQuestions.add(hasVerseContext
+            ? 'What else does this verse teach?'
+            : 'What else does this teach?');
+      }
+
+      if (allText.contains('help') ||
+          allText.contains('guide') ||
+          allText.contains('assist') ||
+          allText.contains('support')) {
+        dynamicQuestions.add(hasVerseContext
+            ? 'How does this verse help me?'
+            : 'How does this help me?');
+      }
+
+      if (allText.contains('promise') ||
+          allText.contains('promises') ||
+          allText.contains('assurance') ||
+          allText.contains('guarantee')) {
+        dynamicQuestions.add(hasVerseContext
+            ? 'What promise does this verse contain?'
+            : 'What promise does this contain?');
+      }
+
+      if (allText.contains('command') ||
+          allText.contains('instruct') ||
+          allText.contains('tells') ||
+          allText.contains('requires')) {
+        dynamicQuestions.add(hasVerseContext
+            ? 'How should I obey this verse?'
+            : 'How should I follow this?');
+      }
+
+      if (allText.contains('encourage') ||
+          allText.contains('comfort') ||
+          allText.contains('strengthen')) {
+        dynamicQuestions.add(hasVerseContext
+            ? 'How does this verse encourage me?'
+            : 'How does this encourage me?');
+      }
+
+      if (allText.contains('warn') ||
+          allText.contains('warning') ||
+          allText.contains('caution')) {
+        dynamicQuestions.add(hasVerseContext
+            ? 'What warning does this verse give?'
+            : 'What warning does this give?');
+      }
+    }
+
+    // Priority 4: Generate questions based on sentence structure
+    if (dynamicQuestions.length < 3) {
+      // Look for "because", "so that", "in order to" patterns
+      if (firstSentence.contains('because') ||
+          firstSentence.contains('so that') ||
+          firstSentence.contains('in order to')) {
+        dynamicQuestions.add(hasVerseContext
+            ? 'Why is this verse important?'
+            : 'Why is this important?');
+      }
+
+      // Look for "how to", "way to" patterns
+      if (firstSentence.contains('how to') ||
+          firstSentence.contains('way to') ||
+          firstSentence.contains('steps')) {
+        dynamicQuestions.add(hasVerseContext
+            ? 'What steps should I take?'
+            : 'What practical steps can I take?');
+      }
+
+      // Look for questions in the response
+      if (firstSentence.contains('?') || answer.contains('?')) {
+        dynamicQuestions.add(hasVerseContext
+            ? 'Can you explain this verse further?'
+            : 'Can you explain this further?');
+      }
+    }
+
+    // Return dynamic questions if we have enough, otherwise fill with contextual fallbacks
+    if (dynamicQuestions.length >= 3) {
+      return dynamicQuestions.take(3).toList();
+    }
+
+    // Fill remaining slots with contextual questions
+    while (dynamicQuestions.length < 3) {
+      if (hasVerseContext) {
+        if (!dynamicQuestions.any((q) => q.contains('apply'))) {
+          dynamicQuestions.add('How can I apply this verse in my life?');
+        } else if (!dynamicQuestions.any((q) => q.contains('more'))) {
+          dynamicQuestions.add('Tell me more about this verse');
+        } else {
+          dynamicQuestions.add('What else does this verse teach?');
+        }
+      } else {
+        if (!dynamicQuestions.any((q) => q.contains('apply'))) {
+          dynamicQuestions.add('How can I apply this?');
+        } else if (!dynamicQuestions.any((q) => q.contains('more'))) {
+          dynamicQuestions.add('Can you explain more?');
+        } else {
+          dynamicQuestions.add('What else should I know?');
+        }
+      }
+    }
+
+    return dynamicQuestions.take(3).toList();
+  }
+
+  // Extract key phrases/nouns from the response
+  List<String> _extractKeyPhrases(String answer, List<String> sentences) {
+    final List<String> phrases = [];
     final lower = answer.toLowerCase();
-    if (lower.contains('fear') || lower.contains('anxious')) {
-      return [
-        'What does God say about fear?',
-        'How to trust God when I am afraid?',
-        'Verses to calm anxiety?',
-      ];
-    }
-    if (lower.contains('forgive') || lower.contains('hurt')) {
-      return [
-        'How do I forgive someone who hurt me?',
-        'What verses teach about forgiveness?',
-        'How do I heal after being hurt?',
-      ];
-    }
-    if (lower.contains('purpose') || lower.contains('plan')) {
-      return [
-        'What is God\'s purpose for my life?',
-        'How do I discern God\'s plan?',
-        'How to stay faithful to God\'s calling?',
-      ];
-    }
-    // Fallback to general prompts
-    return [
-      'What does God say about fear?',
-      'How do I forgive someone who hurt me?',
-      'What is God\'s purpose for my life?',
+
+    // Extract important nouns and phrases (3-5 word phrases)
+    // Look for patterns like "the [noun]", "this [noun]", "your [noun]"
+    final nounPatterns = [
+      RegExp(
+          r'\b(the|this|your|my|our|his|her|their)\s+([a-z]+(?:\s+[a-z]+){0,2})\b',
+          caseSensitive: false),
+      RegExp(
+          r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b'), // Capitalized phrases (likely proper nouns or important concepts)
     ];
+
+    for (var pattern in nounPatterns) {
+      final matches = pattern.allMatches(answer);
+      for (var match in matches) {
+        final phrase = match.group(0)?.trim() ?? '';
+        if (phrase.length > 3 &&
+            phrase.length < 30 &&
+            !phrases.contains(phrase)) {
+          // Filter out common words
+          if (!phrase.toLowerCase().contains('this verse') &&
+              !phrase.toLowerCase().contains('the bible') &&
+              !phrase.toLowerCase().contains('god') &&
+              !phrase.toLowerCase().contains('jesus') &&
+              !phrase.toLowerCase().contains('christ')) {
+            phrases.add(phrase);
+          }
+        }
+      }
+    }
+
+    // Also extract concepts from important words
+    final importantWords = _extractImportantConcepts(lower);
+    phrases.addAll(importantWords);
+
+    return phrases.take(5).toList();
+  }
+
+  // Helper function to extract important concepts from text
+  List<String> _extractImportantConcepts(String text) {
+    final List<String> concepts = [];
+
+    // Common important spiritual/biblical concepts with more keywords
+    final conceptPatterns = {
+      'fear': [
+        'fear',
+        'afraid',
+        'anxious',
+        'anxiety',
+        'worried',
+        'worry',
+        'scared',
+        'frightened'
+      ],
+      'forgiveness': [
+        'forgive',
+        'forgiveness',
+        'hurt',
+        'pain',
+        'healing',
+        'heal',
+        'wound'
+      ],
+      'purpose': [
+        'purpose',
+        'plan',
+        'calling',
+        'mission',
+        'destiny',
+        'will',
+        'intention'
+      ],
+      'love': ['love', 'loving', 'compassion', 'care', 'cherish', 'adore'],
+      'faith': [
+        'faith',
+        'believe',
+        'trust',
+        'belief',
+        'confidence',
+        'reliance'
+      ],
+      'hope': [
+        'hope',
+        'promise',
+        'promises',
+        'future',
+        'expectation',
+        'anticipation'
+      ],
+      'peace': ['peace', 'calm', 'rest', 'quiet', 'tranquil', 'serenity'],
+      'wisdom': [
+        'wisdom',
+        'wise',
+        'understanding',
+        'knowledge',
+        'insight',
+        'discernment'
+      ],
+      'strength': [
+        'strength',
+        'strong',
+        'power',
+        'mighty',
+        'courage',
+        'brave',
+        'bold'
+      ],
+      'guidance': ['guide', 'guidance', 'direction', 'path', 'way', 'lead'],
+      'prayer': ['pray', 'prayer', 'praying', 'prayed', 'supplication'],
+      'salvation': [
+        'salvation',
+        'saved',
+        'redeem',
+        'redemption',
+        'rescue',
+        'deliverance'
+      ],
+      'obedience': [
+        'obey',
+        'obedience',
+        'follow',
+        'command',
+        'submit',
+        'comply'
+      ],
+      'grace': ['grace', 'mercy', 'kindness', 'favor', 'blessing'],
+      'sin': [
+        'sin',
+        'sinful',
+        'wrong',
+        'wrongdoing',
+        'transgression',
+        'iniquity'
+      ],
+      'repentance': [
+        'repent',
+        'repentance',
+        'turn',
+        'change',
+        'return',
+        'convert'
+      ],
+      'joy': ['joy', 'joyful', 'rejoice', 'happiness', 'gladness', 'delight'],
+      'patience': [
+        'patience',
+        'patient',
+        'endure',
+        'persevere',
+        'wait',
+        'longsuffering'
+      ],
+      'humility': ['humble', 'humility', 'meek', 'modest', 'lowly'],
+    };
+
+    // Find which concepts are mentioned (check for word boundaries)
+    for (var entry in conceptPatterns.entries) {
+      for (var keyword in entry.value) {
+        // Use word boundary to avoid partial matches
+        final pattern = RegExp(r'\b' + keyword + r'\b', caseSensitive: false);
+        if (pattern.hasMatch(text)) {
+          if (!concepts.contains(entry.key)) {
+            concepts.add(entry.key);
+          }
+          break; // Found one keyword for this concept, move to next
+        }
+      }
+    }
+
+    return concepts;
   }
 
   Widget _buildVerseContext(double screenWidth, bool isDark) {
@@ -2697,7 +3032,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Suggested Questions:',
+            'Suggestions Questions:',
             style: TextStyle(
               color: CommanColor.whiteBlack(context).withOpacity(0.7),
               fontSize: screenWidth > 450 ? 16 : 14,
@@ -2706,7 +3041,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
           ),
           const SizedBox(height: 10),
           SizedBox(
-            height: screenWidth > 450 ? 50 : 40,
+            height: screenWidth > 450 ? 64 : 58,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: suggestedQuestions.length,
@@ -2714,7 +3049,9 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                 final question = suggestedQuestions[index];
                 final isSelected = _selectedExampleQuestionIndex == index;
                 return Padding(
-                  padding: EdgeInsets.only(right: screenWidth > 450 ? 10 : 8),
+                  padding: EdgeInsets.only(
+                      right: screenWidth > 450 ? 10 : 8,
+                      bottom: screenWidth > 450 ? 4 : 2),
                   child: InkWell(
                     onTap: () {
                       setState(() {
@@ -2731,53 +3068,51 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                         }
                       });
                     },
-                    borderRadius: BorderRadius.circular(20),
                     child: Container(
                       padding: EdgeInsets.symmetric(
-                        horizontal: screenWidth > 450 ? 16 : 12,
-                        vertical: screenWidth > 450 ? 10 : 8,
+                        horizontal: screenWidth > 450 ? 18 : 14,
+                        vertical: screenWidth > 450 ? 14 : 12,
                       ),
                       decoration: BoxDecoration(
-                        color: isSelected
-                            ? CommanColor.lightDarkPrimary(context)
-                            : (isDark
-                                ? CommanColor.darkPrimaryColor.withOpacity(0.6)
-                                : CommanColor.lightDarkPrimary(context)
-                                    .withOpacity(0.1)),
-                        borderRadius: BorderRadius.circular(20),
+                        color: CommanColor.lightDarkPrimary(context),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: isSelected
-                              ? (isDark
-                                  ? Colors.white
-                                  : CommanColor.lightDarkPrimary(context))
+                          color: isSelected && isDark
+                              ? const Color(
+                                  0xFFFFD700) // Light yellow border when tapped in dark mode
                               : (isDark
-                                  ? Colors.white.withOpacity(0.3)
+                                  ? Colors
+                                      .white // White border initially in dark mode
                                   : CommanColor.lightDarkPrimary(context)
-                                      .withOpacity(0.2)),
-                          width: isSelected ? 2 : 1,
+                                      .withOpacity(0.3)),
+                          width: isSelected && isDark ? 3 : (isDark ? 3 : 1),
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: CommanColor.lightDarkPrimary(context)
+                                .withOpacity(0.25),
+                            blurRadius: 3,
+                            offset: const Offset(0, 2),
+                          )
+                        ],
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            question,
-                            style: TextStyle(
-                              color: isSelected
-                                  ? Colors.white
-                                  : CommanColor.whiteBlack(context),
-                              fontSize: screenWidth > 450 ? 14 : 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
                           Icon(
                             Icons.link,
-                            size: screenWidth > 450 ? 16 : 14,
-                            color: isSelected
-                                ? Colors.white
-                                : CommanColor.whiteBlack(context)
-                                    .withOpacity(0.7),
+                            size: screenWidth > 450 ? 18 : 16,
+                            color: CommanColor.white,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            question,
+                            textAlign: TextAlign.start,
+                            style: TextStyle(
+                              color: CommanColor.white,
+                              fontSize: screenWidth > 450 ? 16 : 14,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ],
                       ),
@@ -3325,9 +3660,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
         vertical: screenWidth > 450 ? 8 : 6,
       ),
       decoration: BoxDecoration(
-        color: isDark
-            ? CommanColor.darkPrimaryColor
-            : (isVintage ? Colors.brown[50] : Colors.grey[50]),
+        color: Colors.transparent,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.08),
@@ -3338,93 +3671,101 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
       ),
       child: SafeArea(
         top: false,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+        child: Column(
           children: [
-            Expanded(
-              child: Container(
-                constraints: BoxConstraints(
-                  maxHeight: screenWidth > 450 ? 100 : 80,
-                ),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF2A2A2A)
-                      : (themeProvider.currentCustomTheme ==
-                              AppCustomTheme.vintage
-                          ? Colors.brown[100]
-                          : Colors.white),
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(
-                    color: isDark
-                        ? Colors.grey[700]!.withOpacity(0.3)
-                        : Colors.grey[300]!.withOpacity(0.5),
-                    width: 1,
-                  ),
-                ),
-                child: TextField(
-                  controller: _messageController,
-                  focusNode: _messageFocusNode,
-                  maxLines: null,
-                  minLines: 1,
-                  textInputAction: TextInputAction.send,
-                  enabled: !_isLoading, // Disable text field while loading
-                  readOnly: _isLoading, // Prevent focus when loading
-                  onSubmitted: (_) {
-                    if (!_isLoading) {
-                      _sendMessage();
-                    }
-                  },
-                  style: TextStyle(
-                    color: CommanColor.whiteBlack(context),
-                    fontSize: screenWidth > 450 ? 15 : 14,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: _isListening
-                        ? 'Listening...'
-                        : (_isLoading
-                            ? 'Seeking guidance...'
-                            : "Ask anything here..."),
-                    hintStyle: TextStyle(
-                      color: CommanColor.whiteBlack(context).withOpacity(0.5),
-                      fontSize: screenWidth > 450 ? 15 : 14,
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: screenWidth > 450 ? 16 : 14,
-                      vertical: screenWidth > 450 ? 10 : 8,
-                    ),
-                  ),
-                ),
-              ),
+            SizedBox(
+              height: 10,
             ),
-            const SizedBox(width: 8),
-            // Voice input button temporarily hidden
-            const SizedBox(width: 0, height: 0),
-            const SizedBox(width: 8),
-            Container(
-              decoration: BoxDecoration(
-                color: sendBgColor,
-                shape: BoxShape.circle,
-              ),
-              child: IconButton(
-                icon: _isLoading
-                    ? SizedBox(
-                        width: 15,
-                        height: 15,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 1,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            CommanColor.white,
-                          ),
-                        ),
-                      )
-                    : Image.asset(
-                        "assets/send-2.png",
-                        color: CommanColor.white,
-                        width: screenWidth > 450 ? 24 : 20,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Container(
+                    constraints: BoxConstraints(
+                      maxHeight: screenWidth > 450 ? 100 : 80,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF2A2A2A)
+                          : (themeProvider.currentCustomTheme ==
+                                  AppCustomTheme.vintage
+                              ? Colors.brown[100]
+                              : Colors.white),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(
+                        color: isDark
+                            ? Colors.grey[700]!.withOpacity(0.3)
+                            : Colors.grey[300]!.withOpacity(0.5),
+                        width: 1,
                       ),
-                onPressed: (!_isLoading && hasText) ? _sendMessage : null,
-              ),
+                    ),
+                    child: TextField(
+                      controller: _messageController,
+                      focusNode: _messageFocusNode,
+                      maxLines: null,
+                      minLines: 1,
+                      textInputAction: TextInputAction.send,
+                      enabled: !_isLoading, // Disable text field while loading
+                      readOnly: _isLoading, // Prevent focus when loading
+                      onSubmitted: (_) {
+                        if (!_isLoading) {
+                          _sendMessage();
+                        }
+                      },
+                      style: TextStyle(
+                        color: CommanColor.whiteBlack(context),
+                        fontSize: screenWidth > 450 ? 15 : 14,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: _isListening
+                            ? 'Listening...'
+                            : (_isLoading
+                                ? 'Seeking guidance...'
+                                : "Ask anything here..."),
+                        hintStyle: TextStyle(
+                          color:
+                              CommanColor.whiteBlack(context).withOpacity(0.5),
+                          fontSize: screenWidth > 450 ? 15 : 14,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: screenWidth > 450 ? 20 : 18,
+                          vertical: screenWidth > 450 ? 16 : 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Voice input button temporarily hidden
+                const SizedBox(width: 0, height: 0),
+                const SizedBox(width: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: sendBgColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    icon: _isLoading
+                        ? SizedBox(
+                            width: 15,
+                            height: 15,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                CommanColor.white,
+                              ),
+                            ),
+                          )
+                        : Image.asset(
+                            "assets/send-2.png",
+                            color: CommanColor.white,
+                            width: screenWidth > 450 ? 24 : 20,
+                          ),
+                    onPressed: (!_isLoading && hasText) ? _sendMessage : null,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

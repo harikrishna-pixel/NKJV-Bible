@@ -3295,7 +3295,7 @@ Future<bool> requestPermission([context]) async {
     if (newStatus.isGranted) return true;
 
     if (newStatus.isPermanentlyDenied) {
-      Constants.showToast("Photo access permanently denied. Go to Settings.");
+      // Constants.showToast("Photo access permanently denied. Go to Settings.");
       // openAppSettings();
       showPermissionSettingsDialog(context);
     } else {
@@ -4645,8 +4645,10 @@ class HomeContentEditBottomSheetState
                     _buildResetButton(),
                     if (screenWidth > 450) const SizedBox(width: 20),
                     _buildShareButton(),
-                    if (screenWidth > 450) const SizedBox(width: 20),
-                    _buildAskButton(),
+                    if (BibleInfo.chat == 1) ...[
+                      if (screenWidth > 450) const SizedBox(width: 20),
+                      _buildAskButton(),
+                    ],
                   ],
                 ),
               ),
@@ -5664,10 +5666,16 @@ class HomeContentEditBottomSheetState
               duration: const Duration(milliseconds: 300),
             );
           },
-          child: Icon(
-            CupertinoIcons.chat_bubble_2,
-            color: CommanColor.lightDarkPrimary(context),
-            size: screenWidth > 450 ? 50 : 40,
+          child: Image(
+            image: AssetImage(
+              Provider.of<ThemeProvider>(context, listen: false).themeMode ==
+                      ThemeMode.dark
+                  ? "assets/Chat white.png"
+                  : "assets/Chat icon.png",
+            ),
+            height: screenWidth > 450 ? 60 : 50,
+            width: screenWidth > 450 ? 45 : 35,
+            fit: BoxFit.contain,
           ),
         ),
         Text(

@@ -31,13 +31,20 @@ class WallpaperScreen extends HookConsumerWidget {
     });
     
     // Monitor loading state and show toast if loading takes too long
+    // Increased delay for real devices where first network request can take longer
     useEffect(() {
       if (wallpaperCategoryState.isLoading && !hasShownToast.value) {
         bool cancelled = false;
-        Future.delayed(const Duration(seconds: 3), () {
+        // Add initial delay to account for network initialization on real devices
+        Future.delayed(const Duration(seconds: 1), () {
           if (!cancelled && wallpaperCategoryState.isLoading && !hasShownToast.value) {
-            Constants.showToast('Check Your Internet Connection');
-            hasShownToast.value = true;
+            // Then wait additional 5 seconds before showing toast (total 6 seconds)
+            Future.delayed(const Duration(seconds: 5), () {
+              if (!cancelled && wallpaperCategoryState.isLoading && !hasShownToast.value) {
+                Constants.showToast('Check Your Internet Connection');
+                hasShownToast.value = true;
+              }
+            });
           }
         });
         return () {

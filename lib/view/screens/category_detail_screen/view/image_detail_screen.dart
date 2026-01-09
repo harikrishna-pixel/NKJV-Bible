@@ -944,7 +944,7 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
                               //       )
                               //     :
                               CachedNetworkImage(
-                            imageUrl: photos[currentIndex].imageUrl ?? '',
+                            imageUrl: photos[i].imageUrl ?? '',
                             fit: BoxFit.fill,
                           ),
                           initialScale: PhotoViewComputedScale.contained,

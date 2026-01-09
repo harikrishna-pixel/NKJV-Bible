@@ -90,4 +90,7 @@ class BibleInfo {
 
   static const double fontSizeScale = 1.0;
   static const double letterSpacing = 0.4;
+
+  // Chat feature visibility: 0 = hide, 1 = show
+  static int chat = 1;
 }

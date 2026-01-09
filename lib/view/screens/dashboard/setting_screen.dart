@@ -1831,6 +1831,43 @@ class _SettingScreenState extends State<SettingScreen>
   }
 
   Future<void> _showPremiumThemeDialog(BuildContext context) async {
+    // Check subscription status before showing premium dialog
+    // Only show for unsubscribed users
+    bool isSubscribed = false;
+    
+    // First check subscription plan
+    final downloadProvider = Provider.of<DownloadProvider>(context, listen: false);
+    final subscriptionPlan = await downloadProvider.getSubscriptionPlan();
+    final hasSubscriptionPlan = subscriptionPlan != null &&
+        subscriptionPlan.isNotEmpty &&
+        ['platinum', 'gold', 'silver']
+            .contains(subscriptionPlan.toLowerCase());
+
+    // Must have subscription plan AND valid expiry date
+    if (hasSubscriptionPlan) {
+      try {
+        final expiryDateString = await SharPreferences.getString(
+            SharPreferences.isRewardAdViewTime);
+        if (expiryDateString != null && expiryDateString.isNotEmpty) {
+          final expiryDate = DateTime.parse(expiryDateString);
+          final currentTime = DateTime.now();
+          final diffDays = expiryDate.difference(currentTime).inDays;
+          // Subscription is valid if expiry date is today or in the future (>= 0)
+          // This includes lifetime subscriptions (>365 days)
+          isSubscribed = diffDays >= 0;
+        }
+      } catch (e) {
+        debugPrint("Error checking subscription expiry in premium dialog: $e");
+        isSubscribed = false;
+      }
+    }
+
+    // Don't show premium dialog if user is subscribed
+    if (isSubscribed) {
+      debugPrint("User is subscribed, not showing premium dialog");
+      return;
+    }
+
     final screenWidth = MediaQuery.of(context).size.width;
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final oldPaperColor = themeProvider

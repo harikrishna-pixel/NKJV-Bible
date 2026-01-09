@@ -46,15 +46,16 @@ class PaywallPreloadService {
       debugPrint('PaywallPreloadService: IAP Available: $_isAvailable');
 
       if (_isAvailable == true) {
-        // Set iOS delegate if needed
+        // Set iOS delegate if needed (set to null for preloading - delegate will be set in subscription screen)
         if (Platform.isIOS && !_iosDelegateSet) {
           try {
             final InAppPurchaseStoreKitPlatformAddition iosPlatformAddition =
                 _inAppPurchase
                     .getPlatformAddition<InAppPurchaseStoreKitPlatformAddition>();
-            await iosPlatformAddition.setDelegate(ExamplePaymentQueueDelegate());
+            // Set delegate to null for preloading - the subscription screen will set proper delegate
+            await iosPlatformAddition.setDelegate(null);
             _iosDelegateSet = true;
-            debugPrint('PaywallPreloadService: iOS delegate set');
+            debugPrint('PaywallPreloadService: iOS delegate set to null for preloading');
           } catch (e) {
             debugPrint('PaywallPreloadService: Error setting iOS delegate: $e');
           }
