@@ -145,15 +145,16 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
   Future<void> loadApi() async {
     // Check if background API service is already loading or completed
     final backgroundService = BackgroundApiService();
-    
+
     if (backgroundService.isCompleted) {
       // APIs already loaded in background and cached
       // Still need to load from cache to initialize controller's reactive variables
-      debugPrint('APIs already loaded in background, loading from cache to initialize controller');
+      debugPrint(
+          'APIs already loaded in background, loading from cache to initialize controller');
       await _loadFromCache();
       return;
     }
-    
+
     if (backgroundService.isLoading) {
       // APIs are still loading in background, wait for them
       debugPrint('APIs are loading in background, waiting for completion...');
@@ -168,7 +169,7 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         // Fall through to load APIs directly if background loading failed
       }
     }
-    
+
     // If background service hasn't started or failed, load APIs directly
     try {
       final value = await getMusicDetails();
@@ -233,14 +234,14 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
       // Create empty GetAudioModel and process it to use constants as fallback
       final emptyModel = GetAudioModel();
       await _processApiResponse(emptyModel);
-      
+
       // Save constants to SharedPreferences for IAP plan IDs
       await Future.wait([
         SharPreferences.setString('sixMonthPlan', BibleInfo.sixMonthPlanid),
         SharPreferences.setString('oneYearPlan', BibleInfo.oneYearPlanid),
         SharPreferences.setString('lifeTimePlan', BibleInfo.lifeTimePlanid),
       ]);
-      
+
       debugPrint('Initialized with constants successfully');
     } catch (e) {
       debugPrint('Error initializing with constants: $e');
@@ -276,8 +277,8 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     // This prevents showing "No internet connection" toast when offline
     if (connectionStatus.value.isNotEmpty &&
         (connectionStatus.value.contains(ConnectivityResult.wifi) ||
-         connectionStatus.value.contains(ConnectivityResult.mobile) ||
-         connectionStatus.value.contains(ConnectivityResult.ethernet))) {
+            connectionStatus.value.contains(ConnectivityResult.mobile) ||
+            connectionStatus.value.contains(ConnectivityResult.ethernet))) {
       try {
         final appdata = await getMoreApps();
         //await StorageHelper.saveBooksAndApps(apps: appdata);
@@ -359,7 +360,7 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     String exitOfferId = BibleInfo.exitOfferPlanid; // Default to constant
     if (value.data?.subFields != null) {
       for (var field in value.data!.subFields!) {
-        if (field?.identifier != null && 
+        if (field?.identifier != null &&
             field!.identifier!.contains('exitoffer')) {
           exitOfferId = field.identifier!;
           break;
@@ -373,8 +374,8 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     String coinPack3Id = BibleInfo.coinPack3Id; // Default to constant
     if (value.data?.subFields != null) {
       for (var field in value.data!.subFields!) {
-        if (field?.identifier != null && 
-            field!.identifier!.isNotEmpty && 
+        if (field?.identifier != null &&
+            field!.identifier!.isNotEmpty &&
             field.identifier!.contains('coinspack')) {
           if (field.identifier!.contains('coinspack1')) {
             coinPack1Id = field.identifier!;
@@ -767,11 +768,27 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         SharPreferences.selectedBook,
         selectedBook.value,
       );
-      selectChapterChange.value = int.parse(selectedChapter.value);
+
+      // Validate and parse selectedChapter with default value
+      final chapterValue =
+          selectedChapter.value.isNotEmpty ? selectedChapter.value : "1";
+      selectChapterChange.value = int.tryParse(chapterValue) ?? 1;
+
+      // Validate and parse selectedBookNumForRead with default value
+      final bookNumForRead = selectedBookNumForRead.value.isNotEmpty
+          ? selectedBookNumForRead.value
+          : (selectedBookNum.value.isNotEmpty ? selectedBookNum.value : "0");
+      final parsedBookNum = int.tryParse(bookNumForRead) ?? 0;
+
+      // Validate and parse selectedChapterForRead with default value
+      final chapterForRead = selectedChapterForRead.value.isNotEmpty
+          ? selectedChapterForRead.value
+          : chapterValue;
+      final parsedChapterForRead = int.tryParse(chapterForRead) ?? 1;
+
       DBHelper().db.then((value) {
         value!
-            .rawQuery(
-                "SELECT * From verse WHERE book_num ='${int.parse(selectedBookNumForRead.value)}'")
+            .rawQuery("SELECT * From verse WHERE book_num ='$parsedBookNum'")
             .then((selectedBookResponse) {
           selectedVersesContent.value = selectedBookResponse
               .map<VerseBookContentModel>(
@@ -781,7 +798,7 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         });
         value
             .rawQuery(
-                "SELECT * From verse WHERE book_num ='${int.parse(selectedBookNumForRead.value)}' AND chapter_num = '${int.parse(selectedChapterForRead.value) - 1}'")
+                "SELECT * From verse WHERE book_num ='$parsedBookNum' AND chapter_num = '${parsedChapterForRead - 1}'")
             .then((selectedBookResponse) {
           selectedBookContent.value = filterContent(selectedBookResponse
               .map<VerseBookContentModel>(
@@ -793,12 +810,14 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
 
       DBHelper().db.then((value) {
         value!
-            .rawQuery(
-                "SELECT * From book WHERE book_num = ${int.parse(selectedBookNumForRead.value)}")
+            .rawQuery("SELECT * From book WHERE book_num = $parsedBookNum")
             .then((value) {
-          selectedBookChapterCount.value = value[0]["chapter_count"].toString();
-          bookReadPer.value = value[0]["read_per"].toString();
-          selectedBookId.value = value[0]["id"].toString();
+          if (value.isNotEmpty) {
+            selectedBookChapterCount.value =
+                value[0]["chapter_count"].toString();
+            bookReadPer.value = value[0]["read_per"].toString();
+            selectedBookId.value = value[0]["id"].toString();
+          }
         });
       });
     } catch (e, st) {

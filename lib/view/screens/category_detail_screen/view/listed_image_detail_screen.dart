@@ -277,8 +277,8 @@ class ListedImageDetailScreen extends HookConsumerWidget {
                       return PhotoViewGalleryPageOptions(
                           imageProvider: CachedNetworkImageProvider(
                               photos[i].imageUrl ?? ''),
-                          initialScale: PhotoViewComputedScale.covered,
-                          maxScale: PhotoViewComputedScale.contained * 4,
+                          initialScale: PhotoViewComputedScale.contained,
+                          maxScale: PhotoViewComputedScale.contained,
                           minScale: PhotoViewComputedScale.contained,
                           heroAttributes: PhotoViewHeroAttributes(tag: i));
                     },

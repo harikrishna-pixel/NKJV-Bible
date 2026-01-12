@@ -1369,6 +1369,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                             vertical: screenWidth > 450 ? 16 : 14,
                           ),
                           elevation: 0,
+                          side: isDark
+                              ? const BorderSide(
+                                  color: Colors.white,
+                                  width: 1.5,
+                                )
+                              : null,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -2983,13 +2989,17 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
               Icon(
                 Icons.book,
                 size: screenWidth > 450 ? 20 : 18,
-                color: CommanColor.lightDarkPrimary(context),
+                color: isDark
+                    ? Colors.white
+                    : CommanColor.lightDarkPrimary(context),
               ),
               const SizedBox(width: 8),
               Text(
                 '$book $chapter:$verse',
                 style: TextStyle(
-                  color: CommanColor.lightDarkPrimary(context),
+                  color: isDark
+                      ? Colors.white
+                      : CommanColor.lightDarkPrimary(context),
                   fontSize: screenWidth > 450 ? 16 : 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -3100,7 +3110,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.link,
+                            Icons.north_east,
                             size: screenWidth > 450 ? 18 : 16,
                             color: CommanColor.white,
                           ),

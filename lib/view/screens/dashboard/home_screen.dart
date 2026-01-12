@@ -6786,6 +6786,7 @@ class PremiumWelcomeAlert {
       barrierDismissible: false, // must tap button
       builder: (context) {
         return Dialog(
+          backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),

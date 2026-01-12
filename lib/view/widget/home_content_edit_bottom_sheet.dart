@@ -5670,7 +5670,7 @@ class HomeContentEditBottomSheetState
             image: AssetImage(
               Provider.of<ThemeProvider>(context, listen: false).themeMode ==
                       ThemeMode.dark
-                  ? "assets/Chat white.png"
+                  ? "assets/Chat icon.png"
                   : "assets/Chat icon.png",
             ),
             height: screenWidth > 450 ? 60 : 50,
