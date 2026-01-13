@@ -164,28 +164,17 @@ class LoginScreen extends HookConsumerWidget {
                                 //  Constants.showToast(
                                 //     "Hi $user, Welcome to Amplified Bible");
 
-                                SharedPreferences prefs =
-                                    await SharedPreferences.getInstance();
-                                final saved = prefs
-                                        .getStringList('selected_categories') ??
-                                    [];
-
-                                if (saved.isEmpty) {
-                                  return Get.to(() => PreferenceSelectionScreen(
-                                        isSetting: false,
-                                      ));
-                                } else {
-                                  if (user != null) {
-                                    Constants.showToast(
-                                        "Hi ${user.displayName}, Welcome to ${BibleInfo.bible_shortName}");
-                                    return Get.offAll(() => HomeScreen(
-                                        From: "splash",
-                                        selectedVerseNumForRead: "",
-                                        selectedBookForRead: "",
-                                        selectedChapterForRead: "",
-                                        selectedBookNameForRead: "",
-                                        selectedVerseForRead: ""));
-                                  }
+                                // Always route to HomeScreen after successful login
+                                if (user != null) {
+                                  Constants.showToast(
+                                      "Hi ${user.displayName}, Welcome to ${BibleInfo.bible_shortName}");
+                                  return Get.offAll(() => HomeScreen(
+                                      From: "splash",
+                                      selectedVerseNumForRead: "",
+                                      selectedBookForRead: "",
+                                      selectedChapterForRead: "",
+                                      selectedBookNameForRead: "",
+                                      selectedVerseForRead: ""));
                                 }
                               }
                             } catch (e) {

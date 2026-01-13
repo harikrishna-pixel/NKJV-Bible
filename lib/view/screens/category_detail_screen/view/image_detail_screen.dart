@@ -15,7 +15,6 @@ import 'package:biblebookapp/view/screens/category_detail_screen/bloc/bookmark_s
 import 'package:biblebookapp/view/screens/category_detail_screen/bloc/fetched_images_bloc.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
-import 'package:biblebookapp/view/screens/dashboard/remove_add-screen.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 import 'package:biblebookapp/view/widget/adhelper.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -315,7 +314,8 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
 
   void _handleReward() async {
     await SharPreferences.setBoolean("downloadreward", true);
-    Constants.showToast("Reward unlocked! Download 3 more images for free", 6000);
+    Constants.showToast(
+        "Reward unlocked! Download 3 more images for free", 6000);
   }
 
   Future<void> _handleAdDismissed() async {}
@@ -324,6 +324,14 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
     Sizecf().init(context);
 
     await SharPreferences.setBoolean("downloadreward", false);
+
+    // Check if user has premium subscription
+    final downloadProvider =
+        p.Provider.of<DownloadProvider>(context, listen: false);
+    final subscriptionPlan = await downloadProvider.getSubscriptionPlan();
+    final hasPremium = subscriptionPlan != null &&
+        subscriptionPlan.isNotEmpty &&
+        ['platinum', 'gold', 'silver'].contains(subscriptionPlan.toLowerCase());
 
     showDialog(
       context: context,
@@ -387,38 +395,41 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
                         decoration: TextDecoration.none)),
                 const SizedBox(height: 20),
 
-                // Buy Premium Row
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    //Icon(Icons.diamond, color: Colors.brown),
-                    Image.asset(
-                      'assets/Asset1.png',
-                      height: 25,
-                      width: 25,
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
+                // Buy Premium Row - Only show if user doesn't have premium
+                hasPremium
+                    ? SizedBox.shrink()
+                    : Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Buy Premium',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black),
+                          //Icon(Icons.diamond, color: Colors.brown),
+                          Image.asset(
+                            'assets/Asset1.png',
+                            height: 25,
+                            width: 25,
                           ),
-                          Text(
-                            'Unlock unlimited downloads and remove all limits',
-                            style: CommanStyle.bw15500wU(context).copyWith(
-                                fontWeight: FontWeight.w400,
-                                color: Colors.black),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Buy Premium',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black),
+                                ),
+                                Text(
+                                  'Unlock unlimited downloads and remove all limits',
+                                  style: CommanStyle.bw15500wU(context)
+                                      .copyWith(
+                                          fontWeight: FontWeight.w400,
+                                          color: Colors.black),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
                 const SizedBox(height: 15),
                 isAdReady == false
                     ? SizedBox.shrink()
@@ -476,51 +487,63 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
 
                 // Buttons
                 Row(
-                  mainAxisAlignment: isAdReady == false
+                  mainAxisAlignment: (isAdReady == false || hasPremium)
                       ? MainAxisAlignment.center
                       : MainAxisAlignment.spaceBetween,
                   children: [
-                    ElevatedButton(
-                      onPressed: () async {
-                        await SharPreferences.setString('OpenAd', '1');
-                        // Use constants as fallback when SharedPreferences are empty (first time loading)
-                        final sixMonthPlan =
-                            await SharPreferences.getString('sixMonthPlan') ?? BibleInfo.sixMonthPlanid;
-                        final oneYearPlan =
-                            await SharPreferences.getString('oneYearPlan') ?? BibleInfo.oneYearPlanid;
-                        final lifeTimePlan =
-                            await SharPreferences.getString('lifeTimePlan') ?? BibleInfo.lifeTimePlanid;
-                        setState(() {
-                          clickCount = 0;
-                        });
-                        await SharPreferences.setInt("downloadrewardcount", 0);
-                        if (context.mounted) {
-                          Navigator.pop(context);
-                          // Handle buy premium - Navigate to SubscriptionScreen
-                          Get.to(() => SubscriptionScreen(
-                                sixMonthPlan: sixMonthPlan,
-                                oneYearPlan: oneYearPlan,
-                                lifeTimePlan: lifeTimePlan,
-                                checkad: 'image',
-                              ),
-                              transition: Transition.cupertinoDialog,
-                              duration: const Duration(milliseconds: 300));
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                        backgroundColor: CommanColor.lightModePrimary200,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: Text(
-                        'Buy Premium',
-                        textAlign: TextAlign.center,
-                        style: CommanStyle.white14500.copyWith(
-                            fontSize: 12, fontWeight: FontWeight.w500),
-                      ),
-                    ),
+                    // Buy Premium button - Only show if user doesn't have premium
+                    hasPremium
+                        ? SizedBox.shrink()
+                        : ElevatedButton(
+                            onPressed: () async {
+                              await SharPreferences.setString('OpenAd', '1');
+                              // Use constants as fallback when SharedPreferences are empty (first time loading)
+                              final sixMonthPlan =
+                                  await SharPreferences.getString(
+                                          'sixMonthPlan') ??
+                                      BibleInfo.sixMonthPlanid;
+                              final oneYearPlan =
+                                  await SharPreferences.getString(
+                                          'oneYearPlan') ??
+                                      BibleInfo.oneYearPlanid;
+                              final lifeTimePlan =
+                                  await SharPreferences.getString(
+                                          'lifeTimePlan') ??
+                                      BibleInfo.lifeTimePlanid;
+                              setState(() {
+                                clickCount = 0;
+                              });
+                              await SharPreferences.setInt(
+                                  "downloadrewardcount", 0);
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                                // Handle buy premium - Navigate to SubscriptionScreen
+                                Get.to(
+                                    () => SubscriptionScreen(
+                                          sixMonthPlan: sixMonthPlan,
+                                          oneYearPlan: oneYearPlan,
+                                          lifeTimePlan: lifeTimePlan,
+                                          checkad: 'image',
+                                        ),
+                                    transition: Transition.cupertinoDialog,
+                                    duration:
+                                        const Duration(milliseconds: 300));
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 9, vertical: 5),
+                              backgroundColor: CommanColor.lightModePrimary200,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: Text(
+                              'Buy Premium',
+                              textAlign: TextAlign.center,
+                              style: CommanStyle.white14500.copyWith(
+                                  fontSize: 12, fontWeight: FontWeight.w500),
+                            ),
+                          ),
                     SizedBox(
                       width: 5,
                     ),
@@ -567,21 +590,24 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
                                         await SharPreferences.setBoolean(
                                             "downloadreward", true);
                                         Constants.showToast(
-                                            "Reward unlocked! Download 3 more images for free", 6000);
+                                            "Reward unlocked! Download 3 more images for free",
+                                            6000);
                                         RewardedAdService.loadAd(
                                             onAdLoaded: () {
                                               setState(() => isAdReady = true);
                                             },
                                             onAdFailed: () {
                                               Constants.showToast(
-                                                  "Ad not available. image 2", 6000);
+                                                  "Ad not available. image 2",
+                                                  6000);
                                             },
                                             data: "imaged");
                                       },
                                       data: "image d");
                                 }
                               } else {
-                                Constants.showToast('No Internet Connection', 6000);
+                                Constants.showToast(
+                                    'No Internet Connection', 6000);
                               }
                             },
                             style: ElevatedButton.styleFrom(
@@ -676,20 +702,18 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
           File("${directory.path}/${imageModel.imageId}-${DateTime.now()}.png");
       await image.writeAsBytes(response.bodyBytes);
       isShareImageLoading.value = false;
-      
-      final appPackageName =
-          (await PackageInfo.fromPlatform()).packageName;
+
+      final appPackageName = (await PackageInfo.fromPlatform()).packageName;
       String appid = BibleInfo.apple_AppId;
       String appLink = "";
-      
+
       if (Platform.isAndroid) {
         appLink =
             " \n Read More at: https://play.google.com/store/apps/details?id=$appPackageName";
       } else if (Platform.isIOS) {
-        appLink =
-            " \n Read More at: https://itunes.apple.com/app/id$appid";
+        appLink = " \n Read More at: https://itunes.apple.com/app/id$appid";
       }
-      
+
       await Share.shareXFiles([XFile(image.path)],
           subject: BibleInfo.bible_shortName,
           text: appLink,

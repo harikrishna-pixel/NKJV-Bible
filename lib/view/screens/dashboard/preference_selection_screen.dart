@@ -15,6 +15,7 @@ import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
+import 'package:biblebookapp/view/screens/onboard_faith_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -498,7 +499,21 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                   : InkWell(
                       onTap: () {
                         // checknotification();
-                        Navigator.of(context).pop();
+                        // If coming from onboarding, navigate to Theme Selection Screen
+                        // Otherwise, just pop back
+                        if (widget.isSetting == false) {
+                          Get.off(() => OnboardingThemeSelectionScreen(
+                                onThemeSelected: () {
+                                  // Navigate back to PreferenceSelectionScreen after theme selection
+                                  Get.off(() => PreferenceSelectionScreen(
+                                        isSetting: false,
+                                        selectedbible: widget.selectedbible,
+                                      ));
+                                },
+                              ));
+                        } else {
+                          Navigator.of(context).pop();
+                        }
                       },
                       child: Icon(
                         Icons.arrow_back_ios,

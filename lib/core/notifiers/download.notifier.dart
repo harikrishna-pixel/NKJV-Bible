@@ -551,11 +551,18 @@ class DownloadProvider with ChangeNotifier {
             await SharPreferences.getInt('downloadrewardcount');
         debugPrint(
             "offer enabled 1 or - ad $adEnable - $adEnable2 & sub $subEnable  click count - $clickcountcache");
+        // Show premium popup after 3 downloads (when count reaches 4, i.e., on 4th download attempt)
         if (clickcountcache == 4) {
           await setDownloadReward();
           // showLimitDialog(context);
           return true;
         } else if (!checkDownload!) {
+          // If count is already 4 or more, show popup even if reward not watched
+          if (clickCount >= 4) {
+            await setDownloadReward();
+            return true;
+          }
+          // Otherwise set to 3 to prepare for next download
           clickCount = 3;
           await SharPreferences.setInt("downloadrewardcount", clickCount);
           return false;
