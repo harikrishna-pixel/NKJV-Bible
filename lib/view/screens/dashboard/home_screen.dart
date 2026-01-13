@@ -6213,10 +6213,11 @@ class _HomeScreenState extends State<HomeScreen>
       // Set highlight for Read, Daily, or chat
       state.controller!.readHighlight.value = isReadOrDaily || isFromChat;
 
-      if (isReadOrDaily) {
+      if (isReadOrDaily || isFromChat) {
+        // Use getBookContentForRead for Read, Daily, and chat to properly load content
         state.controller!.getBookContentForRead();
       } else {
-        // Use normal chapter loading for chat and other flows
+        // Use normal chapter loading for other flows
         state.controller!.getSelectedChapterAndBook();
       }
 
@@ -6269,12 +6270,6 @@ class _HomeScreenState extends State<HomeScreen>
     // Maximum retries to prevent infinite loop
     if (retryCount > 20) {
       debugPrint('Timeout waiting for data to load for verse highlighting');
-      // If coming from chat and content is still empty after timeout, show chapters
-      if (widget.From.toString() == "chat" &&
-          !state.controller!.isFetchContent.value &&
-          state.controller!.selectedBookContent.isEmpty) {
-        _navigateToChapters(state.controller!);
-      }
       return;
     }
 
@@ -6284,11 +6279,6 @@ class _HomeScreenState extends State<HomeScreen>
       if (state.controller!.selectedBookContent.isNotEmpty) {
         // Data is ready, scroll and highlight
         _scrollAndHighlightVerse(state, verseIndex);
-      } else {
-        // Content is empty - if from chat, navigate to chapters
-        if (widget.From.toString() == "chat") {
-          _navigateToChapters(state.controller!);
-        }
       }
     } else {
       // Wait a bit and retry
@@ -6301,39 +6291,9 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  // Helper method to navigate to ChapterListScreen
-  void _navigateToChapters(DashBoardController controller) {
-    if (mounted) {
-      Get.to(
-        () => ChapterListScreen(
-          book_num: controller.selectedBookNum.value,
-          chapterCount: controller.selectedBookChapterCount.value,
-          selectedChapter: controller.selectedChapter.value,
-        ),
-      );
-    }
-  }
-
-  // Build empty content widget - show chapters if from chat
+  // Build empty content widget
   Widget _buildEmptyContentWithChapters(DashBoardController controller) {
-    // If coming from chat and content is empty, navigate to chapters
-    if (widget.From.toString() == "chat") {
-      // Use a post-frame callback to navigate after the widget is built
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && controller.selectedBookContent.isEmpty) {
-          // Navigate to ChapterListScreen
-          Get.to(
-            () => ChapterListScreen(
-              book_num: controller.selectedBookNum.value,
-              chapterCount: controller.selectedBookChapterCount.value,
-              selectedChapter: controller.selectedChapter.value,
-            ),
-          );
-        }
-      });
-    }
-
-    // Show empty content message (will be replaced by navigation if from chat)
+    // Show empty content message
     return Center(
       child: Text(
         "Content is Empty",

@@ -2570,7 +2570,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.link,
+                              Icons.north_east,
                               size: screenWidth > 450 ? 18 : 16,
                               color: CommanColor.white,
                             ),
@@ -3294,6 +3294,28 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                   if (caseInsensitiveResult.isNotEmpty) {
                     bookNum = int.tryParse(
                         caseInsensitiveResult[0]['book_num'].toString());
+                  } else {
+                    // Fallback: try matching short_title and singular/plural variants
+                    final shortTitleResult = await db.rawQuery(
+                      "SELECT book_num FROM book WHERE LOWER(short_title) = LOWER(?) LIMIT 1",
+                      [bookName],
+                    );
+                    if (shortTitleResult.isNotEmpty) {
+                      bookNum = int.tryParse(
+                          shortTitleResult[0]['book_num'].toString());
+                    } else {
+                      final altName = bookName.endsWith('s')
+                          ? bookName.substring(0, bookName.length - 1)
+                          : '$bookName' 's';
+                      final altResult = await db.rawQuery(
+                        "SELECT book_num FROM book WHERE LOWER(title) = LOWER(?) OR LOWER(short_title) = LOWER(?) LIMIT 1",
+                        [altName, altName],
+                      );
+                      if (altResult.isNotEmpty) {
+                        bookNum =
+                            int.tryParse(altResult[0]['book_num'].toString());
+                      }
+                    }
                   }
                 } else {
                   bookNum = int.tryParse(result[0]['book_num'].toString());
