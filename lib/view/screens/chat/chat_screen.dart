@@ -1090,12 +1090,23 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     await prefs.setString('chat_history_$_currentConversationId', historyJson);
 
     // Also save conversation metadata
+    String preview;
+    // If verse context exists, use verse reference as preview
+    if (widget.verseContext != null) {
+      final book = widget.verseContext!['book'] ?? '';
+      final chapter = widget.verseContext!['chapter'] ?? '';
+      final verse = widget.verseContext!['verse'] ?? '';
+      preview = '$book $chapter:$verse';
+    } else {
+      preview = _messages.first.text.length > 50
+          ? '${_messages.first.text.substring(0, 50)}...'
+          : _messages.first.text;
+    }
+
     final conversationMeta = {
       'id': _currentConversationId,
       'date': DateTime.now().toIso8601String(),
-      'preview': _messages.first.text.length > 50
-          ? '${_messages.first.text.substring(0, 50)}...'
-          : _messages.first.text,
+      'preview': preview,
       'messageCount': _messages.length,
     };
     await prefs.setString(
@@ -1107,6 +1118,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   String _getTodayKey() {
     return DateFormat('yyyy-MM-dd').format(DateTime.now());
+  }
+
+  // Helper function to extract verse reference from message text
+  String? _extractVerseReference(String messageText) {
+    // Check for "Reference: Book Chapter:Verse" pattern
+    final referencePattern = RegExp(r'Reference:\s*([^\n]+)');
+    final match = referencePattern.firstMatch(messageText);
+    if (match != null) {
+      return match.group(1)?.trim();
+    }
+    return null;
   }
 
   Future<void> _loadRecentConversations() async {
@@ -1138,11 +1160,25 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               final meta = jsonDecode(metaJson);
               date = DateTime.parse(meta['date'] as String);
               preview = meta['preview'] as String;
+              // If preview doesn't look like a verse reference, try to extract from first message
+              if (!preview.contains(RegExp(r'\d+:\d+'))) {
+                final firstMessage = history.first['text'] as String? ?? '';
+                final verseRef = _extractVerseReference(firstMessage);
+                if (verseRef != null) {
+                  preview = verseRef;
+                }
+              }
             } catch (e) {
               date = DateTime.now();
-              preview = history.first['text'] as String;
-              if (preview.length > 50) {
-                preview = '${preview.substring(0, 50)}...';
+              final firstMessage = history.first['text'] as String? ?? '';
+              final verseRef = _extractVerseReference(firstMessage);
+              if (verseRef != null) {
+                preview = verseRef;
+              } else {
+                preview = firstMessage;
+                if (preview.length > 50) {
+                  preview = '${preview.substring(0, 50)}...';
+                }
               }
             }
           } else {
@@ -1159,9 +1195,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 date = DateTime.now();
               }
             }
-            preview = history.first['text'] as String;
-            if (preview.length > 50) {
-              preview = '${preview.substring(0, 50)}...';
+            final firstMessage = history.first['text'] as String? ?? '';
+            final verseRef = _extractVerseReference(firstMessage);
+            if (verseRef != null) {
+              preview = verseRef;
+            } else {
+              preview = firstMessage;
+              if (preview.length > 50) {
+                preview = '${preview.substring(0, 50)}...';
+              }
             }
           }
 
@@ -1181,7 +1223,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (mounted) {
       setState(() {
         _recentConversations =
-            conversations.take(5).toList(); // Show only top 5
+            conversations.take(3).toList(); // Show only top 3
       });
     }
   }
@@ -2357,7 +2399,10 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                   widget.verseContext != null
                       ? _buildVerseSuggestedQuestions(screenWidth, isDark)
                       : _buildDefaultQuestions(screenWidth, isDark),
-                  if (_recentConversations.isNotEmpty)
+                  // Show recent conversations only in Chat Home Screen (no verse context and no history date key)
+                  if (_recentConversations.isNotEmpty &&
+                      widget.verseContext == null &&
+                      widget.historyDateKey == null)
                     _buildRecentConversations(screenWidth, isDark),
                 ] else
                   _buildFollowUpSuggestions(screenWidth, isDark),
@@ -2577,14 +2622,37 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            'RECENT CONVERSATIONS',
-            style: TextStyle(
-              color: CommanColor.lightDarkPrimary(context).withOpacity(0.8),
-              fontSize: screenWidth > 450 ? 14 : 12,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'RECENT CONVERSATIONS',
+                style: TextStyle(
+                  color: CommanColor.lightDarkPrimary(context).withOpacity(0.8),
+                  fontSize: screenWidth > 450 ? 14 : 12,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              InkWell(
+                onTap: () {
+                  Get.to(
+                    () => const ChatHistoryScreen(),
+                    transition: Transition.cupertinoDialog,
+                    duration: const Duration(milliseconds: 300),
+                  );
+                },
+                child: Text(
+                  'View all',
+                  style: TextStyle(
+                    color: CommanColor.lightDarkPrimary(context),
+                    fontSize: screenWidth > 450 ? 13 : 12,
+                    fontWeight: FontWeight.w600,
+                    // decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           ListView.builder(

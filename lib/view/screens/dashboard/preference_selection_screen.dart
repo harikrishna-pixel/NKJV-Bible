@@ -1113,174 +1113,8 @@ class FaithJourneyDialog {
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
-        final mq = MediaQuery.of(ctx).size;
-        final isTablet = mq.width > 600;
-        final screenWidth = MediaQuery.of(context).size.width;
-
-        Widget buildStep(String text, bool done) {
-          return Padding(
-            padding: EdgeInsets.symmetric(
-                vertical: isTablet ? 10 : 8, horizontal: isTablet ? 6 : 4),
-            child: Row(
-              children: [
-                Icon(
-                  done ? Icons.check_circle : Icons.hourglass_bottom_rounded,
-                  color:
-                      done ? const Color(0xFF7AA36D) : const Color(0xFFB3854A),
-                  size: isTablet ? 26 : 22,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    text,
-                    style: TextStyle(
-                      fontSize: isTablet ? 18 : 16,
-                      color: const Color(0xFF7B5536),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return Center(
-          child: Container(
-            width: isTablet ? mq.width * 0.5 : mq.width * 0.9,
-            padding: EdgeInsets.symmetric(
-              horizontal: isTablet ? 28 : 20,
-              vertical: isTablet ? 26 : 20,
-            ),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFF6EBDD), Color(0xFFEBDDC9)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: const Color(0xFFD2C1A8), width: 1.2),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.10),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text(
-                  "Preparing Your Journey",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: isTablet ? 26 : 22,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF7B5536),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "We're aligning scripture with your\nheart and daily needs.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: screenWidth < 380
-                        ? 14
-                        : isTablet
-                            ? 18
-                            : 16,
-                    color: const Color(0xFF7B5536),
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isTablet ? 18 : 14,
-                    vertical: isTablet ? 16 : 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF9F1E4),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: const Color(0xFFD8C8AF)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      buildStep("Understanding Your Goals", true),
-                      buildStep("Selecting Verse Topics", true),
-                      buildStep("Preparing Prayer Guidance", true),
-                      buildStep("Getting Your Daily Verse Ready", false),
-                      const SizedBox(height: 10),
-                      LinearProgressIndicator(
-                        value: 1.0, // show fully loaded per request
-                        backgroundColor: const Color(0xFFE8D8C4),
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          Color(0xFFD69A32),
-                        ),
-                        minHeight: 6,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  "Designed to help you grow daily in God's Word.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: isTablet ? 17 : 15,
-                    color: const Color(0xFF7B5536),
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    // Call the onContinue callback if provided
-                    if (onContinue != null) {
-                      onContinue();
-                    }
-                  },
-                  child: Container(
-                    width: double.infinity,
-                    height: isTablet ? 58 : 48,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color(0xFF763201),
-                          Color(0xFFD5821F),
-                          Color(0xFF763201),
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.12),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      "Continue",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: isTablet ? 20 : 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+        return _AnimatedJourneyDialog(
+          onContinue: onContinue,
         );
       },
     );
@@ -1566,6 +1400,320 @@ class _CustomLoadingIndicatorState extends State<CustomLoadingIndicator>
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _AnimatedJourneyDialog extends StatefulWidget {
+  final VoidCallback? onContinue;
+
+  const _AnimatedJourneyDialog({this.onContinue});
+
+  @override
+  State<_AnimatedJourneyDialog> createState() => _AnimatedJourneyDialogState();
+}
+
+class _AnimatedJourneyDialogState extends State<_AnimatedJourneyDialog>
+    with TickerProviderStateMixin {
+  late AnimationController _progressController;
+  late AnimationController _buttonController;
+  late List<AnimationController> _stepControllers;
+  late Animation<double> _progressAnimation;
+  late Animation<double> _buttonAnimation;
+
+  final List<String> _steps = [
+    "Understanding Your Goals",
+    "Selecting Verse Topics",
+    "Preparing Prayer Guidance",
+    "Getting Your Daily Verse Ready",
+  ];
+
+  int _completedSteps = 0;
+  bool _allStepsCompleted = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Initialize step controllers
+    _stepControllers = List.generate(
+      _steps.length,
+      (index) => AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 400),
+      ),
+    );
+
+    // Progress bar animation
+    _progressController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+    _progressAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _progressController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    // Button animation
+    _buttonController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _buttonAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _buttonController,
+        curve: Curves.easeOut,
+      ),
+    );
+
+    // Start animations sequentially
+    _startAnimations();
+  }
+
+  void _startAnimations() {
+    // Complete steps one by one
+    for (int i = 0; i < _steps.length; i++) {
+      Future.delayed(Duration(milliseconds: 600 * (i + 1)), () {
+        if (mounted) {
+          setState(() {
+            _completedSteps = i + 1;
+          });
+          _stepControllers[i].forward();
+          
+          // Start progress animation after first step
+          if (i == 0) {
+            _progressController.forward();
+          }
+          
+          // Complete progress and show button after last step
+          if (i == _steps.length - 1) {
+            Future.delayed(const Duration(milliseconds: 300), () {
+              if (mounted) {
+                setState(() {
+                  _allStepsCompleted = true;
+                });
+                _buttonController.forward();
+              }
+            });
+          }
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _progressController.dispose();
+    _buttonController.dispose();
+    for (var controller in _stepControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  Widget _buildStep(String text, int index) {
+    final isCompleted = index < _completedSteps;
+    
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        vertical: MediaQuery.of(context).size.width > 600 ? 10 : 8,
+        horizontal: MediaQuery.of(context).size.width > 600 ? 6 : 4,
+      ),
+      child: Row(
+        children: [
+          AnimatedBuilder(
+            animation: _stepControllers[index],
+            builder: (context, child) {
+              return Transform.scale(
+                scale: isCompleted
+                    ? 0.8 + (_stepControllers[index].value * 0.2)
+                    : 1.0,
+                child: Icon(
+                  isCompleted
+                      ? Icons.check_circle
+                      : Icons.hourglass_bottom_rounded,
+                  color: isCompleted
+                      ? const Color(0xFF7AA36D)
+                      : const Color(0xFFB3854A),
+                  size: MediaQuery.of(context).size.width > 600 ? 26 : 22,
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: MediaQuery.of(context).size.width > 600 ? 18 : 16,
+                color: const Color(0xFF7B5536),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context).size;
+    final isTablet = mq.width > 600;
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    return Center(
+      child: Container(
+        width: isTablet ? mq.width * 0.5 : mq.width * 0.9,
+        padding: EdgeInsets.symmetric(
+          horizontal: isTablet ? 28 : 20,
+          vertical: isTablet ? 26 : 20,
+        ),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFF6EBDD), Color(0xFFEBDDC9)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: const Color(0xFFD2C1A8), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.10),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              "Preparing Your Journey",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: isTablet ? 26 : 22,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF7B5536),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "We're aligning scripture with your\nheart and daily needs.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: screenWidth < 380
+                    ? 14
+                    : isTablet
+                        ? 18
+                        : 16,
+                color: const Color(0xFF7B5536),
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(
+                horizontal: isTablet ? 18 : 14,
+                vertical: isTablet ? 16 : 12,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF9F1E4),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFD8C8AF)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ...List.generate(_steps.length, (index) => _buildStep(_steps[index], index)),
+                  const SizedBox(height: 10),
+                  AnimatedBuilder(
+                    animation: _progressAnimation,
+                    builder: (context, child) {
+                      return LinearProgressIndicator(
+                        value: _progressAnimation.value,
+                        backgroundColor: const Color(0xFFE8D8C4),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          Color(0xFFD69A32),
+                        ),
+                        minHeight: 6,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              "Designed to help you grow daily in God's Word.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: isTablet ? 17 : 15,
+                color: const Color(0xFF7B5536),
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: 16),
+            AnimatedBuilder(
+              animation: _buttonAnimation,
+              builder: (context, child) {
+                return Opacity(
+                  opacity: _buttonAnimation.value,
+                  child: Transform.scale(
+                    scale: 0.9 + (_buttonAnimation.value * 0.1),
+                    child: GestureDetector(
+                      onTap: _allStepsCompleted
+                          ? () {
+                              Navigator.of(context).pop();
+                              if (widget.onContinue != null) {
+                                widget.onContinue!();
+                              }
+                            }
+                          : null,
+                      child: Container(
+                        width: double.infinity,
+                        height: isTablet ? 58 : 48,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [
+                              Color(0xFF763201),
+                              Color(0xFFD5821F),
+                              Color(0xFF763201),
+                            ],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.12),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          "Continue",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: isTablet ? 20 : 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
