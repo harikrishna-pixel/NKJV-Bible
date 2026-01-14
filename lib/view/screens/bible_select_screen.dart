@@ -531,11 +531,13 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                     ],
                   ),
                 ),
-                Image.asset(
-                  "assets/Icon-1024.png",
+                Container(
                   height: 79,
                   width: 79,
-                  // color: Colors.brown,
+                  decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      image: DecorationImage(
+                          image: AssetImage("assets/Icon-1024.png"))),
                 ),
                 // const Icon(Icons.menu_book, size: 48, color: Colors.brown),
                 const SizedBox(height: 10),

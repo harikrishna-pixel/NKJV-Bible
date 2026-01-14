@@ -587,71 +587,20 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
   Widget _buildPreviewWithHighlights(String text, double screenWidth, BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
-    final baseColor = CommanColor.whiteBlack(context).withOpacity(0.7);
-    // Use a brighter, more visible color for dark mode verse highlighting
+    // Use a brighter, more visible color for highlighting the entire preview text
     final highlightColor = isDark 
         ? const Color(0xFFE5DF0D)  // Yellow/gold color for dark mode
         : CommanColor.lightDarkPrimary(context);  // Primary color for light mode
     
-    // Pattern to match verse references
-    final versePattern = RegExp(
-      r'\b([1-3]?\s?[A-Za-z]{2,}\s+)?(\d{1,3}):(\d{1,3})(?:-(\d{1,3}))?(?:\s*,\s*(\d{1,3}))?',
-      caseSensitive: false,
-    );
-    
-    List<TextSpan> spans = [];
-    int lastIndex = 0;
-    
-    for (Match match in versePattern.allMatches(text)) {
-      // Add text before the match
-      if (match.start > lastIndex) {
-        spans.add(TextSpan(
-          text: text.substring(lastIndex, match.start),
-          style: TextStyle(
-            color: baseColor,
-            fontSize: screenWidth > 450 ? 14 : 12,
-          ),
-        ));
-      }
-      
-      // Add highlighted verse reference
-      spans.add(TextSpan(
-        text: match.group(0),
+    return RichText(
+      text: TextSpan(
+        text: text,
         style: TextStyle(
           color: highlightColor,
           fontSize: screenWidth > 450 ? 14 : 12,
           fontWeight: FontWeight.w600,
-          decoration: TextDecoration.underline,
         ),
-      ));
-      
-      lastIndex = match.end;
-    }
-    
-    // Add remaining text
-    if (lastIndex < text.length) {
-      spans.add(TextSpan(
-        text: text.substring(lastIndex),
-        style: TextStyle(
-          color: baseColor,
-          fontSize: screenWidth > 450 ? 14 : 12,
-        ),
-      ));
-    }
-    
-    // If no verse references found, return the whole text as a single span
-    if (spans.isEmpty) {
-      spans.add(TextSpan(
-        text: text,
-        style: TextStyle(
-          color: baseColor,
-          fontSize: screenWidth > 450 ? 14 : 12,
-        ),
-      ));
-    }
-    
-    return RichText(
-      text: TextSpan(children: spans),
+      ),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
     );
@@ -750,19 +699,19 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          _formatDate(item.date),
-                          style: TextStyle(
-                            color: CommanColor.whiteBlack(context),
-                            fontSize: screenWidth > 450 ? 16 : 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
                         _buildPreviewWithHighlights(
                           item.preview,
                           screenWidth,
                           context,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatDate(item.date),
+                          style: TextStyle(
+                            color: CommanColor.whiteBlack(context).withOpacity(0.6),
+                            fontSize: screenWidth > 450 ? 13 : 11,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ],
                     ),

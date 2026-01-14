@@ -40,6 +40,8 @@ class _WalletScreenState extends State<WalletScreen> {
   String _currentAnswerLength = 'small'; // Track current answer length
   int _claimCooldownMinutes = 0;
   int _claimCooldownSeconds = 0;
+  bool _hasWatchedMaxAds =
+      false; // Track if user has watched max ads (2 per day)
   Map<String, Timer> _purchaseTimeouts =
       {}; // Track timeout timers for each product
 
@@ -67,7 +69,10 @@ class _WalletScreenState extends State<WalletScreen> {
     _creditsTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _loadCredits();
       _refreshClaimCooldown();
+      _checkMaxAdsWatched();
     });
+    // Initialize max ads check
+    _checkMaxAdsWatched();
   }
 
   Future<void> _checkConnectivityAndShowToast() async {
@@ -227,6 +232,16 @@ class _WalletScreenState extends State<WalletScreen> {
       setState(() {
         _claimCooldownMinutes = cooldown;
         _claimCooldownSeconds = cooldownSeconds;
+      });
+    }
+  }
+
+  Future<void> _checkMaxAdsWatched() async {
+    final canWatch = await WalletService.canWatchAd();
+    final hasMaxAds = !canWatch;
+    if (mounted && hasMaxAds != _hasWatchedMaxAds) {
+      setState(() {
+        _hasWatchedMaxAds = hasMaxAds;
       });
     }
   }
@@ -576,7 +591,7 @@ class _WalletScreenState extends State<WalletScreen> {
       if (!canWatch) {
         final remaining = await WalletService.getRemainingAdsToday();
         Constants.showToast(
-            'You have already watched 2 ads today. Come back tomorrow!', 6000);
+            'You have already watched 2 ads Today. Come back Tomorrow!', 6000);
         return;
       }
 
@@ -636,6 +651,8 @@ class _WalletScreenState extends State<WalletScreen> {
               Constants.showToast(
                   'Watched ad! Received 50 credits. $safeRemaining ads remaining today.',
                   6000);
+              // Update max ads status after watching ad
+              await _checkMaxAdsWatched();
             } else {
               Constants.showToast('You have already watched 2 ads today', 6000);
             }
@@ -828,6 +845,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         subtitle: 'Get 50 credits \n(2 ads per day)',
                         buttonText: 'Watch Ad',
                         onTap: _watchAdForCredits,
+                        buttonOpacity: _hasWatchedMaxAds ? 0.5 : 1.0,
                       ),
                       const SizedBox(height: 32),
 
@@ -863,6 +881,7 @@ class _WalletScreenState extends State<WalletScreen> {
     required String buttonText,
     required VoidCallback onTap,
     bool isDisabled = false,
+    double buttonOpacity = 1.0,
   }) {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     return Container(
@@ -924,36 +943,39 @@ class _WalletScreenState extends State<WalletScreen> {
               ],
             ),
           ),
-          Container(
-            decoration: BoxDecoration(
-              color: isDisabled
-                  ? CommanColor.lightDarkPrimary(context).withOpacity(0.6)
-                  : CommanColor.lightDarkPrimary(context),
-              borderRadius: BorderRadius.circular(8),
-              border: isDark
-                  ? Border.all(
-                      color: Colors.white,
-                      width: 1.5,
-                    )
-                  : null,
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: isDisabled ? null : onTap,
+          Opacity(
+            opacity: buttonOpacity,
+            child: Container(
+              decoration: BoxDecoration(
+                color: isDisabled
+                    ? CommanColor.lightDarkPrimary(context).withOpacity(0.6)
+                    : CommanColor.lightDarkPrimary(context),
                 borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  width: screenWidth > 450 ? 150 : 130,
-                  height: screenWidth > 450 ? 46 : 42,
-                  alignment: Alignment.center,
-                  child: Text(
-                    buttonText,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: screenWidth > 450 ? 14 : 13.5,
-                      fontWeight: FontWeight.w600,
+                border: isDark
+                    ? Border.all(
+                        color: Colors.white,
+                        width: 1.5,
+                      )
+                    : null,
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: isDisabled ? null : onTap,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: screenWidth > 450 ? 150 : 130,
+                    height: screenWidth > 450 ? 46 : 42,
+                    alignment: Alignment.center,
+                    child: Text(
+                      buttonText,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: screenWidth > 450 ? 14 : 13.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
                   ),
                 ),
               ),

@@ -67,6 +67,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   int _currentCredits = 0;
   Timer? _creditsTimer;
 
+  // Recent conversations
+  List<Map<String, dynamic>> _recentConversations = [];
+
   // Topic-based questions
   final List<Map<String, String>> _topicQuestions = [
     {
@@ -108,6 +111,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     // Track Geneva Bible Chat event
     StatsigService.trackGenevaBibleChat();
     _showChatIntroIfNeeded();
+    _loadRecentConversations();
 
     // Load credits from local storage immediately (no API dependency)
     _loadCreditsFromLocal();
@@ -1096,10 +1100,90 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     };
     await prefs.setString(
         'chat_meta_$_currentConversationId', jsonEncode(conversationMeta));
+
+    // Reload recent conversations to update the list
+    _loadRecentConversations();
   }
 
   String _getTodayKey() {
     return DateFormat('yyyy-MM-dd').format(DateTime.now());
+  }
+
+  Future<void> _loadRecentConversations() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs
+        .getKeys()
+        .where((key) => key.startsWith('chat_history_'))
+        .toList();
+
+    final List<Map<String, dynamic>> conversations = [];
+    for (final key in keys) {
+      final conversationId = key.replaceFirst('chat_history_', '');
+      // Skip current conversation
+      if (conversationId == _currentConversationId) continue;
+
+      final historyJson = prefs.getString(key);
+      if (historyJson != null) {
+        final List<dynamic> history = jsonDecode(historyJson);
+        if (history.isNotEmpty) {
+          DateTime date;
+          String preview;
+
+          // Try to get metadata first
+          final metaKey = 'chat_meta_$conversationId';
+          final metaJson = prefs.getString(metaKey);
+
+          if (metaJson != null) {
+            try {
+              final meta = jsonDecode(metaJson);
+              date = DateTime.parse(meta['date'] as String);
+              preview = meta['preview'] as String;
+            } catch (e) {
+              date = DateTime.now();
+              preview = history.first['text'] as String;
+              if (preview.length > 50) {
+                preview = '${preview.substring(0, 50)}...';
+              }
+            }
+          } else {
+            try {
+              date = DateFormat('yyyy-MM-dd').parse(conversationId);
+            } catch (e) {
+              if (history.first['timestamp'] != null) {
+                try {
+                  date = DateTime.parse(history.first['timestamp'] as String);
+                } catch (e2) {
+                  date = DateTime.now();
+                }
+              } else {
+                date = DateTime.now();
+              }
+            }
+            preview = history.first['text'] as String;
+            if (preview.length > 50) {
+              preview = '${preview.substring(0, 50)}...';
+            }
+          }
+
+          conversations.add({
+            'id': conversationId,
+            'date': date,
+            'preview': preview,
+            'messageCount': history.length,
+          });
+        }
+      }
+    }
+
+    conversations.sort(
+        (a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime));
+
+    if (mounted) {
+      setState(() {
+        _recentConversations =
+            conversations.take(5).toList(); // Show only top 5
+      });
+    }
   }
 
   /// Load credits from local storage immediately (no API dependency)
@@ -2269,11 +2353,13 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                   ),
                 ),
                 // Show default questions only when there are no messages
-                if (_messages.isEmpty)
+                if (_messages.isEmpty) ...[
                   widget.verseContext != null
                       ? _buildVerseSuggestedQuestions(screenWidth, isDark)
-                      : _buildDefaultQuestions(screenWidth, isDark)
-                else
+                      : _buildDefaultQuestions(screenWidth, isDark),
+                  if (_recentConversations.isNotEmpty)
+                    _buildRecentConversations(screenWidth, isDark),
+                ] else
                   _buildFollowUpSuggestions(screenWidth, isDark),
                 _buildInputArea(screenWidth, isDark),
               ],
@@ -2478,6 +2564,125 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
     );
   }
 
+  Widget _buildRecentConversations(double screenWidth, bool isDark) {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    return Container(
+      padding: EdgeInsets.only(
+        left: screenWidth > 450 ? 20 : 16,
+        right: screenWidth > 450 ? 20 : 16,
+        top: screenWidth > 450 ? 12 : 8,
+        bottom: screenWidth > 450 ? 8 : 12,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'RECENT CONVERSATIONS',
+            style: TextStyle(
+              color: CommanColor.lightDarkPrimary(context).withOpacity(0.8),
+              fontSize: screenWidth > 450 ? 14 : 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _recentConversations.length,
+            itemBuilder: (context, index) {
+              final conversation = _recentConversations[index];
+              final date = conversation['date'] as DateTime;
+              final preview = conversation['preview'] as String;
+              final now = DateTime.now();
+              final today = DateTime(now.year, now.month, now.day);
+              final dateOnly = DateTime(date.year, date.month, date.day);
+              String dateText;
+              if (dateOnly == today) {
+                dateText = 'Today, ${DateFormat('h:mm a').format(date)}';
+              } else if (dateOnly == today.subtract(const Duration(days: 1))) {
+                dateText = 'Yesterday, ${DateFormat('h:mm a').format(date)}';
+              } else {
+                dateText =
+                    '${DateFormat('MMM dd').format(date)}, ${DateFormat('h:mm a').format(date)}';
+              }
+
+              return Container(
+                margin: EdgeInsets.only(bottom: screenWidth > 450 ? 10 : 8),
+                padding: EdgeInsets.all(screenWidth > 450 ? 14 : 12),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? CommanColor.darkPrimaryColor.withOpacity(0.6)
+                      : (themeProvider.currentCustomTheme ==
+                              AppCustomTheme.vintage
+                          ? themeProvider.backgroundColor
+                          : CommanColor.backgrondcolor),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color:
+                        CommanColor.lightDarkPrimary(context).withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
+                child: InkWell(
+                  onTap: () {
+                    _currentConversationId = conversation['id'] as String;
+                    _loadChatHistory();
+                  },
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              preview,
+                              style: TextStyle(
+                                color: isDark
+                                    ? Colors.white
+                                    : CommanColor.lightDarkPrimary(context),
+                                fontSize: screenWidth > 450 ? 15 : 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              dateText,
+                              style: TextStyle(
+                                color: isDark
+                                    ? Colors.white.withOpacity(0.6)
+                                    : CommanColor.lightDarkPrimary(context)
+                                        .withOpacity(0.6),
+                                fontSize: screenWidth > 450 ? 12 : 11,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        size: screenWidth > 450 ? 16 : 14,
+                        color: isDark
+                            ? Colors.white.withOpacity(0.5)
+                            : CommanColor.lightDarkPrimary(context)
+                                .withOpacity(0.5),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFollowUpSuggestions(double screenWidth, bool isDark) {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     // Find last AI response
@@ -2503,7 +2708,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Suggestions for this answer',
+            'Suggestions',
             style: TextStyle(
               color: CommanColor.whiteBlack(context).withOpacity(0.7),
               fontSize: screenWidth > 450 ? 15 : 13.5,
@@ -3042,7 +3247,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Suggestions Questions:',
+            'Suggestions :',
             style: TextStyle(
               color: CommanColor.whiteBlack(context).withOpacity(0.7),
               fontSize: screenWidth > 450 ? 16 : 14,
@@ -3503,7 +3708,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                     height: screenWidth > 450 ? 18 : 15,
                                     width: screenWidth > 450 ? 18 : 15,
                                     color: CommanColor.whiteBlack(context)
-                                        .withOpacity(0.7),
+                                        .withOpacity(0.4),
                                   ),
                                 ),
                               ),
@@ -3541,7 +3746,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                     Icons.share,
                                     size: screenWidth > 450 ? 18 : 15,
                                     color: CommanColor.whiteBlack(context)
-                                        .withOpacity(0.7),
+                                        .withOpacity(0.4),
                                   ),
                                 ),
                               ),

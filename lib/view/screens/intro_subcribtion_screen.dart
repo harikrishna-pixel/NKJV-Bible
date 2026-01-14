@@ -911,6 +911,19 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       ));
                 } else if (purchaseDetails.productID == widget.lifeTimePlan) {
                   await controller.disableAd(const Duration(days: 3650012345));
+                  // Set subscription plan to platinum for lifetime plan
+                  DownloadProvider? downloadProvider = _myProvider;
+                  if (downloadProvider == null) {
+                    // Try to get from Get.context as fallback
+                    final getContext = Get.context;
+                    if (getContext != null) {
+                      downloadProvider =
+                          Provider.of<DownloadProvider>(getContext, listen: false);
+                    }
+                  }
+                  if (downloadProvider != null) {
+                    await downloadProvider.setSubscriptionPlan('platinum');
+                  }
                   await Future.delayed(Duration(seconds: 2));
                   // Complete the purchase for iOS - critical to prevent infinite loading
                   if (Platform.isIOS) {
@@ -938,6 +951,19 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     // Handle exit offer purchase success
                     await controller
                         .disableAd(const Duration(days: 3650012345));
+                    // Set subscription plan to platinum for exit offer (lifetime) purchase
+                    DownloadProvider? downloadProvider = _myProvider;
+                    if (downloadProvider == null) {
+                      // Try to get from Get.context as fallback
+                      final getContext = Get.context;
+                      if (getContext != null) {
+                        downloadProvider =
+                            Provider.of<DownloadProvider>(getContext, listen: false);
+                      }
+                    }
+                    if (downloadProvider != null) {
+                      await downloadProvider.setSubscriptionPlan('platinum');
+                    }
                     await Future.delayed(Duration(seconds: 2));
                     // Complete the purchase for iOS - critical to prevent infinite loading
                     if (Platform.isIOS) {
