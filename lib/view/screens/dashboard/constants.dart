@@ -10,21 +10,16 @@ class BibleInfo {
   //static int surveyAppId = 3;
 
 //IAP
-  static String sixMonthPlanid =
-      'com.balaklrapps.genevabible.sixmonthadsfree';
+  static String sixMonthPlanid = 'com.balaklrapps.genevabible.sixmonthadsfree';
   static String oneYearPlanid = 'com.balaklrapps.genevabible.oneyearadsfree';
-  static String lifeTimePlanid =
-      'com.balaklrapps.genevabible.lifetimeadsfree';
+  static String lifeTimePlanid = 'com.balaklrapps.genevabible.lifetimeadsfree';
   static String exitOfferPlanid =
       'com.balaklrapps.genevabible.lifetime.exitoffer';
-  
+
   // Coin Pack IDs
-  static String coinPack1Id =
-      'com.balaklrapps.genevabible.coinspack1';
-  static String coinPack2Id =
-      'com.balaklrapps.genevabible.coinspack2';
-  static String coinPack3Id =
-      'com.balaklrapps.genevabible.coinspack3';
+  static String coinPack1Id = 'com.balaklrapps.genevabible.coinspack1';
+  static String coinPack2Id = 'com.balaklrapps.genevabible.coinspack2';
+  static String coinPack3Id = 'com.balaklrapps.genevabible.coinspack3';
 
   // Coin Pack Prices (for offline mode)
   static String coinPack1Price = '\$4.99';
@@ -50,13 +45,15 @@ class BibleInfo {
   static String adsGoogleRewardInterstitialIdAndroid = "";
 
   // Ads IDs - iOS
-  static String adsGoogleBannerIdIos = "ca-app-pub-4194577750257069/3829303484";
+  static String adsGoogleBannerIdIos = "ca-app-pub-4194577750257069/5888490615";
   static String adsGoogleBannerId_2Ios = "";
   static String adsGoogleBannerId_3Ios = "";
-  static String adsGoogleInterstitialIdIos = "ca-app-pub-4194577750257069/8121554676";
-  static String adsGoogleRewardIdIos = "ca-app-pub-4194577750257069/3146777206";
-  static String adsGoogleOpenAppIdIos = "ca-app-pub-4194577750257069/6808473007";
-  static String adsGoogleNativeIdIos = "ca-app-pub-4194577750257069/5043409277";
+  static String adsGoogleInterstitialIdIos =
+      "ca-app-pub-4194577750257069/3990737976";
+  static String adsGoogleRewardIdIos = "ca-app-pub-4194577750257069/3262327277";
+  static String adsGoogleOpenAppIdIos =
+      "ca-app-pub-4194577750257069/1949245605";
+  static String adsGoogleNativeIdIos = "ca-app-pub-4194577750257069/2933990334";
   static String adsGoogleRewardInterstitialIdIos = "";
 
 // add folder names here  assets/zipped/
