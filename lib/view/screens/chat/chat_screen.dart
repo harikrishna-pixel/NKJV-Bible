@@ -1872,8 +1872,14 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
         FocusScope.of(context).unfocus();
         _messageFocusNode.unfocus();
 
-        // Deduct credits after successful response
-        await _deductChatCredits();
+        // Deduct credits only after successful response (not for error messages)
+        final isErrorResponse = responseText == 'Sorry, I could not generate a response.' ||
+            responseText == 'Sorry, I could not generate a response. Please try again.' ||
+            responseText.toLowerCase().contains('sorry, i could not generate');
+        
+        if (!isErrorResponse) {
+          await _deductChatCredits();
+        }
 
         // Scroll to top when answer comes to show at top of answer
         _scrollToTop();
@@ -2307,75 +2313,120 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                         .transparent, // Remove grey background - use transparent
                     child: _messages.isEmpty
                         ? SingleChildScrollView(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: screenWidth > 450 ? 20 : 16,
-                              vertical: screenWidth > 450 ? 14 : 12,
+                            padding: EdgeInsets.only(
+                              top: screenWidth > 450 ? 14 : 12,
+                              bottom: screenWidth > 450 ? 14 : 12,
                             ),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.start,
                               children: [
                                 // Show verse context if available
                                 if (widget.verseContext != null)
-                                  _buildVerseContext(screenWidth, isDark),
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: screenWidth > 450 ? 20 : 16,
+                                    ),
+                                    child: _buildVerseContext(screenWidth, isDark),
+                                  ),
                                 if (widget.verseContext != null)
                                   const SizedBox(height: 20),
                                 // Hide illustration image when opened from verse popup
-                                if (widget.verseContext == null) ...[
-                                  SizedBox(height: screenWidth > 450 ? 10 : 5),
-                                  Transform.translate(
-                                    offset: const Offset(0, -10),
-                                    child: Container(
-                                      width: screenWidth > 450 ? 140 : 130,
-                                      height: screenWidth > 450 ? 140 : 130,
-                                      decoration: const BoxDecoration(
-                                        color: Colors
-                                            .transparent, // Transparent background for illustration
-                                      ),
-                                      child: Image.asset(
-                                        "assets/chat_img.png",
-                                        fit: BoxFit.contain,
-                                        errorBuilder:
-                                            (context, error, stackTrace) {
-                                          // Fallback to icon if image doesn't load
-                                          return Icon(
-                                            Icons.chat_bubble_outline,
-                                            size: 100,
-                                            color:
-                                                CommanColor.whiteBlack(context)
-                                                    .withOpacity(0.5),
-                                          );
-                                        },
+                                if (widget.verseContext == null)
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: screenWidth > 450 ? 20 : 16,
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        SizedBox(height: screenWidth > 450 ? 10 : 5),
+                                        Transform.translate(
+                                          offset: const Offset(0, -10),
+                                          child: Container(
+                                            width: screenWidth > 450 ? 140 : 130,
+                                            height: screenWidth > 450 ? 140 : 130,
+                                            decoration: const BoxDecoration(
+                                              color: Colors
+                                                  .transparent, // Transparent background for illustration
+                                            ),
+                                            child: Image.asset(
+                                              "assets/chat_img.png",
+                                              fit: BoxFit.contain,
+                                              errorBuilder:
+                                                  (context, error, stackTrace) {
+                                                // Fallback to icon if image doesn't load
+                                                return Icon(
+                                                  Icons.chat_bubble_outline,
+                                                  size: 100,
+                                                  color:
+                                                      CommanColor.whiteBlack(context)
+                                                          .withOpacity(0.5),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 5),
+                                        Text(
+                                          'Faith Answers',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            color: CommanColor.whiteBlack(context)
+                                                .withOpacity(0.7),
+                                            fontSize: screenWidth > 450 ? 26 : 23,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                              bottom:
+                                                  20), // Add bottom padding to prevent text from being hidden
+                                          child: Text(
+                                            'Get Guidance Based On Your Need...',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              color: CommanColor.whiteBlack(context)
+                                                  .withOpacity(0.5),
+                                              fontSize: screenWidth > 450 ? 16 : 15,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                // Show verse context text if available
+                                if (widget.verseContext != null)
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: screenWidth > 450 ? 20 : 16,
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(
+                                          bottom:
+                                              20), // Add bottom padding to prevent text from being hidden
+                                      child: Text(
+                                        'Ask questions about this verse...',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: CommanColor.whiteBlack(context)
+                                              .withOpacity(0.5),
+                                          fontSize: screenWidth > 450 ? 16 : 15,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(height: 5),
-                                  Text(
-                                    'Faith Answers',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      color: CommanColor.whiteBlack(context)
-                                          .withOpacity(0.7),
-                                      fontSize: screenWidth > 450 ? 26 : 23,
-                                    ),
-                                  ),
+                                // Show default questions inside scrollable area
+                                widget.verseContext != null
+                                    ? _buildVerseSuggestedQuestions(screenWidth, isDark)
+                                    : _buildDefaultQuestions(screenWidth, isDark),
+                                // Show recent conversations inside scrollable area only in Chat Home Screen (no verse context and no history date key)
+                                if (_recentConversations.isNotEmpty &&
+                                    widget.verseContext == null &&
+                                    widget.historyDateKey == null) ...[
                                   const SizedBox(height: 8),
+                                  _buildRecentConversations(screenWidth, isDark),
                                 ],
-                                Padding(
-                                  padding: const EdgeInsets.only(
-                                      bottom:
-                                          20), // Add bottom padding to prevent text from being hidden
-                                  child: Text(
-                                    widget.verseContext != null
-                                        ? 'Ask questions about this verse...'
-                                        : 'Get Guidance Based On Your Need...',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: CommanColor.whiteBlack(context)
-                                          .withOpacity(0.5),
-                                      fontSize: screenWidth > 450 ? 16 : 15,
-                                    ),
-                                  ),
-                                ),
+                                // Add extra bottom padding for better scrolling
+                                const SizedBox(height: 20),
                               ],
                             ),
                           )
@@ -2394,17 +2445,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                           ),
                   ),
                 ),
-                // Show default questions only when there are no messages
-                if (_messages.isEmpty) ...[
-                  widget.verseContext != null
-                      ? _buildVerseSuggestedQuestions(screenWidth, isDark)
-                      : _buildDefaultQuestions(screenWidth, isDark),
-                  // Show recent conversations only in Chat Home Screen (no verse context and no history date key)
-                  if (_recentConversations.isNotEmpty &&
-                      widget.verseContext == null &&
-                      widget.historyDateKey == null)
-                    _buildRecentConversations(screenWidth, isDark),
-                ] else
+                // Show follow-up suggestions when there are messages
+                if (_messages.isNotEmpty)
                   _buildFollowUpSuggestions(screenWidth, isDark),
                 _buildInputArea(screenWidth, isDark),
               ],
@@ -2628,7 +2670,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
               Text(
                 'RECENT CONVERSATIONS',
                 style: TextStyle(
-                  color: CommanColor.lightDarkPrimary(context).withOpacity(0.8),
+                  color: CommanColor.whiteBlack(context).withOpacity(0.8),
                   fontSize: screenWidth > 450 ? 14 : 12,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.5,
@@ -2645,7 +2687,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                 child: Text(
                   'View all',
                   style: TextStyle(
-                    color: CommanColor.lightDarkPrimary(context),
+                    color: CommanColor.whiteBlack(context),
                     fontSize: screenWidth > 450 ? 13 : 12,
                     fontWeight: FontWeight.w600,
                     // decoration: TextDecoration.underline,
@@ -3766,8 +3808,9 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
-                                      color:
-                                          CommanColor.lightDarkPrimary(context),
+                                      color: isDark
+                                          ? Colors.white
+                                          : CommanColor.lightDarkPrimary(context),
                                       width: 1.4,
                                     ),
                                   ),
@@ -3805,8 +3848,9 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
-                                      color:
-                                          CommanColor.lightDarkPrimary(context),
+                                      color: isDark
+                                          ? Colors.white
+                                          : CommanColor.lightDarkPrimary(context),
                                       width: 1.4,
                                     ),
                                   ),

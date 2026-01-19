@@ -69,13 +69,13 @@ class _SettingScreenState extends State<SettingScreen>
       case AppLifecycleState.resumed:
         await SharPreferences.setString('OpenAd', '1');
         bool? nt =
-        await SharPreferences.getBoolean(SharPreferences.isNotificationOn);
+            await SharPreferences.getBoolean(SharPreferences.isNotificationOn);
 
         bool? nt1 =
-        await SharPreferences.getBoolean(SharPreferences.isNotificationOn1);
+            await SharPreferences.getBoolean(SharPreferences.isNotificationOn1);
 
         bool? nt2 =
-        await SharPreferences.getBoolean(SharPreferences.isNotificationOn2);
+            await SharPreferences.getBoolean(SharPreferences.isNotificationOn2);
         // Check current status
         final status = await Permission.notification.status;
         debugPrint("✅ Notification permission is granted  ${status.isGranted}");
@@ -243,7 +243,7 @@ class _SettingScreenState extends State<SettingScreen>
     try {
       // Fetch all values sequentially using await
       String? hour =
-      await SharPreferences.getString(SharPreferences.notificationTimeHour);
+          await SharPreferences.getString(SharPreferences.notificationTimeHour);
       String? minute = await SharPreferences.getString(
           SharPreferences.notificationTimeMinute);
 
@@ -258,13 +258,13 @@ class _SettingScreenState extends State<SettingScreen>
           SharPreferences.notificationTimeMinute2);
 
       bool? nt =
-      await SharPreferences.getBoolean(SharPreferences.isNotificationOn);
+          await SharPreferences.getBoolean(SharPreferences.isNotificationOn);
 
       bool? nt1 =
-      await SharPreferences.getBoolean(SharPreferences.isNotificationOn1);
+          await SharPreferences.getBoolean(SharPreferences.isNotificationOn1);
 
       bool? nt2 =
-      await SharPreferences.getBoolean(SharPreferences.isNotificationOn2);
+          await SharPreferences.getBoolean(SharPreferences.isNotificationOn2);
       // Check current status
       final status = await Permission.notification.status;
       debugPrint("✅ Notification permission is granted  ${status.isGranted}");
@@ -290,7 +290,7 @@ class _SettingScreenState extends State<SettingScreen>
         selectedTime = (minute == null)
             ? "8:00 AM"
             : DateFormat.jm().format(DateFormat("HH:mm:ss")
-            .parse("$notificationHours:$notificationMinute:00"));
+                .parse("$notificationHours:$notificationMinute:00"));
         selectedNotificationTime = Time(
           hour: int.parse(notificationHours),
           minute: int.parse(notificationMinute),
@@ -302,7 +302,7 @@ class _SettingScreenState extends State<SettingScreen>
         selectedTime1 = (minute1 == null)
             ? "2:00 PM"
             : DateFormat.jm().format(DateFormat("HH:mm:ss")
-            .parse("$notificationHours1:$notificationMinute1:00"));
+                .parse("$notificationHours1:$notificationMinute1:00"));
         selectedNotificationTime1 = Time(
           hour: int.parse(notificationHours1),
           minute: int.parse(notificationMinute1),
@@ -314,7 +314,7 @@ class _SettingScreenState extends State<SettingScreen>
         selectedTime2 = (minute2 == null)
             ? "8:00 PM"
             : DateFormat.jm().format(DateFormat("HH:mm:ss")
-            .parse("$notificationHours2:$notificationMinute2:00"));
+                .parse("$notificationHours2:$notificationMinute2:00"));
         selectedNotificationTime2 = Time(
           hour: int.parse(notificationHours2),
           minute: int.parse(notificationMinute2),
@@ -555,7 +555,7 @@ class _SettingScreenState extends State<SettingScreen>
                       ),
                       const Padding(
                         padding:
-                        EdgeInsets.only(bottom: 20.0, left: 25, right: 25),
+                            EdgeInsets.only(bottom: 20.0, left: 25, right: 25),
                         child: Text(
                             '''Set your best time to get the verse of day every day''',
                             style: TextStyle(
@@ -594,9 +594,9 @@ class _SettingScreenState extends State<SettingScreen>
                                       fontWeight: FontWeight.w500,
                                       letterSpacing: BibleInfo.letterSpacing,
                                       fontSize: BibleInfo.fontSizeScale * 16
-                                    // MediaQuery.of(context).size.width *
-                                    //     0.037
-                                  ),
+                                      // MediaQuery.of(context).size.width *
+                                      //     0.037
+                                      ),
                                 ),
                               )),
                           ElevatedButton(
@@ -720,7 +720,7 @@ class _SettingScreenState extends State<SettingScreen>
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor:
-                                CommanColor.lightDarkPrimary(context),
+                                    CommanColor.lightDarkPrimary(context),
                                 fixedSize: Size(
                                     MediaQuery.of(context).size.width * 0.3,
                                     35),
@@ -858,7 +858,7 @@ class _SettingScreenState extends State<SettingScreen>
         //   }),
         // );
         Get.offAll(
-                () => HomeScreen(
+            () => HomeScreen(
                 From: "Setting",
                 selectedVerseNumForRead: "",
                 selectedBookForRead: "",
@@ -873,13 +873,13 @@ class _SettingScreenState extends State<SettingScreen>
             height: MediaQuery.of(context).size.height,
             width: MediaQuery.of(context).size.width,
             decoration:
-            Provider.of<ThemeProvider>(context).currentCustomTheme ==
-                AppCustomTheme.vintage
-                ? BoxDecoration(
-                image: DecorationImage(
-                    image: AssetImage(Images.bgImage(context)),
-                    fit: BoxFit.fill))
-                : null,
+                Provider.of<ThemeProvider>(context).currentCustomTheme ==
+                        AppCustomTheme.vintage
+                    ? BoxDecoration(
+                        image: DecorationImage(
+                            image: AssetImage(Images.bgImage(context)),
+                            fit: BoxFit.fill))
+                    : null,
             child: ListView(
               shrinkWrap: true,
               physics: const ScrollPhysics(),
@@ -893,7 +893,7 @@ class _SettingScreenState extends State<SettingScreen>
                     InkWell(
                       onTap: () {
                         Get.offAll(
-                                () => HomeScreen(
+                            () => HomeScreen(
                                 From: "Setting",
                                 selectedVerseNumForRead: "",
                                 selectedBookForRead: "",
@@ -1015,7 +1015,7 @@ class _SettingScreenState extends State<SettingScreen>
                           if (status.isGranted) {
                             setState(() {
                               notificationButtonValue =
-                              !notificationButtonValue;
+                                  !notificationButtonValue;
                             });
                             SharPreferences.setBoolean(
                                 SharPreferences.isNotificationOn,
@@ -1090,7 +1090,7 @@ class _SettingScreenState extends State<SettingScreen>
                           if (status.isGranted) {
                             setState(() {
                               notificationButtonValue1 =
-                              !notificationButtonValue1;
+                                  !notificationButtonValue1;
                             });
                             SharPreferences.setBoolean(
                                 SharPreferences.isNotificationOn1,
@@ -1163,7 +1163,7 @@ class _SettingScreenState extends State<SettingScreen>
                           if (status.isGranted) {
                             setState(() {
                               notificationButtonValue2 =
-                              !notificationButtonValue2;
+                                  !notificationButtonValue2;
                             });
                             SharPreferences.setBoolean(
                                 SharPreferences.isNotificationOn2,
@@ -1210,8 +1210,8 @@ class _SettingScreenState extends State<SettingScreen>
                   child: GestureDetector(
                     onTap: () {
                       Get.to(() => PreferenceSelectionScreen(
-                        isSetting: true,
-                      ));
+                            isSetting: true,
+                          ));
                     },
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -1293,13 +1293,13 @@ class _SettingScreenState extends State<SettingScreen>
                           height: screenWidth < 380 ? 27 : 32,
                           decoration: BoxDecoration(
                             image: Provider.of<ThemeProvider>(context)
-                                .currentCustomTheme ==
-                                AppCustomTheme.vintage
+                                        .currentCustomTheme ==
+                                    AppCustomTheme.vintage
                                 ? DecorationImage(
-                              image:
-                              AssetImage(Images.bgImage((context))),
-                              fit: BoxFit.cover,
-                            )
+                                    image:
+                                        AssetImage(Images.bgImage((context))),
+                                    fit: BoxFit.cover,
+                                  )
                                 : null,
                             color: Provider.of<ThemeProvider>(context)
                                 .backgroundColor,
@@ -1414,7 +1414,7 @@ class _SettingScreenState extends State<SettingScreen>
                       // Check actual internet access (not just network interface)
                       // This is more reliable than Connectivity() which can give false negatives
                       final hasInternet =
-                      await InternetConnection().hasInternetAccess;
+                          await InternetConnection().hasInternetAccess;
 
                       // Only show toast if actually offline - don't show when online
                       if (!hasInternet) {
@@ -1688,8 +1688,8 @@ class _SettingScreenState extends State<SettingScreen>
                         fontSize: screenWidth < 380
                             ? 19
                             : screenWidth > 450
-                            ? 22
-                            : 24,
+                                ? 22
+                                : 24,
                         fontWeight: FontWeight.w500,
                         color: Colors.black,
                       ),
@@ -1705,8 +1705,8 @@ class _SettingScreenState extends State<SettingScreen>
                           fontSize: screenWidth < 380
                               ? 13
                               : screenWidth > 450
-                              ? 16
-                              : 14,
+                                  ? 16
+                                  : 14,
                           color: Colors.black87),
                     ),
 
@@ -1720,8 +1720,8 @@ class _SettingScreenState extends State<SettingScreen>
                             fontSize: screenWidth < 380
                                 ? 13
                                 : screenWidth > 450
-                                ? 16
-                                : 14,
+                                    ? 16
+                                    : 14,
                             color: Colors.black),
                         children: [
                           TextSpan(text: "Go to "),
@@ -1776,7 +1776,7 @@ class _SettingScreenState extends State<SettingScreen>
       if (Platform.isAndroid) {
         // Check for Android 12+ (API 31+) - exact alarm permission
         final ProcessResult result =
-        await Process.run('getprop', ['ro.build.version.sdk']);
+            await Process.run('getprop', ['ro.build.version.sdk']);
         final int sdkInt = int.tryParse(result.stdout.toString().trim()) ?? 0;
 
         debugPrint("Android SDK Version: $sdkInt");
@@ -1834,37 +1834,69 @@ class _SettingScreenState extends State<SettingScreen>
     // Check subscription status before showing premium dialog
     // Only show for unsubscribed users
     bool isSubscribed = false;
-    
-    // First check subscription plan
-    final downloadProvider = Provider.of<DownloadProvider>(context, listen: false);
+
+    // First check subscription plan - getSubscriptionPlan() reads directly from SharedPreferences
+    final downloadProvider =
+        Provider.of<DownloadProvider>(context, listen: false);
     final subscriptionPlan = await downloadProvider.getSubscriptionPlan();
     final hasSubscriptionPlan = subscriptionPlan != null &&
         subscriptionPlan.isNotEmpty &&
-        ['platinum', 'gold', 'silver']
-            .contains(subscriptionPlan.toLowerCase());
+        ['platinum', 'gold', 'silver'].contains(subscriptionPlan.toLowerCase());
 
-    // Must have subscription plan AND valid expiry date
-    if (hasSubscriptionPlan) {
+    // Check expiry date (this is set by disableAd() during subscription/restore)
+    String? expiryDateString;
+    try {
+      expiryDateString =
+          await SharPreferences.getString(SharPreferences.isRewardAdViewTime);
+    } catch (e) {
+      debugPrint("Error getting expiry date in premium dialog: $e");
+    }
+
+    // Must have subscription plan AND valid expiry date, OR just valid expiry date as fallback
+    if (hasSubscriptionPlan &&
+        expiryDateString != null &&
+        expiryDateString.isNotEmpty) {
       try {
-        final expiryDateString = await SharPreferences.getString(
-            SharPreferences.isRewardAdViewTime);
-        if (expiryDateString != null && expiryDateString.isNotEmpty) {
-          final expiryDate = DateTime.parse(expiryDateString);
-          final currentTime = DateTime.now();
-          final diffDays = expiryDate.difference(currentTime).inDays;
-          // Subscription is valid if expiry date is today or in the future (>= 0)
-          // This includes lifetime subscriptions (>365 days)
-          isSubscribed = diffDays >= 0;
-        }
+        final expiryDate = DateTime.parse(expiryDateString);
+        final currentTime = DateTime.now();
+        final diffDays = expiryDate.difference(currentTime).inDays;
+        // Subscription is valid if expiry date is today or in the future (>= 0)
+        // This includes lifetime subscriptions (>365 days)
+        isSubscribed = diffDays >= 0;
+        debugPrint(
+            "_showPremiumThemeDialog: Subscription check - plan: $subscriptionPlan, expiry: $expiryDateString, diffDays: $diffDays, isSubscribed: $isSubscribed");
       } catch (e) {
-        debugPrint("Error checking subscription expiry in premium dialog: $e");
+        debugPrint("Error parsing subscription expiry in premium dialog: $e");
         isSubscribed = false;
       }
+    } else if (expiryDateString != null && expiryDateString.isNotEmpty) {
+      // Fallback: If subscription plan is not found but expiry date exists and is valid,
+      // consider user subscribed (handles cases where plan wasn't saved but expiry was set)
+      try {
+        final expiryDate = DateTime.parse(expiryDateString);
+        final currentTime = DateTime.now();
+        final diffDays = expiryDate.difference(currentTime).inDays;
+        if (diffDays >= 0) {
+          isSubscribed = true;
+          debugPrint(
+              "_showPremiumThemeDialog: Fallback check - No plan found but valid expiry date exists: $expiryDateString, diffDays: $diffDays, isSubscribed: $isSubscribed");
+        } else {
+          debugPrint(
+              "_showPremiumThemeDialog: Fallback check - Expiry date found but expired: $expiryDateString, diffDays: $diffDays");
+        }
+      } catch (e) {
+        debugPrint("Error parsing expiry date in fallback premium dialog: $e");
+        isSubscribed = false;
+      }
+    } else {
+      debugPrint(
+          "_showPremiumThemeDialog: No subscription plan found and no expiry date found, user not subscribed");
     }
 
     // Don't show premium dialog if user is subscribed
     if (isSubscribed) {
-      debugPrint("User is subscribed, not showing premium dialog");
+      debugPrint(
+          "_showPremiumThemeDialog: User is subscribed, not showing premium dialog");
       return;
     }
 
@@ -1922,7 +1954,7 @@ class _SettingScreenState extends State<SettingScreen>
                         onPressed: () => Navigator.pop(context),
                         style: ElevatedButton.styleFrom(
                           backgroundColor:
-                          oldPaperColor, // Use old paper theme color
+                              oldPaperColor, // Use old paper theme color
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -1960,7 +1992,7 @@ class _SettingScreenState extends State<SettingScreen>
                               await SharPreferences.getString('lifeTimePlan') ??
                                   BibleInfo.lifeTimePlanid;
                           Get.to(
-                                () => SubscriptionScreen(
+                            () => SubscriptionScreen(
                               sixMonthPlan: sixMonthPlan,
                               oneYearPlan: oneYearPlan,
                               lifeTimePlan: lifeTimePlan,
@@ -1972,7 +2004,7 @@ class _SettingScreenState extends State<SettingScreen>
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor:
-                          const Color(0xFF8B5E3C), // Dark brown
+                              const Color(0xFF8B5E3C), // Dark brown
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -2046,13 +2078,13 @@ class _SettingScreenState extends State<SettingScreen>
                         vertical: screenWidth < 380
                             ? 11
                             : screenWidth > 450
-                            ? 13
-                            : 12,
+                                ? 13
+                                : 12,
                         horizontal: screenWidth < 380
                             ? 14.0
                             : screenWidth > 450
-                            ? 21.0
-                            : 20),
+                                ? 21.0
+                                : 20),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -2063,8 +2095,8 @@ class _SettingScreenState extends State<SettingScreen>
                       fontSize: screenWidth < 380
                           ? 14.0
                           : screenWidth > 450
-                          ? 17
-                          : 16,
+                              ? 17
+                              : 16,
                       color: Colors.white,
                     ),
                   ),
@@ -2085,13 +2117,13 @@ class _SettingScreenState extends State<SettingScreen>
                         vertical: screenWidth < 380
                             ? 11
                             : screenWidth > 450
-                            ? 13
-                            : 12,
+                                ? 13
+                                : 12,
                         horizontal: screenWidth < 380
                             ? 14.0
                             : screenWidth > 450
-                            ? 21.0
-                            : 20),
+                                ? 21.0
+                                : 20),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -2102,8 +2134,8 @@ class _SettingScreenState extends State<SettingScreen>
                       fontSize: screenWidth < 380
                           ? 14.0
                           : screenWidth > 450
-                          ? 17
-                          : 16,
+                              ? 17
+                              : 16,
                       color: Colors.black,
                     ),
                   ),
@@ -2262,9 +2294,9 @@ class _ThemeDialogState extends State<ThemeDialog> {
             color: color,
             image: theme == AppCustomTheme.vintage
                 ? DecorationImage(
-              image: AssetImage(Images.bgImage((context))),
-              fit: BoxFit.cover,
-            )
+                    image: AssetImage(Images.bgImage((context))),
+                    fit: BoxFit.cover,
+                  )
                 : null,
             border: Border.all(
               color: _selectedTheme == theme
@@ -2294,7 +2326,7 @@ class _ThemeDialogState extends State<ThemeDialog> {
             child: const Text(
               "Theme",
               style:
-              TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
           ),
@@ -2313,53 +2345,83 @@ class _ThemeDialogState extends State<ThemeDialog> {
                 ),
                 onPressed: () => Navigator.pop(context),
                 child:
-                const Text("Close", style: TextStyle(color: Colors.black)),
+                    const Text("Close", style: TextStyle(color: Colors.black)),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.brown),
                 onPressed: () async {
                   final provider =
-                  Provider.of<ThemeProvider>(context, listen: false);
+                      Provider.of<ThemeProvider>(context, listen: false);
                   if (_selectedTheme == provider.currentCustomTheme) {
                     Constants.showToast("This theme is already applied");
                     return;
                   }
 
                   // Check subscription before setting theme - same logic as intro subscription screen
-                  // When user subscribes, disableAd() is called which sets expiry date in isRewardAdViewTime
+                  // When user subscribes or restores, disableAd() is called which sets expiry date in isRewardAdViewTime
                   bool isSubscribed = false;
 
                   // First check subscription plan
                   final downloadProvider =
-                  Provider.of<DownloadProvider>(context, listen: false);
+                      Provider.of<DownloadProvider>(context, listen: false);
                   final subscriptionPlan =
-                  await downloadProvider.getSubscriptionPlan();
+                      await downloadProvider.getSubscriptionPlan();
                   final hasSubscriptionPlan = subscriptionPlan != null &&
                       subscriptionPlan.isNotEmpty &&
                       ['platinum', 'gold', 'silver']
                           .contains(subscriptionPlan.toLowerCase());
 
-                  // Must have subscription plan AND valid expiry date
-                  if (hasSubscriptionPlan) {
+                  // Check expiry date (this is set by disableAd() during subscription/restore)
+                  String? expiryDateString;
+                  try {
+                    expiryDateString = await SharPreferences.getString(
+                        SharPreferences.isRewardAdViewTime);
+                  } catch (e) {
+                    debugPrint("Error getting expiry date: $e");
+                  }
+
+                  // Must have subscription plan AND valid expiry date, OR just valid expiry date as fallback
+                  if (hasSubscriptionPlan &&
+                      expiryDateString != null &&
+                      expiryDateString.isNotEmpty) {
                     try {
-                      final expiryDateString = await SharPreferences.getString(
-                          SharPreferences.isRewardAdViewTime);
-                      if (expiryDateString != null &&
-                          expiryDateString.isNotEmpty) {
-                        final expiryDate = DateTime.parse(expiryDateString);
-                        final currentTime = DateTime.now();
-                        final diffDays =
-                            expiryDate.difference(currentTime).inDays;
-                        // Subscription is valid if expiry date is today or in the future (>= 0)
-                        // This includes lifetime subscriptions (>365 days)
-                        isSubscribed = diffDays >= 0;
-                      }
-                      // If no expiry date, user is not subscribed (don't use closead as bypass)
+                      final expiryDate = DateTime.parse(expiryDateString);
+                      final currentTime = DateTime.now();
+                      final diffDays =
+                          expiryDate.difference(currentTime).inDays;
+                      // Subscription is valid if expiry date is today or in the future (>= 0)
+                      // This includes lifetime subscriptions (>365 days)
+                      isSubscribed = diffDays >= 0;
+                      debugPrint(
+                          "ThemeDialog: Subscription check - plan: $subscriptionPlan, expiry: $expiryDateString, diffDays: $diffDays, isSubscribed: $isSubscribed");
                     } catch (e) {
-                      debugPrint("Error checking subscription expiry: $e");
-                      // If error parsing expiry date, user is not subscribed
+                      debugPrint("Error parsing subscription expiry: $e");
                       isSubscribed = false;
                     }
+                  } else if (expiryDateString != null &&
+                      expiryDateString.isNotEmpty) {
+                    // Fallback: If subscription plan is not found but expiry date exists and is valid,
+                    // consider user subscribed (handles cases where plan wasn't saved but expiry was set)
+                    try {
+                      final expiryDate = DateTime.parse(expiryDateString);
+                      final currentTime = DateTime.now();
+                      final diffDays =
+                          expiryDate.difference(currentTime).inDays;
+                      if (diffDays >= 0) {
+                        isSubscribed = true;
+                        debugPrint(
+                            "ThemeDialog: Fallback check - No plan found but valid expiry date exists: $expiryDateString, diffDays: $diffDays, isSubscribed: $isSubscribed");
+                      } else {
+                        debugPrint(
+                            "ThemeDialog: Fallback check - Expiry date found but expired: $expiryDateString, diffDays: $diffDays");
+                      }
+                    } catch (e) {
+                      debugPrint("Error parsing expiry date in fallback: $e");
+                      isSubscribed = false;
+                    }
+                  } else {
+                    debugPrint(
+                        "ThemeDialog: No subscription plan found and no expiry date found, user not subscribed");
                   }
 
                   if (!isSubscribed) {
@@ -2367,7 +2429,9 @@ class _ThemeDialogState extends State<ThemeDialog> {
                     Navigator.pop(context);
                     widget.onPremiumRequired();
                   } else {
-                    // User is subscribed, set theme
+                    // User is subscribed, set theme directly without showing premium dialog
+                    debugPrint(
+                        "ThemeDialog: User is subscribed, setting theme directly");
                     provider.setCustomTheme(_selectedTheme);
                     Navigator.pop(context);
                   }

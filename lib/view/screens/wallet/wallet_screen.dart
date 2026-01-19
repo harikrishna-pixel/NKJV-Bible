@@ -554,7 +554,8 @@ class _WalletScreenState extends State<WalletScreen> {
           _selectedProductId = null; // Clear selected state
         });
       }
-      Constants.showToast('Error: $e');
+      debugPrint('WalletScreen: Purchase initiation error: $e');
+      Constants.showToast('Something went wrong. Please try again.');
     }
   }
 
@@ -1176,13 +1177,6 @@ class _WalletScreenState extends State<WalletScreen> {
                                 : Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(
-                                        Icons.monetization_on,
-                                        color:
-                                            Colors.amber.shade700, // Gold color
-                                        size: screenWidth > 450 ? 18 : 16,
-                                      ),
-                                      const SizedBox(width: 4),
                                       // Use priceFromConstants directly - it's already read from the current pack
                                       Text(
                                         () {

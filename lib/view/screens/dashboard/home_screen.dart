@@ -1712,7 +1712,48 @@ class _HomeScreenState extends State<HomeScreen>
 
           // Proceed with action after ad (if shown) or immediately (if skipped)
           Constants.showToast("Amen!");
-          Navigator.of(context).pop();
+          
+          // Add a small delay after ad dismissal to ensure UI is ready before closing
+          // This prevents white screen issue when ad is dismissed
+          await Future.delayed(const Duration(milliseconds: 500));
+          
+          // Check if bottom sheet is still open and context is valid
+          if (!_isBottomSheetOpen) {
+            return; // Bottom sheet already closed
+          }
+          
+          // Check if context is still valid before closing bottom sheet
+          if (mounted) {
+            // Try using the stored bottom sheet context first (more reliable)
+            if (_bottomSheetContext != null) {
+              try {
+                final route = ModalRoute.of(_bottomSheetContext!);
+                if (route != null && route.isCurrent) {
+                  Navigator.of(_bottomSheetContext!).pop();
+                  _bottomSheetContext = null;
+                  _isBottomSheetOpen = false;
+                  return;
+                }
+              } catch (e) {
+                debugPrint('Error closing bottom sheet with stored context: $e');
+                _bottomSheetContext = null;
+              }
+            }
+            
+            // Fallback: try using the current context
+            if (context.mounted) {
+              final route = ModalRoute.of(context);
+              if (route != null && route.isCurrent) {
+                try {
+                  Navigator.of(context).pop();
+                  _isBottomSheetOpen = false;
+                } catch (e) {
+                  debugPrint('Error closing bottom sheet after Amen: $e');
+                  _isBottomSheetOpen = false;
+                }
+              }
+            }
+          }
         },
         icon: Image.asset(
           "assets/icons/cross1.png",
