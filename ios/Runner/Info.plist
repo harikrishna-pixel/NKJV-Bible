@@ -86,6 +86,8 @@
 	<string>We need access to save files to your device.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app requires access to the microphone to record video to submit feedback with attachments</string>
+	<key>NSBackgroundAudioUsageDescription</key>
+	<string>Allows audio Bible playback to continue when the app is in the background.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>This app needs access to speech recognition to convert your voice to text in the chat feature</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
