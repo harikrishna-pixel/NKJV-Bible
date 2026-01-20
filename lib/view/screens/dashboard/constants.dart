@@ -45,31 +45,31 @@ class BibleInfo {
   static String adsGoogleRewardInterstitialIdAndroid = "";
 
   // Ads IDs - iOS
-  // static String adsGoogleBannerIdIos = "ca-app-pub-4194577750257069/5888490615";
-  // static String adsGoogleBannerId_2Ios = "";
-  // static String adsGoogleBannerId_3Ios = "";
-  // static String adsGoogleInterstitialIdIos =
-  //     "ca-app-pub-4194577750257069/3990737976";
-  // static String adsGoogleRewardIdIos = "ca-app-pub-4194577750257069/3262327277";
-  // static String adsGoogleOpenAppIdIos =
-  //     "ca-app-pub-4194577750257069/1949245605";
-  // static String adsGoogleNativeIdIos = "ca-app-pub-4194577750257069/2933990334";
-  // static String adsGoogleRewardInterstitialIdIos = "";
+  static String adsGoogleBannerIdIos = "ca-app-pub-4194577750257069/5888490615";
+  static String adsGoogleBannerId_2Ios = "";
+  static String adsGoogleBannerId_3Ios = "";
+  static String adsGoogleInterstitialIdIos =
+      "ca-app-pub-4194577750257069/3990737976";
+  static String adsGoogleRewardIdIos = "ca-app-pub-4194577750257069/3262327277";
+  static String adsGoogleOpenAppIdIos =
+      "ca-app-pub-4194577750257069/1949245605";
+  static String adsGoogleNativeIdIos = "ca-app-pub-4194577750257069/2933990334";
+  static String adsGoogleRewardInterstitialIdIos = "";
 
   // TEST Ads IDs - iOS
-  static String adsGoogleBannerIdIos = "ca-app-pub-3940256099942544/2934735716";
-  static String adsGoogleBannerId_2Ios =
-      "ca-app-pub-3940256099942544/2934735716";
-  static String adsGoogleBannerId_3Ios =
-      "ca-app-pub-3940256099942544/2934735716";
-  static String adsGoogleInterstitialIdIos =
-      "ca-app-pub-3940256099942544/4411468910";
-  static String adsGoogleRewardIdIos = "ca-app-pub-3940256099942544/1712485313";
-  static String adsGoogleOpenAppIdIos =
-      "ca-app-pub-3940256099942544/5575463023";
-  static String adsGoogleNativeIdIos = "ca-app-pub-3940256099942544/3986624511";
-  static String adsGoogleRewardInterstitialIdIos =
-      "ca-app-pub-3940256099942544/6978759866";
+  // static String adsGoogleBannerIdIos = "ca-app-pub-3940256099942544/2934735716";
+  // static String adsGoogleBannerId_2Ios =
+  //     "ca-app-pub-3940256099942544/2934735716";
+  // static String adsGoogleBannerId_3Ios =
+  //     "ca-app-pub-3940256099942544/2934735716";
+  // static String adsGoogleInterstitialIdIos =
+  //     "ca-app-pub-3940256099942544/4411468910";
+  // static String adsGoogleRewardIdIos = "ca-app-pub-3940256099942544/1712485313";
+  // static String adsGoogleOpenAppIdIos =
+  //     "ca-app-pub-3940256099942544/5575463023";
+  // static String adsGoogleNativeIdIos = "ca-app-pub-3940256099942544/3986624511";
+  // static String adsGoogleRewardInterstitialIdIos =
+  //     "ca-app-pub-3940256099942544/6978759866";
 
 // add folder names here  assets/zipped/
   static List<String> folders = [
