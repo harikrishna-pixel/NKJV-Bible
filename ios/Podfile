@@ -66,6 +66,26 @@ post_install do |installer|
       end
     end
 
+    # Suppress deprecation warnings for in_app_purchase_storekit (iOS 18.0 SKProduct deprecation)
+    target.build_configurations.each do |config|
+      # Suppress all deprecation warnings
+      config.build_settings['GCC_WARN_DEPRECATED_FUNCTIONS'] = 'NO'
+      config.build_settings['CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS'] = 'NO'
+      # Suppress specific deprecation warnings with compiler flags
+      cflags = config.build_settings['OTHER_CFLAGS'] ||= []
+      cflags = [cflags] unless cflags.is_a?(Array)
+      cflags << '-Wno-deprecated-declarations' unless cflags.include?('-Wno-deprecated-declarations')
+      config.build_settings['OTHER_CFLAGS'] = cflags
+      
+      cppflags = config.build_settings['OTHER_CPLUSPLUSFLAGS'] ||= []
+      cppflags = [cppflags] unless cppflags.is_a?(Array)
+      cppflags << '-Wno-deprecated-declarations' unless cppflags.include?('-Wno-deprecated-declarations')
+      config.build_settings['OTHER_CPLUSPLUSFLAGS'] = cppflags
+      
+      # Also suppress for Swift compiler if needed
+      config.build_settings['SWIFT_SUPPRESS_WARNINGS'] = 'YES'
+    end
+
     # Flutter default iOS build settings
     flutter_additional_ios_build_settings(target)
 

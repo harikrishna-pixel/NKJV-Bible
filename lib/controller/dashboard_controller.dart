@@ -231,9 +231,44 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
   /// Initialize with constants when API data is not available (first time loading)
   Future<void> _initializeWithConstants() async {
     try {
-      // Create empty GetAudioModel and process it to use constants as fallback
-      final emptyModel = GetAudioModel();
-      await _processApiResponse(emptyModel);
+      // Create GetAudioModel with constants data for audio and text-to-speech
+      final constantsModel = GetAudioModel();
+      constantsModel.result = "1";
+      
+      // Create GetAudioModelData with constants
+      final constantsData = GetAudioModelData();
+      
+      // Set subscription plan IDs from constants
+      constantsData.subIdentifierSixMonth = BibleInfo.subIdentifierSixMonth;
+      constantsData.subIdentifierOneyear = BibleInfo.subIdentifierOneYear;
+      constantsData.subIdentifierLifetime = BibleInfo.subIdentifierLifetime;
+      constantsData.isSubscriptionEnabled = BibleInfo.isSubscriptionEnabled;
+      constantsData.adsDuration = BibleInfo.adsDuration;
+      constantsData.offerEnabled = BibleInfo.offerEnabled;
+      constantsData.offerDays = BibleInfo.offerDays;
+      constantsData.offerCount = BibleInfo.offerCount;
+      
+      // Create BibleAudioInfo with constants for audio and text-to-speech
+      final bibleAudioInfo = GetAudioModelDataBibleAudioInfo();
+      bibleAudioInfo.isShowMp3Audio = BibleInfo.isShowMp3Audio;
+      bibleAudioInfo.audioBasepath = BibleInfo.audioBasePath;
+      bibleAudioInfo.audioBasepathType = BibleInfo.audioBasePathType;
+      bibleAudioInfo.isTextToSpeechAvailableIos = BibleInfo.isTextToSpeechAvailableIos;
+      bibleAudioInfo.textToSpeechLanguageCodeIos = BibleInfo.textToSpeechLanguageCodeIos;
+      bibleAudioInfo.textToSpeechIdentifierIos = BibleInfo.textToSpeechIdentifierIos;
+      bibleAudioInfo.isTextToSpeechAvailableAndroid = BibleInfo.isTextToSpeechAvailableAndroid;
+      bibleAudioInfo.textToSpeechLanguageCodeAndroid = BibleInfo.textToSpeechLanguageCodeAndroid;
+      
+      // Set audio info to data
+      constantsData.bibleAudioInfo = bibleAudioInfo;
+      constantsData.appAudioBasepath = BibleInfo.audioBasePath;
+      constantsData.appAudioBasepathType = BibleInfo.audioBasePathType;
+      
+      // Set the data to model
+      constantsModel.data = constantsData;
+      
+      // Process the constants model
+      await _processApiResponse(constantsModel);
 
       // Save constants to SharedPreferences for IAP plan IDs
       await Future.wait([
@@ -242,7 +277,7 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         SharPreferences.setString('lifeTimePlan', BibleInfo.lifeTimePlanid),
       ]);
 
-      debugPrint('Initialized with constants successfully');
+      debugPrint('Initialized with constants successfully - Audio and Text-to-Speech data from constants');
     } catch (e) {
       debugPrint('Error initializing with constants: $e');
       await _handleApiError(e);

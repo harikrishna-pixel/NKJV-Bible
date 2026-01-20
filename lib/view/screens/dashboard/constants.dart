@@ -90,4 +90,32 @@ class BibleInfo {
 
   // Chat feature visibility: 0 = hide, 1 = show
   static int chat = 1;
+
+  // Audio and Text to Speech Constants (fallback when API data is not available)
+  // Audio Settings
+  static String audioBasePath =
+      "https://bibleoffice.com/BibleReplications/dev/v1/uploads/bible_audio/English/";
+  static String audioBasePathType = "3";
+  static String isShowMp3Audio = "1";
+
+  // Text to Speech Settings - iOS
+  static String isTextToSpeechAvailableIos = "0";
+  static String textToSpeechLanguageCodeIos = "";
+  static String textToSpeechIdentifierIos = "";
+
+  // Text to Speech Settings - Android
+  static String isTextToSpeechAvailableAndroid = "0";
+  static String textToSpeechLanguageCodeAndroid = "";
+
+  // Subscription Plan IDs (for fallback)
+  static String subIdentifierSixMonth = sixMonthPlanid;
+  static String subIdentifierOneYear = oneYearPlanid;
+  static String subIdentifierLifetime = lifeTimePlanid;
+
+  // Basic App Settings
+  static String isSubscriptionEnabled = "1";
+  static String adsDuration = "3";
+  static String offerEnabled = "1";
+  static int offerDays = 20;
+  static int offerCount = 200;
 }

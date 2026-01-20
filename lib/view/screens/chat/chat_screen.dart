@@ -17,7 +17,7 @@ import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/chat/chat_history_screen.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
-import 'package:biblebookapp/view/screens/dashboard/setting_screen.dart';
+import 'package:biblebookapp/view/screens/dashboardR/setting_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/services/statsig/statsig_service.dart';
 import 'package:provider/provider.dart';
@@ -1873,10 +1873,12 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
         _messageFocusNode.unfocus();
 
         // Deduct credits only after successful response (not for error messages)
-        final isErrorResponse = responseText == 'Sorry, I could not generate a response.' ||
-            responseText == 'Sorry, I could not generate a response. Please try again.' ||
+        final isErrorResponse = responseText ==
+                'Sorry, I could not generate a response.' ||
+            responseText ==
+                'Sorry, I could not generate a response. Please try again.' ||
             responseText.toLowerCase().contains('sorry, i could not generate');
-        
+
         if (!isErrorResponse) {
           await _deductChatCredits();
         }
@@ -2326,7 +2328,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                     padding: EdgeInsets.symmetric(
                                       horizontal: screenWidth > 450 ? 20 : 16,
                                     ),
-                                    child: _buildVerseContext(screenWidth, isDark),
+                                    child:
+                                        _buildVerseContext(screenWidth, isDark),
                                   ),
                                 if (widget.verseContext != null)
                                   const SizedBox(height: 20),
@@ -2338,12 +2341,15 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                     ),
                                     child: Column(
                                       children: [
-                                        SizedBox(height: screenWidth > 450 ? 10 : 5),
+                                        SizedBox(
+                                            height: screenWidth > 450 ? 10 : 5),
                                         Transform.translate(
                                           offset: const Offset(0, -10),
                                           child: Container(
-                                            width: screenWidth > 450 ? 140 : 130,
-                                            height: screenWidth > 450 ? 140 : 130,
+                                            width:
+                                                screenWidth > 450 ? 140 : 130,
+                                            height:
+                                                screenWidth > 450 ? 140 : 130,
                                             decoration: const BoxDecoration(
                                               color: Colors
                                                   .transparent, // Transparent background for illustration
@@ -2357,9 +2363,9 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                                 return Icon(
                                                   Icons.chat_bubble_outline,
                                                   size: 100,
-                                                  color:
-                                                      CommanColor.whiteBlack(context)
-                                                          .withOpacity(0.5),
+                                                  color: CommanColor.whiteBlack(
+                                                          context)
+                                                      .withOpacity(0.5),
                                                 );
                                               },
                                             ),
@@ -2370,9 +2376,11 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                           'Faith Answers',
                                           style: TextStyle(
                                             fontWeight: FontWeight.w700,
-                                            color: CommanColor.whiteBlack(context)
-                                                .withOpacity(0.7),
-                                            fontSize: screenWidth > 450 ? 26 : 23,
+                                            color:
+                                                CommanColor.whiteBlack(context)
+                                                    .withOpacity(0.7),
+                                            fontSize:
+                                                screenWidth > 450 ? 26 : 23,
                                           ),
                                         ),
                                         const SizedBox(height: 8),
@@ -2384,9 +2392,11 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                             'Get Guidance Based On Your Need...',
                                             textAlign: TextAlign.center,
                                             style: TextStyle(
-                                              color: CommanColor.whiteBlack(context)
+                                              color: CommanColor.whiteBlack(
+                                                      context)
                                                   .withOpacity(0.5),
-                                              fontSize: screenWidth > 450 ? 16 : 15,
+                                              fontSize:
+                                                  screenWidth > 450 ? 16 : 15,
                                             ),
                                           ),
                                         ),
@@ -2416,14 +2426,17 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                   ),
                                 // Show default questions inside scrollable area
                                 widget.verseContext != null
-                                    ? _buildVerseSuggestedQuestions(screenWidth, isDark)
-                                    : _buildDefaultQuestions(screenWidth, isDark),
+                                    ? _buildVerseSuggestedQuestions(
+                                        screenWidth, isDark)
+                                    : _buildDefaultQuestions(
+                                        screenWidth, isDark),
                                 // Show recent conversations inside scrollable area only in Chat Home Screen (no verse context and no history date key)
                                 if (_recentConversations.isNotEmpty &&
                                     widget.verseContext == null &&
                                     widget.historyDateKey == null) ...[
                                   const SizedBox(height: 8),
-                                  _buildRecentConversations(screenWidth, isDark),
+                                  _buildRecentConversations(
+                                      screenWidth, isDark),
                                 ],
                                 // Add extra bottom padding for better scrolling
                                 const SizedBox(height: 20),
@@ -3810,7 +3823,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                     border: Border.all(
                                       color: isDark
                                           ? Colors.white
-                                          : CommanColor.lightDarkPrimary(context),
+                                          : CommanColor.lightDarkPrimary(
+                                              context),
                                       width: 1.4,
                                     ),
                                   ),
@@ -3850,7 +3864,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                     border: Border.all(
                                       color: isDark
                                           ? Colors.white
-                                          : CommanColor.lightDarkPrimary(context),
+                                          : CommanColor.lightDarkPrimary(
+                                              context),
                                       width: 1.4,
                                     ),
                                   ),

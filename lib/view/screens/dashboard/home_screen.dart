@@ -1745,7 +1745,7 @@ class _HomeScreenState extends State<HomeScreen>
               final route = ModalRoute.of(context);
               if (route != null && route.isCurrent) {
                 try {
-                  Navigator.of(context).pop();
+          Navigator.of(context).pop();
                   _isBottomSheetOpen = false;
                 } catch (e) {
                   debugPrint('Error closing bottom sheet after Amen: $e');
