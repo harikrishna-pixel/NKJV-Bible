@@ -7,7 +7,7 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
-import 'package:biblebookapp/controller/dashboard_controller.dart';
+
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/constant/app_api_constant.dart';
@@ -17,7 +17,6 @@ import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/chat/chat_history_screen.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
-import 'package:biblebookapp/view/screens/dashboardR/setting_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/services/statsig/statsig_service.dart';
 import 'package:provider/provider.dart';
