@@ -45,16 +45,31 @@ class BibleInfo {
   static String adsGoogleRewardInterstitialIdAndroid = "";
 
   // Ads IDs - iOS
-  static String adsGoogleBannerIdIos = "ca-app-pub-4194577750257069/5888490615";
-  static String adsGoogleBannerId_2Ios = "";
-  static String adsGoogleBannerId_3Ios = "";
+  // static String adsGoogleBannerIdIos = "ca-app-pub-4194577750257069/5888490615";
+  // static String adsGoogleBannerId_2Ios = "";
+  // static String adsGoogleBannerId_3Ios = "";
+  // static String adsGoogleInterstitialIdIos =
+  //     "ca-app-pub-4194577750257069/3990737976";
+  // static String adsGoogleRewardIdIos = "ca-app-pub-4194577750257069/3262327277";
+  // static String adsGoogleOpenAppIdIos =
+  //     "ca-app-pub-4194577750257069/1949245605";
+  // static String adsGoogleNativeIdIos = "ca-app-pub-4194577750257069/2933990334";
+  // static String adsGoogleRewardInterstitialIdIos = "";
+
+  // TEST Ads IDs - iOS
+  static String adsGoogleBannerIdIos = "ca-app-pub-3940256099942544/2934735716";
+  static String adsGoogleBannerId_2Ios =
+      "ca-app-pub-3940256099942544/2934735716";
+  static String adsGoogleBannerId_3Ios =
+      "ca-app-pub-3940256099942544/2934735716";
   static String adsGoogleInterstitialIdIos =
-      "ca-app-pub-4194577750257069/3990737976";
-  static String adsGoogleRewardIdIos = "ca-app-pub-4194577750257069/3262327277";
+      "ca-app-pub-3940256099942544/4411468910";
+  static String adsGoogleRewardIdIos = "ca-app-pub-3940256099942544/1712485313";
   static String adsGoogleOpenAppIdIos =
-      "ca-app-pub-4194577750257069/1949245605";
-  static String adsGoogleNativeIdIos = "ca-app-pub-4194577750257069/2933990334";
-  static String adsGoogleRewardInterstitialIdIos = "";
+      "ca-app-pub-3940256099942544/5575463023";
+  static String adsGoogleNativeIdIos = "ca-app-pub-3940256099942544/3986624511";
+  static String adsGoogleRewardInterstitialIdIos =
+      "ca-app-pub-3940256099942544/6978759866";
 
 // add folder names here  assets/zipped/
   static List<String> folders = [
@@ -118,4 +133,78 @@ class BibleInfo {
   static String offerEnabled = "1";
   static int offerDays = 20;
   static int offerCount = 200;
+
+  // Wallpaper and Quotes IDs (fallback when API data is not available)
+  // These are the ACTUAL IDs for Geneva Bible app (confirmed from API response)
+  static String wallpaperCatId =
+      "177"; // Actual wallpaper category ID for Geneva Bible
+  static String imageAppId =
+      "322"; // Actual quote/image app ID for Geneva Bible
+
+  // More Apps fallback data (when API data is not available)
+  // These are default apps to show when API fails
+  static List<Map<String, dynamic>> getMoreAppsFallbackData() {
+    return [
+      {
+        'appId': '132',
+        'appName': 'The Amplified Bible Flutter iOS',
+        'appurl': 'https://apps.apple.com/app/id6459793603',
+        'developed_by': 'MBX',
+        'apptype': 'ios',
+        'thumburl':
+            'https://bibleoffice.com/BibleReplications/dev/v1/uploads/moreapp_img/moreapp_thumb132_1745498978.webp',
+        'thumburl_2': '',
+      },
+      {
+        'appId': '133',
+        'appName': 'Bible Word Search Puzzle',
+        'appurl': 'https://apps.apple.com/app/id6739329590',
+        'developed_by': 'MBX',
+        'apptype': 'ios',
+        'thumburl':
+            'https://bibleoffice.com/BibleReplications/dev/v1/uploads/moreapp_img/moreapp_thumb133_1745313891.png',
+        'thumburl_2': '',
+      },
+      {
+        'appId': '143',
+        'appName': 'KJV Bible',
+        'appurl': 'https://apps.apple.com/app/id6461349171',
+        'developed_by': 'MBX',
+        'apptype': 'ios',
+        'thumburl':
+            'https://bibleoffice.com/BibleReplications/dev/v1/uploads/moreapp_img/moreapp_thumb143_1745499032.webp',
+        'thumburl_2': '',
+      },
+      {
+        'appId': '154',
+        'appName': 'New Jerusalem Bible',
+        'appurl': 'https://apps.apple.com/app/id6460890871',
+        'developed_by': 'MBX',
+        'apptype': 'ios',
+        'thumburl':
+            'https://bibleoffice.com/BibleReplications/dev/v1/uploads/moreapp_img/moreapp_thumb154_1745499573.webp',
+        'thumburl_2': '',
+      },
+      {
+        'appId': '163',
+        'appName': 'Messianic Bible',
+        'appurl': 'https://apps.apple.com/app/id6472878164',
+        'developed_by': 'MBX',
+        'apptype': 'ios',
+        'thumburl':
+            'https://bibleoffice.com/BibleReplications/dev/v1/uploads/moreapp_img/moreapp_thumb163_1745499221.webp',
+        'thumburl_2': '',
+      },
+      {
+        'appId': '170',
+        'appName': 'Geneva Bible Pro',
+        'appurl': 'https://apps.apple.com/app/id6478524481',
+        'developed_by': 'MBX',
+        'apptype': 'ios',
+        'thumburl':
+            'https://bibleoffice.com/BibleReplications/dev/v1/uploads/moreapp_img/moreapp_thumb_1745584375.png',
+        'thumburl_2': '',
+      },
+    ];
+  }
 }

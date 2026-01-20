@@ -404,15 +404,17 @@ class _SearchScreenState extends State<SearchScreen> {
               SafeArea(
             child: GestureDetector(
               onTap: () async {
+                // Dismiss keyboard when tapping outside the search field
                 FocusScopeNode currentFocus = FocusScope.of(context);
-                await SharPreferences.setString('OpenAd', '1');
-                if (!currentFocus.hasPrimaryFocus) {
+                if (currentFocus.hasPrimaryFocus || currentFocus.focusedChild != null) {
                   currentFocus.unfocus();
                 }
+                await SharPreferences.setString('OpenAd', '1');
                 Provider.of<DownloadProvider>(context, listen: false)
                     .disableAd();
                 await SharPreferences.setString('OpenAd', '1');
               },
+              behavior: HitTestBehavior.opaque, // Ensure entire area is tappable
               child: Column(
                 children: [
                   const SizedBox(

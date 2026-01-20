@@ -67,6 +67,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   ProductDetails? _exitOfferProduct; // Store exit offer product for purchase
   bool _isExitOfferShowing =
       false; // Track if exit offer is currently being shown
+  Timer?
+      _loadingTimeoutTimer; // Timer to handle loader timeout when purchase sheet is closed
 
   void _sortProducts() {
     _products.sort((a, b) {
@@ -135,6 +137,21 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           userTap = true;
         });
         EasyLoading.show();
+
+        // Start timeout timer (2-3 seconds) to stop loader if purchase sheet is closed
+        _loadingTimeoutTimer?.cancel();
+        _loadingTimeoutTimer = Timer(const Duration(seconds: 3), () {
+          // If loader is still showing after 3 seconds, dismiss it and show toast
+          // This handles the case when user closes purchase sheet (X button) on slow/weak network
+          if (mounted) {
+            EasyLoading.dismiss();
+            Constants.showToast(
+                "Purchase cancelled or network is slow. Please try again.");
+            debugPrint(
+                'Loader timeout: Purchase sheet may have been closed or network is slow');
+          }
+        });
+
         await SharPreferences.setString('OpenAd', '1');
 
         final PurchaseParam purchaseParam = PurchaseParam(productDetails: prod);
@@ -144,6 +161,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         // });
       } catch (e) {
         debugPrint('Error: $e');
+        // Cancel timer on error
+        _loadingTimeoutTimer?.cancel();
+        EasyLoading.dismiss();
       } finally {
         setState(() {
           userTap = false;
@@ -754,6 +774,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           await downloadProvider.setSubscriptionPlan('platinum');
         }
         await Future.delayed(Duration(seconds: 1));
+        // Cancel timeout timer before dismissing loader
+        _loadingTimeoutTimer?.cancel();
         EasyLoading.dismiss();
         await SharPreferences.setBoolean('closead', true);
         return Get.offAll(() => HomeScreen(
@@ -773,6 +795,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           await downloadProvider.setSubscriptionPlan('gold');
         }
         await Future.delayed(Duration(seconds: 1));
+        // Cancel timeout timer before dismissing loader
+        _loadingTimeoutTimer?.cancel();
         EasyLoading.dismiss();
         await SharPreferences.setBoolean('closead', true);
         return Get.offAll(() => HomeScreen(
@@ -792,6 +816,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           await downloadProvider.setSubscriptionPlan('silver');
         }
         await Future.delayed(Duration(seconds: 1));
+        // Cancel timeout timer before dismissing loader
+        _loadingTimeoutTimer?.cancel();
         EasyLoading.dismiss();
         await SharPreferences.setBoolean('closead', true);
         return Get.offAll(() => HomeScreen(
@@ -835,6 +861,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         if (purchaseDetails.status == PurchaseStatus.error) {
           debugPrint('Error: ${purchaseDetails.error}');
           DebugConsole.log(" purchases error - $purchaseDetails");
+          // Cancel timeout timer and dismiss loader on error
+          _loadingTimeoutTimer?.cancel();
+          EasyLoading.dismiss();
         } else if (purchaseDetails.status == PurchaseStatus.purchased ||
             purchaseDetails.status == PurchaseStatus.restored) {
           if (purchaseDetails.status == PurchaseStatus.purchased) {
@@ -880,6 +909,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   if (Platform.isIOS) {
                     await _inAppPurchase.completePurchase(purchaseDetails);
                   }
+                  // Cancel timeout timer before dismissing loader
+                  _loadingTimeoutTimer?.cancel();
                   EasyLoading.dismiss();
                   await SharPreferences.setBoolean('closead', true);
                   debugPrint("restore data 2");
@@ -898,6 +929,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   if (Platform.isIOS) {
                     await _inAppPurchase.completePurchase(purchaseDetails);
                   }
+                  // Cancel timeout timer before dismissing loader
+                  _loadingTimeoutTimer?.cancel();
                   EasyLoading.dismiss();
                   await SharPreferences.setBoolean('closead', true);
                   debugPrint("restore data 3 ");
@@ -917,8 +950,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     // Try to get from Get.context as fallback
                     final getContext = Get.context;
                     if (getContext != null) {
-                      downloadProvider =
-                          Provider.of<DownloadProvider>(getContext, listen: false);
+                      downloadProvider = Provider.of<DownloadProvider>(
+                          getContext,
+                          listen: false);
                     }
                   }
                   if (downloadProvider != null) {
@@ -929,6 +963,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   if (Platform.isIOS) {
                     await _inAppPurchase.completePurchase(purchaseDetails);
                   }
+                  // Cancel timeout timer before dismissing loader
+                  _loadingTimeoutTimer?.cancel();
                   EasyLoading.dismiss();
                   await SharPreferences.setBoolean('closead', true);
                   debugPrint("restore data 4 ");
@@ -957,8 +993,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       // Try to get from Get.context as fallback
                       final getContext = Get.context;
                       if (getContext != null) {
-                        downloadProvider =
-                            Provider.of<DownloadProvider>(getContext, listen: false);
+                        downloadProvider = Provider.of<DownloadProvider>(
+                            getContext,
+                            listen: false);
                       }
                     }
                     if (downloadProvider != null) {
@@ -969,6 +1006,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     if (Platform.isIOS) {
                       await _inAppPurchase.completePurchase(purchaseDetails);
                     }
+                    // Cancel timeout timer before dismissing loader
+                    _loadingTimeoutTimer?.cancel();
                     EasyLoading.dismiss();
                     await SharPreferences.setBoolean('closead', true);
                     debugPrint(
@@ -1385,6 +1424,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   void dispose() {
     debugPrint("iap ad - dispose");
     _subscription?.cancel();
+    // Cancel loading timeout timer on dispose
+    _loadingTimeoutTimer?.cancel();
     // Reset exit offer flag on dispose
     _isExitOfferShowing = false;
     // Call async clean-up without awaiting
@@ -1455,6 +1496,19 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     // });
     EasyLoading.show(status: "Restoring...");
 
+    // Start timeout timer (2-3 seconds) to stop loader if restore takes too long on slow network
+    _loadingTimeoutTimer?.cancel();
+    _loadingTimeoutTimer = Timer(const Duration(seconds: 3), () {
+      // If loader is still showing after 3 seconds, dismiss it and show toast
+      // This handles the case when network is slow or weak
+      if (mounted) {
+        EasyLoading.dismiss();
+        Constants.showToast(
+            "Restore is taking longer than expected. Please check your network connection.");
+        debugPrint('Restore loader timeout: Network may be slow or weak');
+      }
+    });
+
     // try {
     //   // This triggers restored purchases to come via purchaseStream
     //   await InAppPurchase.instance.restorePurchases();
@@ -1484,11 +1538,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           Constants.showToast('Restore Successful');
         }
       } else {
+        // Cancel timeout timer before dismissing loader
+        _loadingTimeoutTimer?.cancel();
+        EasyLoading.dismiss();
         Constants.showToast('No active subscription available');
       }
     } catch (e) {
       //  Constants.showToast(' error No active subscription available');
-
+      // Cancel timeout timer before dismissing loader on error
+      _loadingTimeoutTimer?.cancel();
+      EasyLoading.dismiss();
       DebugConsole.log("restore No active subscription available error - $e");
     }
     // setState(() {
@@ -2096,7 +2155,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                           Text(
                             _products[index].price,
                             style: TextStyle(
-                              fontSize: 23,
+                              fontSize: 21,
                               fontWeight: FontWeight.bold,
                               color: CommanColor.whiteBlack(context),
                             ),

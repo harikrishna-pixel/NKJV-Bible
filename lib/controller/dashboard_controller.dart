@@ -234,10 +234,10 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
       // Create GetAudioModel with constants data for audio and text-to-speech
       final constantsModel = GetAudioModel();
       constantsModel.result = "1";
-      
+
       // Create GetAudioModelData with constants
       final constantsData = GetAudioModelData();
-      
+
       // Set subscription plan IDs from constants
       constantsData.subIdentifierSixMonth = BibleInfo.subIdentifierSixMonth;
       constantsData.subIdentifierOneyear = BibleInfo.subIdentifierOneYear;
@@ -247,26 +247,35 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
       constantsData.offerEnabled = BibleInfo.offerEnabled;
       constantsData.offerDays = BibleInfo.offerDays;
       constantsData.offerCount = BibleInfo.offerCount;
-      
+
       // Create BibleAudioInfo with constants for audio and text-to-speech
       final bibleAudioInfo = GetAudioModelDataBibleAudioInfo();
       bibleAudioInfo.isShowMp3Audio = BibleInfo.isShowMp3Audio;
       bibleAudioInfo.audioBasepath = BibleInfo.audioBasePath;
       bibleAudioInfo.audioBasepathType = BibleInfo.audioBasePathType;
-      bibleAudioInfo.isTextToSpeechAvailableIos = BibleInfo.isTextToSpeechAvailableIos;
-      bibleAudioInfo.textToSpeechLanguageCodeIos = BibleInfo.textToSpeechLanguageCodeIos;
-      bibleAudioInfo.textToSpeechIdentifierIos = BibleInfo.textToSpeechIdentifierIos;
-      bibleAudioInfo.isTextToSpeechAvailableAndroid = BibleInfo.isTextToSpeechAvailableAndroid;
-      bibleAudioInfo.textToSpeechLanguageCodeAndroid = BibleInfo.textToSpeechLanguageCodeAndroid;
-      
+      bibleAudioInfo.isTextToSpeechAvailableIos =
+          BibleInfo.isTextToSpeechAvailableIos;
+      bibleAudioInfo.textToSpeechLanguageCodeIos =
+          BibleInfo.textToSpeechLanguageCodeIos;
+      bibleAudioInfo.textToSpeechIdentifierIos =
+          BibleInfo.textToSpeechIdentifierIos;
+      bibleAudioInfo.isTextToSpeechAvailableAndroid =
+          BibleInfo.isTextToSpeechAvailableAndroid;
+      bibleAudioInfo.textToSpeechLanguageCodeAndroid =
+          BibleInfo.textToSpeechLanguageCodeAndroid;
+
       // Set audio info to data
       constantsData.bibleAudioInfo = bibleAudioInfo;
       constantsData.appAudioBasepath = BibleInfo.audioBasePath;
       constantsData.appAudioBasepathType = BibleInfo.audioBasePathType;
-      
+
+      // Set wallpaper and quotes IDs from constants
+      constantsData.wallpaperCatId = BibleInfo.wallpaperCatId;
+      constantsData.imageAppId = BibleInfo.imageAppId;
+
       // Set the data to model
       constantsModel.data = constantsData;
-      
+
       // Process the constants model
       await _processApiResponse(constantsModel);
 
@@ -277,7 +286,8 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         SharPreferences.setString('lifeTimePlan', BibleInfo.lifeTimePlanid),
       ]);
 
-      debugPrint('Initialized with constants successfully - Audio and Text-to-Speech data from constants');
+      debugPrint(
+          'Initialized with constants successfully - Audio and Text-to-Speech data from constants');
     } catch (e) {
       debugPrint('Error initializing with constants: $e');
       await _handleApiError(e);
@@ -353,11 +363,38 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
   }
 
   Future<void> _saveBasicPreferences(GetAudioModel value) async {
+    // Log actual IDs from API response for Geneva Bible app
+    final apiWallpaperId = value.data?.wallpaperCatId ?? '';
+    final apiImageId = value.data?.imageAppId ?? '';
+
+    // Always print to see what we're getting from API
+    debugPrint('═══════════════════════════════════════════════════════');
+    debugPrint('📱 API Response IDs for Geneva Bible App:');
+    debugPrint('   wallpaper_cat_id from API: "$apiWallpaperId"');
+    debugPrint('   image_app_id from API: "$apiImageId"');
+    debugPrint('   Current constants:');
+    debugPrint('   - BibleInfo.wallpaperCatId: "${BibleInfo.wallpaperCatId}"');
+    debugPrint('   - BibleInfo.imageAppId: "${BibleInfo.imageAppId}"');
+    if (apiWallpaperId.isEmpty && apiImageId.isEmpty) {
+      debugPrint('   ⚠️ WARNING: Both IDs are empty in API response!');
+    } else if (apiWallpaperId.isNotEmpty || apiImageId.isNotEmpty) {
+      debugPrint(
+          '   ✅ IDs received from API - will be saved to SharedPreferences');
+      debugPrint('   ⚠️ If these differ from constants, update constants.dart');
+    }
+    debugPrint('═══════════════════════════════════════════════════════');
+
     await Future.wait([
       SharPreferences.setString(
-          SharPreferences.wallpaperCatID, value.data?.wallpaperCatId ?? ''),
+          SharPreferences.wallpaperCatID,
+          value.data?.wallpaperCatId?.isNotEmpty == true
+              ? value.data!.wallpaperCatId!
+              : BibleInfo.wallpaperCatId),
       SharPreferences.setString(
-          SharPreferences.imageAppID, value.data?.imageAppId ?? ''),
+          SharPreferences.imageAppID,
+          value.data?.imageAppId?.isNotEmpty == true
+              ? value.data!.imageAppId!
+              : BibleInfo.imageAppId),
       SharPreferences.setString(
           SharPreferences.adPauseDiff, value.data?.adsDuration ?? ''),
     ]);

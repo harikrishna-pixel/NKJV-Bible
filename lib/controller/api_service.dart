@@ -147,7 +147,18 @@ Future<GetAudioModel?> getMusicDetails() async {
 
     if (response.statusCode == 200 && response.body.isNotEmpty) {
       var data = json.decode(utf8.decode(response.bodyBytes));
-      return GetAudioModel.fromJson(data);
+      final model = GetAudioModel.fromJson(data);
+
+      // Log wallpaper and image IDs from API response
+      final wallpaperId = model.data?.wallpaperCatId ?? '';
+      final imageId = model.data?.imageAppId ?? '';
+      debugPrint('═══════════════════════════════════════════════════════');
+      debugPrint('🌐 API getMusicDetails Response for Geneva Bible:');
+      debugPrint('   wallpaper_cat_id: "$wallpaperId"');
+      debugPrint('   image_app_id: "$imageId"');
+      debugPrint('═══════════════════════════════════════════════════════');
+
+      return model;
     } else {
       throw Exception('Failed to load Music');
     }
@@ -278,10 +289,22 @@ Future<List<CategoryModel>> getCategoryListing({required bool isQuotes}) async {
   var iosBundleId = BibleInfo.ios_Bundle_Id;
   var appVersion = BibleInfo.current_Version;
   try {
-    final id = await SharPreferences.getString(isQuotes
-            ? SharPreferences.imageAppID
-            : SharPreferences.wallpaperCatID) ??
-        '';
+    // Get ID from SharedPreferences, fallback to constants if not available
+    final idFromPrefs = await SharPreferences.getString(
+        isQuotes ? SharPreferences.imageAppID : SharPreferences.wallpaperCatID);
+
+    // Use constants as fallback when API data is not available
+    final id = idFromPrefs?.isNotEmpty == true
+        ? idFromPrefs!
+        : (isQuotes ? BibleInfo.imageAppId : BibleInfo.wallpaperCatId);
+
+    // If ID is still empty, return empty list instead of making API call
+    if (id.isEmpty) {
+      debugPrint(
+          '${isQuotes ? "Quotes" : "Wallpaper"} ID not available, returning empty list from constants');
+      return [];
+    }
+
     final resp = await http
         .post(Uri.parse(Api.categoryListing), headers: <String, String>{
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -297,13 +320,18 @@ Future<List<CategoryModel>> getCategoryListing({required bool isQuotes}) async {
         .toList();
   } catch (e) {
     DebugConsole.log("wallpaper/quotes err - $e");
-    if (e.toString().contains('host lookup')) {
-      throw 'Check your Internet connection';
+    // If API fails and we have constants, return empty list instead of throwing error
+    // This allows the UI to show empty state instead of error message
+    if (e.toString().contains('host lookup') ||
+        e.toString().contains('SocketException')) {
+      debugPrint(
+          '${isQuotes ? "Quotes" : "Wallpaper"} API failed - no internet, returning empty list from constants fallback');
+      return []; // Return empty list instead of throwing error
     }
-    // if (e.toString().contains('subtype')) {
-    //   throw 'No Internet Connection';
-    // }
-    rethrow;
+    // For other errors, also return empty list to prevent "Check your Internet connection" message
+    debugPrint(
+        '${isQuotes ? "Quotes" : "Wallpaper"} API error: $e, returning empty list from constants fallback');
+    return [];
   }
 }
 
@@ -399,12 +427,30 @@ Future<List<AppModel>> getMoreApps() async {
     return (data as List).map((e) => AppModel.fromJson(e)).toList();
   } catch (e) {
     DebugConsole.log("more apps err - $e");
-    if (e.toString().contains('host lookup')) {
-      // throw 'No Internet Connection';
-      // Don't show toast - connectivity is checked before calling this function
-      // Constants.showToast("No internet connection");
+    // If API fails, use fallback data from constants
+    if (e.toString().contains('host lookup') ||
+        e.toString().contains('SocketException') ||
+        e.toString().contains('TimeoutException') ||
+        e.toString().contains('Failed host lookup')) {
+      debugPrint('More Apps API failed - using fallback data from constants');
+      try {
+        // Get fallback app data from constants
+        final fallbackData = BibleInfo.getMoreAppsFallbackData();
+        return fallbackData.map((e) => AppModel.fromJson(e)).toList();
+      } catch (fallbackError) {
+        debugPrint('Error creating fallback apps: $fallbackError');
+        return []; // Return empty list if fallback also fails
+      }
     }
-    rethrow;
+    // For other errors, also try fallback
+    debugPrint('More Apps API error: $e - using fallback data from constants');
+    try {
+      final fallbackData = BibleInfo.getMoreAppsFallbackData();
+      return fallbackData.map((e) => AppModel.fromJson(e)).toList();
+    } catch (fallbackError) {
+      debugPrint('Error creating fallback apps: $fallbackError');
+      return []; // Return empty list if fallback also fails
+    }
   }
 }
 
@@ -469,7 +515,16 @@ Future<String> getTempToken() async {
     if (e.toString().contains('host lookup')) {
       throw 'No Internet Connection';
     }
-    throw 'Failed to get temp token: $e';
+    // Check for certificate/SSL/handshake errors and show user-friendly message
+    if (e.toString().contains('CERTIFICATE_VERIFY_FAILED') ||
+        e.toString().contains('Handshake') ||
+        e.toString().contains('certificate') ||
+        e.toString().contains('SSL')) {
+      debugPrint('getTempToken: Certificate/SSL error: $e');
+      throw 'Something went wrong. Please check your internet connection and try again.';
+    }
+    debugPrint('getTempToken: Error: $e');
+    throw 'Something went wrong. Please try again.';
   }
 }
 
@@ -523,7 +578,21 @@ Future<void> registerUser(
     if (e.toString().contains('host lookup')) {
       throw 'No Internet Connection';
     }
-    throw 'Failed to register: $e';
+    // Check for certificate/SSL/handshake errors and show user-friendly message
+    if (e.toString().contains('CERTIFICATE_VERIFY_FAILED') ||
+        e.toString().contains('Handshake') ||
+        e.toString().contains('certificate') ||
+        e.toString().contains('SSL') ||
+        e.toString().contains('Failed to get temp token')) {
+      debugPrint('registerUser: Certificate/SSL error or temp token error: $e');
+      throw 'Something went wrong. Please check your internet connection and try again.';
+    }
+    // If error message is already user-friendly (from getTempToken), use it
+    if (e.toString().contains('Something went wrong')) {
+      throw e.toString();
+    }
+    debugPrint('registerUser: Error: $e');
+    throw 'Something went wrong. Please try again.';
   }
 }
 
@@ -567,12 +636,26 @@ Future<UserModel> loginUser(
       //     selectedVerseForRead: ""));
       return UserModel.fromJson(data['data']['user'], data['data']['token']);
     } else {
-      throw data['message'] ?? 'Failed to register';
+      throw data['message'] ?? 'Failed to login';
     }
   } catch (e) {
     if (e.toString().contains('host lookup')) {
       throw 'No Internet Connection';
     }
-    throw 'Failed to register: $e';
+    // Check for certificate/SSL/handshake errors and show user-friendly message
+    if (e.toString().contains('CERTIFICATE_VERIFY_FAILED') ||
+        e.toString().contains('Handshake') ||
+        e.toString().contains('certificate') ||
+        e.toString().contains('SSL') ||
+        e.toString().contains('Failed to get temp token')) {
+      debugPrint('loginUser: Certificate/SSL error or temp token error: $e');
+      throw 'Something went wrong. Please check your internet connection and try again.';
+    }
+    // If error message is already user-friendly (from getTempToken), use it
+    if (e.toString().contains('Something went wrong')) {
+      throw e.toString();
+    }
+    debugPrint('loginUser: Error: $e');
+    throw 'Something went wrong. Please try again.';
   }
 }
