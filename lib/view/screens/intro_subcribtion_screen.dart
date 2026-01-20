@@ -69,6 +69,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       false; // Track if exit offer is currently being shown
   Timer?
       _loadingTimeoutTimer; // Timer to handle loader timeout when purchase sheet is closed
+  bool _hasIapEventSinceAction = false;
 
   void _sortProducts() {
     _products.sort((a, b) {
@@ -138,17 +139,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         });
         EasyLoading.show();
 
-        // Start timeout timer (2-3 seconds) to stop loader if purchase sheet is closed
+        // Start timeout timer (few seconds) to stop loader if purchase sheet is closed
+        // or if we never receive a purchase update (slow/weak network).
+        // IMPORTANT: Don't show toast here; toast should show ONLY when user cancels.
+        _hasIapEventSinceAction = false;
         _loadingTimeoutTimer?.cancel();
         _loadingTimeoutTimer = Timer(const Duration(seconds: 3), () {
-          // If loader is still showing after 3 seconds, dismiss it and show toast
-          // This handles the case when user closes purchase sheet (X button) on slow/weak network
-          if (mounted) {
+          // If no purchase updates came back, stop the spinner silently.
+          if (mounted && !_hasIapEventSinceAction) {
             EasyLoading.dismiss();
-            Constants.showToast(
-                "Purchase cancelled or network is slow. Please try again.");
             debugPrint(
-                'Loader timeout: Purchase sheet may have been closed or network is slow');
+                'IAP loader timeout: No purchase update received (sheet closed or network slow)');
           }
         });
 
@@ -854,15 +855,27 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       DashBoardController controller) {
     // ignore: avoid_function_literals_in_foreach_calls
     purchaseDetailsList.forEach((PurchaseDetails purchaseDetails) async {
+      // We got a purchase update; cancel any pending timeout.
+      _hasIapEventSinceAction = true;
+      _loadingTimeoutTimer?.cancel();
+
       debugPrint("Purchase State: ${purchaseDetails.status}");
       await SharPreferences.setString('OpenAd', '1');
       if (purchaseDetails.status == PurchaseStatus.pending) {
       } else {
+        // Show toast ONLY when user cancels the purchase sheet.
+        if (purchaseDetails.status == PurchaseStatus.canceled) {
+          debugPrint('Purchase cancelled by user');
+          EasyLoading.dismiss();
+          Constants.showToast('Purchase cancelled');
+          // Keep existing exit offer behavior on cancellation
+          await _checkAndShowExitOffer(controller);
+          return;
+        }
         if (purchaseDetails.status == PurchaseStatus.error) {
           debugPrint('Error: ${purchaseDetails.error}');
           DebugConsole.log(" purchases error - $purchaseDetails");
           // Cancel timeout timer and dismiss loader on error
-          _loadingTimeoutTimer?.cancel();
           EasyLoading.dismiss();
         } else if (purchaseDetails.status == PurchaseStatus.purchased ||
             purchaseDetails.status == PurchaseStatus.restored) {
@@ -1496,16 +1509,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     // });
     EasyLoading.show(status: "Restoring...");
 
-    // Start timeout timer (2-3 seconds) to stop loader if restore takes too long on slow network
+    // Start timeout timer (few seconds) to stop loader if we never receive a purchase update.
+    // IMPORTANT: Don't show toast here; toast should show ONLY when user cancels.
+    _hasIapEventSinceAction = false;
     _loadingTimeoutTimer?.cancel();
     _loadingTimeoutTimer = Timer(const Duration(seconds: 3), () {
-      // If loader is still showing after 3 seconds, dismiss it and show toast
-      // This handles the case when network is slow or weak
-      if (mounted) {
+      // If no purchase updates came back, stop the spinner silently.
+      if (mounted && !_hasIapEventSinceAction) {
         EasyLoading.dismiss();
-        Constants.showToast(
-            "Restore is taking longer than expected. Please check your network connection.");
-        debugPrint('Restore loader timeout: Network may be slow or weak');
+        debugPrint('Restore loader timeout: No purchase update received');
       }
     });
 
