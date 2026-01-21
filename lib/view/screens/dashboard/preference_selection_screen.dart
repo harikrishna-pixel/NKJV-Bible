@@ -562,7 +562,8 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                             border: Border.all(
                               // Border stroke color: yellow when selected in dark mode, otherwise use default colors
                               color: selected && isDark
-                                  ? Colors.yellow // Yellow border for selected topics in dark mode
+                                  ? Colors
+                                      .yellow // Yellow border for selected topics in dark mode
                                   : (isDark
                                       ? Colors.grey.shade400
                                       : const Color(0xFF805531)),
@@ -634,12 +635,14 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                             debugPrint("dailyVersesnew 1");
                             if (widget.isSetting == true) {
                               debugPrint("dailyVersesnew 2");
+                              if (!mounted) return;
                               setState(() {
                                 isLoading = true;
                               });
                               _savePreferences();
                               await Future.delayed(Duration(seconds: 1));
                               Constants.showToast("Saved successfully");
+                              if (!mounted) return;
                               setState(() {
                                 isLoading = false;
                               });
@@ -658,6 +661,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                             } else {
                               if (widget.selectedbible != null &&
                                   widget.selectedbible!.isNotEmpty) {
+                                if (!mounted) return;
                                 setState(() {
                                   isLoading = true;
                                 });
@@ -665,7 +669,8 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                                   context,
                                   onContinue: () {
                                     // Show success dialog when user taps Continue
-                                    FaithJourneyDialog.showSuccessDialog(context,
+                                    FaithJourneyDialog.showSuccessDialog(
+                                        context,
                                         isFromOnboarding: !widget.isSetting);
                                   },
                                 );
@@ -717,6 +722,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                                   });
                                   await deleteFiles(BibleInfo.folders.first);
                                   await Future.delayed(Duration(seconds: 2));
+                                  if (!mounted) return;
                                   setState(() {
                                     isLoading = false;
                                   });
@@ -762,6 +768,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                                   });
                                   await deleteFiles(widget.selectedbible);
                                   await Future.delayed(Duration(seconds: 2));
+                                  if (!mounted) return;
                                   setState(() {
                                     isLoading = false;
                                   });
@@ -1108,7 +1115,8 @@ Future<List<VerseBookContentModel>> _parseVerseContent(
 
 class FaithJourneyDialog {
   /// Show Loading Dialog
-  static Future<void> showLoadingDialog(BuildContext context, {VoidCallback? onContinue}) async {
+  static Future<void> showLoadingDialog(BuildContext context,
+      {VoidCallback? onContinue}) async {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1482,12 +1490,12 @@ class _AnimatedJourneyDialogState extends State<_AnimatedJourneyDialog>
             _completedSteps = i + 1;
           });
           _stepControllers[i].forward();
-          
+
           // Start progress animation after first step
           if (i == 0) {
             _progressController.forward();
           }
-          
+
           // Complete progress and show button after last step
           if (i == _steps.length - 1) {
             Future.delayed(const Duration(milliseconds: 300), () {
@@ -1516,7 +1524,7 @@ class _AnimatedJourneyDialogState extends State<_AnimatedJourneyDialog>
 
   Widget _buildStep(String text, int index) {
     final isCompleted = index < _completedSteps;
-    
+
     return Padding(
       padding: EdgeInsets.symmetric(
         vertical: MediaQuery.of(context).size.width > 600 ? 10 : 8,
@@ -1630,7 +1638,8 @@ class _AnimatedJourneyDialogState extends State<_AnimatedJourneyDialog>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ...List.generate(_steps.length, (index) => _buildStep(_steps[index], index)),
+                  ...List.generate(_steps.length,
+                      (index) => _buildStep(_steps[index], index)),
                   const SizedBox(height: 10),
                   AnimatedBuilder(
                     animation: _progressAnimation,

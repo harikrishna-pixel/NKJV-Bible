@@ -28,7 +28,7 @@ class LoginScreen extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final loginState = ref.watch(loginBloc);
     double screenWidth = MediaQuery.of(context).size.width;
-    
+
     // Check and clear fields if account was deleted
     useMemoized(() {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -37,11 +37,11 @@ class LoginScreen extends HookConsumerWidget {
     });
     // debugPrint("sz current width - $screenWidth ");
     return Scaffold(
-        resizeToAvoidBottomInset: false,
-        body: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => FocusScope.of(context).unfocus(),
-          child: Container(
+      resizeToAvoidBottomInset: false,
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Container(
           height: MediaQuery.of(context).size.height,
           width: MediaQuery.of(context).size.width,
           decoration:
@@ -261,8 +261,38 @@ class LoginScreen extends HookConsumerWidget {
                     ],
                   ),
                 ),
-              )
-              )],
+              )),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 120.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    GestureDetector(
+                      onTap: () {
+                        Get.to(() => SignupScreen());
+                      },
+                      child: Text(
+                        '   Note:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: screenWidth > 450 ? 25 : null,
+                          color: CommanColor.whiteBlack(context),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'No login is needed to remove ads or restore purchases',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: CommanColor.whiteBlack(context),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),

@@ -45,6 +45,90 @@ class _WalletScreenState extends State<WalletScreen> {
   Map<String, Timer> _purchaseTimeouts =
       {}; // Track timeout timers for each product
 
+  // Prevent double-crediting the same purchase/restore event
+  static const String _processedWalletPurchaseKey = 'wallet_processed_purchases';
+
+  Future<bool> _markPurchaseProcessedOnce(PurchaseDetails details) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final List<String> processed =
+          prefs.getStringList(_processedWalletPurchaseKey) ?? <String>[];
+
+      // Build a stable-ish key. purchaseID can be null, so fall back safely.
+      final String key = (details.purchaseID != null &&
+              details.purchaseID!.toString().trim().isNotEmpty)
+          ? 'pid:${details.purchaseID}'
+          : (details.transactionDate != null &&
+                  details.transactionDate!.toString().trim().isNotEmpty)
+              ? 'tx:${details.productID}:${details.transactionDate}'
+              : 'vd:${details.productID}:${details.verificationData.serverVerificationData.hashCode}';
+
+      if (processed.contains(key)) return false;
+      processed.add(key);
+
+      // Keep list from growing forever
+      if (processed.length > 100) {
+        processed.removeRange(0, processed.length - 100);
+      }
+
+      await prefs.setStringList(_processedWalletPurchaseKey, processed);
+      return true;
+    } catch (e) {
+      debugPrint('WalletScreen: Error saving processed purchase key: $e');
+      // If we can't persist, allow processing (better to credit than miss)
+      return true;
+    }
+  }
+
+  int _creditsForProductId(String productId) {
+    // Fallback credits if pack mapping isn't available (should rarely happen).
+    if (productId == BibleInfo.coinPack1Id) return 100;
+    if (productId == BibleInfo.coinPack2Id) return 500;
+    if (productId == BibleInfo.coinPack3Id) return 1000;
+    return 0;
+  }
+
+  Future<void> _grantCreditsForPurchase(PurchaseDetails purchaseDetails) async {
+    try {
+      // Ensure we don't credit twice for the same purchase/restore event.
+      final shouldProcess = await _markPurchaseProcessedOnce(purchaseDetails);
+      if (!shouldProcess) {
+        debugPrint(
+            'WalletScreen: Purchase already processed, skipping credit grant for ${purchaseDetails.productID}');
+        return;
+      }
+
+      int credits = 0;
+      try {
+        final pack = _coinPacks.firstWhere(
+          (p) => p['identifier'] == purchaseDetails.productID,
+        );
+        credits = int.tryParse(pack['credits']?.toString() ?? '0') ?? 0;
+      } catch (_) {
+        credits = _creditsForProductId(purchaseDetails.productID);
+      }
+
+      if (credits <= 0) {
+        debugPrint(
+            'WalletScreen: Could not determine credits for ${purchaseDetails.productID}');
+        return;
+      }
+
+      await WalletService.addCredits(credits);
+
+      // Update cached instance immediately for instant display
+      if (_cachedPrefs != null) {
+        final newBalance = await WalletService.getCredits();
+        await _cachedPrefs!.setInt('user_wallet_credits', newBalance);
+      }
+
+      await _loadCredits();
+      Constants.showToast('Successfully added $credits credits!');
+    } catch (e) {
+      debugPrint('WalletScreen: Error granting credits: $e');
+    }
+  }
+
   // Rewarded Ad
   RewardedAd? _rewardedAd;
   bool _isRewardedAdLoaded = false;
@@ -434,27 +518,12 @@ class _WalletScreenState extends State<WalletScreen> {
       final productId = purchaseDetails.productID;
 
       if (purchaseDetails.status == PurchaseStatus.purchased) {
-        // Find which coin pack was purchased
-        try {
-          final pack = _coinPacks.firstWhere(
-            (p) => p['identifier'] == purchaseDetails.productID,
-          );
-
-          final credits = int.tryParse(pack['credits']?.toString() ?? '0') ?? 0;
-          await WalletService.addCredits(credits);
-          // Update cached instance immediately for instant display
-          if (_cachedPrefs != null) {
-            final newBalance = await WalletService.getCredits();
-            await _cachedPrefs!.setInt('user_wallet_credits', newBalance);
-          }
-          await _loadCredits();
-          Constants.showToast('Successfully added $credits credits!');
-        } catch (e) {
-          debugPrint('Error processing purchase: $e');
-        }
+        await _grantCreditsForPurchase(purchaseDetails);
 
         // Complete the purchase (important for consumables)
-        await _inAppPurchase.completePurchase(purchaseDetails);
+        if (purchaseDetails.pendingCompletePurchase) {
+          await _inAppPurchase.completePurchase(purchaseDetails);
+        }
 
         if (mounted && _loadingProductId == productId) {
           setState(() {
@@ -480,7 +549,8 @@ class _WalletScreenState extends State<WalletScreen> {
         // Purchase is pending, keep loading state
         debugPrint('Purchase pending...');
       } else if (purchaseDetails.status == PurchaseStatus.restored) {
-        // Handle restored purchases - clear loading state
+        // Some stores report "already owned" as restored; grant credits once and clear loading.
+        await _grantCreditsForPurchase(purchaseDetails);
         if (mounted && _loadingProductId == productId) {
           setState(() {
             _loadingProductId = null;
