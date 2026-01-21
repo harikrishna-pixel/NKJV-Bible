@@ -538,7 +538,16 @@ class DownloadProvider with ChangeNotifier {
     final clickcountcachefn =
         await SharPreferences.getInt('downloadrewardcount');
 
-    if (clickcountcachefn != null) {
+    // Initialize downloadreward to true if it's null (first time)
+    if (checkDownload == null) {
+      await SharPreferences.setBoolean("downloadreward", true);
+    }
+
+    // Initialize downloadrewardcount to 0 if it's null (first time)
+    if (clickcountcachefn == null) {
+      clickCount = 0;
+      await SharPreferences.setInt("downloadrewardcount", clickCount);
+    } else {
       clickCount = clickcountcachefn;
     }
 
@@ -556,7 +565,7 @@ class DownloadProvider with ChangeNotifier {
           await setDownloadReward();
           // showLimitDialog(context);
           return true;
-        } else if (!checkDownload!) {
+        } else if (checkDownload == false) {
           // If count is already 4 or more, show popup even if reward not watched
           if (clickCount >= 4) {
             await setDownloadReward();

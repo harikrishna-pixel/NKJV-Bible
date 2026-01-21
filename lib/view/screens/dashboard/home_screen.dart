@@ -41,6 +41,8 @@ import 'package:biblebookapp/view/screens/profile/view/profile_screen.dart';
 import 'package:biblebookapp/view/screens/quote_screen/quote_screen.dart';
 import 'package:biblebookapp/view/screens/wallpaper_screen/wallpaper_screen.dart';
 import 'package:biblebookapp/view/screens/chat/chat_screen.dart';
+import 'package:biblebookapp/view/screens/chat/prayer_guidance_screen.dart';
+import 'package:popover/popover.dart';
 
 import 'package:biblebookapp/view/widget/verse_item_widget.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -101,6 +103,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen>
     with WidgetsBindingObserver, RouteAware {
+  bool isOpenChat = false;
 //   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
 //   final ValueNotifier<int> _rating = ValueNotifier<int>(0);
@@ -361,6 +364,105 @@ class _HomeScreenState extends State<HomeScreen>
         }
       }
     }
+  }
+
+  void _showChatEntryPopover(BuildContext buttonContext) {
+    showPopover(
+      context: buttonContext,
+      direction: PopoverDirection.right,
+      transitionDuration: const Duration(milliseconds: 250),
+      bodyBuilder: (context) {
+        return Container(
+          color: CommanColor.whiteLightModePrimary(context),
+          padding: const EdgeInsets.symmetric(vertical: 0),
+          child: Center(
+            child: ListView(
+              physics: const NeverScrollableScrollPhysics(),
+              shrinkWrap: true,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      Get.to(ChatScreen());
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12.0, vertical: 5),
+                    child: Row(
+                      children: [
+                        Image.asset(
+                          CommanColor.isDarkTheme(context)
+                              ? "assets/dark_modes/new-dark_chat.png"
+                              : "assets/Chat white.png",
+                          height: 22,
+                          width: 22,
+                          color: CommanColor.darkModePrimaryWhite(context),
+                        ),
+                        const SizedBox(width: 17),
+                        Text(
+                          "Chat",
+                          style: CommanStyle.pw14500(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Divider(
+                  color: CommanColor.darkModePrimaryWhite(context),
+                  thickness: 1.2,
+                ),
+                GestureDetector(
+                  onTap: () {
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      Get.to(const PrayerGuidanceScreen());
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12.0, vertical: 5),
+                    child: Row(
+                      children: [
+                        Image.asset(
+                          "assets/guidance.png",
+                          height: 26,
+                          width: 26,
+                          color: CommanColor.darkModePrimaryWhite(context),
+                        ),
+                        const SizedBox(width: 15),
+                        Text(
+                          "Prayer Guidance",
+                          style: CommanStyle.pw14500(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      width: 180,
+      height: 100,
+      arrowDyOffset: -20,
+      barrierColor: Colors.transparent,
+      backgroundColor:
+          Provider.of<ThemeProvider>(context, listen: false).themeMode ==
+                  ThemeMode.dark
+              ? Colors.white
+              : CommanColor.lightModePrimary,
+      arrowWidth: 24,
+    ).then((value) {
+      if (mounted) {
+        setState(() {
+          isOpenChat = false;
+        });
+      }
+    });
   }
 
 //   authObserver(User? user) async {
@@ -4403,9 +4505,23 @@ class _HomeScreenState extends State<HomeScreen>
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       if (BibleInfo.chat == 1)
-                        GestureDetector(
+                        Builder(
+                          builder: (buttonContext) => GestureDetector(
                             onTap: () {
-                              Get.to(ChatScreen());
+                              if (isOpenChat) {
+                                // Close the popover by popping the navigator
+                                if (Navigator.of(buttonContext, rootNavigator: false).canPop()) {
+                                  Navigator.of(buttonContext, rootNavigator: false).pop();
+                                }
+                                setState(() {
+                                  isOpenChat = false;
+                                });
+                              } else {
+                                setState(() {
+                                  isOpenChat = true;
+                                });
+                                _showChatEntryPopover(buttonContext);
+                              }
                             },
                             child: Padding(
                               padding: EdgeInsets.symmetric(
@@ -4432,23 +4548,32 @@ class _HomeScreenState extends State<HomeScreen>
                                     shape: BoxShape.circle,
                                   ),
                                   child: Center(
-                                    child: Image.asset(
-                                      CommanColor.isDarkTheme(context)
-                                          ? "assets/dark_modes/new-dark_chat.png"
-                                          : "assets/Chat white.png",
-                                      width: screenWidth > 600
-                                          ? 26
-                                          : screenWidth > 450
-                                              ? 24
-                                              : 22,
-                                      height: screenWidth > 600
-                                          ? 26
-                                          : screenWidth > 450
-                                              ? 24
-                                              : 22,
-                                    ),
+                                    child: isOpenChat
+                                        ? Icon(
+                                            Icons.close,
+                                            color: CommanColor
+                                                .darkModePrimaryWhite(context),
+                                            size: screenWidth > 450 ? 22 : 18,
+                                          )
+                                        : Image.asset(
+                                            CommanColor.isDarkTheme(context)
+                                                ? "assets/dark_modes/new-dark_chat.png"
+                                                : "assets/Chat white.png",
+                                            width: screenWidth > 600
+                                                ? 26
+                                                : screenWidth > 450
+                                                    ? 24
+                                                    : 22,
+                                            height: screenWidth > 600
+                                                ? 26
+                                                : screenWidth > 450
+                                                    ? 24
+                                                    : 22,
+                                          ),
                                   )),
-                            ))
+                            ),
+                          ),
+                        )
                       else
                         SizedBox(
                           width: screenWidth > 600
