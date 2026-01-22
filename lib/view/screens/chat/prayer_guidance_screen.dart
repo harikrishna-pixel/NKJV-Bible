@@ -98,24 +98,25 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
     try {
       final url = Uri.parse(_baseUrl);
 
-      // Answer length instruction (same as ChatScreen idea)
+      // Answer length instruction (same as ChatScreen)
       final answerLength = await WalletService.getAnswerLength();
       String answerLengthInstruction = '';
       switch (answerLength) {
         case 'small':
           answerLengthInstruction =
-              'IMPORTANT: Provide a SHORT and concise answer. Keep your response brief (2-3 sentences maximum).';
+              'IMPORTANT: Provide a SHORT and concise answer. Keep your response brief (2-3 sentences maximum). Be direct and to the point.';
           break;
         case 'medium':
           answerLengthInstruction =
-              'IMPORTANT: Provide a MEDIUM-length answer (4-6 sentences).';
+              'IMPORTANT: Provide a MEDIUM-length answer. Give a balanced response with some context and explanation (4-6 sentences). Include relevant details but stay focused.';
           break;
         case 'large':
           answerLengthInstruction =
-              'IMPORTANT: Provide a FULL and comprehensive answer (8+ sentences).';
+              'IMPORTANT: Provide a FULL and comprehensive answer. Give a detailed response with thorough context, explanations, and relevant information (8+ sentences). Include historical context, theological meanings, and practical applications when relevant.';
           break;
         default:
-          answerLengthInstruction = 'Provide an appropriate answer.';
+          answerLengthInstruction =
+              'Provide an appropriate answer based on the question.';
       }
 
       final prompt = '''
@@ -229,24 +230,25 @@ ${category.prompt}
     try {
       final url = Uri.parse(_baseUrl);
 
-      // Answer length instruction (same as ChatScreen idea)
+      // Answer length instruction (same as ChatScreen)
       final answerLength = await WalletService.getAnswerLength();
       String answerLengthInstruction = '';
       switch (answerLength) {
         case 'small':
           answerLengthInstruction =
-              'IMPORTANT: Provide a SHORT and concise answer. Keep your response brief (2-3 sentences maximum).';
+              'IMPORTANT: Provide a SHORT and concise answer. Keep your response brief (2-3 sentences maximum). Be direct and to the point.';
           break;
         case 'medium':
           answerLengthInstruction =
-              'IMPORTANT: Provide a MEDIUM-length answer (4-6 sentences).';
+              'IMPORTANT: Provide a MEDIUM-length answer. Give a balanced response with some context and explanation (4-6 sentences). Include relevant details but stay focused.';
           break;
         case 'large':
           answerLengthInstruction =
-              'IMPORTANT: Provide a FULL and comprehensive answer (8+ sentences).';
+              'IMPORTANT: Provide a FULL and comprehensive answer. Give a detailed response with thorough context, explanations, and relevant information (8+ sentences). Include historical context, theological meanings, and practical applications when relevant.';
           break;
         default:
-          answerLengthInstruction = 'Provide an appropriate answer.';
+          answerLengthInstruction =
+              'Provide an appropriate answer based on the question.';
       }
 
       final prompt = '''
@@ -477,15 +479,6 @@ Include 1-2 Geneva Bible verse references that relate to the request.
                         ),
                       ),
                     ),
-                    IconButton(
-                      onPressed: () => _showCustomPrayerDialog(context),
-                      icon: Icon(
-                        Icons.edit_note,
-                        color: CommanColor.whiteBlack(context),
-                        size: 24,
-                      ),
-                      tooltip: 'Custom Prayer Request',
-                    ),
                   ],
                 ),
               ),
@@ -530,12 +523,80 @@ Include 1-2 Geneva Bible verse references that relate to the request.
                                 mainAxisSpacing: size.width > 450 ? 16 : 12,
                                 childAspectRatio: size.width > 450 ? 1.4 : 1.3,
                               ),
-                              itemCount: _categories.length,
+                              itemCount: _categories.length + 1,
                               itemBuilder: (context, index) {
+                                // Check if this is the Custom Prayer card (first item)
+                                if (index == 0) {
+                                  // Custom Prayer card
+                                  final paperColor = isDark
+                                      ? const Color(0xFF8B6F47)
+                                      : const Color(0xFFD4A574);
+
+                                  return InkWell(
+                                    onTap: () {
+                                      _showCustomPrayerDialog(context);
+                                    },
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Container(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: size.width > 450 ? 16 : 12,
+                                        vertical: size.width > 450 ? 24 : 20,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: paperColor,
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: isDark
+                                              ? const Color(0xFF6B5638)
+                                              : const Color(0xFFB8956A),
+                                          width: 1.5,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color:
+                                                Colors.black.withOpacity(0.15),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 3),
+                                            spreadRadius: 0,
+                                          ),
+                                        ],
+                                      ),
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.edit_note,
+                                            size: size.width > 450 ? 32 : 28,
+                                            color: isDark
+                                                ? Colors.white
+                                                : const Color(0xFF5C4033),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Custom Prayer',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize:
+                                                  size.width > 450 ? 17 : 15,
+                                              color: isDark
+                                                  ? Colors.white
+                                                  : const Color(0xFF5C4033),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                // Regular category cards (adjust index since Custom Prayer is at 0)
+                                final categoryIndex = index - 1;
                                 // Get icon for each category
                                 IconData categoryIcon;
 
-                                switch (index % 8) {
+                                switch (categoryIndex % 8) {
                                   case 0: // Thanksgiving
                                     categoryIcon = Icons.celebration;
                                     break;
@@ -569,7 +630,7 @@ Include 1-2 Geneva Bible verse references that relate to the request.
 
                                 return InkWell(
                                   onTap: () {
-                                    _sendPrayerRequest(index);
+                                    _sendPrayerRequest(categoryIndex);
                                   },
                                   borderRadius: BorderRadius.circular(20),
                                   child: Container(
@@ -608,7 +669,7 @@ Include 1-2 Geneva Bible verse references that relate to the request.
                                         ),
                                         const SizedBox(height: 8),
                                         Text(
-                                          _categories[index].title,
+                                          _categories[categoryIndex].title,
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
                                             fontWeight: FontWeight.w700,
