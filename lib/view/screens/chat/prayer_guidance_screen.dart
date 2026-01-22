@@ -1,9 +1,11 @@
 import 'dart:convert';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/images.dart';
+import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -26,6 +28,15 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
   final List<_GuidanceMessage> _messages = [];
   bool _isLoading = false;
   final TextEditingController _customPrayerController = TextEditingController();
+
+  // Audio player for background music
+  late AudioPlayer _audioPlayer;
+  bool _isAudioPlaying = false;
+  bool _isAudioMuted = false;
+
+  // Background music URL - replace with your meditation/prayer music URL
+  static const String _backgroundMusicUrl =
+      'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'; // Placeholder - replace with actual music URL
 
   final List<_GuidanceCategory> _categories = const [
     _GuidanceCategory(
@@ -200,6 +211,31 @@ ${category.prompt}
     );
   }
 
+  Future<void> _showRotatingAmenMessage() async {
+    // Rotating AMEN messages
+    final amenMessages = [
+      "Your prayer has been heard.",
+      "May your heart feel lighter.",
+      "Grace covers every word spoken.",
+    ];
+
+    // Get current message index
+    final messageIndex =
+        await SharPreferences.getInt(SharPreferences.prayerAmenMessageIndex) ??
+            0;
+
+    // Get the message for this tap
+    final message = amenMessages[messageIndex % amenMessages.length];
+
+    // Show toast
+    Constants.showToast(message, 3000);
+
+    // Rotate to next message index for next tap
+    final nextIndex = (messageIndex + 1) % amenMessages.length;
+    await SharPreferences.setInt(
+        SharPreferences.prayerAmenMessageIndex, nextIndex);
+  }
+
   Future<void> _sendCustomPrayerRequest(String customRequest) async {
     if (_isLoading) return;
     if (customRequest.trim().isEmpty) {
@@ -309,6 +345,8 @@ Include 1-2 Geneva Bible verse references that relate to the request.
               responseText.toLowerCase().startsWith('error:');
       if (!isErrorResponse) {
         await WalletService.deductCredits(chatCost);
+        // Play background music when prayer is generated
+        await _playBackgroundMusic();
       }
 
       _scrollToTop();
@@ -434,10 +472,89 @@ Include 1-2 Geneva Bible verse references that relate to the request.
   }
 
   @override
+  void initState() {
+    super.initState();
+    _audioPlayer = AudioPlayer();
+    _audioPlayer.setReleaseMode(ReleaseMode.loop);
+
+    // Listen to player state changes
+    _audioPlayer.onPlayerStateChanged.listen((state) {
+      if (mounted) {
+        setState(() {
+          _isAudioPlaying = state == PlayerState.playing;
+        });
+      }
+    });
+  }
+
+  @override
   void dispose() {
+    _audioPlayer.stop();
+    _audioPlayer.dispose();
     _customPrayerController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _playBackgroundMusic() async {
+    // Only play music when there are messages (responses displayed)
+    if (_messages.isEmpty || _isAudioMuted) return;
+
+    try {
+      // Get current player state
+      final currentState = _audioPlayer.state;
+
+      // If already playing, don't restart
+      if (currentState == PlayerState.playing) {
+        return;
+      }
+
+      // Stop any existing playback first
+      if (currentState != PlayerState.stopped) {
+        await _audioPlayer.stop();
+      }
+
+      // Set the source URL
+      await _audioPlayer.setSourceUrl(_backgroundMusicUrl);
+
+      // Wait a moment for the source to be ready
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      // Seek to beginning to ensure it starts from the start
+      await _audioPlayer.seek(Duration.zero);
+
+      // Resume/play the audio - this should work after setSourceUrl
+      await _audioPlayer.resume();
+
+      // State will be updated by the onPlayerStateChanged listener
+    } catch (e) {
+      debugPrint('Error playing background music: $e');
+      if (mounted) {
+        setState(() {
+          _isAudioPlaying = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _toggleAudio() async {
+    if (_isAudioMuted) {
+      // Unmute - resume playing if it was playing
+      _isAudioMuted = false;
+      if (_isAudioPlaying) {
+        await _audioPlayer.resume();
+      } else {
+        await _playBackgroundMusic();
+      }
+    } else {
+      // Mute - pause the audio
+      _isAudioMuted = true;
+      await _audioPlayer.pause();
+    }
+
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -479,6 +596,23 @@ Include 1-2 Geneva Bible verse references that relate to the request.
                         ),
                       ),
                     ),
+                    // Audio ON/OFF toggle button - only show when responses are displayed
+                    if (_messages.isNotEmpty)
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.grey.withOpacity(0.2),
+                        ),
+                        child: IconButton(
+                          onPressed: _toggleAudio,
+                          icon: Icon(
+                            _isAudioMuted ? Icons.volume_off : Icons.music_note,
+                            color: CommanColor.whiteBlack(context),
+                            size: 22,
+                          ),
+                          tooltip: _isAudioMuted ? 'Audio Off' : 'Audio On',
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -770,7 +904,7 @@ Include 1-2 Geneva Bible verse references that relate to the request.
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
-                        Constants.showToast("AMEN", 3000);
+                        _showRotatingAmenMessage();
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: isDark

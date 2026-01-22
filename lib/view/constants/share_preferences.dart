@@ -55,6 +55,10 @@ class SharPreferences {
 
   static const lastInterstitialRewardedAdPlayedTime =
       'lastInterstitialRewardedAdPlayedTime';
+  static const dailyWelcomeLastShownDate = 'dailyWelcomeLastShownDate';
+  static const dailyWelcomeMessageIndex = 'dailyWelcomeMessageIndex';
+  static const prayerAmenMessageIndex = 'prayerAmenMessageIndex';
+  static const verseOfDayAmenMessageIndex = 'verseOfDayAmenMessageIndex';
 
   static Future<bool?> getBoolean(String key) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();

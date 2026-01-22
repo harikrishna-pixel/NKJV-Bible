@@ -2456,13 +2456,21 @@ class floatingButtonState extends State<floatingButton>
                         Set<String> seenDisplayNames =
                             {}; // Track display names to prevent duplicates
 
+                        // Allowed voice names (case-insensitive)
+                        final allowedVoiceNames = ['Rishi', 'Daniel', 'Karen', 'Samantha'];
+                        
                         for (var voice in snapshot.data!) {
                           // Get the display name that will be shown to users
                           String displayName = _getVoiceDisplayName(voice);
+                          String displayNameLower = displayName.toLowerCase();
 
-                          // Only add if we haven't seen this display name before
-                          // This ensures users don't see duplicate narrator names
-                          if (!seenDisplayNames.contains(displayName)) {
+                          // Only include voices with allowed names (check if display name contains any allowed name)
+                          bool isAllowedVoice = allowedVoiceNames.any(
+                            (allowedName) => displayNameLower.contains(allowedName.toLowerCase())
+                          );
+
+                          // Only add if it's an allowed voice and we haven't seen this display name before
+                          if (isAllowedVoice && !seenDisplayNames.contains(displayName)) {
                             seenDisplayNames.add(displayName);
                             uniqueVoices.add(voice);
                           }

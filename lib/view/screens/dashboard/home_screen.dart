@@ -1108,6 +1108,7 @@ class _HomeScreenState extends State<HomeScreen>
 //  await _checkAndShowVerse();
       await _handleAppLaunchCount();
       await checkUserLoggedIn();
+      await _checkAndShowDailyWelcomeToast();
     });
 
     // _initializeAds();
@@ -1159,6 +1160,79 @@ class _HomeScreenState extends State<HomeScreen>
         });
       }
     }
+  }
+
+  Future<void> _checkAndShowDailyWelcomeToast() async {
+    if (!mounted) return;
+
+    // Only show on Reading screen (From == "Read")
+    if (widget.From != "Read") return;
+
+    final today = DateTime.now();
+    final todayKey = today.toIso8601String().split('T')[0]; // YYYY-MM-DD format
+
+    // Get last shown date
+    final lastShownDate = await SharPreferences.getString(
+        SharPreferences.dailyWelcomeLastShownDate);
+
+    // Check if it's a new day
+    if (lastShownDate != todayKey) {
+      // Get current message index (0-3)
+      final messageIndex = await SharPreferences.getInt(
+              SharPreferences.dailyWelcomeMessageIndex) ??
+          0;
+
+      // Daily rotating welcome messages
+      final welcomeMessages = [
+        "Welcome back. God's Word is always with you.",
+        "Take a moment. Let God's Word speak to you.",
+        "Grace and peace as you read today.",
+        "You're never alone. God's Word is here.",
+      ];
+
+      // Get the message for today
+      final message = welcomeMessages[messageIndex % welcomeMessages.length];
+
+      // Show toast after a small delay to ensure screen is fully loaded
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          Constants.showToast(message, 3000);
+        }
+      });
+
+      // Update last shown date
+      await SharPreferences.setString(
+          SharPreferences.dailyWelcomeLastShownDate, todayKey);
+
+      // Rotate to next message index for tomorrow
+      final nextIndex = (messageIndex + 1) % welcomeMessages.length;
+      await SharPreferences.setInt(
+          SharPreferences.dailyWelcomeMessageIndex, nextIndex);
+    }
+  }
+
+  Future<void> _showRotatingVerseAmenMessage() async {
+    // Rotating Verse of the Day Amen messages
+    final amenMessages = [
+      "Let this verse stay with you today.",
+      "Carry this word into your day.",
+    ];
+
+    // Get current message index
+    final messageIndex = await SharPreferences.getInt(
+            SharPreferences.verseOfDayAmenMessageIndex) ??
+        0;
+
+    // Get the message for this tap
+    final message = amenMessages[messageIndex % amenMessages.length];
+
+    // Show toast
+    Constants.showToast(message, 3000);
+
+    // Rotate to next message index for next tap
+    final nextIndex = (messageIndex + 1) % amenMessages.length;
+    await SharPreferences.setInt(
+        SharPreferences.verseOfDayAmenMessageIndex, nextIndex);
   }
 
   // void _initializeAds() {
@@ -1813,7 +1887,7 @@ class _HomeScreenState extends State<HomeScreen>
           }
 
           // Proceed with action after ad (if shown) or immediately (if skipped)
-          Constants.showToast("Amen!");
+          await _showRotatingVerseAmenMessage();
 
           // Add a small delay after ad dismissal to ensure UI is ready before closing
           // This prevents white screen issue when ad is dismissed
