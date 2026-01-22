@@ -403,7 +403,7 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
                         const SizedBox(width: 17),
                         Text(
-                          "Chat",
+                          "Ask Anything",
                           style: CommanStyle.pw14500(context),
                         ),
                       ],
@@ -427,7 +427,7 @@ class _HomeScreenState extends State<HomeScreen>
                     child: Row(
                       children: [
                         Image.asset(
-                          "assets/guidance.png",
+                          "assets/dove.png",
                           height: 26,
                           width: 26,
                           color: CommanColor.darkModePrimaryWhite(context),
@@ -1814,16 +1814,16 @@ class _HomeScreenState extends State<HomeScreen>
 
           // Proceed with action after ad (if shown) or immediately (if skipped)
           Constants.showToast("Amen!");
-          
+
           // Add a small delay after ad dismissal to ensure UI is ready before closing
           // This prevents white screen issue when ad is dismissed
           await Future.delayed(const Duration(milliseconds: 500));
-          
+
           // Check if bottom sheet is still open and context is valid
           if (!_isBottomSheetOpen) {
             return; // Bottom sheet already closed
           }
-          
+
           // Check if context is still valid before closing bottom sheet
           if (mounted) {
             // Try using the stored bottom sheet context first (more reliable)
@@ -1837,17 +1837,18 @@ class _HomeScreenState extends State<HomeScreen>
                   return;
                 }
               } catch (e) {
-                debugPrint('Error closing bottom sheet with stored context: $e');
+                debugPrint(
+                    'Error closing bottom sheet with stored context: $e');
                 _bottomSheetContext = null;
               }
             }
-            
+
             // Fallback: try using the current context
             if (context.mounted) {
               final route = ModalRoute.of(context);
               if (route != null && route.isCurrent) {
                 try {
-          Navigator.of(context).pop();
+                  Navigator.of(context).pop();
                   _isBottomSheetOpen = false;
                 } catch (e) {
                   debugPrint('Error closing bottom sheet after Amen: $e');
@@ -4510,8 +4511,12 @@ class _HomeScreenState extends State<HomeScreen>
                             onTap: () {
                               if (isOpenChat) {
                                 // Close the popover by popping the navigator
-                                if (Navigator.of(buttonContext, rootNavigator: false).canPop()) {
-                                  Navigator.of(buttonContext, rootNavigator: false).pop();
+                                if (Navigator.of(buttonContext,
+                                        rootNavigator: false)
+                                    .canPop()) {
+                                  Navigator.of(buttonContext,
+                                          rootNavigator: false)
+                                      .pop();
                                 }
                                 setState(() {
                                   isOpenChat = false;
@@ -5718,11 +5723,13 @@ class _HomeScreenState extends State<HomeScreen>
                     ],
                   ),
                 ),
-                Image.asset(
-                  "assets/Icon-1024.png",
+                Container(
                   height: 79,
                   width: 79,
-                  // color: Colors.brown,
+                  decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      image: DecorationImage(
+                          image: AssetImage("assets/Icon-1024.png"))),
                 ),
                 // const Icon(Icons.menu_book, size: 48, color: Colors.brown),
                 const SizedBox(height: 10),

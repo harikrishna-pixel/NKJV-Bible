@@ -522,7 +522,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
         // Complete the purchase (important for consumables)
         if (purchaseDetails.pendingCompletePurchase) {
-          await _inAppPurchase.completePurchase(purchaseDetails);
+        await _inAppPurchase.completePurchase(purchaseDetails);
         }
 
         if (mounted && _loadingProductId == productId) {

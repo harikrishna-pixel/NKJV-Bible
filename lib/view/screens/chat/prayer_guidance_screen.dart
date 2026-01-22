@@ -25,6 +25,7 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
   final ScrollController _scrollController = ScrollController();
   final List<_GuidanceMessage> _messages = [];
   bool _isLoading = false;
+  final TextEditingController _customPrayerController = TextEditingController();
 
   final List<_GuidanceCategory> _categories = const [
     _GuidanceCategory(
@@ -198,6 +199,245 @@ ${category.prompt}
     );
   }
 
+  Future<void> _sendCustomPrayerRequest(String customRequest) async {
+    if (_isLoading) return;
+    if (customRequest.trim().isEmpty) {
+      Constants.showToast("Please enter your prayer request", 3000);
+      return;
+    }
+
+    // Check internet connection
+    final isConnected = await InternetConnection().hasInternetAccess;
+    if (!isConnected) {
+      Constants.showToast("Check Your Internet Connection", 5000);
+      return;
+    }
+
+    // Credits check (same as Chat)
+    final chatCost = await WalletService.getChatCost();
+    final hasCredits = await WalletService.getCredits() >= chatCost;
+    if (!hasCredits) {
+      Constants.showToast('Insufficient credits. Please add credits.', 5000);
+      return;
+    }
+
+    setState(() {
+      _messages.add(_GuidanceMessage(text: customRequest, isUser: true));
+      _isLoading = true;
+    });
+
+    try {
+      final url = Uri.parse(_baseUrl);
+
+      // Answer length instruction (same as ChatScreen idea)
+      final answerLength = await WalletService.getAnswerLength();
+      String answerLengthInstruction = '';
+      switch (answerLength) {
+        case 'small':
+          answerLengthInstruction =
+              'IMPORTANT: Provide a SHORT and concise answer. Keep your response brief (2-3 sentences maximum).';
+          break;
+        case 'medium':
+          answerLengthInstruction =
+              'IMPORTANT: Provide a MEDIUM-length answer (4-6 sentences).';
+          break;
+        case 'large':
+          answerLengthInstruction =
+              'IMPORTANT: Provide a FULL and comprehensive answer (8+ sentences).';
+          break;
+        default:
+          answerLengthInstruction = 'Provide an appropriate answer.';
+      }
+
+      final prompt = '''
+You are a respectful assistant for the Geneva Bible. Always respond in plain text without asterisks (*) or markdown.
+${answerLengthInstruction}
+
+Task:
+Write a prayer based on the following request: ${customRequest.trim()}
+Include 1-2 Geneva Bible verse references that relate to the request.
+''';
+
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'prompt': prompt}),
+      );
+
+      String responseText = 'Sorry, I could not generate a response.';
+      if (response.statusCode == 200) {
+        try {
+          final responseData = jsonDecode(response.body);
+          if (responseData['output'] != null && responseData['output'] is Map) {
+            final output = responseData['output'] as Map;
+            if (output['candidates'] is List &&
+                (output['candidates'] as List).isNotEmpty) {
+              final candidate = (output['candidates'] as List)[0];
+              if (candidate is Map &&
+                  candidate['content'] is Map &&
+                  candidate['content']['parts'] is List &&
+                  (candidate['content']['parts'] as List).isNotEmpty) {
+                final part = (candidate['content']['parts'] as List)[0];
+                if (part is Map && part['text'] != null) {
+                  responseText = part['text'].toString();
+                }
+              }
+            }
+          } else if (responseData['response'] != null) {
+            responseText = responseData['response'].toString();
+          } else if (responseData['text'] != null) {
+            responseText = responseData['text'].toString();
+          } else if (responseData['message'] != null) {
+            responseText = responseData['message'].toString();
+          }
+        } catch (_) {}
+      } else {
+        responseText =
+            'Error: Failed to get response (Status: ${response.statusCode})';
+      }
+
+      setState(() {
+        _messages.add(_GuidanceMessage(text: responseText, isUser: false));
+        _isLoading = false;
+      });
+
+      // Deduct credits only if we got a non-error response (same behavior as chat)
+      final isErrorResponse =
+          responseText.toLowerCase().contains('sorry, i could not generate') ||
+              responseText.toLowerCase().startsWith('error:');
+      if (!isErrorResponse) {
+        await WalletService.deductCredits(chatCost);
+      }
+
+      _scrollToTop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _messages.add(_GuidanceMessage(
+            text: 'Error: Something went wrong. Please try again.',
+            isUser: false));
+        _isLoading = false;
+      });
+      _scrollToTop();
+    }
+  }
+
+  void _showCustomPrayerDialog(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDark = themeProvider.themeMode == ThemeMode.dark;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: CommanColor.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Custom Prayer Request',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: CommanColor.black,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.grey),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        _customPrayerController.clear();
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _customPrayerController,
+                  maxLines: 5,
+                  decoration: InputDecoration(
+                    hintText: 'Enter your prayer request...',
+                    hintStyle: TextStyle(
+                      color: Colors.grey.shade600,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: isDark
+                            ? const Color(0xFF8B6F47)
+                            : const Color(0xFFD4A574),
+                        width: 2,
+                      ),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                  ),
+                  style: TextStyle(
+                    color: CommanColor.black,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      final request = _customPrayerController.text.trim();
+                      Navigator.of(context).pop();
+                      _customPrayerController.clear();
+                      if (request.isNotEmpty) {
+                        _sendCustomPrayerRequest(request);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isDark
+                          ? const Color(0xFF8B6F47)
+                          : const Color(0xFFD4A574),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      'Send Prayer Request',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : const Color(0xFF5C4033),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _customPrayerController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -236,6 +476,15 @@ ${category.prompt}
                           color: CommanColor.whiteBlack(context),
                         ),
                       ),
+                    ),
+                    IconButton(
+                      onPressed: () => _showCustomPrayerDialog(context),
+                      icon: Icon(
+                        Icons.edit_note,
+                        color: CommanColor.whiteBlack(context),
+                        size: 24,
+                      ),
+                      tooltip: 'Custom Prayer Request',
                     ),
                   ],
                 ),
@@ -451,6 +700,38 @@ ${category.prompt}
                         },
                       ),
               ),
+              // AMEN button at the bottom - only show when there are messages (responses)
+              if (_messages.isNotEmpty)
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Constants.showToast("AMEN", 3000);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isDark
+                            ? const Color(0xFF8B6F47)
+                            : const Color(0xFFD4A574),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'AMEN',
+                        style: TextStyle(
+                          fontSize: size.width > 450 ? 18 : 16,
+                          fontWeight: FontWeight.w700,
+                          color:
+                              isDark ? Colors.white : const Color(0xFF5C4033),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

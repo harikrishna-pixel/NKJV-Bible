@@ -132,9 +132,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       debugPrint("Buy Product");
       try {
         if (mounted) {
-          setState(() {
-            userTap = true;
-          });
+        setState(() {
+          userTap = true;
+        });
         }
         EasyLoading.show();
         await SharPreferences.setString('OpenAd', '1');
@@ -148,9 +148,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         debugPrint('Error: $e');
       } finally {
         if (mounted) {
-          setState(() {
-            userTap = false;
-          });
+        setState(() {
+          userTap = false;
+        });
         }
       }
     }

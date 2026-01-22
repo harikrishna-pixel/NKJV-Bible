@@ -2839,7 +2839,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
           ),
           const SizedBox(height: 8),
           SizedBox(
-            height: screenWidth > 450 ? 64 : 58,
+            height: screenWidth > 450 ? 180 : 160,
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -2849,7 +2849,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                   final isTapped = _selectedExampleQuestionIndex == index;
                   return Padding(
                     padding: EdgeInsets.only(
-                        right: screenWidth > 450 ? 10 : 8,
+                        right: screenWidth > 450 ? 12 : 10,
                         bottom: screenWidth > 450 ? 4 : 2),
                     child: InkWell(
                       onTap: () {
@@ -2867,48 +2867,50 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                           }
                         });
                       },
+                      borderRadius: BorderRadius.circular(12),
                       child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: screenWidth > 450 ? 18 : 14,
-                          vertical: screenWidth > 450 ? 14 : 12,
+                        width: screenWidth > 450 ? 280 : 240,
+                        constraints: BoxConstraints(
+                          minHeight: screenWidth > 450 ? 100 : 90,
+                        ),
+                        padding: EdgeInsets.only(
+                          left: screenWidth > 450 ? 16 : 14,
+                          right: screenWidth > 450 ? 50 : 44,
+                          top: screenWidth > 450 ? 16 : 14,
+                          bottom: screenWidth > 450 ? 16 : 14,
                         ),
                         decoration: BoxDecoration(
                           color: CommanColor.lightDarkPrimary(context),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: isTapped && isDark
-                                ? const Color(0xFFFFD700)
-                                : (isDark
-                                    ? Colors.white
-                                    : CommanColor.lightDarkPrimary(context)
-                                        .withOpacity(0.3)),
-                            width: isTapped && isDark ? 3 : (isDark ? 3 : 1),
+                            color: isTapped
+                                ? CommanColor.lightDarkPrimary(context)
+                                : Colors.transparent,
+                            width: isTapped ? 2 : 0,
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: CommanColor.lightDarkPrimary(context)
-                                  .withOpacity(0.25),
-                              blurRadius: 3,
-                              offset: const Offset(0, 2),
-                            )
-                          ],
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                        child: Stack(
                           children: [
-                            Icon(
-                              Icons.north_east,
-                              size: screenWidth > 450 ? 18 : 16,
-                              color: CommanColor.white,
+                            Positioned(
+                              top: 0,
+                              right: 0,
+                              child: Padding(
+                                padding: EdgeInsets.only(left: 50.0),
+                                child: Icon(
+                                  Icons.north_east,
+                                  size: screenWidth > 450 ? 20 : 18,
+                                  color: CommanColor.white.withOpacity(0.7),
+                                ),
+                              ),
                             ),
-                            const SizedBox(width: 6),
                             Text(
                               question,
                               textAlign: TextAlign.start,
                               style: TextStyle(
                                 color: CommanColor.white,
-                                fontSize: screenWidth > 450 ? 16 : 14,
+                                fontSize: screenWidth > 450 ? 15 : 14,
                                 fontWeight: FontWeight.w500,
+                                height: 1.4,
                               ),
                             ),
                           ],

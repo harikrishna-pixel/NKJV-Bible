@@ -535,7 +535,7 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                   height: 79,
                   width: 79,
                   decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(12),
                       image: DecorationImage(
                           image: AssetImage("assets/Icon-1024.png"))),
                 ),

@@ -67,9 +67,16 @@ class _SearchScreenState extends State<SearchScreen> {
         await SharPreferences.getString(SharPreferences.selectedFontSize) ??
             "${Sizecf.scrnWidth! > 450 ? 25.0 : 15.0}";
     fontSize = double.parse(fontSizeS);
-    selectedFontFamily =
+    final fontFamily =
         await SharPreferences.getString(SharPreferences.selectedFontFamily) ??
             "Arial";
+    if (mounted) {
+      setState(() {
+        selectedFontFamily = fontFamily;
+      });
+    } else {
+      selectedFontFamily = fontFamily;
+    }
   }
 
   @override
@@ -78,6 +85,7 @@ class _SearchScreenState extends State<SearchScreen> {
     loadBookListsFromPrefs();
     getFont();
   }
+
 
   // loadLocal() async {
   //   _myProvider = Provider.of<DownloadProvider>(context, listen: false);
@@ -823,8 +831,8 @@ class _SearchScreenState extends State<SearchScreen> {
                             hint: Text("All Chapter",
                                 style: screenWidth > 450
                                     ? CommanStyle.black15400
-                                        .copyWith(fontSize: 19)
-                                    : CommanStyle.black15400),
+                                        .copyWith(fontSize: 19, fontFamily: selectedFontFamily)
+                                    : CommanStyle.black15400.copyWith(fontFamily: selectedFontFamily)),
                             iconStyleData: IconStyleData(
                               icon: const Icon(
                                 Icons.keyboard_arrow_down_sharp,
@@ -991,7 +999,9 @@ class _SearchScreenState extends State<SearchScreen> {
                                                           ?.text ??
                                                       '',
                                                   // "${data.content}",
-                                                  style: CommanStyle.black15400,
+                                                  style: CommanStyle.black15400.copyWith(
+                                                    fontFamily: selectedFontFamily,
+                                                  ),
                                                   maxLines: 7,
                                                 ),
                                                 const SizedBox(
@@ -1312,6 +1322,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                     context)
                                                                 .copyWith(
                                                           fontSize: fontSize,
+                                                          fontFamily: selectedFontFamily,
                                                           // fontSize: screenWidth > 450
                                                           //     ? BibleInfo
                                                           //             .fontSizeScale *
@@ -1345,6 +1356,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                     context)
                                                                 .copyWith(
                                                           fontSize: fontSize,
+                                                          fontFamily: selectedFontFamily,
                                                           // screenWidth >
                                                           //         450
                                                           //     ? BibleInfo
@@ -1428,7 +1440,9 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                 '',
                                                             // "${data.content}",
                                                             style: CommanStyle
-                                                                .black15400,
+                                                                .black15400.copyWith(
+                                                              fontFamily: selectedFontFamily,
+                                                            ),
                                                             maxLines: 7,
                                                           ),
                                                           const SizedBox(
@@ -1709,7 +1723,10 @@ class _SearchScreenState extends State<SearchScreen> {
   List<TextSpan> highlightOccurrences(
       String source, String query, screenWidth, double fontSize) {
     if (query.isEmpty || !source.toLowerCase().contains(query.toLowerCase())) {
-      return [TextSpan(text: source)];
+      return [TextSpan(
+        text: source,
+        style: TextStyle(fontFamily: selectedFontFamily),
+      )];
     }
     final matches = query.toLowerCase().allMatches(source.toLowerCase());
 
@@ -1722,17 +1739,20 @@ class _SearchScreenState extends State<SearchScreen> {
       if (match.start != lastMatchEnd) {
         children.add(TextSpan(
           text: source.substring(lastMatchEnd, match.start),
+          style: TextStyle(fontFamily: selectedFontFamily),
         ));
       }
       children.add(TextSpan(
         text: " ${source.substring(match.start, match.end)} ",
         style: CommanStyle.searchTextStyle(context).copyWith(
+          fontFamily: selectedFontFamily,
             fontSize: fontSize),
       ));
 
       if (i == matches.length - 1 && match.end != source.length) {
         children.add(TextSpan(
           text: source.substring(match.end, source.length),
+          style: TextStyle(fontFamily: selectedFontFamily),
         ));
       }
 
