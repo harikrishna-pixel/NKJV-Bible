@@ -67,6 +67,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   ProductDetails? _exitOfferProduct; // Store exit offer product for purchase
   bool _isExitOfferShowing =
       false; // Track if exit offer is currently being shown
+  bool _shouldShowRestoreDialog =
+      false; // Track if restore dialog should be shown
+  String? _pendingRestoreProductId; // Store product ID for pending restore
 
   void _sortProducts() {
     _products.sort((a, b) {
@@ -120,6 +123,121 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     return DateTime(year, month, day);
   }
 
+  /// Check if user has an active subscription for the given product ID
+  Future<bool> _hasActiveSubscriptionForPlan(String productId) async {
+    try {
+      // Get current subscription plan
+      final downloadProvider =
+          Provider.of<DownloadProvider>(context, listen: false);
+      final subscriptionPlan = await downloadProvider.getSubscriptionPlan();
+
+      // Map product IDs to subscription plans
+      String? expectedPlan;
+      if (productId == widget.lifeTimePlan) {
+        expectedPlan = 'platinum';
+      } else if (productId == widget.oneYearPlan) {
+        expectedPlan = 'gold';
+      } else if (productId == widget.sixMonthPlan) {
+        expectedPlan = 'silver';
+      }
+
+      // Check if subscription plan matches
+      if (subscriptionPlan == null || expectedPlan == null) {
+        return false;
+      }
+
+      if (subscriptionPlan.toLowerCase() != expectedPlan.toLowerCase()) {
+        return false;
+      }
+
+      // Check if subscription is still valid (expiry date)
+      final expiryDateString =
+          await SharPreferences.getString(SharPreferences.isRewardAdViewTime);
+      if (expiryDateString == null || expiryDateString.isEmpty) {
+        return false;
+      }
+
+      try {
+        final expiryDate = DateTime.parse(expiryDateString);
+        final currentTime = DateTime.now();
+        final diffDays = expiryDate.difference(currentTime).inDays;
+        // Subscription is valid if expiry date is today or in the future (>= 0)
+        return diffDays >= 0;
+      } catch (e) {
+        debugPrint("Error parsing expiry date: $e");
+        return false;
+      }
+    } catch (e) {
+      debugPrint("Error checking active subscription: $e");
+      return false;
+    }
+  }
+
+  /// Show restore dialog if user already has active subscription for the plan
+  Future<void> _showRestoreDialog(
+      ProductDetails prod, DashBoardController controller) async {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return PopScope(
+          canPop: false,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Text(
+              "You're Already on this Plan",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: const Text(
+              "Would You like to Restore it",
+              style: TextStyle(
+                fontSize: 16,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                },
+                child: const Text(
+                  "Cancel",
+                  style: TextStyle(
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.of(dialogContext).pop();
+                  // Process restore
+                  await _restorePurchases(controller);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: CommanColor.lightModePrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  "Yes, Restore",
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _buyProduct(ProductDetails prod) async {
     // Check connectivity FIRST before showing loader
     final hasInternet = await InternetConnection().hasInternetAccess;
@@ -128,16 +246,52 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       return; // Return early - don't show loader or proceed
     }
 
+    // Check if user already has active subscription for this plan
+    final hasActiveSubscription = await _hasActiveSubscriptionForPlan(prod.id);
+    if (hasActiveSubscription) {
+      // Set flag to show restore dialog when purchase stream detects restored status
+      _shouldShowRestoreDialog = true;
+      _pendingRestoreProductId = prod.id;
+      // Show restore dialog immediately
+      final controller = Get.find<DashBoardController>();
+      await _showRestoreDialog(prod, controller);
+      // Reset flags if user cancels
+      _shouldShowRestoreDialog = false;
+      _pendingRestoreProductId = null;
+      return; // Don't proceed with purchase
+    }
+
     if (!userTap) {
       debugPrint("Buy Product");
       try {
         if (mounted) {
-        setState(() {
-          userTap = true;
-        });
+          setState(() {
+            userTap = true;
+          });
         }
         EasyLoading.show();
         await SharPreferences.setString('OpenAd', '1');
+
+        // Check again before purchase (in case subscription status changed)
+        final hasActiveSubscriptionCheck =
+            await _hasActiveSubscriptionForPlan(prod.id);
+        if (hasActiveSubscriptionCheck) {
+          // Set flag to show restore dialog when purchase stream detects restored status
+          _shouldShowRestoreDialog = true;
+          _pendingRestoreProductId = prod.id;
+          EasyLoading.dismiss();
+          if (mounted) {
+            setState(() {
+              userTap = false;
+            });
+          }
+          final controller = Get.find<DashBoardController>();
+          await _showRestoreDialog(prod, controller);
+          // Reset flags if user cancels
+          _shouldShowRestoreDialog = false;
+          _pendingRestoreProductId = null;
+          return;
+        }
 
         final PurchaseParam purchaseParam = PurchaseParam(productDetails: prod);
         _inAppPurchase.buyNonConsumable(purchaseParam: purchaseParam);
@@ -148,9 +302,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         debugPrint('Error: $e');
       } finally {
         if (mounted) {
-        setState(() {
-          userTap = false;
-        });
+          setState(() {
+            userTap = false;
+          });
         }
       }
     }
@@ -1039,15 +1193,31 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             debugPrint("restore data 5 is $restoreFlag");
 
             // If Apple reports "restored" during a Buy flow (already subscribed),
-            // handle it using the existing restore logic.
+            // check if we should show restore dialog first
             if (restoreFlag == true || startFlag == true) {
-              if (restoreFlag != true) {
-                await SharPreferences.setBoolean('restorepurches', true);
+              // Check if user tapped on a plan they already own (should show dialog)
+              if (_shouldShowRestoreDialog &&
+                  _pendingRestoreProductId == purchaseDetails.productID) {
+                // Show restore dialog instead of auto-restoring
+                if (mounted) {
+                  await _showRestoreDialogForRestoredPurchase(
+                      purchaseDetails, controller);
+                }
+                // Reset flags
+                _shouldShowRestoreDialog = false;
+                _pendingRestoreProductId = null;
+              } else {
+                // Normal restore flow (from restore button)
+                if (restoreFlag != true) {
+                  await SharPreferences.setBoolean('restorepurches', true);
+                }
+                // debugPrint("restore data 6 is $data");
+                // await restorePurchaseHandle(purchaseDetails.productID,
+                //     purchaseDetails.transactionDate ?? '', controller);
+                if (mounted) {
+                  _handleRestore(purchaseDetails, controller);
+                }
               }
-              // debugPrint("restore data 6 is $data");
-              // await restorePurchaseHandle(purchaseDetails.productID,
-              //     purchaseDetails.transactionDate ?? '', controller);
-              _handleRestore(purchaseDetails, controller);
             }
           }
         } else if (purchaseDetails.pendingCompletePurchase) {
@@ -1446,11 +1616,92 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   //new iap logic
 
+  /// Show restore dialog for restored purchase detected from purchase stream
+  Future<void> _showRestoreDialogForRestoredPurchase(
+    PurchaseDetails purchaseDetails,
+    DashBoardController controller,
+  ) async {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return PopScope(
+          canPop: false,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Text(
+              "You're Already on this Plan",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: const Text(
+              "Would You like to Restore it",
+              style: TextStyle(
+                fontSize: 16,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  // Reset flags
+                  _shouldShowRestoreDialog = false;
+                  _pendingRestoreProductId = null;
+                },
+                child: const Text(
+                  "Cancel",
+                  style: TextStyle(
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.of(dialogContext).pop();
+                  // Reset flags
+                  _shouldShowRestoreDialog = false;
+                  _pendingRestoreProductId = null;
+                  // Process restore
+                  if (mounted) {
+                    await restorePurchaseHandle(
+                      purchaseDetails.productID,
+                      purchaseDetails.transactionDate ?? '',
+                      controller,
+                      context: context,
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: CommanColor.lightModePrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  "Yes, Restore",
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   /// 🔹 Handle restored purchases (after pressing restore button)
   Future<void> _handleRestore(
     PurchaseDetails purchaseDetails,
     DashBoardController controller,
   ) async {
+    if (!mounted) return;
     //EasyLoading.dismiss();
     debugPrint("Restored Purchase: ${purchaseDetails.productID}");
 

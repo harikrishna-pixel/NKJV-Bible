@@ -14,6 +14,7 @@ import 'package:get/get_core/src/get_main.dart';
 import 'package:get/get_navigation/get_navigation.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MarkAsReadScreen extends StatefulWidget {
   String RededBookName;
@@ -30,6 +31,37 @@ class MarkAsReadScreen extends StatefulWidget {
 }
 
 class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
+  String _currentMessage = "";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRotatingMessage();
+  }
+
+  Future<void> _loadRotatingMessage() async {
+    final List<String> markAsReadMessages = [
+      "Well done. Keep walking in His Word!",
+      "You're growing closer through Scripture!",
+      "God's Word is shaping your life!",
+      "A faithful step today. Go ahead!",
+    ];
+    final prefs = await SharedPreferences.getInstance();
+    int messageIndex =
+        prefs.getInt(SharPreferences.markAsReadMessageIndex) ?? 0;
+    if (messageIndex >= markAsReadMessages.length) {
+      messageIndex = 0;
+    }
+    if (mounted) {
+      setState(() {
+        _currentMessage = markAsReadMessages[messageIndex];
+      });
+    }
+    final nextIndex = (messageIndex + 1) % markAsReadMessages.length;
+    await SharPreferences.setInt(
+        SharPreferences.markAsReadMessageIndex, nextIndex);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -124,7 +156,7 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
             ),
             Center(
               child: Text(
-                "One More Chapter is Marked as Read!",
+                _currentMessage.isEmpty ? "Loading..." : _currentMessage,
                 style: CommanStyle.bw18400(context),
                 textAlign: TextAlign.center,
               ),
@@ -165,7 +197,8 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                 debugPrint(
                     'SelectedBookChapterCount : ${widget.SelectedBookChapterCount}');
                 if (int.parse(widget.ReadedChapter) + 1 <=
-                    int.parse("${int.parse(widget.SelectedBookChapterCount)}")) {
+                    int.parse(
+                        "${int.parse(widget.SelectedBookChapterCount)}")) {
                   // Next Chapter
                   SharPreferences.setString(SharPreferences.selectedChapter,
                       (int.parse(widget.ReadedChapter) + 1).toString());
@@ -187,7 +220,9 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                   // Next Book - Get the next book and navigate to first chapter
                   try {
                     // Get current book number from SharedPreferences
-                    final currentBookNumStr = await SharPreferences.getString(SharPreferences.selectedBookNum) ?? "0";
+                    final currentBookNumStr = await SharPreferences.getString(
+                            SharPreferences.selectedBookNum) ??
+                        "0";
                     final currentBookNum = int.parse(currentBookNumStr);
 
                     // Get next book from database
@@ -195,14 +230,14 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                     if (db != null) {
                       final nextBookNum = currentBookNum + 1;
                       final result = await db.rawQuery(
-                        "SELECT * FROM book WHERE book_num = $nextBookNum LIMIT 1"
-                      );
+                          "SELECT * FROM book WHERE book_num = $nextBookNum LIMIT 1");
 
                       if (result.isNotEmpty) {
                         final nextBook = MainBookListModel.fromJson(result[0]);
                         final nextBookNumValue = nextBook.bookNum!.toInt();
                         final nextBookName = nextBook.title ?? "";
-                        final nextBookChapterCount = nextBook.chapterCount!.toInt();
+                        final nextBookChapterCount =
+                            nextBook.chapterCount!.toInt();
 
                         // Update SharedPreferences for next book and first chapter
                         await SharPreferences.setString(
@@ -210,18 +245,23 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                         await SharPreferences.setString(
                             SharPreferences.selectedChapter, "1");
                         await SharPreferences.setString(
-                            SharPreferences.selectedBookNum, nextBookNumValue.toString());
+                            SharPreferences.selectedBookNum,
+                            nextBookNumValue.toString());
 
                         // Update controller if available
                         try {
                           final controller = Get.find<DashBoardController>();
                           controller.selectedBook.value = nextBookName;
-                          controller.selectedBookNum.value = nextBookNumValue.toString();
+                          controller.selectedBookNum.value =
+                              nextBookNumValue.toString();
                           controller.selectedChapter.value = "1";
                           controller.selectChapterChange.value = 1;
-                          controller.selectedBookChapterCount.value = nextBookChapterCount.toString();
-                          controller.selectedBookNameForRead.value = nextBookName;
-                          controller.selectedBookNumForRead.value = nextBookNumValue.toString();
+                          controller.selectedBookChapterCount.value =
+                              nextBookChapterCount.toString();
+                          controller.selectedBookNameForRead.value =
+                              nextBookName;
+                          controller.selectedBookNumForRead.value =
+                              nextBookNumValue.toString();
                           controller.selectedChapterForRead.value = "1";
 
                           // Load content
@@ -275,7 +315,8 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                 ),
                 child: Center(
                     child: int.parse(widget.ReadedChapter) + 1 <=
-                            int.parse("${int.parse(widget.SelectedBookChapterCount)}")
+                            int.parse(
+                                "${int.parse(widget.SelectedBookChapterCount)}")
                         ? Text(
                             "Next Chapter",
                             style:

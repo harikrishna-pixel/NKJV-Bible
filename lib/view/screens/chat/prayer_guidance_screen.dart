@@ -34,9 +34,9 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
   bool _isAudioPlaying = false;
   bool _isAudioMuted = false;
 
-  // Background music URL - replace with your meditation/prayer music URL
+  // Background music asset path (without 'assets/' prefix as AssetSource adds it automatically)
   static const String _backgroundMusicUrl =
-      'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'; // Placeholder - replace with actual music URL
+      'music/christian-rock-for-jesus-christ-always-301257.mp3';
 
   final List<_GuidanceCategory> _categories = const [
     _GuidanceCategory(
@@ -187,6 +187,9 @@ ${category.prompt}
               responseText.toLowerCase().startsWith('error:');
       if (!isErrorResponse) {
         await WalletService.deductCredits(chatCost);
+        // Automatically unmute and play background music when prayer is generated
+        _isAudioMuted = false;
+        await _playBackgroundMusic();
       }
 
       _scrollToTop();
@@ -345,7 +348,8 @@ Include 1-2 Geneva Bible verse references that relate to the request.
               responseText.toLowerCase().startsWith('error:');
       if (!isErrorResponse) {
         await WalletService.deductCredits(chatCost);
-        // Play background music when prayer is generated
+        // Automatically unmute and play background music when prayer is generated
+        _isAudioMuted = false;
         await _playBackgroundMusic();
       }
 
@@ -514,8 +518,8 @@ Include 1-2 Geneva Bible verse references that relate to the request.
         await _audioPlayer.stop();
       }
 
-      // Set the source URL
-      await _audioPlayer.setSourceUrl(_backgroundMusicUrl);
+      // Set the source from local asset
+      await _audioPlayer.setSource(AssetSource(_backgroundMusicUrl));
 
       // Wait a moment for the source to be ready
       await Future.delayed(const Duration(milliseconds: 200));

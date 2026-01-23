@@ -149,6 +149,7 @@ flutter:
     - assets/onboarding/
     - assets/dark_modes/
     - assets/light_modes/
+    - assets/music/
     - .env
 
   fonts:

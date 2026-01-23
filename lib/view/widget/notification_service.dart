@@ -89,10 +89,17 @@ class NotificationsServices {
       body,
       setTime,
       NotificationDetails(
-        android: AndroidNotificationDetails(id.toString(), "Go TO Bed",
-            importance: Importance.max,
-            priority: Priority.max,
-            icon: "@mipmap/ic_launcher"),
+        android: AndroidNotificationDetails(
+          id.toString(),
+          "Go TO Bed",
+          importance: Importance.max,
+          priority: Priority.max,
+          icon: "@mipmap/ic_launcher",
+          sound: const RawResourceAndroidNotificationSound('bell'),
+        ),
+        iOS: const DarwinNotificationDetails(
+          sound: 'bell.caf',
+        ),
       ),
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,

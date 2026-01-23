@@ -1449,7 +1449,7 @@ class _AnimatedJourneyDialogState extends State<_AnimatedJourneyDialog>
       _steps.length,
       (index) => AnimationController(
         vsync: this,
-        duration: const Duration(milliseconds: 400),
+        duration: const Duration(milliseconds: 1000),
       ),
     );
 

@@ -19,6 +19,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
+import 'package:biblebookapp/utils/internet_speed_checker.dart';
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
@@ -44,6 +45,7 @@ class _WalletScreenState extends State<WalletScreen> {
       false; // Track if user has watched max ads (2 per day)
   Map<String, Timer> _purchaseTimeouts =
       {}; // Track timeout timers for each product
+  bool _isLowNetwork = false; // Track if network is low/2G
 
   // Prevent double-crediting the same purchase/restore event
   static const String _processedWalletPurchaseKey = 'wallet_processed_purchases';
@@ -164,8 +166,72 @@ class _WalletScreenState extends State<WalletScreen> {
     // This checks actual internet access, not just network interface availability
     final hasInternet = await InternetConnection().hasInternetAccess;
     if (!hasInternet) {
-      // No internet connection - show toast
-      Constants.showToast("No internet connection");
+      // No internet connection - show toast and hide Buy Credits section
+      Constants.showToast("Check your Internet connection");
+      if (mounted) {
+        setState(() {
+          _isLowNetwork = true;
+        });
+      }
+      return;
+    }
+
+    // Check connection speed to detect slow/2G networks
+    // Hide Buy Credits section for slow connections (2G/low network)
+    // Show for fast connections (5G, 4G, WiFi, Ethernet)
+    try {
+      final connectionSpeed = await InternetSpeedChecker.checkSpeed(
+        timeout: const Duration(seconds: 5),
+      );
+      
+      // If connection speed is null (no response) or very slow (>5000ms), treat as low network
+      // 2G networks typically have response times >5000ms
+      // Fast networks (5G, 4G, WiFi) usually have response times <3000ms
+      final isSlowConnection = connectionSpeed == null || connectionSpeed > 5000;
+      
+      if (isSlowConnection) {
+        // Slow/2G network - hide Buy Credits section and show toast
+        Constants.showToast("Check your Internet connection");
+        if (mounted) {
+          setState(() {
+            _isLowNetwork = true;
+          });
+        }
+      } else {
+        // Fast connection (5G, 4G, WiFi, Ethernet) - show Buy Credits section
+        if (mounted) {
+          setState(() {
+            _isLowNetwork = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking connection speed: $e');
+      // On error, check network type as fallback
+      try {
+        final connectivity = Connectivity();
+        final connectivityResults = await connectivity.checkConnectivity();
+        final isWifi = connectivityResults.contains(ConnectivityResult.wifi);
+        final isEthernet = connectivityResults.contains(ConnectivityResult.ethernet);
+        
+        // Show for WiFi/Ethernet, hide for mobile (might be 2G)
+        if (mounted) {
+          setState(() {
+            _isLowNetwork = !isWifi && !isEthernet; // Hide for mobile, show for WiFi/Ethernet
+          });
+        }
+        if (!isWifi && !isEthernet) {
+          Constants.showToast("Check your Internet connection");
+        }
+      } catch (e2) {
+        debugPrint('Error checking connectivity: $e2');
+        // On error, assume good connection and show Buy Credits
+        if (mounted) {
+          setState(() {
+            _isLowNetwork = false;
+          });
+        }
+      }
     }
   }
 
@@ -920,17 +986,19 @@ class _WalletScreenState extends State<WalletScreen> {
                       ),
                       const SizedBox(height: 32),
 
-                      // Buy Credits Section
-                      Text(
-                        'Buy Credits',
-                        style: TextStyle(
-                          color: CommanColor.whiteBlack(context),
-                          fontSize: screenWidth > 450 ? 20 : 18,
-                          fontWeight: FontWeight.bold,
+                      // Buy Credits Section - Hide if low network/2G
+                      if (!_isLowNetwork) ...[
+                        Text(
+                          'Buy Credits',
+                          style: TextStyle(
+                            color: CommanColor.whiteBlack(context),
+                            fontSize: screenWidth > 450 ? 20 : 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      ..._buildBuyCreditCards(context, screenWidth, isDark),
+                        const SizedBox(height: 12),
+                        ..._buildBuyCreditCards(context, screenWidth, isDark),
+                      ],
                     ],
                   ),
                 ),
