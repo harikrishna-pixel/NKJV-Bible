@@ -1,4 +1,5 @@
 import 'package:biblebookapp/services/statsig/statsig_service.dart';
+import 'package:biblebookapp/utils/internet_speed_checker.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/images.dart';
@@ -9,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:get/get.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:provider/provider.dart' as p;
 
 class QuoteScreen extends HookConsumerWidget {
@@ -18,6 +20,7 @@ class QuoteScreen extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final quotesState = ref.watch(quotesCategoryBloc).quotesCategoryState;
     final hasShownToast = useRef(false);
+    final hasCheckedNetwork = useRef(false);
     
     useMemoized(() {
       WidgetsBinding.instance.addPostFrameCallback((callback) {
@@ -26,6 +29,7 @@ class QuoteScreen extends HookConsumerWidget {
         StatsigService.trackQuotes();
         // Reset toast flag when starting to load
         hasShownToast.value = false;
+        hasCheckedNetwork.value = false;
       });
     });
     
@@ -94,6 +98,34 @@ class QuoteScreen extends HookConsumerWidget {
             Expanded(
               child: quotesState.when(
                 data: (data) {
+                  // Check network speed if data is empty and haven't checked yet
+                  if (data.isEmpty && !hasCheckedNetwork.value) {
+                    hasCheckedNetwork.value = true;
+                    WidgetsBinding.instance.addPostFrameCallback((_) async {
+                      final hasInternet = await InternetConnection().hasInternetAccess;
+                      if (!hasInternet) {
+                        Constants.showToast('Check Your Internet Connection');
+                        return;
+                      }
+                      
+                      try {
+                        final connectionSpeed = await InternetSpeedChecker.checkSpeed(
+                          timeout: const Duration(seconds: 5),
+                        );
+                        
+                        // If connection speed is null or very slow (>5000ms), treat as 2G/low network
+                        final isSlowConnection = connectionSpeed == null || connectionSpeed > 5000;
+                        
+                        if (isSlowConnection) {
+                          Constants.showToast('Check Your Internet Connection');
+                        }
+                      } catch (e) {
+                        // On error, assume slow connection
+                        Constants.showToast('Check Your Internet Connection');
+                      }
+                    });
+                  }
+                  
                   return GridView.builder(
                     physics: const BouncingScrollPhysics(),
                     itemCount: data.length,

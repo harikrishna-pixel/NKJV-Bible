@@ -1,4 +1,5 @@
 import 'package:biblebookapp/services/statsig/statsig_service.dart';
+import 'package:biblebookapp/utils/internet_speed_checker.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/images.dart';
@@ -9,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:get/get.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:provider/provider.dart' as p;
 
 class WallpaperScreen extends HookConsumerWidget {
@@ -19,7 +21,8 @@ class WallpaperScreen extends HookConsumerWidget {
     final wallpaperCategoryState =
         ref.watch(wallpaperCategoryBloc).wallpaperCategoryState;
     final hasShownToast = useRef(false);
-    
+    final hasCheckedNetwork = useRef(false);
+
     useMemoized(() {
       WidgetsBinding.instance.addPostFrameCallback((callback) {
         ref.read(wallpaperCategoryBloc).getWallpaperCategory();
@@ -27,9 +30,10 @@ class WallpaperScreen extends HookConsumerWidget {
         StatsigService.trackWallpaper();
         // Reset toast flag when starting to load
         hasShownToast.value = false;
+        hasCheckedNetwork.value = false;
       });
     });
-    
+
     // Monitor loading state and show toast if loading takes too long
     // Increased delay for real devices where first network request can take longer
     useEffect(() {
@@ -37,10 +41,14 @@ class WallpaperScreen extends HookConsumerWidget {
         bool cancelled = false;
         // Add initial delay to account for network initialization on real devices
         Future.delayed(const Duration(seconds: 1), () {
-          if (!cancelled && wallpaperCategoryState.isLoading && !hasShownToast.value) {
+          if (!cancelled &&
+              wallpaperCategoryState.isLoading &&
+              !hasShownToast.value) {
             // Then wait additional 5 seconds before showing toast (total 6 seconds)
             Future.delayed(const Duration(seconds: 5), () {
-              if (!cancelled && wallpaperCategoryState.isLoading && !hasShownToast.value) {
+              if (!cancelled &&
+                  wallpaperCategoryState.isLoading &&
+                  !hasShownToast.value) {
                 Constants.showToast('Check Your Internet Connection');
                 hasShownToast.value = true;
               }
@@ -95,6 +103,37 @@ class WallpaperScreen extends HookConsumerWidget {
             Expanded(
               child: wallpaperCategoryState.when(
                 data: (data) {
+                  // Check network speed if data is empty and haven't checked yet
+                  if (data.isEmpty && !hasCheckedNetwork.value) {
+                    hasCheckedNetwork.value = true;
+                    WidgetsBinding.instance.addPostFrameCallback((_) async {
+                      final hasInternet =
+                          await InternetConnection().hasInternetAccess;
+                      if (!hasInternet) {
+                        Constants.showToast('Check Your Internet Connection');
+                        return;
+                      }
+
+                      try {
+                        final connectionSpeed =
+                            await InternetSpeedChecker.checkSpeed(
+                          timeout: const Duration(seconds: 5),
+                        );
+
+                        // If connection speed is null or very slow (>5000ms), treat as 2G/low network
+                        final isSlowConnection =
+                            connectionSpeed == null || connectionSpeed > 5000;
+
+                        if (isSlowConnection) {
+                          Constants.showToast('Check Your Internet Connection');
+                        }
+                      } catch (e) {
+                        // On error, assume slow connection
+                        Constants.showToast('Check Your Internet Connection');
+                      }
+                    });
+                  }
+
                   return GridView.builder(
                     physics: const BouncingScrollPhysics(),
                     itemCount: data.length,
@@ -150,4 +189,3 @@ class WallpaperScreen extends HookConsumerWidget {
     ));
   }
 }
-

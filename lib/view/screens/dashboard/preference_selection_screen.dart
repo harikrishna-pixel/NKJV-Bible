@@ -28,6 +28,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
+import 'package:biblebookapp/utils/internet_speed_checker.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 
 class PreferenceSelectionScreen extends StatefulWidget {
   final bool isSetting;
@@ -1290,15 +1292,64 @@ class FaithJourneyDialog {
                   onPressed: () async {
                     Navigator.of(ctx).pop(); // Close dialog
                     if (isFromOnboarding) {
-                      final sixMonthPlan =
-                          await SharPreferences.getString('sixMonthPlan') ??
-                              BibleInfo.sixMonthPlanid;
-                      final oneYearPlan =
-                          await SharPreferences.getString('oneYearPlan') ??
-                              BibleInfo.oneYearPlanid;
-                      final lifeTimePlan =
-                          await SharPreferences.getString('lifeTimePlan') ??
-                              BibleInfo.lifeTimePlanid;
+                      // Check network speed - if slow/2G, bypass IAP screen and go to Home
+                      final hasInternet =
+                          await InternetConnection().hasInternetAccess;
+                      if (!hasInternet) {
+                        // No internet - bypass to HomeScreen
+                        Get.offAll(() => HomeScreen(
+                              From: "splash",
+                              selectedVerseNumForRead: "",
+                              selectedBookForRead: "",
+                              selectedChapterForRead: "",
+                              selectedBookNameForRead: "",
+                              selectedVerseForRead: "",
+                            ));
+                        return;
+                      }
+
+                      // Check connection speed for slow/2G networks
+                      try {
+                        final connectionSpeed =
+                            await InternetSpeedChecker.checkSpeed(
+                          timeout: const Duration(seconds: 5),
+                        );
+
+                        // If connection speed is null (no response) or very slow (>5000ms), treat as 2G/low network
+                        final isSlowConnection =
+                            connectionSpeed == null || connectionSpeed > 5000;
+
+                        if (isSlowConnection) {
+                          // Slow/2G network - bypass IAP screen and go directly to HomeScreen
+                          Get.offAll(() => HomeScreen(
+                                From: "splash",
+                                selectedVerseNumForRead: "",
+                                selectedBookForRead: "",
+                                selectedChapterForRead: "",
+                                selectedBookNameForRead: "",
+                                selectedVerseForRead: "",
+                              ));
+                          return;
+                        }
+                      } catch (e) {
+                        debugPrint(
+                            'Error checking connection speed in onboarding: $e');
+                        // On error, assume slow connection and bypass to HomeScreen
+                        Get.offAll(() => HomeScreen(
+                              From: "splash",
+                              selectedVerseNumForRead: "",
+                              selectedBookForRead: "",
+                              selectedChapterForRead: "",
+                              selectedBookNameForRead: "",
+                              selectedVerseForRead: "",
+                            ));
+                        return;
+                      }
+
+                      // Fast connection - proceed to SubscriptionScreen using constants only
+                      final sixMonthPlan = BibleInfo.sixMonthPlanid;
+                      final oneYearPlan = BibleInfo.oneYearPlanid;
+                      final lifeTimePlan = BibleInfo.lifeTimePlanid;
                       Get.offAll(() => SubscriptionScreen(
                             sixMonthPlan: sixMonthPlan,
                             oneYearPlan: oneYearPlan,
