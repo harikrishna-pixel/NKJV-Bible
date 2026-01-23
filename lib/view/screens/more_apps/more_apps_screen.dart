@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:get/get.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:provider/provider.dart' as p;
 
@@ -33,9 +34,14 @@ class MoreAppsScreen extends HookConsumerWidget {
     useEffect(() {
       if (appState.isLoading && appState.apps.isEmpty && !hasShownToast.value) {
         bool cancelled = false;
-        Future.delayed(const Duration(seconds: 3), () {
+        Future.delayed(const Duration(seconds: 3), () async {
           if (!cancelled && appState.isLoading && appState.apps.isEmpty && !hasShownToast.value) {
-            Constants.showToast('Check Your Internet Connection');
+            final hasInternet = await InternetConnection().hasInternetAccess;
+            if (!hasInternet) {
+              Constants.showToast('No Internet Connection');
+            } else {
+              Constants.showToast('Check Your Internet Connection');
+            }
             hasShownToast.value = true;
           }
         });

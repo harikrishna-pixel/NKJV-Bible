@@ -110,7 +110,7 @@ class WallpaperScreen extends HookConsumerWidget {
                       final hasInternet =
                           await InternetConnection().hasInternetAccess;
                       if (!hasInternet) {
-                        Constants.showToast('Check Your Internet Connection');
+                        Constants.showToast('No Internet Connection');
                         return;
                       }
 

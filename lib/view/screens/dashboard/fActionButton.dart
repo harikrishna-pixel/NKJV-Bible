@@ -1238,7 +1238,12 @@ class floatingButtonState extends State<floatingButton>
                               : 22,
                         )),
           onTap: () async {
-            Constants.showToast("Check your Internet Connection");
+            final hasInternet = await InternetConnection().hasInternetAccess;
+            if (!hasInternet) {
+              Constants.showToast("No Internet Connection");
+            } else {
+              Constants.showToast("Check your Internet Connection");
+            }
           },
         ),
       );

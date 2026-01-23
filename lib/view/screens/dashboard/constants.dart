@@ -16,15 +16,26 @@ class BibleInfo {
   static String exitOfferPlanid =
       'com.balaklrapps.genevabible.lifetime.exitoffer';
 
+  // IAP Discounts (for offline mode)
+  static String sixMonthPlanDiscount = '0';
+  static String oneYearPlanDiscount = '50';
+  static String lifeTimePlanDiscount = 'Best Value';
+  static String exitOfferPlanDiscount = '0';
+
   // Coin Pack IDs
   static String coinPack1Id = 'com.balaklrapps.genevabible.coinspack1';
   static String coinPack2Id = 'com.balaklrapps.genevabible.coinspack2';
   static String coinPack3Id = 'com.balaklrapps.genevabible.coinspack3';
 
-  // Coin Pack Prices (for offline mode)
-  static String coinPack1Price = '\$4.99';
-  static String coinPack2Price = '\$9.99';
-  static String coinPack3Price = '\$19.99';
+  // Coin Pack Credits (for offline mode)
+  static String coinPack1Credits = '100';
+  static String coinPack2Credits = '500';
+  static String coinPack3Credits = '1000';
+
+  // Coin Pack Discounts (for offline mode)
+  static String coinPack1Discount = '0';
+  static String coinPack2Discount = '30';
+  static String coinPack3Discount = '50';
 
   static bool enableIAP = true;
 

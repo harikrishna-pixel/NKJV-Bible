@@ -87,7 +87,7 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
     // Check internet connection
     final isConnected = await InternetConnection().hasInternetAccess;
     if (!isConnected) {
-      Constants.showToast("Check Your Internet Connection", 5000);
+      Constants.showToast("No Internet Connection", 5000);
       return;
     }
 
@@ -249,7 +249,7 @@ ${category.prompt}
     // Check internet connection
     final isConnected = await InternetConnection().hasInternetAccess;
     if (!isConnected) {
-      Constants.showToast("Check Your Internet Connection", 5000);
+      Constants.showToast("No Internet Connection", 5000);
       return;
     }
 

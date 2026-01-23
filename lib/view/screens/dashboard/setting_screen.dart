@@ -1418,7 +1418,7 @@ class _SettingScreenState extends State<SettingScreen>
 
                       // Only show toast if actually offline - don't show when online
                       if (!hasInternet) {
-                        Constants.showToast('Check Your Internet Connection');
+                        Constants.showToast('No Internet Connection');
                         return;
                       }
                       // If online, proceed directly without showing toast

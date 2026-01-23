@@ -252,11 +252,33 @@ class BackgroundApiService {
       
       // Save coin pack data from sub_fields (keep existing JSON structure for backward compatibility)
       if (value.data?.subFields != null) {
+        // Print full API response for wallet credits/coin packs
+        debugPrint('═══════════════════════════════════════════════════════════════════════');
+        debugPrint('Wallet Credits API Response:');
+        try {
+          debugPrint('Full API Response Data: ${value.data?.toJson()}');
+        } catch (e) {
+          debugPrint('Could not serialize full API response: $e');
+        }
+        debugPrint('SubFields Count: ${value.data!.subFields!.length}');
+        
         final coinPacks = <String, dynamic>{};
         for (var field in value.data!.subFields!) {
           if (field?.identifier != null && 
               field!.identifier!.isNotEmpty && 
               field.identifier!.contains('coinspack')) {
+            // Print individual coin pack field details
+            debugPrint('Coin Pack Field Found:');
+            debugPrint('  - Identifier: ${field.identifier}');
+            debugPrint('  - Credits (item_1): ${field.item_1}');
+            debugPrint('  - Discount (value): ${field.value}');
+            debugPrint('  - Field Num: ${field.fieldNum}');
+            try {
+              debugPrint('  - Full Field Data: ${field.toJson()}');
+            } catch (e) {
+              debugPrint('  - Could not serialize field data: $e');
+            }
+            
             coinPacks[field.identifier!] = {
               'credits': field.item_1 ?? '0',
               'discount': field.value ?? '0',
@@ -266,8 +288,14 @@ class BackgroundApiService {
         }
         if (coinPacks.isNotEmpty) {
           await prefs.setString('coin_packs', jsonEncode(coinPacks));
+          debugPrint('Saved Coin Packs JSON: ${jsonEncode(coinPacks)}');
           debugPrint('Background API: Saved ${coinPacks.length} coin packs');
+        } else {
+          debugPrint('No coin packs found in API response');
         }
+        debugPrint('═══════════════════════════════════════════════════════════════════════');
+      } else {
+        debugPrint('Wallet Credits API Response: No subFields found in API response');
       }
     } catch (e) {
       debugPrint('Background API: Error processing subscription data: $e');

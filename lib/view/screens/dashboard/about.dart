@@ -11,6 +11,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:in_app_review/in_app_review.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -55,7 +56,17 @@ class _AboutUsState extends State<AboutUs> {
               retry.contains(ConnectivityResult.mobile) ||
               retry.contains(ConnectivityResult.ethernet));
       if (!retryHasConnection) {
-        return Constants.showToast("Check your Internet connection");
+        // Check actual internet access
+        try {
+          final hasInternet = await InternetConnection().hasInternetAccess;
+          if (!hasInternet) {
+            return Constants.showToast("No Internet Connection");
+          } else {
+            return Constants.showToast("Check your Internet connection");
+          }
+        } catch (_) {
+          return Constants.showToast("No Internet Connection");
+        }
       }
     }
 

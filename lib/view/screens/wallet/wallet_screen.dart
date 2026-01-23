@@ -48,7 +48,8 @@ class _WalletScreenState extends State<WalletScreen> {
   bool _isLowNetwork = false; // Track if network is low/2G
 
   // Prevent double-crediting the same purchase/restore event
-  static const String _processedWalletPurchaseKey = 'wallet_processed_purchases';
+  static const String _processedWalletPurchaseKey =
+      'wallet_processed_purchases';
 
   Future<bool> _markPurchaseProcessedOnce(PurchaseDetails details) async {
     try {
@@ -167,7 +168,7 @@ class _WalletScreenState extends State<WalletScreen> {
     final hasInternet = await InternetConnection().hasInternetAccess;
     if (!hasInternet) {
       // No internet connection - show toast and hide Buy Credits section
-      Constants.showToast("Check your Internet connection");
+      Constants.showToast("No Internet Connection");
       if (mounted) {
         setState(() {
           _isLowNetwork = true;
@@ -183,12 +184,13 @@ class _WalletScreenState extends State<WalletScreen> {
       final connectionSpeed = await InternetSpeedChecker.checkSpeed(
         timeout: const Duration(seconds: 5),
       );
-      
+
       // If connection speed is null (no response) or very slow (>5000ms), treat as low network
       // 2G networks typically have response times >5000ms
       // Fast networks (5G, 4G, WiFi) usually have response times <3000ms
-      final isSlowConnection = connectionSpeed == null || connectionSpeed > 5000;
-      
+      final isSlowConnection =
+          connectionSpeed == null || connectionSpeed > 5000;
+
       if (isSlowConnection) {
         // Slow/2G network - hide Buy Credits section and show toast
         Constants.showToast("Check your Internet connection");
@@ -212,12 +214,14 @@ class _WalletScreenState extends State<WalletScreen> {
         final connectivity = Connectivity();
         final connectivityResults = await connectivity.checkConnectivity();
         final isWifi = connectivityResults.contains(ConnectivityResult.wifi);
-        final isEthernet = connectivityResults.contains(ConnectivityResult.ethernet);
-        
+        final isEthernet =
+            connectivityResults.contains(ConnectivityResult.ethernet);
+
         // Show for WiFi/Ethernet, hide for mobile (might be 2G)
         if (mounted) {
           setState(() {
-            _isLowNetwork = !isWifi && !isEthernet; // Hide for mobile, show for WiFi/Ethernet
+            _isLowNetwork = !isWifi &&
+                !isEthernet; // Hide for mobile, show for WiFi/Ethernet
           });
         }
         if (!isWifi && !isEthernet) {
@@ -413,28 +417,54 @@ class _WalletScreenState extends State<WalletScreen> {
 
     if (coinPacksJson != null && coinPacksJson.isNotEmpty) {
       try {
+        // Print the official API response from SharedPreferences
+        debugPrint(
+            '═══════════════════════════════════════════════════════════════════════');
+        debugPrint('Wallet Screen: Loading Coin Packs from API Response');
+        debugPrint('Raw Coin Packs JSON from API: $coinPacksJson');
+
         final coinPacksMap = jsonDecode(coinPacksJson) as Map<String, dynamic>;
+        debugPrint('Parsed Coin Packs Map: $coinPacksMap');
+        debugPrint('Coin Packs Count: ${coinPacksMap.length}');
+
         final packs = <Map<String, dynamic>>[];
 
         coinPacksMap.forEach((identifier, data) {
-          // Determine which price constant to use based on identifier
-          String priceFromConstants = '';
+          // Determine which credits and discount constants to use based on identifier
+          String creditsFromConstants = '';
+          String discountFromConstants = '';
           if (identifier == BibleInfo.coinPack1Id) {
-            priceFromConstants = BibleInfo.coinPack1Price;
+            creditsFromConstants = BibleInfo.coinPack1Credits;
+            discountFromConstants = BibleInfo.coinPack1Discount;
           } else if (identifier == BibleInfo.coinPack2Id) {
-            priceFromConstants = BibleInfo.coinPack2Price;
+            creditsFromConstants = BibleInfo.coinPack2Credits;
+            discountFromConstants = BibleInfo.coinPack2Discount;
           } else if (identifier == BibleInfo.coinPack3Id) {
-            priceFromConstants = BibleInfo.coinPack3Price;
+            creditsFromConstants = BibleInfo.coinPack3Credits;
+            discountFromConstants = BibleInfo.coinPack3Discount;
           }
 
-          packs.add({
+          final packData = {
             'identifier': identifier,
-            'credits': data['credits'] ??
-                '0', // Credits from API response (sub_fields.item_1)
-            'discount': data['discount'] ??
-                '0', // Discount from API response (sub_fields.value)
-            'price': priceFromConstants, // Price from constants as fallback
-          });
+            'credits': data['credits'] ?? creditsFromConstants.isNotEmpty
+                ? creditsFromConstants
+                : '0', // Credits from API response (sub_fields.item_1) or constants
+            'discount': data['discount'] ?? discountFromConstants.isNotEmpty
+                ? discountFromConstants
+                : '0', // Discount from API response (sub_fields.value) or constants
+            'price': '', // Price will come from IAP product details
+          };
+
+          // Print individual pack details
+          debugPrint('Coin Pack Details:');
+          debugPrint('  - Identifier: $identifier');
+          debugPrint('  - Credits (from API): ${data['credits']}');
+          debugPrint('  - Discount (from API): ${data['discount']}');
+          debugPrint('  - Credits (from constants): $creditsFromConstants');
+          debugPrint('  - Discount (from constants): $discountFromConstants');
+          debugPrint('  - Full Pack Data: $packData');
+
+          packs.add(packData);
         });
 
         // Sort by credits amount
@@ -443,6 +473,10 @@ class _WalletScreenState extends State<WalletScreen> {
           final bCredits = int.tryParse(b['credits']?.toString() ?? '0') ?? 0;
           return aCredits.compareTo(bCredits);
         });
+
+        debugPrint('Final Processed Coin Packs: $packs');
+        debugPrint(
+            '═══════════════════════════════════════════════════════════════════════');
 
         if (mounted) {
           setState(() {
@@ -472,21 +506,21 @@ class _WalletScreenState extends State<WalletScreen> {
       final packs = <Map<String, dynamic>>[
         {
           'identifier': coinPack1Id,
-          'credits': '100', // Default credits for pack 1
-          'discount': '20', // Default discount for pack 1
-          'price': BibleInfo.coinPack1Price, // Price from constants
+          'credits': BibleInfo.coinPack1Credits, // Credits from constants
+          'discount': BibleInfo.coinPack1Discount, // Discount from constants
+          'price': '', // Price will come from IAP product details
         },
         {
           'identifier': coinPack2Id,
-          'credits': '500', // Default credits for pack 2
-          'discount': '20', // Default discount for pack 2
-          'price': BibleInfo.coinPack2Price, // Price from constants
+          'credits': BibleInfo.coinPack2Credits, // Credits from constants
+          'discount': BibleInfo.coinPack2Discount, // Discount from constants
+          'price': '', // Price will come from IAP product details
         },
         {
           'identifier': coinPack3Id,
-          'credits': '1000', // Default credits for pack 3
-          'discount': '20', // Default discount for pack 3
-          'price': BibleInfo.coinPack3Price, // Price from constants
+          'credits': BibleInfo.coinPack3Credits, // Credits from constants
+          'discount': BibleInfo.coinPack3Discount, // Discount from constants
+          'price': '', // Price will come from IAP product details
         },
       ];
 
@@ -588,7 +622,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
         // Complete the purchase (important for consumables)
         if (purchaseDetails.pendingCompletePurchase) {
-        await _inAppPurchase.completePurchase(purchaseDetails);
+          await _inAppPurchase.completePurchase(purchaseDetails);
         }
 
         if (mounted && _loadingProductId == productId) {
@@ -648,7 +682,7 @@ class _WalletScreenState extends State<WalletScreen> {
     // This checks actual internet access, not just network interface availability
     final hasInternet = await InternetConnection().hasInternetAccess;
     if (!hasInternet) {
-      Constants.showToast("Check your internet connection.");
+      Constants.showToast("No Internet Connection");
       return;
     }
 
@@ -719,7 +753,7 @@ class _WalletScreenState extends State<WalletScreen> {
       // This checks actual internet access, not just network interface availability
       final hasInternet = await InternetConnection().hasInternetAccess;
       if (!hasInternet) {
-        Constants.showToast("Check your Internet connection", 6000);
+        Constants.showToast("No Internet Connection", 6000);
         return;
       }
 
@@ -1148,10 +1182,8 @@ class _WalletScreenState extends State<WalletScreen> {
       final identifier = pack['identifier'] as String;
       final credits = pack['credits']?.toString() ?? '0';
       final discount = pack['discount']?.toString() ?? '0';
-      // Read price directly from pack - this will be the latest value since we're iterating over _coinPacks
-      final priceFromConstants = (pack['price']?.toString() ?? '').trim();
       debugPrint(
-          'WalletScreen: Building card for $identifier - Credits: $credits, Price: "$priceFromConstants", isEmpty: ${priceFromConstants.isEmpty}, _coinPacks.length: ${_coinPacks.length}');
+          'WalletScreen: Building card for $identifier - Credits: $credits, Discount: $discount, _coinPacks.length: ${_coinPacks.length}');
 
       ProductDetails? product;
       try {
@@ -1315,41 +1347,20 @@ class _WalletScreenState extends State<WalletScreen> {
                                 : Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      // Use priceFromConstants directly - it's already read from the current pack
+                                      // Price comes from IAP product details
                                       Text(
                                         () {
-                                          // Determine display price
+                                          // Determine display price (only from IAP product details)
                                           String displayPrice;
                                           if (product != null &&
                                               product.price.isNotEmpty) {
                                             displayPrice = product.price;
-                                          } else if (priceFromConstants
-                                              .isNotEmpty) {
-                                            displayPrice = priceFromConstants;
                                           } else {
-                                            // Fallback: try to get price from constants directly
-                                            String fallbackPrice = '';
-                                            if (identifier ==
-                                                BibleInfo.coinPack1Id) {
-                                              fallbackPrice =
-                                                  BibleInfo.coinPack1Price;
-                                            } else if (identifier ==
-                                                BibleInfo.coinPack2Id) {
-                                              fallbackPrice =
-                                                  BibleInfo.coinPack2Price;
-                                            } else if (identifier ==
-                                                BibleInfo.coinPack3Id) {
-                                              fallbackPrice =
-                                                  BibleInfo.coinPack3Price;
-                                            }
-                                            displayPrice =
-                                                fallbackPrice.isNotEmpty
-                                                    ? fallbackPrice
-                                                    : 'Loading...';
+                                            displayPrice = 'Loading...';
                                           }
 
                                           debugPrint(
-                                              'WalletScreen: Text for $identifier - priceFromConstants: "$priceFromConstants", product: ${product?.id}, displayPrice: "$displayPrice"');
+                                              'WalletScreen: Text for $identifier - product: ${product?.id}, displayPrice: "$displayPrice"');
                                           return displayPrice;
                                         }(),
                                         style: TextStyle(

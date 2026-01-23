@@ -8,6 +8,7 @@ import 'package:biblebookapp/view/screens/authenitcation/view/otp_screen.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/rest_password_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import '../../../Model/auth/register_model.dart';
 import '../../../constant/size_config.dart';
 import '../../../view/constants/colors.dart';
@@ -315,7 +316,17 @@ class AuthNotifier extends ChangeNotifier {
         return false;
       }
     } catch (e) {
-      Constants.showToast("Check your Internet connection");
+      // Check if it's a network error (offline) vs other error
+      try {
+        final hasInternet = await InternetConnection().hasInternetAccess;
+        if (!hasInternet) {
+          Constants.showToast("No Internet Connection");
+        } else {
+          Constants.showToast("Check your Internet connection");
+        }
+      } catch (_) {
+        Constants.showToast("No Internet Connection");
+      }
       devtools.log("login notifier error is $e");
       return false;
     }
