@@ -58,6 +58,7 @@ class _SearchScreenState extends State<SearchScreen> {
   TextEditingController searchController = TextEditingController();
 
   bool isLoading = false;
+  bool _isBookNameSearchMode = false;
 
   double fontSize = Sizecf.scrnWidth! > 450 ? 25.0 : 15.0;
   var fontSizeS = "";
@@ -233,6 +234,34 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  String _normalizeBookKey(String input) {
+    return input.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+
+  MainBookListModel? _findMatchingBook(String query, List<MainBookListModel> books) {
+    final q = _normalizeBookKey(query.trim());
+    if (q.isEmpty) return null;
+
+    MainBookListModel? prefixMatch;
+    for (final book in books) {
+      if (book.bookNum == -1) continue; // "All Chapter"
+      final title = (book.title ?? '').toString();
+      final t = _normalizeBookKey(title);
+      if (t.isEmpty) continue;
+
+      // Prefer exact match (Genesis == genesis)
+      if (t == q) return book;
+
+      // Fallback: allow prefix match for partial typing (gen -> Genesis)
+      if (prefixMatch == null && q.length >= 3 && t.startsWith(q)) {
+        prefixMatch = book;
+      }
+    }
+    return prefixMatch;
+  }
+
+  int _safeInt(dynamic v) => int.tryParse(v?.toString() ?? '') ?? 0;
+
   Future<void> _searchFilter(value) async {
     // setState(() {
     //   if (selectedValueFilter == "ALL" && selectedBook.bookNum != -1) {
@@ -275,6 +304,41 @@ class _SearchScreenState extends State<SearchScreen> {
     await prefs.setString('OpenAd', '1');
     final downloadProvider =
         Provider.of<DownloadProvider>(context, listen: false);
+
+    // If user typed a book name (Genesis/Exodus/etc), show the full book content
+    // (all verses across all chapters) in this same results view.
+    final queryText = (value ?? '').toString().trim();
+    final booksSource =
+        downloadProvider.bookList.isNotEmpty ? downloadProvider.bookList : bookList;
+    final matchedBook = _findMatchingBook(queryText, booksSource);
+    if (matchedBook != null) {
+      List<VerseBookContentModel> bookVerses = [];
+      if (selectedValueFilter == "OT") {
+        bookVerses = downloadProvider.otVerseList
+            .where((v) => v.bookNum == matchedBook.bookNum)
+            .toList();
+      } else if (selectedValueFilter == "NT") {
+        bookVerses = downloadProvider.ntVerseList
+            .where((v) => v.bookNum == matchedBook.bookNum)
+            .toList();
+      } else {
+        bookVerses = downloadProvider.verseList
+            .where((v) => v.bookNum == matchedBook.bookNum)
+            .toList();
+      }
+
+      bookVerses.sort((a, b) {
+        final c = _safeInt(a.chapterNum).compareTo(_safeInt(b.chapterNum));
+        if (c != 0) return c;
+        return _safeInt(a.verseNum).compareTo(_safeInt(b.verseNum));
+      });
+
+      setState(() {
+        filterSelectedVersesContent = bookVerses;
+        _isBookNameSearchMode = true;
+      });
+      return;
+    }
 
     List<VerseBookContentModel> sourceList = [];
     downloadProvider.disableAd();
@@ -324,6 +388,7 @@ class _SearchScreenState extends State<SearchScreen> {
     await SharPreferences.setString('OpenAd', '1');
     setState(() {
       filterSelectedVersesContent = sourceList;
+      _isBookNameSearchMode = false;
     });
   }
 
@@ -727,159 +792,160 @@ class _SearchScreenState extends State<SearchScreen> {
                             },
                           ),
                         ),
-                        DropdownButtonHideUnderline(
-                          child: DropdownButton2<MainBookListModel>(
-                            isExpanded: true,
-                            items: selectedValueFilterIndex == 0
-                                ? bookList
-                                    .map((item) =>
-                                        DropdownMenuItem<MainBookListModel>(
-                                          value: item,
-                                          child: Text(
-                                            item.title.toString(),
-                                            style: TextStyle(
-                                              letterSpacing:
-                                                  BibleInfo.letterSpacing,
-                                              fontSize:
-                                                  BibleInfo.fontSizeScale *
-                                                              screenWidth >
-                                                          450
-                                                      ? 19
-                                                      : 15,
-                                              fontWeight: FontWeight.w400,
-                                              color: selectedBook.title ==
-                                                      item.title
-                                                  ? CommanColor
-                                                      .lightDarkPrimary(context)
-                                                  : Colors.black,
+                        if (!_isBookNameSearchMode)
+                          DropdownButtonHideUnderline(
+                            child: DropdownButton2<MainBookListModel>(
+                              isExpanded: true,
+                              items: selectedValueFilterIndex == 0
+                                  ? bookList
+                                      .map((item) =>
+                                          DropdownMenuItem<MainBookListModel>(
+                                            value: item,
+                                            child: Text(
+                                              item.title.toString(),
+                                              style: TextStyle(
+                                                letterSpacing:
+                                                    BibleInfo.letterSpacing,
+                                                fontSize:
+                                                    BibleInfo.fontSizeScale *
+                                                                screenWidth >
+                                                            450
+                                                        ? 19
+                                                        : 15,
+                                                fontWeight: FontWeight.w400,
+                                                color: selectedBook.title ==
+                                                        item.title
+                                                    ? CommanColor
+                                                        .lightDarkPrimary(context)
+                                                    : Colors.black,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
                                             ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ))
-                                    .toList()
-                                : selectedValueFilterIndex == 1
-                                    ? oTBookList
-                                        .map((item) =>
-                                            DropdownMenuItem<MainBookListModel>(
-                                              value: item,
-                                              child: Text(
-                                                item.title.toString(),
-                                                style: TextStyle(
-                                                  letterSpacing:
-                                                      BibleInfo.letterSpacing,
-                                                  fontSize:
-                                                      BibleInfo.fontSizeScale *
-                                                                  screenWidth >
-                                                              450
-                                                          ? 19
-                                                          : 15,
-                                                  fontWeight: FontWeight.w400,
-                                                  color: selectedBook.title ==
-                                                          item.title
-                                                      ? CommanColor
-                                                          .lightDarkPrimary(
-                                                              context)
-                                                      : Colors.black,
+                                          ))
+                                      .toList()
+                                  : selectedValueFilterIndex == 1
+                                      ? oTBookList
+                                          .map((item) =>
+                                              DropdownMenuItem<MainBookListModel>(
+                                                value: item,
+                                                child: Text(
+                                                  item.title.toString(),
+                                                  style: TextStyle(
+                                                    letterSpacing:
+                                                        BibleInfo.letterSpacing,
+                                                    fontSize:
+                                                        BibleInfo.fontSizeScale *
+                                                                    screenWidth >
+                                                                450
+                                                            ? 19
+                                                            : 15,
+                                                    fontWeight: FontWeight.w400,
+                                                    color: selectedBook.title ==
+                                                            item.title
+                                                        ? CommanColor
+                                                            .lightDarkPrimary(
+                                                                context)
+                                                        : Colors.black,
+                                                  ),
+                                                  overflow: TextOverflow.ellipsis,
                                                 ),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ))
-                                        .toList()
-                                    : nTBookList
-                                        .map((item) =>
-                                            DropdownMenuItem<MainBookListModel>(
-                                              value: item,
-                                              child: Text(
-                                                item.title.toString(),
-                                                style: TextStyle(
-                                                  letterSpacing:
-                                                      BibleInfo.letterSpacing,
-                                                  fontSize:
-                                                      BibleInfo.fontSizeScale *
-                                                                  screenWidth >
-                                                              450
-                                                          ? 19
-                                                          : 15,
-                                                  fontWeight: FontWeight.w400,
-                                                  color: selectedBook.title ==
-                                                          item.title
-                                                      ? CommanColor
-                                                          .lightDarkPrimary(
-                                                              context)
-                                                      : Colors.black,
+                                              ))
+                                          .toList()
+                                      : nTBookList
+                                          .map((item) =>
+                                              DropdownMenuItem<MainBookListModel>(
+                                                value: item,
+                                                child: Text(
+                                                  item.title.toString(),
+                                                  style: TextStyle(
+                                                    letterSpacing:
+                                                        BibleInfo.letterSpacing,
+                                                    fontSize:
+                                                        BibleInfo.fontSizeScale *
+                                                                    screenWidth >
+                                                                450
+                                                            ? 19
+                                                            : 15,
+                                                    fontWeight: FontWeight.w400,
+                                                    color: selectedBook.title ==
+                                                            item.title
+                                                        ? CommanColor
+                                                            .lightDarkPrimary(
+                                                                context)
+                                                        : Colors.black,
+                                                  ),
+                                                  overflow: TextOverflow.ellipsis,
                                                 ),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ))
-                                        .toList(),
-                            value: selectedBook.bookNum == -1
-                                ? null
-                                : selectedBook,
-                            onChanged: (newValue) async {
-                              FocusScopeNode currentFocus =
-                                  FocusScope.of(context);
-                              await SharPreferences.setString('OpenAd', '1');
-                              if (!currentFocus.hasPrimaryFocus) {
-                                currentFocus.unfocus();
-                              }
-                              setState(() {
-                                selectedBook = newValue!;
-                                filterSelectedVersesContent.clear();
-                              });
-                              _searchFilter(searchController.text);
-                            },
-                            hint: Text("All Chapter",
-                                style: screenWidth > 450
-                                    ? CommanStyle.black15400
-                                        .copyWith(fontSize: 19, fontFamily: selectedFontFamily)
-                                    : CommanStyle.black15400.copyWith(fontFamily: selectedFontFamily)),
-                            iconStyleData: IconStyleData(
-                              icon: const Icon(
-                                Icons.keyboard_arrow_down_sharp,
+                                              ))
+                                          .toList(),
+                              value: selectedBook.bookNum == -1
+                                  ? null
+                                  : selectedBook,
+                              onChanged: (newValue) async {
+                                FocusScopeNode currentFocus =
+                                    FocusScope.of(context);
+                                await SharPreferences.setString('OpenAd', '1');
+                                if (!currentFocus.hasPrimaryFocus) {
+                                  currentFocus.unfocus();
+                                }
+                                setState(() {
+                                  selectedBook = newValue!;
+                                  filterSelectedVersesContent.clear();
+                                });
+                                _searchFilter(searchController.text);
+                              },
+                              hint: Text("All Chapter",
+                                  style: screenWidth > 450
+                                      ? CommanStyle.black15400
+                                          .copyWith(fontSize: 19, fontFamily: selectedFontFamily)
+                                      : CommanStyle.black15400.copyWith(fontFamily: selectedFontFamily)),
+                              iconStyleData: IconStyleData(
+                                icon: const Icon(
+                                  Icons.keyboard_arrow_down_sharp,
+                                ),
+                                iconSize: screenWidth > 450 ? 30 : 20,
+                                iconEnabledColor:
+                                    CommanColor.lightDarkPrimary(context),
+                                iconDisabledColor:
+                                    CommanColor.lightDarkPrimary(context),
                               ),
-                              iconSize: screenWidth > 450 ? 30 : 20,
-                              iconEnabledColor:
-                                  CommanColor.lightDarkPrimary(context),
-                              iconDisabledColor:
-                                  CommanColor.lightDarkPrimary(context),
-                            ),
-                            buttonStyleData: ButtonStyleData(
-                                height: screenWidth > 450 ? 45 : 33,
+                              buttonStyleData: ButtonStyleData(
+                                  height: screenWidth > 450 ? 45 : 33,
+                                  width: MediaQuery.of(context).size.width * 0.43,
+                                  padding:
+                                      const EdgeInsets.only(left: 8, right: 3),
+                                  decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(5),
+                                      color: Colors.white),
+                                  elevation: 1,
+                                  overlayColor:
+                                      WidgetStateProperty.all(Colors.white)),
+                              menuItemStyleData: MenuItemStyleData(
+                                height: 33,
+                                padding: const EdgeInsets.only(left: 8, right: 3),
+                              ),
+                              dropdownStyleData: DropdownStyleData(
+                                maxHeight: 200,
                                 width: MediaQuery.of(context).size.width * 0.43,
-                                padding:
-                                    const EdgeInsets.only(left: 8, right: 3),
                                 decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(5),
-                                    color: Colors.white),
+                                  borderRadius: BorderRadius.circular(5),
+                                  color: Colors.white,
+                                ),
                                 elevation: 1,
-                                overlayColor:
-                                    WidgetStateProperty.all(Colors.white)),
-                            menuItemStyleData: MenuItemStyleData(
-                              height: 33,
-                              padding: const EdgeInsets.only(left: 8, right: 3),
-                            ),
-                            dropdownStyleData: DropdownStyleData(
-                              maxHeight: 200,
-                              width: MediaQuery.of(context).size.width * 0.43,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(5),
-                                color: Colors.white,
+                                scrollbarTheme: ScrollbarThemeData(
+                                    radius: const Radius.circular(20),
+                                    thickness: WidgetStateProperty.all(5.0),
+                                    minThumbLength: 20),
+                                offset: const Offset(0, -5),
                               ),
-                              elevation: 1,
-                              scrollbarTheme: ScrollbarThemeData(
-                                  radius: const Radius.circular(20),
-                                  thickness: WidgetStateProperty.all(5.0),
-                                  minThumbLength: 20),
-                              offset: const Offset(0, -5),
-                            ),
-                            style: TextStyle(
-                              letterSpacing: BibleInfo.letterSpacing,
-                              fontSize: BibleInfo.fontSizeScale * 14,
-                              fontWeight: FontWeight.w400,
-                              color: Colors.black,
+                              style: TextStyle(
+                                letterSpacing: BibleInfo.letterSpacing,
+                                fontSize: BibleInfo.fontSizeScale * 14,
+                                fontWeight: FontWeight.w400,
+                                color: Colors.black,
+                              ),
                             ),
                           ),
-                        ),
                       ],
                     ),
                   ),

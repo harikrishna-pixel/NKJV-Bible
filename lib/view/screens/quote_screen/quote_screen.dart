@@ -21,6 +21,10 @@ class QuoteScreen extends HookConsumerWidget {
     final quotesState = ref.watch(quotesCategoryBloc).quotesCategoryState;
     final hasShownToast = useRef(false);
     final hasCheckedNetwork = useRef(false);
+    final screenSize = MediaQuery.of(context).size;
+    final screenWidth = screenSize.width;
+    final isVintageTheme = p.Provider.of<ThemeProvider>(context).currentCustomTheme ==
+        AppCustomTheme.vintage;
     
     useMemoized(() {
       WidgetsBinding.instance.addPostFrameCallback((callback) {
@@ -57,46 +61,50 @@ class QuoteScreen extends HookConsumerWidget {
       return null;
     }, [quotesState.isLoading]);
     return Scaffold(
-        body: Container(
-      height: MediaQuery.of(context).size.height,
-      width: MediaQuery.of(context).size.width,
-      decoration: p.Provider.of<ThemeProvider>(context).currentCustomTheme ==
-              AppCustomTheme.vintage
-          ? BoxDecoration(
-              image: DecorationImage(
-                  image: AssetImage(Images.bgImage(context)), fit: BoxFit.fill))
-          : null,
-      child: SafeArea(
-        child: Column(
-          children: [
-            SizedBox(
-              height: 12,
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                InkWell(
-                  onTap: () {
-                    Get.back();
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 15.0),
-                    child: Icon(
-                      Icons.arrow_back_ios,
-                      size: 20,
-                      color: CommanColor.whiteBlack(context),
+      body: Container(
+        height: screenSize.height,
+        width: screenSize.width,
+        decoration: isVintageTheme
+            ? BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage(Images.bgImage(context)),
+                  fit: BoxFit.fill,
+                ),
+              )
+            : BoxDecoration(
+                color: CommanColor.Blackwhite(context),
+              ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              SizedBox(
+                height: 12,
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  InkWell(
+                    onTap: () {
+                      Get.back();
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 15.0),
+                      child: Icon(
+                        Icons.arrow_back_ios,
+                        size: 20,
+                        color: CommanColor.whiteBlack(context),
+                      ),
                     ),
                   ),
-                ),
-                Text("Quotes", style: CommanStyle.appBarStyle(context)),
-                const SizedBox(width: 20)
-              ],
-            ),
-            const SizedBox(
-              height: 15,
-            ),
-            Expanded(
-              child: quotesState.when(
+                  Text("Quotes", style: CommanStyle.appBarStyle(context)),
+                  const SizedBox(width: 20)
+                ],
+              ),
+              const SizedBox(
+                height: 15,
+              ),
+              Expanded(
+                child: quotesState.when(
                 data: (data) {
                   // Check network speed if data is empty and haven't checked yet
                   if (data.isEmpty && !hasCheckedNetwork.value) {
@@ -130,13 +138,14 @@ class QuoteScreen extends HookConsumerWidget {
                     physics: const BouncingScrollPhysics(),
                     itemCount: data.length,
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 20),
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                     gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                            mainAxisSpacing: 6,
-                            crossAxisSpacing: 6,
-                            childAspectRatio: 1.4,
-                            crossAxisCount: 2),
+                        SliverGridDelegateWithFixedCrossAxisCount(
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: screenWidth > 600 ? 1.75 : 1.4,
+                      crossAxisCount: 2,
+                    ),
                     itemBuilder: (context, index) => CategoryWidget(
                       category: data[index],
                       isWallpaper: false,
@@ -146,35 +155,37 @@ class QuoteScreen extends HookConsumerWidget {
                 error: (error, st) {
                   return Center(child: Text('Check your Internet connection'));
                 },
-                loading: () => Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  //   crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Align(
-                      alignment: Alignment.center,
-                      child: Column(
-                        children: [
-                          SizedBox(
-                            height: 50,
-                            width: 50,
-                            child: CircularProgressIndicator.adaptive(),
-                          ),
-                          Text(
-                            "Loading...",
-                          ),
-                        ],
+                loading: () => Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(
+                        height: 44,
+                        width: 44,
+                        child: CircularProgressIndicator.adaptive(),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 12),
+                      Text(
+                        "Loading...",
+                        style: TextStyle(
+                          color: CommanColor.whiteBlack(context)
+                              .withOpacity(0.85),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               // const Center(
               //     child: CircularProgressIndicator.adaptive())),
-            )
-          ],
+              )
+            ],
+          ),
         ),
       ),
-    ));
+    );
   }
 }
 

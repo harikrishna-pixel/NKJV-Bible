@@ -11,6 +11,7 @@
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
+		B15A371D2F29E552006454BA /* bell.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B15A371C2F29E552006454BA /* bell.mp3 */; };
 		C1EA71597E67699CD62D1CC5 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 413BDC41C4F0F89A62B893A3 /* Pods_Runner.framework */; };
 		D46DC1882CB8003400AC7AD7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = D46DC1872CB8003300AC7AD7 /* GoogleService-Info.plist */; };
 		D4A3F9352CA194B000866824 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D4A3F9332CA194B000866824 /* Main.storyboard */; };
@@ -45,6 +46,7 @@
 		97C146EE1CF9000F007C117D /* Runner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Runner.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		97C146FD1CF9000F007C117D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B15A371C2F29E552006454BA /* bell.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = bell.mp3; sourceTree = "<group>"; };
 		D26F2C5DAD1D80C6510EDE6B /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
 		D46DC1872CB8003300AC7AD7 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		D4A3F9322CA1909300866824 /* Runner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
@@ -106,6 +108,7 @@
 			isa = PBXGroup;
 			children = (
 				D4A3F9322CA1909300866824 /* Runner.entitlements */,
+				B15A371C2F29E552006454BA /* bell.mp3 */,
 				D46DC1872CB8003300AC7AD7 /* GoogleService-Info.plist */,
 				D4A3F9342CA194B000866824 /* LaunchScreen.storyboard */,
 				D4A3F9332CA194B000866824 /* Main.storyboard */,
@@ -199,6 +202,7 @@
 				D46DC1882CB8003400AC7AD7 /* GoogleService-Info.plist in Resources */,
 				3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */,
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
+				B15A371D2F29E552006454BA /* bell.mp3 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

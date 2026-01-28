@@ -70,6 +70,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   bool _shouldShowRestoreDialog =
       false; // Track if restore dialog should be shown
   String? _pendingRestoreProductId; // Store product ID for pending restore
+  Timer? _loadingTimeoutTimer; // Timer for 10-second loading timeout
 
   void _sortProducts() {
     _products.sort((a, b) {
@@ -270,6 +271,19 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           });
         }
         EasyLoading.show();
+        
+        // Start 10-second timeout timer for loading
+        _loadingTimeoutTimer?.cancel(); // Cancel any existing timer
+        _loadingTimeoutTimer = Timer(const Duration(seconds: 10), () {
+          if (mounted) {
+            debugPrint('IAP Loading timeout - dismissing after 10 seconds');
+            EasyLoading.dismiss();
+            setState(() {
+              userTap = false;
+            });
+          }
+        });
+        
         await SharPreferences.setString('OpenAd', '1');
 
         // Check again before purchase (in case subscription status changed)
@@ -279,6 +293,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           // Set flag to show restore dialog when purchase stream detects restored status
           _shouldShowRestoreDialog = true;
           _pendingRestoreProductId = prod.id;
+          _loadingTimeoutTimer?.cancel(); // Cancel timeout timer
           EasyLoading.dismiss();
           if (mounted) {
             setState(() {
@@ -300,12 +315,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         // });
       } catch (e) {
         debugPrint('Error: $e');
+        _loadingTimeoutTimer?.cancel(); // Cancel timeout timer on error
       } finally {
-        if (mounted) {
-          setState(() {
-            userTap = false;
-          });
-        }
+        // Don't reset userTap here immediately - let timeout or purchase completion handle it
+        // This prevents premature reset if user closes system dialog
       }
     }
   }
@@ -1001,9 +1014,18 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       await SharPreferences.setString('OpenAd', '1');
       if (purchaseDetails.status == PurchaseStatus.pending) {
       } else {
+        // Cancel loading timeout timer when purchase completes (success or error)
+        _loadingTimeoutTimer?.cancel();
+        
         if (purchaseDetails.status == PurchaseStatus.error) {
           debugPrint('Error: ${purchaseDetails.error}');
           DebugConsole.log(" purchases error - $purchaseDetails");
+          // Reset userTap on error
+          if (mounted) {
+            setState(() {
+              userTap = false;
+            });
+          }
         } else if (purchaseDetails.status == PurchaseStatus.purchased ||
             purchaseDetails.status == PurchaseStatus.restored) {
           if (purchaseDetails.status == PurchaseStatus.purchased) {
@@ -1585,6 +1607,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   void dispose() {
     debugPrint("iap ad - dispose");
     _subscription?.cancel();
+    _loadingTimeoutTimer?.cancel(); // Cancel loading timeout timer
     // Reset exit offer flag on dispose
     _isExitOfferShowing = false;
     // Call async clean-up without awaiting

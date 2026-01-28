@@ -90,15 +90,19 @@ class NotificationsServices {
       setTime,
       NotificationDetails(
         android: AndroidNotificationDetails(
-          id.toString(),
-          "Go TO Bed",
+          'daily_verse_channel',
+          'Daily Verse Notifications',
+          channelDescription: 'Notifications for daily Bible verses',
           importance: Importance.max,
           priority: Priority.max,
           icon: "@mipmap/ic_launcher",
           sound: const RawResourceAndroidNotificationSound('bell'),
+          playSound: true,
+          enableVibration: true,
         ),
         iOS: const DarwinNotificationDetails(
-          sound: 'bell.caf',
+          sound: 'bell.mp3',
+          presentSound: true,
         ),
       ),
       uiLocalNotificationDateInterpretation:

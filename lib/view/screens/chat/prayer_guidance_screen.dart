@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:audioplayers/audioplayers.dart';
@@ -33,6 +34,10 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
   late AudioPlayer _audioPlayer;
   bool _isAudioPlaying = false;
   bool _isAudioMuted = false;
+
+  // AMEN toast overlay (shown slightly above bottom so it won't cover AMEN button)
+  OverlayEntry? _amenToastEntry;
+  Timer? _amenToastTimer;
 
   // Background music asset path (without 'assets/' prefix as AssetSource adds it automatically)
   static const String _backgroundMusicUrl =
@@ -230,13 +235,70 @@ ${category.prompt}
     // Get the message for this tap
     final message = amenMessages[messageIndex % amenMessages.length];
 
-    // Show toast
-    Constants.showToast(message, 3000);
+    // Show toast (slightly above bottom so it won't cover AMEN button)
+    _showAmenOverlayToast(message);
 
     // Rotate to next message index for next tap
     final nextIndex = (messageIndex + 1) % amenMessages.length;
     await SharPreferences.setInt(
         SharPreferences.prayerAmenMessageIndex, nextIndex);
+  }
+
+  void _showAmenOverlayToast(String message) {
+    if (!mounted) return;
+
+    _amenToastTimer?.cancel();
+    _amenToastEntry?.remove();
+    _amenToastEntry = null;
+
+    final overlay = Overlay.of(context);
+
+    final bottomSafe = MediaQuery.of(context).padding.bottom;
+    // Keep it above the bottom button area.
+    final bottomOffset = bottomSafe + 90;
+
+    _amenToastEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        left: 16,
+        right: 16,
+        bottom: bottomOffset,
+        child: IgnorePointer(
+          ignoring: true,
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF745248).withOpacity(0.95),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 12,
+                    offset: Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(_amenToastEntry!);
+    _amenToastTimer = Timer(const Duration(milliseconds: 2500), () {
+      _amenToastEntry?.remove();
+      _amenToastEntry = null;
+    });
   }
 
   Future<void> _sendCustomPrayerRequest(String customRequest) async {
@@ -493,6 +555,9 @@ Include 1-2 Geneva Bible verse references that relate to the request.
 
   @override
   void dispose() {
+    _amenToastTimer?.cancel();
+    _amenToastEntry?.remove();
+    _amenToastEntry = null;
     _audioPlayer.stop();
     _audioPlayer.dispose();
     _customPrayerController.dispose();

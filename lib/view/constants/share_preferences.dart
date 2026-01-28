@@ -108,9 +108,10 @@ class SharPreferences {
   // Check if ad has been shown today for bookmark/notes/images/underline actions
   static Future<bool> hasShownActionAdToday() async {
     final prefs = await SharedPreferences.getInstance();
-    final todayKey = DateTime.now().toIso8601String().split('T')[0]; // Get YYYY-MM-DD
+    final todayKey =
+        DateTime.now().toIso8601String().split('T')[0]; // Get YYYY-MM-DD
     final lastShownDate = prefs.getString('action_ad_last_shown_date');
-    
+
     if (lastShownDate == todayKey) {
       return true; // Ad already shown today
     }
@@ -120,7 +121,8 @@ class SharPreferences {
   // Mark that ad has been shown today for bookmark/notes/images/underline actions
   static Future<void> markActionAdShownToday() async {
     final prefs = await SharedPreferences.getInstance();
-    final todayKey = DateTime.now().toIso8601String().split('T')[0]; // Get YYYY-MM-DD
+    final todayKey =
+        DateTime.now().toIso8601String().split('T')[0]; // Get YYYY-MM-DD
     await prefs.setString('action_ad_last_shown_date', todayKey);
   }
 

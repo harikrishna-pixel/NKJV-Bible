@@ -2183,7 +2183,9 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                             child: Text(
                               'Faith Chat',
                               style: TextStyle(
-                                color: CommanColor.whiteBlack(context),
+                                color: isDark
+                                    ? Colors.white
+                                    : const Color(0xFF8D6E63),
                                 fontSize: screenWidth > 450 ? 18 : 16,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -2192,116 +2194,307 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                         )
                       else
                         Spacer(),
+                      // Right pill (Wallet/Credits + New Chat) + History icon
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          GestureDetector(
-                            onTap: () {
-                              Get.to(
-                                () => const WalletScreen(),
-                                transition: Transition.cupertinoDialog,
-                                duration: const Duration(milliseconds: 300),
-                              )?.then((_) {
-                                // Refresh credits when returning from wallet screen
-                                _loadCreditsFromLocal();
-                              });
-                            },
-                            child: Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: screenWidth > 450 ? 8 : 6,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: screenWidth > 450 ? 12 : 10,
+                              vertical: screenWidth > 450 ? 10 : 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? CommanColor.darkPrimaryColor
+                                      .withOpacity(0.35)
+                                  : const Color(0xFFF6F1E9).withOpacity(0.65),
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(
                                 color: isDark
-                                    ? CommanColor.darkPrimaryColor
-                                        .withOpacity(0.6)
-                                    : CommanColor.lightDarkPrimary(context)
-                                        .withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(10),
+                                    ? Colors.white.withOpacity(0.18)
+                                    : const Color(0xFF8D6E63).withOpacity(0.18),
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.account_balance_wallet,
-                                    size: screenWidth > 450 ? 26 : 24,
-                                    color: isDark
-                                        ? Colors.white
-                                        : CommanColor.lightDarkPrimary(context),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(18),
+                                  onTap: () {
+                                    Get.to(
+                                      () => const WalletScreen(),
+                                      transition: Transition.cupertinoDialog,
+                                      duration:
+                                          const Duration(milliseconds: 300),
+                                    )?.then((_) {
+                                      // Refresh credits when returning from wallet screen
+                                      _loadCreditsFromLocal();
+                                    });
+                                  },
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.account_balance_wallet,
+                                        size: screenWidth > 450 ? 22 : 20,
+                                        color: isDark
+                                            ? Colors.white
+                                            : const Color(0xFF8D6E63),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '$_currentCredits',
+                                        style: TextStyle(
+                                          color: isDark
+                                              ? Colors.white
+                                              : const Color(0xFF8D6E63),
+                                          fontSize: screenWidth > 450 ? 14 : 13,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '$_currentCredits',
-                                    style: TextStyle(
+                                ),
+                                SizedBox(width: screenWidth > 450 ? 12 : 10),
+                                Container(
+                                  width: 1,
+                                  height: screenWidth > 450 ? 18 : 16,
+                                  color: isDark
+                                      ? Colors.white.withOpacity(0.22)
+                                      : const Color(0xFF8D6E63)
+                                          .withOpacity(0.22),
+                                ),
+                                SizedBox(width: screenWidth > 450 ? 12 : 10),
+                                // Keep the existing new-chat logic unchanged
+                                if (_messages.any((msg) => !msg.isUser))
+                                  InkWell(
+                                    borderRadius: BorderRadius.circular(18),
+                                    onTap: () {
+                                      showModalBottomSheet(
+                                        context: context,
+                                        backgroundColor: Colors.transparent,
+                                        builder: (_) {
+                                          final bg = isDark
+                                              ? CommanColor.darkPrimaryColor
+                                                  .withOpacity(0.96)
+                                              : const Color(0xFFF6F1E9);
+                                          return SafeArea(
+                                            child: Container(
+                                              margin: const EdgeInsets.all(12),
+                                              padding: const EdgeInsets.all(12),
+                                              decoration: BoxDecoration(
+                                                color: bg,
+                                                borderRadius:
+                                                    BorderRadius.circular(18),
+                                              ),
+                                              child: Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  ListTile(
+                                                    dense: true,
+                                                    leading: Icon(
+                                                      Icons.add,
+                                                      color: isDark
+                                                          ? Colors.white
+                                                          : const Color(
+                                                              0xFF8D6E63),
+                                                    ),
+                                                    title: Text(
+                                                      'New Chat',
+                                                      style: TextStyle(
+                                                        color: isDark
+                                                            ? Colors.white
+                                                            : const Color(
+                                                                0xFF8D6E63),
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                    onTap: () {
+                                                      Navigator.pop(context);
+                                                      if (_messages
+                                                          .isNotEmpty) {
+                                                        _showNewChatBottomSheet();
+                                                      } else {
+                                                        _startNewChat();
+                                                      }
+                                                    },
+                                                  ),
+                                                  const Divider(height: 1),
+                                                  ListTile(
+                                                    dense: true,
+                                                    leading: Image.asset(
+                                                      "assets/message-time.png",
+                                                      width: 22,
+                                                      height: 22,
+                                                      color: isDark
+                                                          ? Colors.white
+                                                          : const Color(
+                                                              0xFF8D6E63),
+                                                    ),
+                                                    title: Text(
+                                                      'History',
+                                                      style: TextStyle(
+                                                        color: isDark
+                                                            ? Colors.white
+                                                            : const Color(
+                                                                0xFF8D6E63),
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                    onTap: () {
+                                                      Navigator.pop(context);
+                                                      Get.to(
+                                                        () =>
+                                                            const ChatHistoryScreen(),
+                                                        transition: Transition
+                                                            .cupertinoDialog,
+                                                        duration:
+                                                            const Duration(
+                                                                milliseconds:
+                                                                    300),
+                                                      );
+                                                    },
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      );
+                                    },
+                                    child: Icon(
+                                      Icons.add,
+                                      size: screenWidth > 450 ? 22 : 20,
                                       color: isDark
                                           ? Colors.white
-                                          : CommanColor.lightDarkPrimary(
-                                              context),
-                                      fontSize: screenWidth > 450 ? 13 : 12,
-                                      fontWeight: FontWeight.w600,
+                                          : const Color(0xFF8D6E63),
+                                    ),
+                                  )
+                                else
+                                  InkWell(
+                                    borderRadius: BorderRadius.circular(18),
+                                    onTap: () {
+                                      showModalBottomSheet(
+                                        context: context,
+                                        backgroundColor: Colors.transparent,
+                                        builder: (_) {
+                                          final bg = isDark
+                                              ? CommanColor.darkPrimaryColor
+                                                  .withOpacity(0.96)
+                                              : const Color(0xFFF6F1E9);
+                                          return SafeArea(
+                                            child: Container(
+                                              margin: const EdgeInsets.all(12),
+                                              padding: const EdgeInsets.all(12),
+                                              decoration: BoxDecoration(
+                                                color: bg,
+                                                borderRadius:
+                                                    BorderRadius.circular(18),
+                                              ),
+                                              child: Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  ListTile(
+                                                    dense: true,
+                                                    leading: Icon(
+                                                      Icons.add,
+                                                      color: isDark
+                                                          ? Colors.white
+                                                          : const Color(
+                                                              0xFF8D6E63),
+                                                    ),
+                                                    title: Text(
+                                                      'New Chat',
+                                                      style: TextStyle(
+                                                        color: isDark
+                                                            ? Colors.white
+                                                            : const Color(
+                                                                0xFF8D6E63),
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                    onTap: () {
+                                                      Navigator.pop(context);
+                                                      _startNewChat();
+                                                    },
+                                                  ),
+                                                  const Divider(height: 1),
+                                                  ListTile(
+                                                    dense: true,
+                                                    leading: Image.asset(
+                                                      "assets/message-time.png",
+                                                      width: 22,
+                                                      height: 22,
+                                                      color: isDark
+                                                          ? Colors.white
+                                                          : const Color(
+                                                              0xFF8D6E63),
+                                                    ),
+                                                    title: Text(
+                                                      'History',
+                                                      style: TextStyle(
+                                                        color: isDark
+                                                            ? Colors.white
+                                                            : const Color(
+                                                                0xFF8D6E63),
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                    onTap: () {
+                                                      Navigator.pop(context);
+                                                      Get.to(
+                                                        () =>
+                                                            const ChatHistoryScreen(),
+                                                        transition: Transition
+                                                            .cupertinoDialog,
+                                                        duration:
+                                                            const Duration(
+                                                                milliseconds:
+                                                                    300),
+                                                      );
+                                                    },
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      );
+                                    },
+                                    child: Icon(
+                                      Icons.add,
+                                      size: screenWidth > 450 ? 22 : 20,
+                                      color: isDark
+                                          ? Colors.white
+                                          : const Color(0xFF8D6E63),
                                     ),
                                   ),
-                                ],
-                              ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          // Wallet icon button
+                          const SizedBox(width: 8),
                           // IconButton(
-                          //   icon: Icon(
-                          //     Icons.account_balance_wallet,
+                          //   icon: Image.asset(
+                          //     "assets/message-time.png",
+                          //     width: 24,
+                          //     height: 24,
                           //     color: isDark
                           //         ? Colors.white
-                          //         : CommanColor.lightDarkPrimary(context),
+                          //         : const Color(0xFF8D6E63),
                           //   ),
-                          //   tooltip: 'Wallet',
+                          //   tooltip: 'Chat History',
                           //   onPressed: () {
                           //     Get.to(
-                          //       () => const WalletScreen(),
+                          //       () => const ChatHistoryScreen(),
                           //       transition: Transition.cupertinoDialog,
                           //       duration: const Duration(milliseconds: 300),
-                          //     )?.then((_) {
-                          //       // Refresh credits when returning from wallet screen
-                          //       _loadCreditsFromLocal();
-                          //     });
+                          //     );
                           //   },
                           // ),
-                          // Show new chat icon when at least one response has been received
-                          if (_messages.any((msg) => !msg.isUser))
-                            IconButton(
-                              icon: Icon(
-                                Icons.add_circle_outline,
-                                color: isDark
-                                    ? Colors.white
-                                    : CommanColor.lightDarkPrimary(context),
-                              ),
-                              tooltip: 'New Chat',
-                              onPressed: () {
-                                if (_messages.isNotEmpty) {
-                                  _showNewChatBottomSheet();
-                                } else {
-                                  _startNewChat();
-                                }
-                              },
-                            ),
-                          IconButton(
-                            icon: Image.asset(
-                              "assets/message-time.png",
-                              width: 24,
-                              height: 24,
-                              color: isDark
-                                  ? Colors.white
-                                  : CommanColor.lightDarkPrimary(context),
-                            ),
-                            tooltip: 'Chat History',
-                            onPressed: () {
-                              Get.to(
-                                () => const ChatHistoryScreen(),
-                                transition: Transition.cupertinoDialog,
-                                duration: const Duration(milliseconds: 300),
-                              );
-                            },
-                          ),
                         ],
                       ),
                     ],
@@ -2822,8 +3015,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
       padding: EdgeInsets.only(
         left: screenWidth > 450 ? 20 : 16,
         right: screenWidth > 450 ? 20 : 16,
-        top: screenWidth > 450 ? 8 : 6,
-        bottom: screenWidth > 450 ? 8 : 12,
+        top: screenWidth > 450 ? 4 : 2,
+        bottom: screenWidth > 450 ? 6 : 8,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2832,14 +3025,16 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
           Text(
             'Suggestions',
             style: TextStyle(
-              color: CommanColor.whiteBlack(context).withOpacity(0.7),
-              fontSize: screenWidth > 450 ? 15 : 13.5,
+              color: isDark
+                  ? Colors.white.withOpacity(0.75)
+                  : const Color(0xFF8D6E63).withOpacity(0.65),
+              fontSize: screenWidth > 450 ? 14 : 12.5,
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           SizedBox(
-            height: screenWidth > 450 ? 180 : 160,
+            height: screenWidth > 450 ? 160 : 138,
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -2880,11 +3075,12 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                           bottom: screenWidth > 450 ? 16 : 14,
                         ),
                         decoration: BoxDecoration(
-                          color: CommanColor.lightDarkPrimary(context),
+                          color: const Color(
+                              0xFF8D6E63), // Brown color matching user message
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: isTapped
-                                ? CommanColor.lightDarkPrimary(context)
+                                ? const Color(0xFF8D6E63)
                                 : Colors.transparent,
                             width: isTapped ? 2 : 0,
                           ),
@@ -2899,7 +3095,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                 child: Icon(
                                   Icons.north_east,
                                   size: screenWidth > 450 ? 20 : 18,
-                                  color: CommanColor.white.withOpacity(0.7),
+                                  color: const Color(0xFFF6F1E9)
+                                      .withOpacity(0.7), // Light beige icon
                                 ),
                               ),
                             ),
@@ -2907,7 +3104,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                               question,
                               textAlign: TextAlign.start,
                               style: TextStyle(
-                                color: CommanColor.white,
+                                color:
+                                    const Color(0xFFF6F1E9), // Light beige text
                                 fontSize: screenWidth > 450 ? 15 : 14,
                                 fontWeight: FontWeight.w500,
                                 height: 1.4,
@@ -3553,7 +3751,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
     final baseColor =
-        isUser ? CommanColor.white : CommanColor.whiteBlack(context);
+        isUser ? const Color(0xFFF6F1E9) : const Color(0xFF8D6E63);
     // Use a brighter, more visible color for verse highlighting
     // For AI responses (isUser = false): use yellow in light mode, white in dark mode
     // For user messages: use the same colors
@@ -3561,9 +3759,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
         ? Colors
             .white // White color for dark mode - highly visible against dark background
         : (isUser
-            ? CommanColor.white // Keep white for user messages in light mode
-            : Colors
-                .brown); // Light yellow/gold color for AI responses in light mode - visible against light beige background
+            ? const Color(0xFFF6F1E9) // Match user text in light mode
+            : const Color(0xFF8D6E63)); // Match AI text in light mode
 
     // Pattern to match verse references like "John 3:16", "Genesis 1:1-3", "1 Corinthians 13:4-7", "John 3:16, 17", etc.
     // Matches: Book name (with optional number prefix) + chapter:verse (with optional verse range or comma-separated verses)
@@ -3756,19 +3953,13 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
               padding: EdgeInsets.all(screenWidth > 450 ? 16 : 14),
               decoration: BoxDecoration(
                 color: isUser
-                    ? CommanColor.lightDarkPrimary(context)
+                    ? const Color(0xFF8D6E63) // Brown color for user messages
                     : (isDark
                         ? CommanColor.darkPrimaryColor.withOpacity(0.5)
-                        : (themeProvider.currentCustomTheme ==
-                                AppCustomTheme.vintage
-                            ? themeProvider.backgroundColor.withOpacity(0.9)
-                            : CommanColor.backgrondcolor.withOpacity(0.9))),
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(20),
-                  topRight: const Radius.circular(20),
-                  bottomLeft: Radius.circular(isUser ? 20 : 4),
-                  bottomRight: Radius.circular(isUser ? 4 : 20),
-                ),
+                        : const Color(
+                            0xFFF6F1E9)), // Light beige like screenshot
+                borderRadius:
+                    BorderRadius.circular(20), // round like screenshot
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -3777,8 +3968,12 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                     text: TextSpan(
                       style: TextStyle(
                         color: isUser
-                            ? Colors.white
-                            : CommanColor.whiteBlack(context).withOpacity(0.5),
+                            ? const Color(
+                                0xFFF6F1E9) // Light beige text for user messages
+                            : (isDark
+                                ? Colors.white.withOpacity(0.9)
+                                : const Color(
+                                    0xFF8D6E63)), // Brown text like screenshot
                         fontSize: screenWidth > 450 ? 18 : 16,
                         fontWeight: FontWeight.w500,
                         height: 1.4,
@@ -3796,9 +3991,12 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                         DateFormat('HH:mm').format(message.timestamp),
                         style: TextStyle(
                           color: isUser
-                              ? Colors.white.withOpacity(0.9)
-                              : CommanColor.whiteBlack(context)
-                                  .withOpacity(0.5),
+                              ? const Color(0xFFF6F1E9).withOpacity(
+                                  0.8) // Light beige for user timestamp
+                              : (isDark
+                                  ? Colors.white.withOpacity(0.7)
+                                  : const Color(0xFF8D6E63).withOpacity(
+                                      0.6)), // Dark brown for AI timestamp
                           fontSize: screenWidth > 450 ? 12 : 11,
                         ),
                       ),
@@ -3824,8 +4022,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                     border: Border.all(
                                       color: isDark
                                           ? Colors.white
-                                          : CommanColor.lightDarkPrimary(
-                                              context),
+                                          : const Color(
+                                              0xFF8D6E63), // Brown border like screenshot
                                       width: 1.4,
                                     ),
                                   ),
@@ -3833,8 +4031,10 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                     "assets/Bookmark icons/Frame 3630.png",
                                     height: screenWidth > 450 ? 18 : 15,
                                     width: screenWidth > 450 ? 18 : 15,
-                                    color: CommanColor.whiteBlack(context)
-                                        .withOpacity(0.4),
+                                    color: isDark
+                                        ? Colors.white.withOpacity(0.7)
+                                        : const Color(0xFF8D6E63).withOpacity(
+                                            0.7), // Brown icon like screenshot
                                   ),
                                 ),
                               ),
@@ -3865,16 +4065,18 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                     border: Border.all(
                                       color: isDark
                                           ? Colors.white
-                                          : CommanColor.lightDarkPrimary(
-                                              context),
+                                          : const Color(
+                                              0xFF8D6E63), // Brown border like screenshot
                                       width: 1.4,
                                     ),
                                   ),
                                   child: Icon(
                                     Icons.share,
                                     size: screenWidth > 450 ? 18 : 15,
-                                    color: CommanColor.whiteBlack(context)
-                                        .withOpacity(0.4),
+                                    color: isDark
+                                        ? Colors.white.withOpacity(0.7)
+                                        : const Color(0xFF8D6E63).withOpacity(
+                                            0.7), // Brown icon like screenshot
                                   ),
                                 ),
                               ),
@@ -4028,7 +4230,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
         color: Colors.transparent,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black12.withOpacity(0.08),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),

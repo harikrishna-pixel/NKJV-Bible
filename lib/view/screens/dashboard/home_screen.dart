@@ -42,6 +42,7 @@ import 'package:biblebookapp/view/screens/quote_screen/quote_screen.dart';
 import 'package:biblebookapp/view/screens/wallpaper_screen/wallpaper_screen.dart';
 import 'package:biblebookapp/view/screens/chat/chat_screen.dart';
 import 'package:biblebookapp/view/screens/chat/prayer_guidance_screen.dart';
+import 'package:biblebookapp/view/screens/tawk_chat/tawk_chat_screen.dart';
 import 'package:popover/popover.dart';
 
 import 'package:biblebookapp/view/widget/verse_item_widget.dart';
@@ -4778,6 +4779,34 @@ class _HomeScreenState extends State<HomeScreen>
                               style: CommanStyle.bothPrimary16600(context),
                             ),
                           ),
+                        ListTile(
+                          dense: true,
+                          onTap: () {
+                            Get.back();
+                            if (controller.adFree.value == false) {
+                              controller.bannerAd?.dispose();
+                              controller.bannerAd?.load();
+                            }
+                            Get.to(() => const TawkChatScreen(),
+                                transition: Transition.cupertinoDialog,
+                                duration: const Duration(milliseconds: 300));
+                          },
+                          visualDensity:
+                              const VisualDensity(horizontal: 0, vertical: 0),
+                          leading: Icon(
+                            Icons.support_agent,
+                            size: 24,
+                            color:
+                                Provider.of<ThemeProvider>(context).themeMode ==
+                                        ThemeMode.dark
+                                    ? CommanColor.darkPrimaryColor
+                                    : CommanColor.lightModePrimary,
+                          ),
+                          title: Text(
+                            'Chat Us',
+                            style: CommanStyle.bothPrimary16600(context),
+                          ),
+                        ),
                         ListTile(
                           dense: true,
                           onTap: () async {

@@ -32,11 +32,13 @@ class MarkAsReadScreen extends StatefulWidget {
 
 class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
   String _currentMessage = "";
+  String _readingPercentage = "0";
 
   @override
   void initState() {
     super.initState();
     _loadRotatingMessage();
+    _loadReadingPercentage();
   }
 
   Future<void> _loadRotatingMessage() async {
@@ -60,6 +62,36 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
     final nextIndex = (messageIndex + 1) % markAsReadMessages.length;
     await SharPreferences.setInt(
         SharPreferences.markAsReadMessageIndex, nextIndex);
+  }
+
+  Future<void> _loadReadingPercentage() async {
+    try {
+      // Get current book number from SharedPreferences
+      final currentBookNumStr =
+          await SharPreferences.getString(SharPreferences.selectedBookNum) ??
+              "0";
+      final currentBookNum = int.parse(currentBookNumStr);
+
+      // Get reading percentage from database
+      final db = await DBHelper().db;
+      if (db != null) {
+        final result = await db.rawQuery(
+            "SELECT read_per FROM book WHERE book_num = $currentBookNum LIMIT 1");
+
+        if (result.isNotEmpty && result[0]["read_per"] != null) {
+          final readPer = double.tryParse(result[0]["read_per"].toString()) ?? 0.0;
+          if (mounted) {
+            setState(() {
+              _readingPercentage = readPer >= 99.9 
+                  ? "100" 
+                  : readPer.toStringAsFixed(1);
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error loading reading percentage: $e");
+    }
   }
 
   @override
@@ -188,8 +220,46 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                 style: CommanStyle.bw22500(context),
               ),
             ),
+            const SizedBox(
+              height: 30,
+            ),
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                decoration: BoxDecoration(
+                  color: CommanColor.lightDarkPrimary(context).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: CommanColor.lightDarkPrimary(context).withOpacity(0.3),
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.auto_stories_rounded,
+                      size: 24,
+                      color: CommanColor.lightDarkPrimary(context),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      "Reading Progress: ",
+                      style: CommanStyle.bw18400(context),
+                    ),
+                    Text(
+                      "$_readingPercentage%",
+                      style: CommanStyle.bw20500(context).copyWith(
+                        color: CommanColor.lightDarkPrimary(context),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             SizedBox(
-              height: MediaQuery.of(context).size.height * 0.15,
+              height: MediaQuery.of(context).size.height * 0.08,
             ),
             InkWell(
               onTap: () async {
