@@ -79,12 +79,12 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
             "SELECT read_per FROM book WHERE book_num = $currentBookNum LIMIT 1");
 
         if (result.isNotEmpty && result[0]["read_per"] != null) {
-          final readPer = double.tryParse(result[0]["read_per"].toString()) ?? 0.0;
+          final readPer =
+              double.tryParse(result[0]["read_per"].toString()) ?? 0.0;
           if (mounted) {
             setState(() {
-              _readingPercentage = readPer >= 99.9 
-                  ? "100" 
-                  : readPer.toStringAsFixed(1);
+              _readingPercentage =
+                  readPer >= 99.9 ? "100" : readPer.toStringAsFixed(1);
             });
           }
         }
@@ -110,8 +110,9 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            const SizedBox(
-              height: 50,
+            SizedBox(
+              height: MediaQuery.of(context).size.height *
+                  0.06, // Responsive for all devices
             ),
             Row(
               mainAxisAlignment: MainAxisAlignment.start,
@@ -133,8 +134,9 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                 ),
               ],
             ),
-            const SizedBox(
-              height: 30,
+            SizedBox(
+              height: MediaQuery.of(context).size.height *
+                  0.02, // Responsive spacing
             ),
             // Stack(
             //   children: [
@@ -161,7 +163,8 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
             //   ],
             // ),
             SizedBox(
-                height: 120,
+                height: MediaQuery.of(context).size.height *
+                    0.10, // Responsive for SE
                 child: Provider.of<ThemeProvider>(context).themeMode ==
                         ThemeMode.dark
                     ? Image(
@@ -174,8 +177,9 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                         fit: BoxFit.contain,
                         // color: CommanColor.lightDarkPrimary(context),
                       )),
-            const SizedBox(
-              height: 40,
+            SizedBox(
+              height: MediaQuery.of(context).size.height *
+                  0.02, // Responsive spacing
             ),
             Center(
               child: Text(
@@ -183,8 +187,9 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                 style: CommanStyle.bw20500(context),
               ),
             ),
-            const SizedBox(
-              height: 20,
+            SizedBox(
+              height: MediaQuery.of(context).size.height *
+                  0.015, // Responsive spacing
             ),
             Center(
               child: Text(
@@ -193,8 +198,9 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                 textAlign: TextAlign.center,
               ),
             ),
-            const SizedBox(
-              height: 20,
+            SizedBox(
+              height: MediaQuery.of(context).size.height *
+                  0.015, // Responsive spacing
             ),
             Center(
               child: Text(
@@ -202,8 +208,9 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                 style: CommanStyle.bw22500(context),
               ),
             ),
-            const SizedBox(
-              height: 20,
+            SizedBox(
+              height: MediaQuery.of(context).size.height *
+                  0.015, // Responsive spacing
             ),
             Center(
               child: Text(
@@ -211,8 +218,9 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                 style: CommanStyle.bw20500(context),
               ),
             ),
-            const SizedBox(
-              height: 20,
+            SizedBox(
+              height: MediaQuery.of(context).size.height *
+                  0.015, // Responsive spacing
             ),
             Center(
               child: Text(
@@ -220,17 +228,29 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                 style: CommanStyle.bw22500(context),
               ),
             ),
-            const SizedBox(
-              height: 30,
+            SizedBox(
+              height: MediaQuery.of(context).size.height *
+                  0.02, // Responsive spacing
             ),
             Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 decoration: BoxDecoration(
-                  color: CommanColor.lightDarkPrimary(context).withOpacity(0.1),
+                  color: CommanColor.lightDarkPrimary(context).withOpacity(Provider
+                                  .of<ThemeProvider>(context)
+                              .themeMode ==
+                          ThemeMode.dark
+                      ? 0.3 // Higher opacity in dark mode for better visibility
+                      : 0.1), // Lower opacity in light mode
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: CommanColor.lightDarkPrimary(context).withOpacity(0.3),
+                    color: Provider.of<ThemeProvider>(context).themeMode ==
+                            ThemeMode.dark
+                        ? Colors.white
+                            .withOpacity(0.8) // White border in dark mode
+                        : CommanColor.lightDarkPrimary(context)
+                            .withOpacity(0.3), // Lower opacity in light mode
                     width: 1.5,
                   ),
                 ),
@@ -240,17 +260,28 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                     Icon(
                       Icons.auto_stories_rounded,
                       size: 24,
-                      color: CommanColor.lightDarkPrimary(context),
+                      color: Provider.of<ThemeProvider>(context).themeMode ==
+                              ThemeMode.dark
+                          ? Colors.white
+                          : CommanColor.lightDarkPrimary(context),
                     ),
                     const SizedBox(width: 12),
                     Text(
                       "Reading Progress: ",
-                      style: CommanStyle.bw18400(context),
+                      style: CommanStyle.bw18400(context).copyWith(
+                        color: Provider.of<ThemeProvider>(context).themeMode ==
+                                ThemeMode.dark
+                            ? Colors.white
+                            : null,
+                      ),
                     ),
                     Text(
                       "$_readingPercentage%",
                       style: CommanStyle.bw20500(context).copyWith(
-                        color: CommanColor.lightDarkPrimary(context),
+                        color: Provider.of<ThemeProvider>(context).themeMode ==
+                                ThemeMode.dark
+                            ? Colors.white
+                            : CommanColor.lightDarkPrimary(context),
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -259,7 +290,8 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
               ),
             ),
             SizedBox(
-              height: MediaQuery.of(context).size.height * 0.08,
+              height: MediaQuery.of(context).size.height *
+                  0.03, // Responsive spacing before button
             ),
             InkWell(
               onTap: () async {

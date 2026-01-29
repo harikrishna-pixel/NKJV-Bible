@@ -87,7 +87,6 @@ class _SearchScreenState extends State<SearchScreen> {
     getFont();
   }
 
-
   // loadLocal() async {
   //   _myProvider = Provider.of<DownloadProvider>(context, listen: false);
   //   _myProvider?.disableAd();
@@ -238,7 +237,8 @@ class _SearchScreenState extends State<SearchScreen> {
     return input.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
   }
 
-  MainBookListModel? _findMatchingBook(String query, List<MainBookListModel> books) {
+  MainBookListModel? _findMatchingBook(
+      String query, List<MainBookListModel> books) {
     final q = _normalizeBookKey(query.trim());
     if (q.isEmpty) return null;
 
@@ -308,8 +308,9 @@ class _SearchScreenState extends State<SearchScreen> {
     // If user typed a book name (Genesis/Exodus/etc), show the full book content
     // (all verses across all chapters) in this same results view.
     final queryText = (value ?? '').toString().trim();
-    final booksSource =
-        downloadProvider.bookList.isNotEmpty ? downloadProvider.bookList : bookList;
+    final booksSource = downloadProvider.bookList.isNotEmpty
+        ? downloadProvider.bookList
+        : bookList;
     final matchedBook = _findMatchingBook(queryText, booksSource);
     if (matchedBook != null) {
       List<VerseBookContentModel> bookVerses = [];
@@ -479,7 +480,8 @@ class _SearchScreenState extends State<SearchScreen> {
               onTap: () async {
                 // Dismiss keyboard when tapping outside the search field
                 FocusScopeNode currentFocus = FocusScope.of(context);
-                if (currentFocus.hasPrimaryFocus || currentFocus.focusedChild != null) {
+                if (currentFocus.hasPrimaryFocus ||
+                    currentFocus.focusedChild != null) {
                   currentFocus.unfocus();
                 }
                 await SharPreferences.setString('OpenAd', '1');
@@ -487,7 +489,8 @@ class _SearchScreenState extends State<SearchScreen> {
                     .disableAd();
                 await SharPreferences.setString('OpenAd', '1');
               },
-              behavior: HitTestBehavior.opaque, // Ensure entire area is tappable
+              behavior:
+                  HitTestBehavior.opaque, // Ensure entire area is tappable
               child: Column(
                 children: [
                   const SizedBox(
@@ -816,7 +819,8 @@ class _SearchScreenState extends State<SearchScreen> {
                                                 color: selectedBook.title ==
                                                         item.title
                                                     ? CommanColor
-                                                        .lightDarkPrimary(context)
+                                                        .lightDarkPrimary(
+                                                            context)
                                                     : Colors.black,
                                               ),
                                               overflow: TextOverflow.ellipsis,
@@ -825,8 +829,8 @@ class _SearchScreenState extends State<SearchScreen> {
                                       .toList()
                                   : selectedValueFilterIndex == 1
                                       ? oTBookList
-                                          .map((item) =>
-                                              DropdownMenuItem<MainBookListModel>(
+                                          .map((item) => DropdownMenuItem<
+                                                  MainBookListModel>(
                                                 value: item,
                                                 child: Text(
                                                   item.title.toString(),
@@ -847,13 +851,14 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                 context)
                                                         : Colors.black,
                                                   ),
-                                                  overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                 ),
                                               ))
                                           .toList()
                                       : nTBookList
-                                          .map((item) =>
-                                              DropdownMenuItem<MainBookListModel>(
+                                          .map((item) => DropdownMenuItem<
+                                                  MainBookListModel>(
                                                 value: item,
                                                 child: Text(
                                                   item.title.toString(),
@@ -874,7 +879,8 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                 context)
                                                         : Colors.black,
                                                   ),
-                                                  overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                 ),
                                               ))
                                           .toList(),
@@ -896,9 +902,11 @@ class _SearchScreenState extends State<SearchScreen> {
                               },
                               hint: Text("All Chapter",
                                   style: screenWidth > 450
-                                      ? CommanStyle.black15400
-                                          .copyWith(fontSize: 19, fontFamily: selectedFontFamily)
-                                      : CommanStyle.black15400.copyWith(fontFamily: selectedFontFamily)),
+                                      ? CommanStyle.black15400.copyWith(
+                                          fontSize: 19,
+                                          fontFamily: selectedFontFamily)
+                                      : CommanStyle.black15400.copyWith(
+                                          fontFamily: selectedFontFamily)),
                               iconStyleData: IconStyleData(
                                 icon: const Icon(
                                   Icons.keyboard_arrow_down_sharp,
@@ -911,7 +919,8 @@ class _SearchScreenState extends State<SearchScreen> {
                               ),
                               buttonStyleData: ButtonStyleData(
                                   height: screenWidth > 450 ? 45 : 33,
-                                  width: MediaQuery.of(context).size.width * 0.43,
+                                  width:
+                                      MediaQuery.of(context).size.width * 0.43,
                                   padding:
                                       const EdgeInsets.only(left: 8, right: 3),
                                   decoration: BoxDecoration(
@@ -922,7 +931,8 @@ class _SearchScreenState extends State<SearchScreen> {
                                       WidgetStateProperty.all(Colors.white)),
                               menuItemStyleData: MenuItemStyleData(
                                 height: 33,
-                                padding: const EdgeInsets.only(left: 8, right: 3),
+                                padding:
+                                    const EdgeInsets.only(left: 8, right: 3),
                               ),
                               dropdownStyleData: DropdownStyleData(
                                 maxHeight: 200,
@@ -955,12 +965,43 @@ class _SearchScreenState extends State<SearchScreen> {
                   searchController.text.isEmpty
                       ? Padding(
                           padding: EdgeInsets.only(
-                              top: MediaQuery.of(context).size.height * 0.19),
+                              top: MediaQuery.of(context).size.height * 0.15),
                           child: Center(
-                            child: Image.asset(
-                              Images.searchPlaceHolder(context),
-                              height: 160,
-                              width: 160,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Image.asset(
+                                  Images.searchPlaceHolder(context),
+                                  height: 160,
+                                  width: 160,
+                                ),
+                                SizedBox(height: 30),
+                                Text(
+                                  'Search by Words',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: CommanColor.whiteBlack(context),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                SizedBox(height: 15),
+                                Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 40),
+                                  child: Text(
+                                    'This search finds words and verse content.\nTo open a specific verse (Genesis 1:1), use the Read screen.',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.normal,
+                                      color: CommanColor.whiteBlack(context)
+                                          .withOpacity(0.7),
+                                      height: 1.5,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         )
@@ -1065,8 +1106,10 @@ class _SearchScreenState extends State<SearchScreen> {
                                                           ?.text ??
                                                       '',
                                                   // "${data.content}",
-                                                  style: CommanStyle.black15400.copyWith(
-                                                    fontFamily: selectedFontFamily,
+                                                  style: CommanStyle.black15400
+                                                      .copyWith(
+                                                    fontFamily:
+                                                        selectedFontFamily,
                                                   ),
                                                   maxLines: 7,
                                                 ),
@@ -1106,21 +1149,30 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                   .showToast(
                                                                       "Copied");
                                                             },
-                                                                child: Container(
-                                                                    padding: const EdgeInsets.all(6),
-                                                                    decoration: BoxDecoration(
-                                                                      borderRadius: BorderRadius.circular(8),
-                                                                      border: Border.all(
-                                                                        color: CommanColor.lightDarkPrimary(context),
-                                                                        width: 1.4,
-                                                                      ),
-                                                                    ),
-                                                                    child: Image.asset(
-                                                                        "assets/Bookmark icons/Frame 3630.png",
-                                                                        height: 28,
-                                                                        color: CommanColor
-                                                                            .lightDarkPrimary(
-                                                                                context)))),
+                                                            child: Container(
+                                                                padding:
+                                                                    const EdgeInsets
+                                                                        .all(6),
+                                                                decoration:
+                                                                    BoxDecoration(
+                                                                  borderRadius:
+                                                                      BorderRadius
+                                                                          .circular(
+                                                                              8),
+                                                                  border: Border
+                                                                      .all(
+                                                                    color: CommanColor
+                                                                        .lightDarkPrimary(
+                                                                            context),
+                                                                    width: 1.4,
+                                                                  ),
+                                                                ),
+                                                                child: Image.asset(
+                                                                    "assets/Bookmark icons/Frame 3630.png",
+                                                                    height: 28,
+                                                                    color: CommanColor
+                                                                        .lightDarkPrimary(
+                                                                            context)))),
                                                         const SizedBox(
                                                           height: 15,
                                                         ),
@@ -1388,7 +1440,8 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                     context)
                                                                 .copyWith(
                                                           fontSize: fontSize,
-                                                          fontFamily: selectedFontFamily,
+                                                          fontFamily:
+                                                              selectedFontFamily,
                                                           // fontSize: screenWidth > 450
                                                           //     ? BibleInfo
                                                           //             .fontSizeScale *
@@ -1422,7 +1475,8 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                     context)
                                                                 .copyWith(
                                                           fontSize: fontSize,
-                                                          fontFamily: selectedFontFamily,
+                                                          fontFamily:
+                                                              selectedFontFamily,
                                                           // screenWidth >
                                                           //         450
                                                           //     ? BibleInfo
@@ -1506,8 +1560,10 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                 '',
                                                             // "${data.content}",
                                                             style: CommanStyle
-                                                                .black15400.copyWith(
-                                                              fontFamily: selectedFontFamily,
+                                                                .black15400
+                                                                .copyWith(
+                                                              fontFamily:
+                                                                  selectedFontFamily,
                                                             ),
                                                             maxLines: 7,
                                                           ),
@@ -1550,19 +1606,15 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                       child: Container(
                                                                           padding: const EdgeInsets.all(6),
                                                                           decoration: BoxDecoration(
-                                                                            borderRadius: BorderRadius.circular(8),
-                                                                            border: Border.all(
+                                                                            borderRadius:
+                                                                                BorderRadius.circular(8),
+                                                                            border:
+                                                                                Border.all(
                                                                               color: CommanColor.lightDarkPrimary(context),
                                                                               width: 1.4,
                                                                             ),
                                                                           ),
-                                                                          child: Image.asset(
-                                                                              "assets/Bookmark icons/Frame 3630.png",
-                                                                              height:
-                                                                                  25,
-                                                                              width: 25,
-                                                                              color:
-                                                                                  CommanColor.lightDarkPrimary(context)))),
+                                                                          child: Image.asset("assets/Bookmark icons/Frame 3630.png", height: 25, width: 25, color: CommanColor.lightDarkPrimary(context)))),
                                                                   const SizedBox(
                                                                     height: 15,
                                                                   ),
@@ -1789,10 +1841,12 @@ class _SearchScreenState extends State<SearchScreen> {
   List<TextSpan> highlightOccurrences(
       String source, String query, screenWidth, double fontSize) {
     if (query.isEmpty || !source.toLowerCase().contains(query.toLowerCase())) {
-      return [TextSpan(
-        text: source,
-        style: TextStyle(fontFamily: selectedFontFamily),
-      )];
+      return [
+        TextSpan(
+          text: source,
+          style: TextStyle(fontFamily: selectedFontFamily),
+        )
+      ];
     }
     final matches = query.toLowerCase().allMatches(source.toLowerCase());
 
@@ -1810,9 +1864,8 @@ class _SearchScreenState extends State<SearchScreen> {
       }
       children.add(TextSpan(
         text: " ${source.substring(match.start, match.end)} ",
-        style: CommanStyle.searchTextStyle(context).copyWith(
-          fontFamily: selectedFontFamily,
-            fontSize: fontSize),
+        style: CommanStyle.searchTextStyle(context)
+            .copyWith(fontFamily: selectedFontFamily, fontSize: fontSize),
       ));
 
       if (i == matches.length - 1 && match.end != source.length) {

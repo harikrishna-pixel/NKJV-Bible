@@ -99,16 +99,25 @@ class ForgetPasswordScreen extends HookConsumerWidget {
                         const SizedBox(height: 40),
                         GestureDetector(
                           onTap: () async {
+                            print("=== UI: Reset Password button tapped ===");
                             if (_formKey.currentState?.validate() ?? false) {
+                              print("UI: Form validation passed");
                               FocusScope.of(context).unfocus();
                               try {
                                 if (!forgetPasswordState.isLoading) {
+                                  print("UI: Starting forgetPassword...");
                                   await forgetPasswordState
                                       .forgetPassword(context);
+                                  print(
+                                      "UI: forgetPassword completed successfully");
                                 }
                               } catch (e) {
-                                Constants.showToast(e.toString());
+                                print("UI: Exception caught: $e");
+                                print("UI: Exception type: ${e.runtimeType}");
+                                Constants.showToast("Error: ${e.toString()}");
                               }
+                            } else {
+                              print("UI: Form validation failed");
                             }
                           },
                           child: Container(

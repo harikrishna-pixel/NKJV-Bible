@@ -446,12 +446,18 @@ class _WalletScreenState extends State<WalletScreen> {
 
           final packData = {
             'identifier': identifier,
-            'credits': data['credits'] ?? creditsFromConstants.isNotEmpty
-                ? creditsFromConstants
-                : '0', // Credits from API response (sub_fields.item_1) or constants
-            'discount': data['discount'] ?? discountFromConstants.isNotEmpty
-                ? discountFromConstants
-                : '0', // Discount from API response (sub_fields.value) or constants
+            'credits': (data['credits'] != null &&
+                    data['credits'].toString().isNotEmpty)
+                ? data['credits'].toString()
+                : (creditsFromConstants.isNotEmpty
+                    ? creditsFromConstants
+                    : '0'), // Credits from API response or constants
+            'discount': (data['discount'] != null &&
+                    data['discount'].toString().isNotEmpty)
+                ? data['discount'].toString()
+                : (discountFromConstants.isNotEmpty
+                    ? discountFromConstants
+                    : '0'), // Discount from API response or constants
             'price': '', // Price will come from IAP product details
           };
 

@@ -36,17 +36,26 @@ class ForgetPasswordBloc extends ChangeNotifier {
   }
 
   Future<void> forgetPassword(context) async {
+    print("=== BLOC: forgetPassword called ===");
+    print("BLOC: Email = ${emailCon.text}");
+
     isLoading = true;
     notifyListeners();
     // if (await userExists()) {
     try {
+      print("BLOC: Calling authNotifier.forgotsendotp...");
       await authNotifier.forgotsendotp(email: emailCon.text, context: context);
+      print("BLOC: forgotsendotp completed");
       isLoading = false;
       // await FirebaseAuth.instance
       //     .sendPasswordResetEmail(email: emailCon.text);
     } catch (e) {
+      print("BLOC: Exception caught: $e");
+      print("BLOC: Exception type: ${e.runtimeType}");
       isLoading = false;
       notifyListeners();
+      // Rethrow so the UI can handle it
+      rethrow;
       // throw e.code.replaceAll('-', ' ').toTitleCase;
     }
     // } else {
@@ -56,5 +65,6 @@ class ForgetPasswordBloc extends ChangeNotifier {
     // }
     isLoading = false;
     notifyListeners();
+    print("=== BLOC: forgetPassword finished ===");
   }
 }

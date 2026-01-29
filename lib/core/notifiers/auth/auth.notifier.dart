@@ -80,7 +80,7 @@ class AuthNotifier extends ChangeNotifier {
               });
         }
       } else {
-        devtools.log("register data is null");
+        print("register data is null");
 
         final datafn = jsonDecode(appdata);
 
@@ -103,7 +103,7 @@ class AuthNotifier extends ChangeNotifier {
             });
       }
     } catch (e) {
-      devtools.log("register notifier error is $e");
+      print("register notifier error is $e");
       return null;
     }
   }
@@ -122,11 +122,11 @@ class AuthNotifier extends ChangeNotifier {
       if (data.data != null && data.data!.isNotEmpty) {
         return data.data;
       } else {
-        devtools.log("getofferbook data is null");
+        print("getofferbook data is null");
         return [];
       }
     } catch (e) {
-      devtools.log("getofferbook notifier error is $e");
+      print("getofferbook notifier error is $e");
       return [];
     }
   }
@@ -145,11 +145,11 @@ class AuthNotifier extends ChangeNotifier {
       if (data.data != null && data.data!.isNotEmpty) {
         return data;
       } else {
-        devtools.log("getbooks data is null");
+        print("getbooks data is null");
         return [];
       }
     } catch (e) {
-      devtools.log("getbooks notifier error is $e");
+      print("getbooks notifier error is $e");
       return [];
     }
   }
@@ -181,13 +181,13 @@ class AuthNotifier extends ChangeNotifier {
 
         //return data.data;
       } else {
-        devtools.log("delete account data is null");
+        print("delete account data is null");
         Get.back();
         return null;
       }
     } catch (e) {
       Constants.showToast('Please connect to the internet');
-      devtools.log("delete account notifier error is $e");
+      print("delete account notifier error is $e");
       Get.back();
       return null;
     }
@@ -263,7 +263,7 @@ class AuthNotifier extends ChangeNotifier {
         return null;
       }
     } catch (e) {
-      devtools.log("login notifier error is $e");
+      print("login notifier error is $e");
       return null;
     }
   }
@@ -272,25 +272,73 @@ class AuthNotifier extends ChangeNotifier {
     required email,
     context,
   }) async {
+    print("AUTH NOTIFIER: Starting forgotsendotp for email: $email");
+
+    // Check internet connectivity before making API call
     try {
+      print("AUTH NOTIFIER: Checking internet connectivity...");
+      final hasInternet = await InternetConnection()
+          .hasInternetAccess
+          .timeout(const Duration(seconds: 5), onTimeout: () {
+        print("AUTH NOTIFIER: Internet check timed out - assuming connected");
+        return true; // Assume connected if check times out
+      });
+
+      print("AUTH NOTIFIER: Internet check result: $hasInternet");
+
+      if (!hasInternet) {
+        print("AUTH NOTIFIER: No internet connection detected");
+        SnackbarUtil.showSnackbar(
+          context: context,
+          message:
+              'No internet connection. Please check your network and try again.',
+          backgroundColor: Colors.redAccent,
+        );
+        return false;
+      }
+    } catch (connectivityError) {
+      print("AUTH NOTIFIER: Internet check failed: $connectivityError");
+      // Continue anyway - the check itself might have failed
+    }
+
+    try {
+      print("AUTH NOTIFIER: Making API call...");
       var appdata = await registerApi.forgotsendotp(
         email: email,
       );
 
+      print(
+          "AUTH NOTIFIER: Received response, appdata is ${appdata == null ? 'NULL' : 'NOT NULL'}");
+
+      // Check if API returned null (error occurred)
+      if (appdata == null) {
+        devtools
+            .log("AUTH NOTIFIER: API returned null - showing error to user");
+        SnackbarUtil.showSnackbar(
+          context: context,
+          message:
+              'Cannot reach server. Please check:\n1. Your internet connection\n2. Server might be down\nPlease try again later.',
+          backgroundColor: Colors.redAccent,
+        );
+        return false;
+      }
+
+      print("AUTH NOTIFIER: Attempting to decode JSON response");
       final datafn = jsonDecode(appdata);
 
-      // final statuscode = datafn['status_code'];
-
+      final statuscode = datafn['status_code'];
       final status = datafn['status'];
-
       final msg = datafn['message'];
 
-      //  debugPrint("APP data: $datafn");
+      print(
+          "AUTH NOTIFIER: Response decoded - Status: $status, StatusCode: $statuscode, Message: $msg");
 
       await cacheNotifier.writeCache(key: "useremail", value: email.toString());
 
       if (datafn != null) {
         if (status == true) {
+          print(
+              "AUTH NOTIFIER: SUCCESS - Showing success message and navigating to OTP screen");
           SnackbarUtil.showSnackbar(
             context: context,
             message: msg,
@@ -300,14 +348,26 @@ class AuthNotifier extends ChangeNotifier {
               .push(MaterialPageRoute(builder: (context) => OtpScreen()));
           return true;
         } else {
+          print(
+              "AUTH NOTIFIER: ERROR - Server returned error: $msg (Status Code: $statuscode)");
+
+          // Provide more helpful error message based on status code
+          String errorMessage = msg;
+          if (statuscode == 500) {
+            errorMessage =
+                "Server error: $msg\n\nPossible reasons:\n• Email not registered in system\n• Please contact support if this persists";
+          }
+
+          print("AUTH NOTIFIER: Showing error snackbar to user");
           SnackbarUtil.showSnackbar(
             context: context,
-            message: msg,
+            message: errorMessage,
             backgroundColor: Colors.redAccent,
           );
           return false;
         }
       } else {
+        print("AUTH NOTIFIER: ERROR - datafn is null");
         SnackbarUtil.showSnackbar(
           context: context,
           message: 'Something Went Wrong !',
@@ -318,16 +378,34 @@ class AuthNotifier extends ChangeNotifier {
     } catch (e) {
       // Check if it's a network error (offline) vs other error
       try {
-        final hasInternet = await InternetConnection().hasInternetAccess;
+        // Add timeout to internet check to prevent hanging
+        final hasInternet = await InternetConnection()
+            .hasInternetAccess
+            .timeout(const Duration(seconds: 5), onTimeout: () => true);
+
         if (!hasInternet) {
-          Constants.showToast("No Internet Connection");
+          SnackbarUtil.showSnackbar(
+            context: context,
+            message: 'No Internet Connection',
+            backgroundColor: Colors.redAccent,
+          );
         } else {
-          Constants.showToast("Check your Internet connection");
+          SnackbarUtil.showSnackbar(
+            context: context,
+            message: 'Unable to connect to server. Please try again.',
+            backgroundColor: Colors.redAccent,
+          );
         }
       } catch (_) {
-        Constants.showToast("No Internet Connection");
+        // If internet check fails, show generic error instead of assuming no connection
+        SnackbarUtil.showSnackbar(
+          context: context,
+          message: 'Unable to connect to server. Please try again.',
+          backgroundColor: Colors.redAccent,
+        );
       }
-      devtools.log("login notifier error is $e");
+      print("AUTH NOTIFIER: Exception in forgotsendotp: $e");
+      print("AUTH NOTIFIER: Exception type: ${e.runtimeType}");
       return false;
     }
   }
@@ -342,6 +420,16 @@ class AuthNotifier extends ChangeNotifier {
         email: email,
         otp: otp,
       );
+
+      // Check if API returned null (error occurred)
+      if (appdata == null) {
+        SnackbarUtil.showSnackbar(
+          context: context,
+          message: 'Unable to connect to server. Please try again.',
+          backgroundColor: Colors.redAccent,
+        );
+        return false;
+      }
 
       final datafn = jsonDecode(appdata);
 
@@ -388,7 +476,7 @@ class AuthNotifier extends ChangeNotifier {
         message: 'Something Went Wrong !',
         backgroundColor: Colors.redAccent,
       );
-      devtools.log("forgot otp verify notifier error is $e");
+      print("forgot otp verify notifier error is $e");
       return false;
     }
   }
@@ -406,6 +494,16 @@ class AuthNotifier extends ChangeNotifier {
         passwordconfirmation: passwordconfirmation,
         password: password,
       );
+
+      // Check if API returned null (error occurred)
+      if (appdata == null) {
+        SnackbarUtil.showSnackbar(
+          context: context,
+          message: 'Unable to connect to server. Please try again.',
+          backgroundColor: Colors.redAccent,
+        );
+        return false;
+      }
 
       final datafn = jsonDecode(appdata);
 
@@ -454,7 +552,7 @@ class AuthNotifier extends ChangeNotifier {
         return false;
       }
     } catch (e) {
-      devtools.log("login notifier error is $e");
+      print("login notifier error is $e");
       return false;
     }
   }
@@ -523,7 +621,7 @@ class AuthNotifier extends ChangeNotifier {
       }
     } catch (e) {
       Constants.showToast('Check your Internet connection');
-      devtools.log("login notifier error is $e");
+      print("login notifier error is $e");
       return false;
     }
   }

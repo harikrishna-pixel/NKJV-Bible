@@ -57,7 +57,11 @@ class SharPreferences {
       'lastInterstitialRewardedAdPlayedTime';
   static const dailyWelcomeLastShownDate = 'dailyWelcomeLastShownDate';
   static const dailyWelcomeMessageIndex = 'dailyWelcomeMessageIndex';
+  static const dailyWelcomeFirstTimeShown =
+      'dailyWelcomeFirstTimeShown'; // Track if first message was shown
   static const prayerAmenMessageIndex = 'prayerAmenMessageIndex';
+  static const prayerAmenAdCounter =
+      'prayerAmenAdCounter'; // Counter for AMEN ad rotation (every 10 taps)
   static const verseOfDayAmenMessageIndex = 'verseOfDayAmenMessageIndex';
   static const markAsReadMessageIndex = 'markAsReadMessageIndex';
 

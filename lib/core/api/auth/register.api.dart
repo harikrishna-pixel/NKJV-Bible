@@ -30,7 +30,7 @@ class RegisterApi {
       final data = Temptoken.fromJson(jsonDecode(tokendata));
       if (data.statusCode == 200) {
         if (data.data!.tempAccessToken != null) {
-          // devtools.log("access token is ${data.data!.tempAccessToken}");
+          // print("access token is ${data.data!.tempAccessToken}");
           var response = await CustomHttp().postwithtoken(
             path: uri,
             token: data.data!.tempAccessToken.toString(),
@@ -55,24 +55,24 @@ class RegisterApi {
           final statuscode = response!.statusCode;
           final body = response.body;
 
-          devtools.log("register msg is ${response.statusCode} - ");
+          print("register msg is ${response.statusCode} - ");
 
           if (statuscode == 200) {
             return body;
           } else {
-            devtools.log("register is failed");
+            print("register is failed");
             return body;
           }
         } else {
-          devtools.log("access token is null");
+          print("access token is null");
           return null;
         }
       } else {
-        devtools.log("access token is not found");
+        print("access token is not found");
         return null;
       }
     } catch (e) {
-      devtools.log("register error is $e");
+      print("register error is $e");
       return null;
     }
   }
@@ -93,7 +93,7 @@ class RegisterApi {
       final data = Temptoken.fromJson(jsonDecode(tokendata));
       if (data.statusCode == 200) {
         if (data.data!.tempAccessToken != null) {
-          // devtools.log("access token is ${data.data!.tempAccessToken}");
+          // print("access token is ${data.data!.tempAccessToken}");
           var response = await CustomHttp().postwithtoken(
             path: uri,
             token: data.data!.tempAccessToken.toString(),
@@ -115,24 +115,24 @@ class RegisterApi {
           final statuscode = response!.statusCode;
           final body = response.body;
 
-          devtools.log("login msg is $statuscode - $body");
+          print("login msg is $statuscode - $body");
 
           if (body.isNotEmpty) {
             return body;
           } else {
-            devtools.log("login api  is not found");
+            print("login api  is not found");
             return null;
           }
         } else {
-          devtools.log("access token is null");
+          print("access token is null");
           return null;
         }
       } else {
-        devtools.log("access token is not found");
+        print("access token is not found");
         return null;
       }
     } catch (e) {
-      devtools.log("login api error is $e");
+      print("login api error is $e");
       return null;
     }
   }
@@ -146,7 +146,7 @@ class RegisterApi {
       // final data = Temptoken.fromJson(jsonDecode(tokendata));
       // if (data.statusCode == 200) {
       //   if (data.data!.tempAccessToken != null) {
-      // devtools.log("access token is ${data.data!.tempAccessToken}");
+      // print("access token is ${data.data!.tempAccessToken}");
       var response = await CustomHttp().postwithtoken(
         path: uri,
         token: token,
@@ -160,25 +160,25 @@ class RegisterApi {
       final statuscode = response!.statusCode;
       final body = response.body;
 
-      devtools.log("deleteyouraccount api msg is $statuscode - $body");
+      print("deleteyouraccount api msg is $statuscode - $body");
 
       if (body.isNotEmpty) {
         return body;
       } else {
-        devtools.log("deleteyouraccount api  is not found");
+        print("deleteyouraccount api  is not found");
         return null;
       }
       //   } else {
-      //     devtools.log("access token is null");
+      //     print("access token is null");
       //     return null;
       //   }
       // } else {
-      //   devtools.log("access token is not found");
+      //   print("access token is not found");
       //   return null;
       // }
     } catch (e) {
       Constants.showToast('Check your Internet connection');
-      devtools.log("deleteyouraccount api error is $e");
+      print("deleteyouraccount api error is $e");
       return null;
     }
   }
@@ -189,27 +189,66 @@ class RegisterApi {
     final Uri uri =
         Uri.parse(AppApiConstant.baseurl + AppApiConstant.forgotsendotp);
 
-    // PhoneInfo phoneInfos = await Phoneinformations.getPhoneInformation();
+    print("========== FORGOT PASSWORD DEBUG ==========");
+    print("forgotsendotp - Request URL: $uri");
+    print("forgotsendotp - Email: $email");
+    print("forgotsendotp - AppID: ${BibleInfo.appID}");
+    print(
+        "forgotsendotp - Full URL: ${AppApiConstant.baseurl}${AppApiConstant.forgotsendotp}");
+
     try {
-      // devtools.log("access token is ${data.data!.tempAccessToken}");
+      print("forgotsendotp - Starting HTTP request...");
+
       final response = await CustomHttp().postwithout(
         uri,
-        data: {
-          "email": email,
-          "app_id": BibleInfo.appID
-          //"app_id": AppApiConstant.appid,
-        },
+        data: {"email": email, "app_id": BibleInfo.appID},
       );
 
       final statuscode = response.statusCode;
       final body = response.body;
 
-      devtools.log("forgotsendotp msg is $statuscode - $body ");
+      print("forgotsendotp response: statusCode=$statuscode");
+      print("forgotsendotp response body: $body");
 
-      return body;
-    } catch (e) {
-      devtools.log("forgotsendotp api error is $e");
+      // Check if response is successful
+      if (statuscode >= 200 && statuscode < 300) {
+        print("forgotsendotp - SUCCESS: Returning response body");
+        return body;
+      } else {
+        devtools
+            .log("forgotsendotp - ERROR: Failed with status code: $statuscode");
+        print("forgotsendotp - ERROR: Response body: $body");
+        // Return the error response body so it can be parsed
+        return body;
+      }
+    } on Exception catch (e) {
+      print("forgotsendotp - EXCEPTION: $e");
+      print("forgotsendotp - Exception type: ${e.runtimeType}");
+
+      // Check if it's a timeout exception
+      if (e.toString().contains('timed out') ||
+          e.toString().contains('TimeoutException')) {
+        devtools
+            .log("forgotsendotp - TIMEOUT: Request timed out after 30 seconds");
+        print(
+            "forgotsendotp - TIMEOUT: Server at ${AppApiConstant.baseurl} not responding");
+      } else if (e.toString().contains('SocketException')) {
+        print("forgotsendotp - SOCKET ERROR: Cannot connect to server");
+        print(
+            "forgotsendotp - Possible causes: DNS failure, server down, firewall blocking");
+      } else if (e.toString().contains('HandshakeException') ||
+          e.toString().contains('CERTIFICATE')) {
+        devtools
+            .log("forgotsendotp - SSL ERROR: Certificate validation failed");
+      }
+
       return null;
+    } catch (e) {
+      print("forgotsendotp - UNEXPECTED ERROR: $e");
+      print("forgotsendotp - Error type: ${e.runtimeType}");
+      return null;
+    } finally {
+      print("========== END FORGOT PASSWORD DEBUG ==========");
     }
   }
 
@@ -222,7 +261,7 @@ class RegisterApi {
 
     // PhoneInfo phoneInfos = await Phoneinformations.getPhoneInformation();
     try {
-      // devtools.log("access token is ${data.data!.tempAccessToken}");
+      // print("access token is ${data.data!.tempAccessToken}");
       var response = await CustomHttp().postwithout(
         uri,
         data: {
@@ -236,11 +275,11 @@ class RegisterApi {
       final statuscode = response.statusCode;
       final body = response.body;
 
-      devtools.log("forgotverifyotp msg is $statuscode - ");
+      print("forgotverifyotp msg is $statuscode - ");
 
       return body;
     } catch (e) {
-      devtools.log("forgotverifyotp api error is $e");
+      print("forgotverifyotp api error is $e");
       return null;
     }
   }
@@ -260,7 +299,7 @@ class RegisterApi {
       final data = Temptoken.fromJson(jsonDecode(tokendata));
       if (data.statusCode == 200) {
         if (data.data!.tempAccessToken != null) {
-          // devtools.log("access token is ${data.data!.tempAccessToken}");
+          // print("access token is ${data.data!.tempAccessToken}");
           var response = await CustomHttp().postwithout(
             uri,
             data: {
@@ -276,19 +315,19 @@ class RegisterApi {
           final statuscode = response.statusCode;
           final body = response.body;
 
-          devtools.log("forgotrestpwd msg is $statuscode - ");
+          print("forgotrestpwd msg is $statuscode - ");
 
           return body;
         } else {
-          devtools.log("access token is null");
+          print("access token is null");
           return null;
         }
       } else {
-        devtools.log("access token is not found");
+        print("access token is not found");
         return null;
       }
     } catch (e) {
-      devtools.log("forgotrestpwd api error is $e");
+      print("forgotrestpwd api error is $e");
       return null;
     }
   }

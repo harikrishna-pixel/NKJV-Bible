@@ -15,6 +15,7 @@ import 'package:biblebookapp/utils/rating_dialog_helper.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/chat/chat_history_screen.dart';
+import 'package:biblebookapp/view/screens/chat/chat_translations.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
@@ -69,33 +70,26 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   // Recent conversations
   List<Map<String, dynamic>> _recentConversations = [];
 
-  // Topic-based questions
-  final List<Map<String, String>> _topicQuestions = [
-    {
-      'topic': 'I feel anxious',
-      'question': 'Show me verses that calm anxiety..'
-    },
-    {
-      'topic': 'I\'m confused',
-      'question': 'Show me verses about clarity and direction..'
-    },
-    {
-      'topic': 'I need strength',
-      'question': 'How can I stay strong spiritually?'
-    },
-    {
-      'topic': 'I feel lost',
-      'question': 'How does God guide me when I feel lost?'
-    },
-    {
-      'topic': 'I feel stuck',
-      'question': 'Encourage me when everything feels heavy..'
-    },
-    {
-      'topic': 'God\'s promises',
-      'question': 'What promises remind me I\'m not alone?'
-    },
+  // Topic-based questions (translation keys)
+  final List<Map<String, String>> _topicQuestionKeys = [
+    {'topicKey': 'topic_anxious', 'questionKey': 'question_anxious'},
+    {'topicKey': 'topic_confused', 'questionKey': 'question_confused'},
+    {'topicKey': 'topic_strength', 'questionKey': 'question_strength'},
+    {'topicKey': 'topic_lost', 'questionKey': 'question_lost'},
+    {'topicKey': 'topic_stuck', 'questionKey': 'question_stuck'},
+    {'topicKey': 'topic_promises', 'questionKey': 'question_promises'},
   ];
+
+  // Helper to get translated topic questions
+  List<Map<String, String>> get _topicQuestions =>
+      _topicQuestionKeys.map((keys) {
+        return {
+          'topic': ChatTranslations.get(
+              keys['topicKey']!, AppApiConstant.chatLanguage),
+          'question': ChatTranslations.get(
+              keys['questionKey']!, AppApiConstant.chatLanguage),
+        };
+      }).toList();
 
   @override
   void initState() {
@@ -996,7 +990,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         ),
                       ),
                       child: Text(
-                        'Cancel',
+                        ChatTranslations.get(
+                            'cancel', AppApiConstant.chatLanguage),
                         style: TextStyle(
                           fontSize: isTablet ? 16 : 14,
                           fontWeight: FontWeight.w600,
@@ -1414,7 +1409,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 const SizedBox(height: 20),
                 // Title
                 Text(
-                  'New Chat',
+                  ChatTranslations.get('new_chat', AppApiConstant.chatLanguage),
                   style: TextStyle(
                     color: CommanColor.whiteBlack(context),
                     fontSize: screenWidth > 450 ? 24 : 22,
@@ -1425,7 +1420,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 const SizedBox(height: 12),
                 // Description
                 Text(
-                  'Are you sure you want to start a new chat?\nYour current conversation will be cleared.',
+                  ChatTranslations.get(
+                      'new_chat_confirmation', AppApiConstant.chatLanguage),
                   style: TextStyle(
                     color: CommanColor.whiteBlack(context).withOpacity(0.7),
                     fontSize: screenWidth > 450 ? 16 : 14,
@@ -1467,7 +1463,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              'Cancel',
+                              ChatTranslations.get(
+                                  'cancel', AppApiConstant.chatLanguage),
                               style: TextStyle(
                                 color: isDark
                                     ? CommanColor.white.withOpacity(0.8)
@@ -1514,7 +1511,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              'New Chat ',
+                              ChatTranslations.get(
+                                  'new_chat_long', AppApiConstant.chatLanguage),
                               style: TextStyle(
                                 color: CommanColor.white,
                                 fontSize: screenWidth > 450 ? 16 : 14,
@@ -2085,7 +2083,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
       //                     TextButton(
       //                       onPressed: () => Get.back(),
       //                       child: Text(
-      //                         'Cancel',
+      //                         ChatTranslations.get('cancel', AppApiConstant.chatLanguage),
       //                         style: TextStyle(
       //                           color: isDark
       //                               ? CommanColor.white.withOpacity(0.8)
@@ -2099,7 +2097,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
       //                         _startNewChat();
       //                       },
       //                       child: Text(
-      //                         'New Chat',
+      //                         ChatTranslations.get('new_chat', AppApiConstant.chatLanguage),
       //                         style: TextStyle(
       //                           color: isDark
       //                               ? CommanColor.lightDarkPrimary(context)
@@ -2181,7 +2179,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                         Expanded(
                           child: Center(
                             child: Text(
-                              'Faith Chat',
+                              ChatTranslations.get(
+                                  'faith_chat', AppApiConstant.chatLanguage),
                               style: TextStyle(
                                 color: isDark
                                     ? Colors.white
@@ -2300,7 +2299,10 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                                               0xFF8D6E63),
                                                     ),
                                                     title: Text(
-                                                      'New Chat',
+                                                      ChatTranslations.get(
+                                                          'new_chat',
+                                                          AppApiConstant
+                                                              .chatLanguage),
                                                       style: TextStyle(
                                                         color: isDark
                                                             ? Colors.white
@@ -2333,7 +2335,10 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                                               0xFF8D6E63),
                                                     ),
                                                     title: Text(
-                                                      'History',
+                                                      ChatTranslations.get(
+                                                          'history',
+                                                          AppApiConstant
+                                                              .chatLanguage),
                                                       style: TextStyle(
                                                         color: isDark
                                                             ? Colors.white
@@ -2406,7 +2411,10 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                                               0xFF8D6E63),
                                                     ),
                                                     title: Text(
-                                                      'New Chat',
+                                                      ChatTranslations.get(
+                                                          'new_chat',
+                                                          AppApiConstant
+                                                              .chatLanguage),
                                                       style: TextStyle(
                                                         color: isDark
                                                             ? Colors.white
@@ -2434,7 +2442,10 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                                               0xFF8D6E63),
                                                     ),
                                                     title: Text(
-                                                      'History',
+                                                      ChatTranslations.get(
+                                                          'history',
+                                                          AppApiConstant
+                                                              .chatLanguage),
                                                       style: TextStyle(
                                                         color: isDark
                                                             ? Colors.white
@@ -2565,7 +2576,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                         ),
                                         const SizedBox(height: 5),
                                         Text(
-                                          'Faith Answers',
+                                          ChatTranslations.get('faith_answers',
+                                              AppApiConstant.chatLanguage),
                                           style: TextStyle(
                                             fontWeight: FontWeight.w700,
                                             color:
@@ -2581,7 +2593,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                               bottom:
                                                   20), // Add bottom padding to prevent text from being hidden
                                           child: Text(
-                                            'Get Guidance Based On Your Need...',
+                                            ChatTranslations.get('get_guidance',
+                                                AppApiConstant.chatLanguage),
                                             textAlign: TextAlign.center,
                                             style: TextStyle(
                                               color: CommanColor.whiteBlack(
@@ -2606,7 +2619,9 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                                           bottom:
                                               20), // Add bottom padding to prevent text from being hidden
                                       child: Text(
-                                        'Ask questions about this verse...',
+                                        ChatTranslations.get(
+                                            'ask_questions_verse',
+                                            AppApiConstant.chatLanguage),
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
                                           color: CommanColor.whiteBlack(context)
@@ -2766,9 +2781,12 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  'What does God say about fear?',
-                  'How do I forgive someone who hurt me?',
-                  'What is God\'s purpose for my life?',
+                  ChatTranslations.get(
+                      'what_god_say_fear', AppApiConstant.chatLanguage),
+                  ChatTranslations.get(
+                      'example_forgive', AppApiConstant.chatLanguage),
+                  ChatTranslations.get(
+                      'example_purpose', AppApiConstant.chatLanguage),
                 ].asMap().entries.map((entry) {
                   final index = entry.key;
                   final question = entry.value;
@@ -2873,7 +2891,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'RECENT CONVERSATIONS',
+                ChatTranslations.get(
+                    'recent_conversations', AppApiConstant.chatLanguage),
                 style: TextStyle(
                   color: CommanColor.whiteBlack(context).withOpacity(0.8),
                   fontSize: screenWidth > 450 ? 14 : 12,
@@ -2890,7 +2909,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                   );
                 },
                 child: Text(
-                  'View all',
+                  ChatTranslations.get('view_all', AppApiConstant.chatLanguage),
                   style: TextStyle(
                     color: CommanColor.whiteBlack(context),
                     fontSize: screenWidth > 450 ? 13 : 12,
@@ -3023,7 +3042,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Suggestions',
+            ChatTranslations.get('suggestions', AppApiConstant.chatLanguage),
             style: TextStyle(
               color: isDark
                   ? Colors.white.withOpacity(0.75)
@@ -3136,14 +3155,19 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
     if (sentences.isEmpty) {
       return hasVerseContext
           ? [
-              'Tell me more about this verse',
-              'How can I apply this verse in my life?',
-              'What else does this verse teach?',
+              ChatTranslations.get(
+                  'tell_more_verse', AppApiConstant.chatLanguage),
+              ChatTranslations.get(
+                  'how_apply_verse_life', AppApiConstant.chatLanguage),
+              ChatTranslations.get(
+                  'what_else_verse_teach', AppApiConstant.chatLanguage),
             ]
           : [
-              'Can you explain more?',
-              'How can I apply this?',
-              'What else should I know?',
+              ChatTranslations.get('explain_more', AppApiConstant.chatLanguage),
+              ChatTranslations.get(
+                  'how_apply_this', AppApiConstant.chatLanguage),
+              ChatTranslations.get(
+                  'what_else_know', AppApiConstant.chatLanguage),
             ];
     }
 
@@ -3162,11 +3186,15 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
     if (keyPhrases.isNotEmpty) {
       for (var phrase in keyPhrases.take(2)) {
         if (hasVerseContext) {
-          dynamicQuestions.add('Can you explain more about ${phrase}?');
-          dynamicQuestions.add('How does this verse relate to ${phrase}?');
+          dynamicQuestions.add(
+              '${ChatTranslations.get('explain_more_about', AppApiConstant.chatLanguage)} ${phrase}?');
+          dynamicQuestions.add(
+              '${ChatTranslations.get('how_verse_relate_to', AppApiConstant.chatLanguage)} ${phrase}?');
         } else {
-          dynamicQuestions.add('Can you explain more about ${phrase}?');
-          dynamicQuestions.add('How does this relate to ${phrase}?');
+          dynamicQuestions.add(
+              '${ChatTranslations.get('explain_more_about', AppApiConstant.chatLanguage)} ${phrase}?');
+          dynamicQuestions.add(
+              '${ChatTranslations.get('how_relate_to', AppApiConstant.chatLanguage)} ${phrase}?');
         }
         if (dynamicQuestions.length >= 3) break;
       }
@@ -3177,12 +3205,13 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
       for (var concept in importantConcepts.take(2)) {
         if (hasVerseContext) {
           if (!dynamicQuestions.any((q) => q.toLowerCase().contains(concept))) {
-            dynamicQuestions
-                .add('What does this verse teach about ${concept}?');
+            dynamicQuestions.add(
+                '${ChatTranslations.get('verse_teach_about', AppApiConstant.chatLanguage)} ${concept}?');
           }
         } else {
           if (!dynamicQuestions.any((q) => q.toLowerCase().contains(concept))) {
-            dynamicQuestions.add('What does God say about ${concept}?');
+            dynamicQuestions.add(
+                '${ChatTranslations.get('god_say_about', AppApiConstant.chatLanguage)} ${concept}?');
           }
         }
         if (dynamicQuestions.length >= 3) break;
@@ -3261,8 +3290,10 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
           firstSentence.contains('so that') ||
           firstSentence.contains('in order to')) {
         dynamicQuestions.add(hasVerseContext
-            ? 'Why is this verse important?'
-            : 'Why is this important?');
+            ? ChatTranslations.get(
+                'why_verse_important', AppApiConstant.chatLanguage)
+            : ChatTranslations.get(
+                'why_important', AppApiConstant.chatLanguage));
       }
 
       // Look for "how to", "way to" patterns
@@ -3270,15 +3301,19 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
           firstSentence.contains('way to') ||
           firstSentence.contains('steps')) {
         dynamicQuestions.add(hasVerseContext
-            ? 'What steps should I take?'
-            : 'What practical steps can I take?');
+            ? ChatTranslations.get(
+                'what_steps_take', AppApiConstant.chatLanguage)
+            : ChatTranslations.get(
+                'what_practical_steps', AppApiConstant.chatLanguage));
       }
 
       // Look for questions in the response
       if (firstSentence.contains('?') || answer.contains('?')) {
         dynamicQuestions.add(hasVerseContext
-            ? 'Can you explain this verse further?'
-            : 'Can you explain this further?');
+            ? ChatTranslations.get(
+                'explain_verse_further', AppApiConstant.chatLanguage)
+            : ChatTranslations.get(
+                'explain_further', AppApiConstant.chatLanguage));
       }
     }
 
@@ -3290,20 +3325,42 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
     // Fill remaining slots with contextual questions
     while (dynamicQuestions.length < 3) {
       if (hasVerseContext) {
-        if (!dynamicQuestions.any((q) => q.contains('apply'))) {
-          dynamicQuestions.add('How can I apply this verse in my life?');
-        } else if (!dynamicQuestions.any((q) => q.contains('more'))) {
-          dynamicQuestions.add('Tell me more about this verse');
+        if (!dynamicQuestions.any((q) =>
+            q.contains('apply') ||
+            q.contains(ChatTranslations.get(
+                    'how_apply_verse_life', AppApiConstant.chatLanguage)
+                .substring(0, 5)))) {
+          dynamicQuestions.add(ChatTranslations.get(
+              'how_apply_verse_life', AppApiConstant.chatLanguage));
+        } else if (!dynamicQuestions.any((q) =>
+            q.contains('more') ||
+            q.contains(ChatTranslations.get(
+                    'tell_more_verse', AppApiConstant.chatLanguage)
+                .substring(0, 5)))) {
+          dynamicQuestions.add(ChatTranslations.get(
+              'tell_more_verse', AppApiConstant.chatLanguage));
         } else {
-          dynamicQuestions.add('What else does this verse teach?');
+          dynamicQuestions.add(ChatTranslations.get(
+              'what_else_verse_teach', AppApiConstant.chatLanguage));
         }
       } else {
-        if (!dynamicQuestions.any((q) => q.contains('apply'))) {
-          dynamicQuestions.add('How can I apply this?');
-        } else if (!dynamicQuestions.any((q) => q.contains('more'))) {
-          dynamicQuestions.add('Can you explain more?');
+        if (!dynamicQuestions.any((q) =>
+            q.contains('apply') ||
+            q.contains(ChatTranslations.get(
+                    'how_apply_this', AppApiConstant.chatLanguage)
+                .substring(0, 5)))) {
+          dynamicQuestions.add(ChatTranslations.get(
+              'how_apply_this', AppApiConstant.chatLanguage));
+        } else if (!dynamicQuestions.any((q) =>
+            q.contains('more') ||
+            q.contains(ChatTranslations.get(
+                    'explain_more', AppApiConstant.chatLanguage)
+                .substring(0, 5)))) {
+          dynamicQuestions.add(ChatTranslations.get(
+              'explain_more', AppApiConstant.chatLanguage));
         } else {
-          dynamicQuestions.add('What else should I know?');
+          dynamicQuestions.add(ChatTranslations.get(
+              'what_else_know', AppApiConstant.chatLanguage));
         }
       }
     }
@@ -3552,9 +3609,9 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
 
     // Generate suggested questions based on the verse
     final suggestedQuestions = [
-      'Explain this verse',
-      'What does this verse mean for my daily life?',
-      'How can I apply this teaching?',
+      ChatTranslations.get('explain_verse', AppApiConstant.chatLanguage),
+      ChatTranslations.get('verse_daily_life', AppApiConstant.chatLanguage),
+      ChatTranslations.get('how_apply_teaching', AppApiConstant.chatLanguage),
     ];
 
     return Container(
@@ -3569,7 +3626,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Suggestions :',
+            ChatTranslations.get(
+                'suggestions_colon', AppApiConstant.chatLanguage),
             style: TextStyle(
               color: CommanColor.whiteBlack(context).withOpacity(0.7),
               fontSize: screenWidth > 450 ? 16 : 14,
@@ -3750,8 +3808,9 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
       String text, bool isUser, double screenWidth, BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
-    final baseColor =
-        isUser ? const Color(0xFFF6F1E9) : const Color(0xFF8D6E63);
+    final baseColor = isUser
+        ? const Color(0xFFF6F1E9)
+        : (isDark ? Colors.white.withOpacity(0.9) : const Color(0xFF8D6E63));
     // Use a brighter, more visible color for verse highlighting
     // For AI responses (isUser = false): use yellow in light mode, white in dark mode
     // For user messages: use the same colors
@@ -3937,7 +3996,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
       child: Row(
         mainAxisAlignment:
             isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.end, // Changed to .end for bottom alignment
         children: [
           if (!isUser) ...[
             Image.asset(
@@ -3955,7 +4015,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                 color: isUser
                     ? const Color(0xFF8D6E63) // Brown color for user messages
                     : (isDark
-                        ? CommanColor.darkPrimaryColor.withOpacity(0.5)
+                        ? const Color(
+                            0xFF4A4A4A) // Solid dark gray for better contrast in dark mode
                         : const Color(
                             0xFFF6F1E9)), // Light beige like screenshot
                 borderRadius:
@@ -4091,17 +4152,21 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
           ),
           if (isUser) ...[
             const SizedBox(width: 8),
-            CircleAvatar(
-              radius: screenWidth > 450 ? 18 : 16,
-              backgroundColor:
-                  CommanColor.lightDarkPrimary(context).withOpacity(
-                isDark ? 0.25 : 0.15,
-              ),
-              child: Image.asset(
-                "assets/home icons/My Account.png",
-                width: screenWidth > 450 ? 20 : 18,
-                height: screenWidth > 450 ? 20 : 18,
-                color: Colors.white,
+            Padding(
+              padding: const EdgeInsets.only(
+                  bottom: 4), // Add slight padding for better alignment
+              child: CircleAvatar(
+                radius: screenWidth > 450 ? 18 : 16,
+                backgroundColor:
+                    CommanColor.lightDarkPrimary(context).withOpacity(
+                  isDark ? 0.25 : 0.15,
+                ),
+                child: Image.asset(
+                  "assets/home icons/My Account.png",
+                  width: screenWidth > 450 ? 20 : 18,
+                  height: screenWidth > 450 ? 20 : 18,
+                  color: Colors.white,
+                ),
               ),
             ),
           ],
@@ -4159,7 +4224,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
               ),
               const SizedBox(width: 12),
               Text(
-                'Copy',
+                ChatTranslations.get('copy', AppApiConstant.chatLanguage),
                 style: TextStyle(
                   color: textColor,
                   fontSize: screenWidth > 450 ? 16 : 14,
@@ -4169,7 +4234,8 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
           ),
           onTap: () async {
             await Clipboard.setData(ClipboardData(text: message.text));
-            Constants.showToast('Message copied to clipboard');
+            Constants.showToast(
+                ChatTranslations.get('copied', AppApiConstant.chatLanguage));
           },
         ),
         if (!message.isUser) // Only show Share for reply messages
@@ -4183,7 +4249,7 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  'Share',
+                  ChatTranslations.get('share', AppApiConstant.chatLanguage),
                   style: TextStyle(
                     color: textColor,
                     fontSize: screenWidth > 450 ? 16 : 14,
@@ -4285,10 +4351,13 @@ Remember: You are assisting users with the Geneva Bible, so provide responses th
                       ),
                       decoration: InputDecoration(
                         hintText: _isListening
-                            ? 'Listening...'
+                            ? ChatTranslations.get(
+                                'listening', AppApiConstant.chatLanguage)
                             : (_isLoading
-                                ? 'Seeking guidance...'
-                                : "Ask anything here..."),
+                                ? ChatTranslations.get('seeking_guidance',
+                                    AppApiConstant.chatLanguage)
+                                : ChatTranslations.get('ask_anything',
+                                    AppApiConstant.chatLanguage)),
                         hintStyle: TextStyle(
                           color:
                               CommanColor.whiteBlack(context).withOpacity(0.5),

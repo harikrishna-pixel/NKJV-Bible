@@ -1500,14 +1500,17 @@ class _AnimatedJourneyDialogState extends State<_AnimatedJourneyDialog>
       _steps.length,
       (index) => AnimationController(
         vsync: this,
-        duration: const Duration(milliseconds: 1800),
+        duration: const Duration(
+            milliseconds: 1500), // Increased from 1800ms to 2000ms
       ),
     );
 
-    // Progress bar animation
+    // Progress bar animation - should complete with all tick animations
     _progressController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3500),
+      duration: const Duration(
+          milliseconds:
+              8000), // Matches total tick animation time (2000ms × 4 steps)
     );
     _progressAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
@@ -1535,7 +1538,8 @@ class _AnimatedJourneyDialogState extends State<_AnimatedJourneyDialog>
   void _startAnimations() {
     // Complete steps one by one
     for (int i = 0; i < _steps.length; i++) {
-      Future.delayed(Duration(milliseconds: 1100 * (i + 1)), () {
+      Future.delayed(Duration(milliseconds: 2000 * (i + 1)), () {
+        // Increased from 1100ms to 2000ms
         if (mounted) {
           setState(() {
             _completedSteps = i + 1;

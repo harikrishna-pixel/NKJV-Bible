@@ -271,7 +271,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           });
         }
         EasyLoading.show();
-        
+
         // Start 10-second timeout timer for loading
         _loadingTimeoutTimer?.cancel(); // Cancel any existing timer
         _loadingTimeoutTimer = Timer(const Duration(seconds: 10), () {
@@ -283,7 +283,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             });
           }
         });
-        
+
         await SharPreferences.setString('OpenAd', '1');
 
         // Check again before purchase (in case subscription status changed)
@@ -1016,7 +1016,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       } else {
         // Cancel loading timeout timer when purchase completes (success or error)
         _loadingTimeoutTimer?.cancel();
-        
+
         if (purchaseDetails.status == PurchaseStatus.error) {
           debugPrint('Error: ${purchaseDetails.error}');
           DebugConsole.log(" purchases error - $purchaseDetails");
@@ -2352,7 +2352,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                           Text(
                             _products[index].price,
                             style: TextStyle(
-                              fontSize: 24,
+                              fontSize: 20,
                               fontWeight: FontWeight.bold,
                               color: CommanColor.whiteBlack(context),
                             ),
@@ -2400,7 +2400,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                           Text(
                             _products[index].price,
                             style: TextStyle(
-                              fontSize: 23,
+                              fontSize: 20,
                               fontWeight: FontWeight.bold,
                               color: CommanColor.whiteBlack(context),
                             ),

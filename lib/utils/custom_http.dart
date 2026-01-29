@@ -33,16 +33,39 @@ class CustomHttp {
   }
 
   Future<http.Response> postwithout(path, {data}) async {
-    devtools.log("req post body  - $data");
-    var response = await client.post(path, body: data, headers: {
-      'Content-type': 'application/x-www-form-urlencoded',
-      "Acess-Control-Allow-Origin": "*",
-    });
-    return response;
+    print("========== HTTP REQUEST DEBUG ==========");
+    print("HTTP - Request URL: $path");
+    print("HTTP - Request body: $data");
+    print("HTTP - Starting request with 30s timeout...");
+
+    try {
+      var response = await client.post(path, body: data, headers: {
+        'Content-type': 'application/x-www-form-urlencoded',
+        "Acess-Control-Allow-Origin": "*",
+      }).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          print("HTTP - TIMEOUT: Request timed out after 30 seconds");
+          print("HTTP - Server did not respond in time");
+          throw Exception('Request timed out. Please check your connection.');
+        },
+      );
+
+      print("HTTP - Response received successfully");
+      print("HTTP - Status code: ${response.statusCode}");
+      print("========== END HTTP REQUEST DEBUG ==========");
+
+      return response;
+    } catch (e) {
+      print("HTTP - ERROR during request: $e");
+      print("HTTP - Error type: ${e.runtimeType}");
+      print("========== END HTTP REQUEST DEBUG ==========");
+      rethrow;
+    }
   }
 
   Future<http.Response?> postwithtokenwitht(path, {data, token}) async {
-    devtools.log("req post body  - $data");
+    print("req post body  - $data");
     try {
       var response = await client.post(path, body: data, headers: {
         'Authorization': 'Bearer $token',
@@ -50,14 +73,14 @@ class CustomHttp {
 
       return response;
     } catch (e) {
-      devtools.log("post resp $e");
+      print("post resp $e");
       return null;
     }
   }
 
   //! Post with headers beartoken
   Future<http.Response?> postwithtoken({path, token, data}) async {
-    devtools.log("req post body  - $data");
+    print("req post body  - $data");
     try {
       var response = await client.post(path, body: data, headers: {
         'Authorization': 'Bearer $token',
@@ -65,7 +88,7 @@ class CustomHttp {
 
       return response;
     } catch (e) {
-      devtools.log("post resp $e");
+      print("post resp $e");
       return null;
     }
   }

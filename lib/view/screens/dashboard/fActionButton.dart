@@ -153,17 +153,33 @@ class floatingButtonState extends State<floatingButton>
     final oldChapterNum = int.parse(oldWidget.chapterNum);
     final newChapterNum = int.parse(widget.chapterNum);
 
+    // Check if book number changed (in case user swiped to different book)
+    final oldBookNum = int.parse(oldWidget.bookNum.toString());
+    final newBookNum = int.parse(widget.bookNum.toString());
+
     if (oldChapterNum != newChapterNum) {
       // Chapter changed - update audio chapter number
       audioChapterNum = newChapterNum;
       selectedChapter = newChapterNum;
 
+      // Also check if book number changed and update accordingly
+      if (oldBookNum != newBookNum) {
+        audioBookNum = newBookNum + 1;
+        currentBookChapterCount = int.parse(widget.chapterCount.toString());
+        // Update book name from widget if available, otherwise keep stored name
+        if (widget.bookName.isNotEmpty) {
+          _storedBookName = widget.bookName;
+        }
+      }
+
       // If audio was playing before close, auto-start it on new chapter
       if (_wasAudioPlayingBeforeClose && !isAudioPlaying) {
-        // Update book name if it changed
-        if (widget.bookName != oldWidget.bookName) {
-          _storedBookName = widget.bookName;
-          audioBookNum = int.parse(widget.bookNum.toString()) + 1;
+        // Update book info if it changed
+        if (widget.bookName != oldWidget.bookName || oldBookNum != newBookNum) {
+          if (widget.bookName.isNotEmpty) {
+            _storedBookName = widget.bookName;
+          }
+          audioBookNum = newBookNum + 1;
           currentBookChapterCount = int.parse(widget.chapterCount.toString());
         }
 
@@ -183,10 +199,20 @@ class floatingButtonState extends State<floatingButton>
     }
 
     // Update book name if it changed
-    if (widget.bookName != oldWidget.bookName) {
+    if (widget.bookName != oldWidget.bookName && widget.bookName.isNotEmpty) {
       _storedBookName = widget.bookName;
-      audioBookNum = int.parse(widget.bookNum.toString()) + 1;
+      audioBookNum = newBookNum + 1;
       currentBookChapterCount = int.parse(widget.chapterCount.toString());
+    }
+
+    // Additional check: if only book number changed without chapter change
+    if (oldBookNum != newBookNum && oldChapterNum == newChapterNum) {
+      audioBookNum = newBookNum + 1;
+      currentBookChapterCount = int.parse(widget.chapterCount.toString());
+      // Update book name from widget if available, otherwise keep stored name
+      if (widget.bookName.isNotEmpty) {
+        _storedBookName = widget.bookName;
+      }
     }
   }
 
@@ -1295,38 +1321,107 @@ class floatingButtonState extends State<floatingButton>
         );
 
   Future audioPlayerBottomSheet() async {
-    // Refresh _storedBookName from controller first (most current), then widget.bookName, then SharedPreferences
+    print("=== AUDIO BOTTOM SHEET: Opening ===");
+    print("AUDIO: widget.bookName = '${widget.bookName}'");
+    print("AUDIO: widget.bookNum = ${widget.bookNum}");
+    print("AUDIO: widget.chapterNum = ${widget.chapterNum}");
+    print("AUDIO: Current _storedBookName = '$_storedBookName'");
+    print("AUDIO: Current audioBookNum = $audioBookNum");
+    print("AUDIO: Current audioChapterNum = $audioChapterNum");
+
+    // Sync audio position with current reading position before opening bottom sheet
     try {
+      final currentBookNum = int.parse(widget.bookNum.toString());
+      final currentChapterNum = int.parse(widget.chapterNum);
+      String? currentBookName;
+
+      // Get current book name from controller, widget, or SharedPreferences
+      if (Get.isRegistered<DashBoardController>()) {
+        final controller = Get.find<DashBoardController>();
+        if (controller.selectedBook.value.isNotEmpty) {
+          currentBookName = controller.selectedBook.value;
+          print("AUDIO: Got book name from controller: '$currentBookName'");
+        }
+      }
+
+      if (currentBookName == null || currentBookName.isEmpty) {
+        if (widget.bookName.isNotEmpty) {
+          currentBookName = widget.bookName;
+          print("AUDIO: Got book name from widget: '$currentBookName'");
+        } else {
+          currentBookName =
+              await SharPreferences.getString(SharPreferences.selectedBook);
+          print(
+              "AUDIO: Got book name from SharedPreferences: '$currentBookName'");
+        }
+      }
+
+      // Update audioBookNum, audioChapterNum, and _storedBookName to match current reading position
+      if (mounted) {
+        setState(() {
+          audioBookNum = currentBookNum + 1;
+          audioChapterNum = currentChapterNum;
+          currentBookChapterCount = int.parse(widget.chapterCount.toString());
+          if (currentBookName != null && currentBookName.isNotEmpty) {
+            _storedBookName = currentBookName;
+            print("AUDIO: Updated _storedBookName to: '$_storedBookName'");
+          }
+        });
+      }
+
+      print(
+          "AUDIO: After sync - audioBookNum = $audioBookNum, audioChapterNum = $audioChapterNum");
+      print("AUDIO: After sync - _storedBookName = '$_storedBookName'");
+    } catch (e) {
+      print("AUDIO: Error syncing audio position: $e");
+      debugPrint("Error syncing audio position: $e");
+    }
+
+    // Additional refresh of _storedBookName from controller first (most current), then widget.bookName, then SharedPreferences
+    try {
+      String? finalBookName;
+
       // Always try to get from controller first (source of truth)
       if (Get.isRegistered<DashBoardController>()) {
         final controller = Get.find<DashBoardController>();
-        if (controller.selectedBook.value.isNotEmpty && mounted) {
-          setState(() {
-            _storedBookName = controller.selectedBook.value;
-          });
+        if (controller.selectedBook.value.isNotEmpty) {
+          finalBookName = controller.selectedBook.value;
+          print(
+              "AUDIO: Final check - got book from controller: '$finalBookName'");
         }
       }
+
       // Fallback to widget.bookName if controller doesn't have it
-      if ((_storedBookName == null || _storedBookName!.isEmpty) &&
-          widget.bookName.isNotEmpty &&
-          mounted) {
-        setState(() {
-          _storedBookName = widget.bookName;
-        });
+      if ((finalBookName == null || finalBookName.isEmpty) &&
+          widget.bookName.isNotEmpty) {
+        finalBookName = widget.bookName;
+        print("AUDIO: Final check - got book from widget: '$finalBookName'");
       }
+
       // Fallback to SharedPreferences if both above are empty
-      if (_storedBookName == null || _storedBookName!.isEmpty) {
-        final bookName =
+      if (finalBookName == null || finalBookName.isEmpty) {
+        finalBookName =
             await SharPreferences.getString(SharPreferences.selectedBook);
-        if (bookName != null && bookName.isNotEmpty && mounted) {
-          setState(() {
-            _storedBookName = bookName;
-          });
-        }
+        print(
+            "AUDIO: Final check - got book from SharedPreferences: '$finalBookName'");
+      }
+
+      // Update _storedBookName once with the final value
+      if (finalBookName != null && finalBookName.isNotEmpty && mounted) {
+        setState(() {
+          _storedBookName = finalBookName;
+        });
+        print("AUDIO: Final _storedBookName set to: '$_storedBookName'");
+        // Small delay to ensure setState completes before showing modal
+        await Future.delayed(const Duration(milliseconds: 50));
       }
     } catch (e) {
+      print("AUDIO: Error refreshing book name: $e");
       debugPrint("Error refreshing book name: $e");
     }
+
+    print(
+        "AUDIO: About to show modal - _storedBookName = '$_storedBookName', audioChapterNum = $audioChapterNum");
 
     // local flags/subscriptions that persist for the sheet's lifetime
     bool listenersAttached = false;
@@ -1644,18 +1739,33 @@ class floatingButtonState extends State<floatingButton>
                     const SizedBox(width: 60),
                     Builder(
                       builder: (context) {
+                        print(
+                            "=== AUDIO BUILDER: Building book name display ===");
+                        print(
+                            "BUILDER: widget.bookName = '${widget.bookName}'");
+                        print("BUILDER: _storedBookName = '$_storedBookName'");
+                        print("BUILDER: audioChapterNum = $audioChapterNum");
+
                         String bookName = '';
                         if (widget.bookName.isNotEmpty) {
                           bookName = widget.bookName;
+                          print("BUILDER: Using widget.bookName = '$bookName'");
                         } else if (_storedBookName != null &&
                             _storedBookName!.isNotEmpty) {
                           bookName = _storedBookName!;
+                          print("BUILDER: Using _storedBookName = '$bookName'");
                         } else if (Get.isRegistered<DashBoardController>()) {
                           final controller = Get.find<DashBoardController>();
                           if (controller.selectedBook.value.isNotEmpty) {
                             bookName = controller.selectedBook.value;
+                            print(
+                                "BUILDER: Using controller book = '$bookName'");
                           }
                         }
+
+                        print(
+                            "BUILDER: Final display = '$bookName - $audioChapterNum'");
+
                         return Text(
                           "$bookName - $audioChapterNum",
                           style: TextStyle(
@@ -2949,34 +3059,75 @@ class floatingButtonState extends State<floatingButton>
   }
 
   Future textToSpeechBottomSheet() async {
-    // Refresh _storedBookName from widget.bookName first, then controller, then SharedPreferences
+    // Sync audio position with current reading position before opening bottom sheet
     try {
+      final currentBookNum = int.parse(widget.bookNum.toString());
+      final currentChapterNum = int.parse(widget.chapterNum);
+      String? currentBookName;
+
+      // Get current book name from controller, widget, or SharedPreferences
+      if (Get.isRegistered<DashBoardController>()) {
+        final controller = Get.find<DashBoardController>();
+        if (controller.selectedBook.value.isNotEmpty) {
+          currentBookName = controller.selectedBook.value;
+        }
+      }
+
+      if (currentBookName == null || currentBookName.isEmpty) {
+        if (widget.bookName.isNotEmpty) {
+          currentBookName = widget.bookName;
+        } else {
+          currentBookName =
+              await SharPreferences.getString(SharPreferences.selectedBook);
+        }
+      }
+
+      // Update audioBookNum, audioChapterNum, and _storedBookName to match current reading position
+      if (mounted) {
+        setState(() {
+          audioBookNum = currentBookNum + 1;
+          audioChapterNum = currentChapterNum;
+          currentBookChapterCount = int.parse(widget.chapterCount.toString());
+          if (currentBookName != null && currentBookName.isNotEmpty) {
+            _storedBookName = currentBookName;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint("Error syncing audio position: $e");
+    }
+
+    // Additional refresh of _storedBookName from widget.bookName first, then controller, then SharedPreferences
+    try {
+      String? finalBookName;
+
       // Always try to get from controller first (source of truth)
       if (Get.isRegistered<DashBoardController>()) {
         final controller = Get.find<DashBoardController>();
-        if (controller.selectedBook.value.isNotEmpty && mounted) {
-          setState(() {
-            _storedBookName = controller.selectedBook.value;
-          });
+        if (controller.selectedBook.value.isNotEmpty) {
+          finalBookName = controller.selectedBook.value;
         }
       }
+
       // Fallback to widget.bookName if controller doesn't have it
-      if ((_storedBookName == null || _storedBookName!.isEmpty) &&
-          widget.bookName.isNotEmpty &&
-          mounted) {
-        setState(() {
-          _storedBookName = widget.bookName;
-        });
+      if ((finalBookName == null || finalBookName.isEmpty) &&
+          widget.bookName.isNotEmpty) {
+        finalBookName = widget.bookName;
       }
+
       // Fallback to SharedPreferences if both above are empty
-      if (_storedBookName == null || _storedBookName!.isEmpty) {
-        final bookName =
+      if (finalBookName == null || finalBookName.isEmpty) {
+        finalBookName =
             await SharPreferences.getString(SharPreferences.selectedBook);
-        if (bookName != null && bookName.isNotEmpty && mounted) {
-          setState(() {
-            _storedBookName = bookName;
-          });
-        }
+      }
+
+      // Update _storedBookName once with the final value
+      if (finalBookName != null && finalBookName.isNotEmpty && mounted) {
+        setState(() {
+          _storedBookName = finalBookName;
+        });
+        // Small delay to ensure setState completes before showing modal
+        await Future.delayed(const Duration(milliseconds: 50));
       }
     } catch (e) {
       debugPrint("Error refreshing book name: $e");

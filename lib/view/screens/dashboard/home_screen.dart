@@ -1126,7 +1126,7 @@ class _HomeScreenState extends State<HomeScreen>
         final firstShown = DateTime.parse(ts);
         final diff = DateTime.now().difference(firstShown).inMinutes;
         if (diff >= 10) {
-          await prefs.setBool('exit_offer_cooldown_active', false);
+          await SharPreferences.setBoolean('exit_offer_cooldown_active', false);
           show = false;
         }
       } catch (_) {}
@@ -1172,27 +1172,51 @@ class _HomeScreenState extends State<HomeScreen>
     final today = DateTime.now();
     final todayKey = today.toIso8601String().split('T')[0]; // YYYY-MM-DD format
 
+    // Check if first-time message has been shown
+    final firstTimeShown = await SharPreferences.getBoolean(
+            SharPreferences.dailyWelcomeFirstTimeShown) ??
+        false;
+
     // Get last shown date
     final lastShownDate = await SharPreferences.getString(
         SharPreferences.dailyWelcomeLastShownDate);
 
     // Check if it's a new day
     if (lastShownDate != todayKey) {
-      // Get current message index (0-3)
-      final messageIndex = await SharPreferences.getInt(
-              SharPreferences.dailyWelcomeMessageIndex) ??
-          0;
+      String message;
 
-      // Daily rotating welcome messages
-      final welcomeMessages = [
-        "Welcome back. God's Word is always with you.",
-        "Take a moment. Let God's Word speak to you.",
-        "Grace and peace as you read today.",
-        "You're never alone. God's Word is here.",
-      ];
+      if (!firstTimeShown) {
+        // Very first time - show welcome message only once
+        message = "Welcome You. God's Word is always with you.";
 
-      // Get the message for today
-      final message = welcomeMessages[messageIndex % welcomeMessages.length];
+        // Mark first-time message as shown
+        await SharPreferences.setBoolean(
+            SharPreferences.dailyWelcomeFirstTimeShown, true);
+
+        // Initialize message index to 1 (skip the first message for future rotations)
+        await SharPreferences.setInt(
+            SharPreferences.dailyWelcomeMessageIndex, 1);
+      } else {
+        // After first time - rotate through other messages (excluding first one)
+        final messageIndex = await SharPreferences.getInt(
+                SharPreferences.dailyWelcomeMessageIndex) ??
+            1;
+
+        // Rotating messages (excluding the first-time welcome)
+        final welcomeMessages = [
+          "Take a moment. Let God's Word speak to you.",
+          "Grace and peace as you read today.",
+          "You're never alone. God's Word is here.",
+        ];
+
+        // Get the message for today (rotate through messages 1-3)
+        message = welcomeMessages[(messageIndex - 1) % welcomeMessages.length];
+
+        // Rotate to next message index for tomorrow (keep in range 1-3)
+        final nextIndex = messageIndex % welcomeMessages.length + 1;
+        await SharPreferences.setInt(
+            SharPreferences.dailyWelcomeMessageIndex, nextIndex);
+      }
 
       // Show toast after a small delay to ensure screen is fully loaded
       Future.delayed(const Duration(milliseconds: 500), () {
@@ -1204,11 +1228,6 @@ class _HomeScreenState extends State<HomeScreen>
       // Update last shown date
       await SharPreferences.setString(
           SharPreferences.dailyWelcomeLastShownDate, todayKey);
-
-      // Rotate to next message index for tomorrow
-      final nextIndex = (messageIndex + 1) % welcomeMessages.length;
-      await SharPreferences.setInt(
-          SharPreferences.dailyWelcomeMessageIndex, nextIndex);
     }
   }
 
@@ -4781,8 +4800,25 @@ class _HomeScreenState extends State<HomeScreen>
                           ),
                         ListTile(
                           dense: true,
-                          onTap: () {
+                          onTap: () async {
                             Get.back();
+
+                            // Check internet connectivity before opening chat
+                            try {
+                              final hasInternet = await InternetConnection()
+                                  .hasInternetAccess
+                                  .timeout(const Duration(seconds: 3),
+                                      onTimeout: () => false);
+
+                              if (!hasInternet) {
+                                Constants.showToast("No internet connection");
+                                return;
+                              }
+                            } catch (e) {
+                              Constants.showToast("No internet connection");
+                              return;
+                            }
+
                             if (controller.adFree.value == false) {
                               controller.bannerAd?.dispose();
                               controller.bannerAd?.load();
