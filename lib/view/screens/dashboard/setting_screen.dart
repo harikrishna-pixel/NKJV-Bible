@@ -9,6 +9,7 @@ import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/preference_selection_screen.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
+import 'package:biblebookapp/view/screens/tawk_chat/tawk_chat_screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:day_night_time_picker/day_night_time_picker.dart';
@@ -751,63 +752,9 @@ class _SettingScreenState extends State<SettingScreen>
   }
 
   _launchURL() async {
-    final DeviceInfoPlugin deviceInfoPlugin = DeviceInfoPlugin();
-    PackageInfo packageInfo = await PackageInfo.fromPlatform();
-    final locale = ui.window.locale;
-    String deviceType = 'ios';
-    String groupId = '1';
-    String packageName = '';
-    String appName = BibleInfo.bible_shortName;
-    String deviceId = '';
-    String deviceModel = '';
-    String deviceName = '';
-    String appVersion = packageInfo.version;
-    String osVersion = '';
-    String appType = '';
-    String language = locale.languageCode;
-    String countryCode = locale.countryCode.toString();
-    String themeColor = 'd43f8d';
-    String themeMode = '0';
-    String width = '100px';
-    String height = '100px';
-    String isDevelopOrProd = '0';
+    // Open Tawk chat screen for feedback (same as Chat Us)
     await SharPreferences.setString('OpenAd', '1');
-    if (Platform.isAndroid) {
-      final androidInfo = await deviceInfoPlugin.androidInfo;
-      deviceType = 'Android';
-      deviceId = androidInfo.id ?? '';
-      deviceModel = androidInfo.model ?? '';
-      deviceName = androidInfo.name;
-      osVersion = 'Android ${androidInfo.version.release}';
-      packageName = BibleInfo.android_Package_Name;
-    } else if (Platform.isIOS) {
-      final iosInfo = await deviceInfoPlugin.iosInfo;
-      deviceType = 'iOS';
-      osVersion = 'iOS ${iosInfo.systemVersion}';
-      packageName = BibleInfo.ios_Bundle_Id;
-      deviceName = iosInfo.name;
-      deviceId = iosInfo.identifierForVendor ?? '';
-      deviceModel = iosInfo.utsname.machine ?? '';
-    }
-
-    debugPrint(
-        "urldata - $deviceType - $packageName - $appName - $deviceModel - $deviceId");
-
-    final url =
-        "https://bibleoffice.com/m_feedback/API/feedback_form/index.php?device_type=$deviceType&group_id=1&package_name=$packageName&app_name=$appName&device_id=$deviceId&device_model=$deviceModel&device_name=$deviceName&app_version=$appVersion&os_version=$osVersion&app_type=$deviceType&language=$language&country_code=$countryCode";
-
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url));
-    } else {
-      throw 'Could not launch $url';
-    }
-    // const url =
-    //     'https://bibleoffice.com/m_feedback/API/feedback_form/index.php';
-    // if (await canLaunch(url)) {
-    //   await launch(url);
-    // } else {
-    //   throw 'Could not launch $url';
-    // }
+    Get.to(const TawkChatScreen());
   }
 
   Future<void> _requestReview() async {

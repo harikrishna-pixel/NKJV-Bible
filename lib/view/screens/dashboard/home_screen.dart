@@ -6398,13 +6398,8 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _launchFeedbackForm() async {
-    const url =
-        'https://bibleoffice.com/m_feedback/API/feedback_form/index.php';
-    if (await canLaunch(url)) {
-      await launch(url);
-    } else {
-      throw 'Could not launch $url';
-    }
+    // Open Tawk chat screen for feedback (same as Chat Us)
+    Get.to(const TawkChatScreen());
   }
 
   void _attachScrollListener(GetXState<DashBoardController> state) {
