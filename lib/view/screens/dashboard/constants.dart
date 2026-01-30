@@ -3,7 +3,7 @@ class BibleInfo {
 
   // 6484270584  //6459793603
   static String ios_Bundle_Id = "com.balaklrapps.genevabible";
-  static String bible_shortName = "Geneva Bible";
+  static String bible_shortName = "NIV";
   static String current_Version = "1.0.69";
   static String android_Package_Name = "com.whitebibles.genevabible";
   static String appID = '11656bd4-ed0c-11ef-b28e-fa163e8c011b';

@@ -12,6 +12,7 @@ import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
 import 'package:biblebookapp/view/screens/chat/chat_translations.dart';
+import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/gestures.dart';
@@ -221,7 +222,7 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
       }
 
       final prompt = '''
-You are a respectful assistant for the Geneva Bible. Always respond in plain text without asterisks (*) or markdown.
+You are a respectful assistant for the ${BibleInfo.bible_shortName}. Always respond in plain text without asterisks (*) or markdown.
 ${languageInstruction}
 ${answerLengthInstruction}
 
@@ -454,13 +455,13 @@ ${category.prompt}
       }
 
       final prompt = '''
-You are a respectful assistant for the Geneva Bible. Always respond in plain text without asterisks (*) or markdown.
+You are a respectful assistant for the ${BibleInfo.bible_shortName}. Always respond in plain text without asterisks (*) or markdown.
 ${languageInstruction}
 ${answerLengthInstruction}
 
 Task:
 Write a prayer based on the following request: ${customRequest.trim()}
-Include 1-2 Geneva Bible verse references that relate to the request.
+Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the request.
 ''';
 
       final response = await http.post(
