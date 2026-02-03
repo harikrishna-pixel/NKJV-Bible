@@ -263,7 +263,9 @@ class LoginScreen extends HookConsumerWidget {
                 ),
               )),
               Padding(
-                padding: const EdgeInsets.only(bottom: 120.0),
+                // Keep the same bottom spacing but align contents to the start
+                // so the Note appears at the left on wide screens (iPad).
+                padding: const EdgeInsets.fromLTRB(20.0, 0.0, 20.0, 120.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -272,7 +274,8 @@ class LoginScreen extends HookConsumerWidget {
                         Get.to(() => SignupScreen());
                       },
                       child: Text(
-                        '   Note:',
+                        'Note:',
+                        textAlign: TextAlign.start,
                         style: TextStyle(
                           fontWeight: FontWeight.w500,
                           fontSize: screenWidth > 450 ? 25 : null,
@@ -283,7 +286,7 @@ class LoginScreen extends HookConsumerWidget {
                     const SizedBox(height: 8),
                     Text(
                       'No login is needed to remove ads or restore purchases',
-                      textAlign: TextAlign.center,
+                      textAlign: TextAlign.start,
                       style: TextStyle(
                         fontWeight: FontWeight.w500,
                         color: CommanColor.whiteBlack(context),

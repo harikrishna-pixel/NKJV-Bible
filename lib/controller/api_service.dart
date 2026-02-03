@@ -512,14 +512,26 @@ Future<String> getTempToken() async {
       throw 'Failed to get temp token';
     }
   } catch (e) {
-    if (e.toString().contains('host lookup')) {
+    // If the code explicitly threw a user-facing string (e.g. data['message']), rethrow it unchanged
+    if (e is String) {
+      throw e;
+    }
+    final err = e.toString().toLowerCase();
+    // Map common network errors/timeouts to a user-friendly offline message
+    if (e is SocketException ||
+        e is TimeoutException ||
+        err.contains('socketexception') ||
+        err.contains('host lookup') ||
+        err.contains('failed host lookup') ||
+        err.contains('timed out') ||
+        err.contains('timeout')) {
       throw 'No Internet Connection';
     }
     // Check for certificate/SSL/handshake errors and show user-friendly message
-    if (e.toString().contains('CERTIFICATE_VERIFY_FAILED') ||
-        e.toString().contains('Handshake') ||
-        e.toString().contains('certificate') ||
-        e.toString().contains('SSL')) {
+    if (err.contains('certificate_verify_failed') ||
+        err.contains('handshake') ||
+        err.contains('certificate') ||
+        err.contains('ssl')) {
       debugPrint('getTempToken: Certificate/SSL error: $e');
       throw 'Something went wrong. Please check your internet connection and try again.';
     }
@@ -575,20 +587,31 @@ Future<void> registerUser(
       throw data['message'] ?? 'Failed to register';
     }
   } catch (e) {
-    if (e.toString().contains('host lookup')) {
+    // If the code explicitly threw a user-facing string (e.g. data['message']), rethrow it unchanged
+    if (e is String) {
+      throw e;
+    }
+    final err = e.toString().toLowerCase();
+    if (e is SocketException ||
+        e is TimeoutException ||
+        err.contains('socketexception') ||
+        err.contains('host lookup') ||
+        err.contains('failed host lookup') ||
+        err.contains('timed out') ||
+        err.contains('timeout')) {
       throw 'No Internet Connection';
     }
     // Check for certificate/SSL/handshake errors and show user-friendly message
-    if (e.toString().contains('CERTIFICATE_VERIFY_FAILED') ||
-        e.toString().contains('Handshake') ||
-        e.toString().contains('certificate') ||
-        e.toString().contains('SSL') ||
-        e.toString().contains('Failed to get temp token')) {
+    if (err.contains('certificate_verify_failed') ||
+        err.contains('handshake') ||
+        err.contains('certificate') ||
+        err.contains('ssl') ||
+        err.contains('failed to get temp token')) {
       debugPrint('registerUser: Certificate/SSL error or temp token error: $e');
       throw 'Something went wrong. Please check your internet connection and try again.';
     }
     // If error message is already user-friendly (from getTempToken), use it
-    if (e.toString().contains('Something went wrong')) {
+    if (err.contains('something went wrong')) {
       throw e.toString();
     }
     debugPrint('registerUser: Error: $e');
@@ -639,20 +662,31 @@ Future<UserModel> loginUser(
       throw data['message'] ?? 'Failed to login';
     }
   } catch (e) {
-    if (e.toString().contains('host lookup')) {
+    // If the code explicitly threw a user-facing string (e.g. data['message']), rethrow it unchanged
+    if (e is String) {
+      throw e;
+    }
+    final err = e.toString().toLowerCase();
+    if (e is SocketException ||
+        e is TimeoutException ||
+        err.contains('socketexception') ||
+        err.contains('host lookup') ||
+        err.contains('failed host lookup') ||
+        err.contains('timed out') ||
+        err.contains('timeout')) {
       throw 'No Internet Connection';
     }
     // Check for certificate/SSL/handshake errors and show user-friendly message
-    if (e.toString().contains('CERTIFICATE_VERIFY_FAILED') ||
-        e.toString().contains('Handshake') ||
-        e.toString().contains('certificate') ||
-        e.toString().contains('SSL') ||
-        e.toString().contains('Failed to get temp token')) {
+    if (err.contains('certificate_verify_failed') ||
+        err.contains('handshake') ||
+        err.contains('certificate') ||
+        err.contains('ssl') ||
+        err.contains('failed to get temp token')) {
       debugPrint('loginUser: Certificate/SSL error or temp token error: $e');
       throw 'Something went wrong. Please check your internet connection and try again.';
     }
     // If error message is already user-friendly (from getTempToken), use it
-    if (e.toString().contains('Something went wrong')) {
+    if (err.contains('something went wrong')) {
       throw e.toString();
     }
     debugPrint('loginUser: Error: $e');

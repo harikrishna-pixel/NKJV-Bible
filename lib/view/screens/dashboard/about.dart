@@ -16,6 +16,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:biblebookapp/view/screens/tawk_chat/tawk_chat_screen.dart';
 import '../../constants/colors.dart';
 import '../../constants/images.dart';
 
@@ -251,14 +252,11 @@ class _AboutUsState extends State<AboutUs> {
                       debugPrint(
                           "urldata - $deviceType - $packageName - $appName - $deviceModel - $deviceId");
 
-                      final url =
-                          "https://bibleoffice.com/m_feedback/API/feedback_form/index.php?device_type=$deviceType&group_id=1&package_name=$packageName&app_name=$appName&device_id=$deviceId&device_model=$deviceModel&device_name=$deviceName&app_version=$appVersion&os_version=$osVersion&app_type=$deviceType&language=$language&country_code=$countryCode";
-
-                      if (await canLaunchUrl(Uri.parse(url))) {
-                        await launchUrl(Uri.parse(url));
-                      } else {
-                        throw 'Could not launch $url';
-                      }
+                      // Open chat screen instead of external feedback form
+                      await SharPreferences.setString('OpenAd', '1');
+                      Get.to(() => const TawkChatScreen(),
+                          transition: Transition.cupertinoDialog,
+                          duration: const Duration(milliseconds: 300));
                       // const url =
                       //     'https://bibleoffice.com/m_feedback/API/feedback_form/index.php';
                       // if (await canLaunch(url)) {

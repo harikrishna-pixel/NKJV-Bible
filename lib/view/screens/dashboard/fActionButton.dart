@@ -1945,9 +1945,44 @@ class floatingButtonState extends State<floatingButton>
                         } else {
                           // at first chapter: maybe rewind to start
                           await audioPlayer.seek(Duration.zero);
-                          await audioPlayer.resume();
-                          if (context.mounted) {
-                            setState(() => isAudioPlaying = true);
+                          // If audio was stopped previously the source may have been
+                          // cleared by the player. Ensure the source is set before
+                          // calling resume so audio actually starts.
+                          try {
+                            if (duration == Duration.zero) {
+                              // If we don't have a loaded duration, try to (re)load
+                              // the source. Prefer using the current audioBaseUrl
+                              // if available, otherwise fall back to setAudio().
+                              if (audioBaseUrl.isNotEmpty) {
+                                await audioPlayer.setSourceUrl(audioBaseUrl);
+                                await audioPlayer.seek(Duration.zero);
+                              } else {
+                                await setAudio();
+                              }
+                            }
+
+                            await audioPlayer.resume();
+                            if (context.mounted) {
+                              setState(() => isAudioPlaying = true);
+                            }
+                          } catch (e) {
+                            debugPrint('Error resuming audio: $e');
+                            // Fallback: try to set the source explicitly then resume.
+                            try {
+                              if (audioBaseUrl.isNotEmpty) {
+                                await audioPlayer.setSourceUrl(audioBaseUrl);
+                                await audioPlayer.seek(Duration.zero);
+                                await audioPlayer.resume();
+                                if (context.mounted) {
+                                  setState(() => isAudioPlaying = true);
+                                }
+                              }
+                            } catch (err) {
+                              debugPrint('Fallback resume failed: $err');
+                              if (context.mounted) {
+                                setState(() => isAudioPlaying = false);
+                              }
+                            }
                           }
                         }
                       },

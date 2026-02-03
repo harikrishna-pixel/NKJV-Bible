@@ -33,6 +33,7 @@ import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/dashboard/preference_selection_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:biblebookapp/view/screens/tawk_chat/tawk_chat_screen.dart';
 
 class BibleVersionsScreen extends StatefulWidget {
   final String from;
@@ -1041,59 +1042,9 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                 ElevatedButton(
                   onPressed: () async {
                     Navigator.pop(context);
-                    // Add your feedback logic here
+                    // Preserve existing preference side-effect then open chat screen
                     await SharPreferences.setString('OpenAd', '1');
-                    final DeviceInfoPlugin deviceInfoPlugin =
-                        DeviceInfoPlugin();
-                    PackageInfo packageInfo = await PackageInfo.fromPlatform();
-                    final locale = ui.window.locale;
-                    String deviceType = 'ios';
-                    String groupId = '1';
-                    String packageName = '';
-                    String appName = BibleInfo.bible_shortName;
-                    String deviceId = '';
-                    String deviceModel = '';
-                    String deviceName = '';
-                    String appVersion = packageInfo.version;
-                    String osVersion = '';
-                    String appType = '';
-                    String language = locale.languageCode;
-                    String countryCode = locale.countryCode.toString();
-                    String themeColor = 'd43f8d';
-                    String themeMode = '0';
-                    String width = '100px';
-                    String height = '100px';
-                    String isDevelopOrProd = '0';
-
-                    if (Platform.isAndroid) {
-                      final androidInfo = await deviceInfoPlugin.androidInfo;
-                      deviceType = 'Android';
-                      deviceId = androidInfo.id ?? '';
-                      deviceName = androidInfo.name;
-                      deviceModel = androidInfo.model ?? '';
-                      osVersion = 'Android ${androidInfo.version.release}';
-                      packageName = BibleInfo.android_Package_Name;
-                    } else if (Platform.isIOS) {
-                      final iosInfo = await deviceInfoPlugin.iosInfo;
-                      deviceType = 'iOS';
-                      osVersion = 'iOS ${iosInfo.systemVersion}';
-                      deviceName = iosInfo.name;
-                      packageName = BibleInfo.ios_Bundle_Id;
-                      deviceId = iosInfo.identifierForVendor ?? '';
-                      deviceModel = iosInfo.utsname.machine ?? '';
-                    }
-
-                    debugPrint(
-                        "urldata - $deviceType - $packageName - $appName - $deviceModel - $deviceId");
-
-                    final url =
-                        "https://bibleoffice.com/m_feedback/API/feedback_form/index.php?device_type=$deviceType&group_id=1&package_name=$packageName&app_name=$appName&device_id=$deviceId&device_model=$deviceModel&device_name=$deviceName&app_version=$appVersion&os_version=$osVersion&app_type=$deviceType&language=$language&country_code=$countryCode";
-
-                    if (await canLaunchUrl(Uri.parse(url))) {
-                      await launchUrl(Uri.parse(url));
-                    } else {
-                      throw 'Could not launch $url';
-                    }
+                    Get.to(() => const TawkChatScreen());
                   },
                   style:
                       ElevatedButton.styleFrom(backgroundColor: Colors.brown),

@@ -72,13 +72,23 @@ class _DailyVerseState extends State<DailyVerse> {
   var fontSizeS = "";
   var selectedFontFamily = "";
   Future<void> getFont() async {
-    fontSizeS =
+    final fs =
         await SharPreferences.getString(SharPreferences.selectedFontSize) ??
             "${Sizecf.scrnWidth! > 450 ? 25.0 : 15.0}";
-    fontSize = double.parse(fontSizeS);
-    selectedFontFamily =
+    final ff =
         await SharPreferences.getString(SharPreferences.selectedFontFamily) ??
             "Arial";
+    if (mounted) {
+      setState(() {
+        fontSizeS = fs;
+        fontSize = double.parse(fontSizeS);
+        selectedFontFamily = ff;
+      });
+    } else {
+      fontSizeS = fs;
+      fontSize = double.parse(fontSizeS);
+      selectedFontFamily = ff;
+    }
   }
 
   @override
@@ -671,20 +681,11 @@ class _DailyVerseState extends State<DailyVerse> {
                                             },
                                             child: HtmlWidget(
                                               data.verse ?? '',
-                                              textStyle: CommanStyle.bw14400(
-                                                      context)
-                                                  .copyWith(
-                                                      fontSize: fontSize,
-                                                      // screenWidth >
-                                                      //         450
-                                                      //     ? BibleInfo
-                                                      //             .fontSizeScale *
-                                                      //         19
-                                                      //     : BibleInfo
-                                                      //             .fontSizeScale *
-                                                      //         14,
-                                                      color: CommanColor
-                                                          .whiteBlack(context)),
+                                              textStyle:
+                                                  CommanStyle.bwWithChangeFont(
+                                                      context,
+                                                      fontSize,
+                                                      selectedFontFamily),
                                             )),
                                         const SizedBox(
                                           height: 5,
@@ -695,20 +696,11 @@ class _DailyVerseState extends State<DailyVerse> {
                                           children: [
                                             Text(
                                               "${data.book} ${data.chapter! + 1}:${data.verseNum! + 1}",
-                                              style: CommanStyle.bw14400(
-                                                      context)
-                                                  .copyWith(
-                                                      fontSize: fontSize,
-                                                      //  screenWidth >
-                                                      //         450
-                                                      //     ? BibleInfo
-                                                      //             .fontSizeScale *
-                                                      //         19
-                                                      //     : BibleInfo
-                                                      //             .fontSizeScale *
-                                                      //         14,
-                                                      color: CommanColor
-                                                          .whiteBlack(context)),
+                                              style:
+                                                  CommanStyle.bwWithChangeFont(
+                                                      context,
+                                                      fontSize,
+                                                      selectedFontFamily),
                                             ),
                                           ],
                                         )

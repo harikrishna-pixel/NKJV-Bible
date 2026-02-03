@@ -151,6 +151,7 @@ flutter:
     - assets/dark_modes/
     - assets/light_modes/
     - assets/music/
+    - assets/study_plan_images/
     - .env
 
   fonts:

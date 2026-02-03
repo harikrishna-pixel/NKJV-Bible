@@ -753,6 +753,34 @@ class _SettingScreenState extends State<SettingScreen>
 
   _launchURL() async {
     // Open Tawk chat screen for feedback (same as Chat Us)
+    // First check connectivity and show a toast if offline
+    final connectivityResult = await Connectivity().checkConnectivity();
+    final hasConnection = connectivityResult.isNotEmpty &&
+        (connectivityResult.contains(ConnectivityResult.wifi) ||
+            connectivityResult.contains(ConnectivityResult.mobile) ||
+            connectivityResult.contains(ConnectivityResult.ethernet));
+    if (!hasConnection) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      final retry = await Connectivity().checkConnectivity();
+      final retryHasConnection = retry.isNotEmpty &&
+          (retry.contains(ConnectivityResult.wifi) ||
+              retry.contains(ConnectivityResult.mobile) ||
+              retry.contains(ConnectivityResult.ethernet));
+      if (!retryHasConnection) {
+        // Check actual internet access before showing final toast
+        try {
+          final hasInternet = await InternetConnection().hasInternetAccess;
+          if (!hasInternet) {
+            return Constants.showToast("No Internet Connection");
+          } else {
+            return Constants.showToast("Check your Internet connection");
+          }
+        } catch (_) {
+          return Constants.showToast("No Internet Connection");
+        }
+      }
+    }
+
     await SharPreferences.setString('OpenAd', '1');
     Get.to(const TawkChatScreen());
   }

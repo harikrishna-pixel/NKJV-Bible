@@ -43,6 +43,8 @@ import 'package:biblebookapp/view/screens/wallpaper_screen/wallpaper_screen.dart
 import 'package:biblebookapp/view/screens/chat/chat_screen.dart';
 import 'package:biblebookapp/view/screens/chat/prayer_guidance_screen.dart';
 import 'package:biblebookapp/view/screens/tawk_chat/tawk_chat_screen.dart';
+import 'package:biblebookapp/view/screens/study_plans/study_plans_screen.dart'
+    as biblebookapp;
 import 'package:popover/popover.dart';
 
 import 'package:biblebookapp/view/widget/verse_item_widget.dart';
@@ -5025,6 +5027,74 @@ class _HomeScreenState extends State<HomeScreen>
                             style: CommanStyle.bothPrimary16600(context),
                           ),
                         ),
+                        ListTile(
+                          dense: true,
+                          onTap: () async {
+                            // If offline, show toast and do not navigate
+                            final connectivityResult =
+                                await Connectivity().checkConnectivity();
+                            final hasConnection = connectivityResult
+                                    .isNotEmpty &&
+                                (connectivityResult
+                                        .contains(ConnectivityResult.wifi) ||
+                                    connectivityResult
+                                        .contains(ConnectivityResult.mobile) ||
+                                    connectivityResult
+                                        .contains(ConnectivityResult.ethernet));
+                            if (!hasConnection) {
+                              await Future.delayed(
+                                  const Duration(milliseconds: 500));
+                              final retry =
+                                  await Connectivity().checkConnectivity();
+                              final retryHasConnection = retry.isNotEmpty &&
+                                  (retry.contains(ConnectivityResult.wifi) ||
+                                      retry.contains(
+                                          ConnectivityResult.mobile) ||
+                                      retry.contains(
+                                          ConnectivityResult.ethernet));
+                              if (!retryHasConnection) {
+                                try {
+                                  final hasInternet = await InternetConnection()
+                                      .hasInternetAccess;
+                                  if (!hasInternet) {
+                                    return Constants.showToast(
+                                        "No Internet Connection");
+                                  } else {
+                                    return Constants.showToast(
+                                        "Check your Internet connection");
+                                  }
+                                } catch (_) {
+                                  return Constants.showToast(
+                                      "No Internet Connection");
+                                }
+                              }
+                            }
+
+                            Get.back();
+                            if (controller.adFree.value == false) {
+                              controller.bannerAd?.dispose();
+                              controller.bannerAd?.load();
+                            }
+                            Get.to(() => const biblebookapp.StudyPlansScreen(),
+                                transition: Transition.cupertinoDialog,
+                                duration: const Duration(milliseconds: 300));
+                          },
+                          visualDensity:
+                              const VisualDensity(horizontal: 0, vertical: 0),
+                          leading: Icon(
+                            Icons.menu_book,
+                            size: 24,
+                            color:
+                                Provider.of<ThemeProvider>(context).themeMode ==
+                                        ThemeMode.dark
+                                    ? CommanColor.darkPrimaryColor
+                                    : CommanColor.lightModePrimary,
+                          ),
+                          title: Text(
+                            'Study Plans',
+                            style: CommanStyle.bothPrimary16600(context),
+                          ),
+                        ),
                         // ListTile(
                         //   dense: true,
                         //   onTap: () {
@@ -5396,66 +5466,9 @@ class _HomeScreenState extends State<HomeScreen>
                           dense: true,
                           onTap: (() async {
                             Get.back();
-                            // await SharPreferences.setString('OpenAd', '1');
-                            // // debugPrint(
-                            // //     "notify ${controller.connectionStatus.first}");
-                            // return await requestReview(
-                            //     controller.connectionStatus);
                             await SharPreferences.setString('OpenAd', '1');
-                            final DeviceInfoPlugin deviceInfoPlugin =
-                                DeviceInfoPlugin();
-                            PackageInfo packageInfo =
-                                await PackageInfo.fromPlatform();
-                            final locale = ui.window.locale;
-                            String deviceType = 'ios';
-                            String groupId = '1';
-                            String packageName = '';
-                            String appName = BibleInfo.bible_shortName;
-                            String deviceId = '';
-                            String deviceModel = '';
-                            String deviceName = '';
-                            String appVersion = packageInfo.version;
-                            String osVersion = '';
-                            String appType = '';
-                            String language = locale.languageCode;
-                            String countryCode = locale.countryCode.toString();
-                            String themeColor = 'd43f8d';
-                            String themeMode = '0';
-                            String width = '100px';
-                            String height = '100px';
-                            String isDevelopOrProd = '0';
-
-                            if (Platform.isAndroid) {
-                              final androidInfo =
-                                  await deviceInfoPlugin.androidInfo;
-                              deviceType = 'Android';
-                              deviceId = androidInfo.id ?? '';
-                              deviceName = androidInfo.name;
-                              deviceModel = androidInfo.model ?? '';
-                              osVersion =
-                                  'Android ${androidInfo.version.release}';
-                              packageName = BibleInfo.android_Package_Name;
-                            } else if (Platform.isIOS) {
-                              final iosInfo = await deviceInfoPlugin.iosInfo;
-                              deviceType = 'iOS';
-                              osVersion = 'iOS ${iosInfo.systemVersion}';
-                              deviceName = iosInfo.name;
-                              packageName = BibleInfo.ios_Bundle_Id;
-                              deviceId = iosInfo.identifierForVendor ?? '';
-                              deviceModel = iosInfo.utsname.machine ?? '';
-                            }
-
-                            debugPrint(
-                                "urldata - $deviceType - $packageName - $appName - $deviceModel - $deviceId");
-
-                            final url =
-                                "https://bibleoffice.com/m_feedback/API/feedback_form/index.php?device_type=$deviceType&group_id=1&package_name=$packageName&app_name=$appName&device_id=$deviceId&device_model=$deviceModel&device_name=$deviceName&app_version=$appVersion&os_version=$osVersion&app_type=$deviceType&language=$language&country_code=$countryCode";
-
-                            if (await canLaunchUrl(Uri.parse(url))) {
-                              await launchUrl(Uri.parse(url));
-                            } else {
-                              throw 'Could not launch $url';
-                            }
+                            // Open Tawk chat screen instead of external feedback form
+                            Get.to(() => const TawkChatScreen());
                           }),
                           visualDensity:
                               const VisualDensity(horizontal: 0, vertical: 0),

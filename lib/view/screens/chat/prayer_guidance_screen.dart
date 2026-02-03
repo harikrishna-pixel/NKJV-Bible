@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:biblebookapp/constant/app_api_constant.dart';
+import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
@@ -13,9 +15,13 @@ import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
 import 'package:biblebookapp/view/screens/chat/chat_translations.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
+import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:biblebookapp/utils/rating_dialog_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -47,6 +53,9 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
   // AMEN toast overlay (shown slightly above bottom so it won't cover AMEN button)
   OverlayEntry? _amenToastEntry;
   Timer? _amenToastTimer;
+
+  // Track which AI responses have already shown an AMEN toast using a content hash
+  final Set<int> _amenShownForResponseHashes = {};
 
   // Ad service for interstitial ads
   final AdService _adService = AdService();
@@ -155,6 +164,14 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
         ),
       ),
     );
+  }
+
+  String _buildShareText(String text) {
+    final androidLink =
+        "https://play.google.com/store/apps/details?id=${BibleInfo.android_Package_Name}";
+    final iosLink = "https://itunes.apple.com/app/id${BibleInfo.apple_AppId}";
+    final storeLink = Platform.isIOS ? iosLink : androidLink;
+    return "$text\n\nRead more at: $storeLink";
   }
 
   Future<void> _sendPrayerRequest(int categoryIndex) async {
@@ -816,6 +833,41 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     );
   }
 
+  // Parse verse reference to extract book, chapter, and verse
+  Map<String, dynamic>? _parseVerseReference(String verseRef) {
+    try {
+      // Pattern to match verse references like "John 3:16", "Genesis 1:1", "1 Corinthians 13:4"
+      final pattern = RegExp(
+        r'\b([1-3]?\s?[A-Za-z]{2,})\s+(\d{1,3}):(\d{1,3})',
+        caseSensitive: false,
+      );
+      final match = pattern.firstMatch(verseRef);
+      if (match != null) {
+        String bookName = match.group(1)?.trim() ?? '';
+        final chapter = int.tryParse(match.group(2) ?? '');
+        final verse = int.tryParse(match.group(3) ?? '');
+        if (chapter != null && verse != null && bookName.isNotEmpty) {
+          // Capitalize first letter of each word in book name
+          bookName = bookName
+              .split(' ')
+              .map((word) => word.isNotEmpty
+                  ? word[0].toUpperCase() + word.substring(1).toLowerCase()
+                  : '')
+              .join(' ');
+
+          return {
+            'bookName': bookName,
+            'chapter': chapter,
+            'verse': verse,
+          };
+        }
+      }
+    } catch (e) {
+      debugPrint('Error parsing verse reference: $e');
+    }
+    return null;
+  }
+
   // Build rich text with clickable verse references
   Widget _buildMessageWithVerseLinks(
       String text, bool isUser, Size size, bool isDark) {
@@ -863,9 +915,92 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
           fontWeight: FontWeight.w600,
         ),
         recognizer: TapGestureRecognizer()
-          ..onTap = () {
-            Constants.showToast("Verse reference: $verseRef");
-            // You can add navigation to the verse here if needed
+          ..onTap = () async {
+            // Navigate to verse screen
+            final verseData = _parseVerseReference(verseRef);
+            if (verseData == null) {
+              Constants.showToast("Unable to parse verse reference");
+              return;
+            }
+
+            final bookName = verseData['bookName'] as String;
+            final chapter = verseData['chapter'] as int;
+            final verse = verseData['verse'] as int;
+
+            // Get book number from database using book name
+            int? bookNum;
+            try {
+              final db = await DBHelper().db;
+              if (db != null) {
+                // Try exact match first
+                var result = await db.rawQuery(
+                  "SELECT book_num FROM book WHERE title = ? LIMIT 1",
+                  [bookName],
+                );
+
+                // If no exact match, try case-insensitive search
+                if (result.isEmpty) {
+                  result = await db.rawQuery(
+                    "SELECT book_num FROM book WHERE LOWER(title) = LOWER(?) LIMIT 1",
+                    [bookName],
+                  );
+                }
+
+                // Try short_title
+                if (result.isEmpty) {
+                  result = await db.rawQuery(
+                    "SELECT book_num FROM book WHERE LOWER(short_title) = LOWER(?) LIMIT 1",
+                    [bookName],
+                  );
+                }
+
+                // Try singular/plural variants
+                if (result.isEmpty) {
+                  final altName = bookName.endsWith('s')
+                      ? bookName.substring(0, bookName.length - 1)
+                      : '${bookName}s';
+                  result = await db.rawQuery(
+                    "SELECT book_num FROM book WHERE LOWER(title) = LOWER(?) OR LOWER(short_title) = LOWER(?) LIMIT 1",
+                    [altName, altName],
+                  );
+                }
+
+                if (result.isNotEmpty) {
+                  bookNum = int.tryParse(result[0]['book_num'].toString());
+                }
+              }
+            } catch (e) {
+              debugPrint('Error getting book number: $e');
+            }
+
+            if (bookNum == null) {
+              Constants.showToast("Book not found in database");
+              return;
+            }
+
+            // Save selected book and book number
+            await SharPreferences.setString(
+              SharPreferences.selectedBook,
+              bookName,
+            );
+            await SharPreferences.setString(
+              SharPreferences.selectedBookNum,
+              bookNum.toString(),
+            );
+            await SharPreferences.setString(
+              SharPreferences.selectedChapter,
+              chapter.toString(),
+            );
+
+            // Navigate to HomeScreen with verse details
+            Get.to(() => HomeScreen(
+                  From: "prayer",
+                  selectedVerseNumForRead: verse.toString(),
+                  selectedBookForRead: bookNum.toString(),
+                  selectedChapterForRead: chapter.toString(),
+                  selectedBookNameForRead: bookName,
+                  selectedVerseForRead: "",
+                ));
           },
       ));
 
@@ -1261,11 +1396,135 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                       width: !isUser && isDark ? 1.2 : 0,
                                     ),
                                   ),
-                                  child: _buildMessageWithVerseLinks(
-                                    message.text,
-                                    isUser,
-                                    size,
-                                    isDark,
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      _buildMessageWithVerseLinks(
+                                        message.text,
+                                        isUser,
+                                        size,
+                                        isDark,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      // Action icons (Copy / Share) for responses only
+                                      if (!isUser)
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.end,
+                                          children: [
+                                            // Copy (uses same asset as ChatScreen)
+                                            GestureDetector(
+                                              onTap: () async {
+                                                await Clipboard.setData(
+                                                    ClipboardData(
+                                                        text: message.text));
+                                                Constants.showToast(
+                                                    ChatTranslations.get(
+                                                        'copied',
+                                                        AppApiConstant
+                                                            .chatLanguage));
+                                              },
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 4),
+                                                child: Container(
+                                                  padding:
+                                                      const EdgeInsets.all(6),
+                                                  decoration: BoxDecoration(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
+                                                    border: Border.all(
+                                                      color: isDark
+                                                          ? Colors.white
+                                                          : const Color(
+                                                              0xFF8D6E63),
+                                                      width: 1.4,
+                                                    ),
+                                                  ),
+                                                  child: Image.asset(
+                                                    "assets/Bookmark icons/Frame 3630.png",
+                                                    height: size.width > 450
+                                                        ? 18
+                                                        : 15,
+                                                    width: size.width > 450
+                                                        ? 18
+                                                        : 15,
+                                                    color: isDark
+                                                        ? Colors.white
+                                                            .withOpacity(0.7)
+                                                        : const Color(
+                                                                0xFF8D6E63)
+                                                            .withOpacity(0.7),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            // Share
+                                            GestureDetector(
+                                              onTap: () async {
+                                                await RatingDialogHelper
+                                                    .showRatingDialogOnFirstShare(
+                                                        context);
+
+                                                final screenSize =
+                                                    MediaQuery.of(context).size;
+                                                final sharePositionOrigin =
+                                                    Rect.fromLTWH(
+                                                  screenSize.width / 2 - 50,
+                                                  screenSize.height / 2 - 50,
+                                                  100,
+                                                  100,
+                                                );
+                                                await Share.share(
+                                                  _buildShareText(message.text),
+                                                  sharePositionOrigin:
+                                                      sharePositionOrigin,
+                                                );
+                                              },
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 4),
+                                                child: Container(
+                                                  padding:
+                                                      const EdgeInsets.all(6),
+                                                  decoration: BoxDecoration(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
+                                                    border: Border.all(
+                                                      color: isDark
+                                                          ? Colors.white
+                                                          : const Color(
+                                                              0xFF8D6E63),
+                                                      width: 1.4,
+                                                    ),
+                                                  ),
+                                                  child: Icon(
+                                                    Icons.share,
+                                                    size: size.width > 450
+                                                        ? 18
+                                                        : 15,
+                                                    color: isDark
+                                                        ? Colors.white
+                                                            .withOpacity(0.7)
+                                                        : const Color(
+                                                                0xFF8D6E63)
+                                                            .withOpacity(0.7),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -1349,7 +1608,34 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                           }
 
                           // Show Amen message after ad (or immediately if no ad)
-                          _showRotatingAmenMessage();
+                          // Only show once per AI response. Determine latest AI response index.
+                          int latestAiIndex = -1;
+                          for (int idx = _messages.length - 1;
+                              idx >= 0;
+                              idx--) {
+                            if (!_messages[idx].isUser) {
+                              latestAiIndex = idx;
+                              break;
+                            }
+                          }
+
+                          if (latestAiIndex == -1) {
+                            // No AI response yet - preserve existing behaviour
+                            _showRotatingAmenMessage();
+                          } else {
+                            // Use a hash of the AI response text so clearing/refreshing
+                            // the _messages list doesn't cause index collisions.
+                            final aiText = _messages[latestAiIndex].text;
+                            final hash = aiText.hashCode;
+                            if (_amenShownForResponseHashes.contains(hash)) {
+                              debugPrint(
+                                  '🔍 AMEN: Toast already shown for response hash $hash');
+                              // Do not show again for the same AI response content
+                            } else {
+                              _showRotatingAmenMessage();
+                              _amenShownForResponseHashes.add(hash);
+                            }
+                          }
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: isDark

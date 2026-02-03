@@ -2269,105 +2269,117 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                   InkWell(
                                     borderRadius: BorderRadius.circular(18),
                                     onTap: () {
-                                      showModalBottomSheet(
-                                        context: context,
-                                        backgroundColor: Colors.transparent,
-                                        builder: (_) {
-                                          final bg = isDark
-                                              ? CommanColor.darkPrimaryColor
-                                                  .withOpacity(0.96)
-                                              : const Color(0xFFF6F1E9);
-                                          return SafeArea(
-                                            child: Container(
-                                              margin: const EdgeInsets.all(12),
-                                              padding: const EdgeInsets.all(12),
-                                              decoration: BoxDecoration(
-                                                color: bg,
-                                                borderRadius:
-                                                    BorderRadius.circular(18),
-                                              ),
-                                              child: Column(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  ListTile(
-                                                    dense: true,
-                                                    leading: Icon(
-                                                      Icons.add,
-                                                      color: isDark
-                                                          ? Colors.white
-                                                          : const Color(
-                                                              0xFF8D6E63),
-                                                    ),
-                                                    title: Text(
-                                                      ChatTranslations.get(
-                                                          'new_chat',
-                                                          AppApiConstant
-                                                              .chatLanguage),
-                                                      style: TextStyle(
+                                      // Delay the sheet opening slightly so the
+                                      // originating tap gesture (tap up) doesn't
+                                      // get delivered to the sheet and dismiss it
+                                      // immediately on iPad. This is a timing-only
+                                      // UI fix; logic remains unchanged.
+                                      Future.delayed(
+                                          const Duration(milliseconds: 100),
+                                          () {
+                                        showModalBottomSheet(
+                                          context: context,
+                                          backgroundColor: Colors.transparent,
+                                          builder: (_) {
+                                            final bg = isDark
+                                                ? CommanColor.darkPrimaryColor
+                                                    .withOpacity(0.96)
+                                                : const Color(0xFFF6F1E9);
+                                            return SafeArea(
+                                              child: Container(
+                                                margin:
+                                                    const EdgeInsets.all(12),
+                                                padding:
+                                                    const EdgeInsets.all(12),
+                                                decoration: BoxDecoration(
+                                                  color: bg,
+                                                  borderRadius:
+                                                      BorderRadius.circular(18),
+                                                ),
+                                                child: Column(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    ListTile(
+                                                      dense: true,
+                                                      leading: Icon(
+                                                        Icons.add,
                                                         color: isDark
                                                             ? Colors.white
                                                             : const Color(
                                                                 0xFF8D6E63),
-                                                        fontWeight:
-                                                            FontWeight.w600,
                                                       ),
+                                                      title: Text(
+                                                        ChatTranslations.get(
+                                                            'new_chat',
+                                                            AppApiConstant
+                                                                .chatLanguage),
+                                                        style: TextStyle(
+                                                          color: isDark
+                                                              ? Colors.white
+                                                              : const Color(
+                                                                  0xFF8D6E63),
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                      onTap: () {
+                                                        Navigator.pop(context);
+                                                        if (_messages
+                                                            .isNotEmpty) {
+                                                          _showNewChatBottomSheet();
+                                                        } else {
+                                                          _startNewChat();
+                                                        }
+                                                      },
                                                     ),
-                                                    onTap: () {
-                                                      Navigator.pop(context);
-                                                      if (_messages
-                                                          .isNotEmpty) {
-                                                        _showNewChatBottomSheet();
-                                                      } else {
-                                                        _startNewChat();
-                                                      }
-                                                    },
-                                                  ),
-                                                  const Divider(height: 1),
-                                                  ListTile(
-                                                    dense: true,
-                                                    leading: Image.asset(
-                                                      "assets/message-time.png",
-                                                      width: 22,
-                                                      height: 22,
-                                                      color: isDark
-                                                          ? Colors.white
-                                                          : const Color(
-                                                              0xFF8D6E63),
-                                                    ),
-                                                    title: Text(
-                                                      ChatTranslations.get(
-                                                          'history',
-                                                          AppApiConstant
-                                                              .chatLanguage),
-                                                      style: TextStyle(
+                                                    const Divider(height: 1),
+                                                    ListTile(
+                                                      dense: true,
+                                                      leading: Image.asset(
+                                                        "assets/message-time.png",
+                                                        width: 22,
+                                                        height: 22,
                                                         color: isDark
                                                             ? Colors.white
                                                             : const Color(
                                                                 0xFF8D6E63),
-                                                        fontWeight:
-                                                            FontWeight.w600,
                                                       ),
+                                                      title: Text(
+                                                        ChatTranslations.get(
+                                                            'history',
+                                                            AppApiConstant
+                                                                .chatLanguage),
+                                                        style: TextStyle(
+                                                          color: isDark
+                                                              ? Colors.white
+                                                              : const Color(
+                                                                  0xFF8D6E63),
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                      onTap: () {
+                                                        Navigator.pop(context);
+                                                        Get.to(
+                                                          () =>
+                                                              const ChatHistoryScreen(),
+                                                          transition: Transition
+                                                              .cupertinoDialog,
+                                                          duration:
+                                                              const Duration(
+                                                                  milliseconds:
+                                                                      300),
+                                                        );
+                                                      },
                                                     ),
-                                                    onTap: () {
-                                                      Navigator.pop(context);
-                                                      Get.to(
-                                                        () =>
-                                                            const ChatHistoryScreen(),
-                                                        transition: Transition
-                                                            .cupertinoDialog,
-                                                        duration:
-                                                            const Duration(
-                                                                milliseconds:
-                                                                    300),
-                                                      );
-                                                    },
-                                                  ),
-                                                ],
+                                                  ],
+                                                ),
                                               ),
-                                            ),
-                                          );
-                                        },
-                                      );
+                                            );
+                                          },
+                                        );
+                                      });
                                     },
                                     child: Icon(
                                       Icons.add,
@@ -2381,100 +2393,110 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                   InkWell(
                                     borderRadius: BorderRadius.circular(18),
                                     onTap: () {
-                                      showModalBottomSheet(
-                                        context: context,
-                                        backgroundColor: Colors.transparent,
-                                        builder: (_) {
-                                          final bg = isDark
-                                              ? CommanColor.darkPrimaryColor
-                                                  .withOpacity(0.96)
-                                              : const Color(0xFFF6F1E9);
-                                          return SafeArea(
-                                            child: Container(
-                                              margin: const EdgeInsets.all(12),
-                                              padding: const EdgeInsets.all(12),
-                                              decoration: BoxDecoration(
-                                                color: bg,
-                                                borderRadius:
-                                                    BorderRadius.circular(18),
-                                              ),
-                                              child: Column(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  ListTile(
-                                                    dense: true,
-                                                    leading: Icon(
-                                                      Icons.add,
-                                                      color: isDark
-                                                          ? Colors.white
-                                                          : const Color(
-                                                              0xFF8D6E63),
-                                                    ),
-                                                    title: Text(
-                                                      ChatTranslations.get(
-                                                          'new_chat',
-                                                          AppApiConstant
-                                                              .chatLanguage),
-                                                      style: TextStyle(
+                                      // See comment above: small delay prevents the
+                                      // tap event from being routed into the sheet
+                                      // and causing an immediate dismiss on iPad.
+                                      Future.delayed(
+                                          const Duration(milliseconds: 100),
+                                          () {
+                                        showModalBottomSheet(
+                                          context: context,
+                                          backgroundColor: Colors.transparent,
+                                          builder: (_) {
+                                            final bg = isDark
+                                                ? CommanColor.darkPrimaryColor
+                                                    .withOpacity(0.96)
+                                                : const Color(0xFFF6F1E9);
+                                            return SafeArea(
+                                              child: Container(
+                                                margin:
+                                                    const EdgeInsets.all(12),
+                                                padding:
+                                                    const EdgeInsets.all(12),
+                                                decoration: BoxDecoration(
+                                                  color: bg,
+                                                  borderRadius:
+                                                      BorderRadius.circular(18),
+                                                ),
+                                                child: Column(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    ListTile(
+                                                      dense: true,
+                                                      leading: Icon(
+                                                        Icons.add,
                                                         color: isDark
                                                             ? Colors.white
                                                             : const Color(
                                                                 0xFF8D6E63),
-                                                        fontWeight:
-                                                            FontWeight.w600,
                                                       ),
+                                                      title: Text(
+                                                        ChatTranslations.get(
+                                                            'new_chat',
+                                                            AppApiConstant
+                                                                .chatLanguage),
+                                                        style: TextStyle(
+                                                          color: isDark
+                                                              ? Colors.white
+                                                              : const Color(
+                                                                  0xFF8D6E63),
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                      onTap: () {
+                                                        Navigator.pop(context);
+                                                        _startNewChat();
+                                                      },
                                                     ),
-                                                    onTap: () {
-                                                      Navigator.pop(context);
-                                                      _startNewChat();
-                                                    },
-                                                  ),
-                                                  const Divider(height: 1),
-                                                  ListTile(
-                                                    dense: true,
-                                                    leading: Image.asset(
-                                                      "assets/message-time.png",
-                                                      width: 22,
-                                                      height: 22,
-                                                      color: isDark
-                                                          ? Colors.white
-                                                          : const Color(
-                                                              0xFF8D6E63),
-                                                    ),
-                                                    title: Text(
-                                                      ChatTranslations.get(
-                                                          'history',
-                                                          AppApiConstant
-                                                              .chatLanguage),
-                                                      style: TextStyle(
+                                                    const Divider(height: 1),
+                                                    ListTile(
+                                                      dense: true,
+                                                      leading: Image.asset(
+                                                        "assets/message-time.png",
+                                                        width: 22,
+                                                        height: 22,
                                                         color: isDark
                                                             ? Colors.white
                                                             : const Color(
                                                                 0xFF8D6E63),
-                                                        fontWeight:
-                                                            FontWeight.w600,
                                                       ),
+                                                      title: Text(
+                                                        ChatTranslations.get(
+                                                            'history',
+                                                            AppApiConstant
+                                                                .chatLanguage),
+                                                        style: TextStyle(
+                                                          color: isDark
+                                                              ? Colors.white
+                                                              : const Color(
+                                                                  0xFF8D6E63),
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                      onTap: () {
+                                                        Navigator.pop(context);
+                                                        Get.to(
+                                                          () =>
+                                                              const ChatHistoryScreen(),
+                                                          transition: Transition
+                                                              .cupertinoDialog,
+                                                          duration:
+                                                              const Duration(
+                                                                  milliseconds:
+                                                                      300),
+                                                        );
+                                                      },
                                                     ),
-                                                    onTap: () {
-                                                      Navigator.pop(context);
-                                                      Get.to(
-                                                        () =>
-                                                            const ChatHistoryScreen(),
-                                                        transition: Transition
-                                                            .cupertinoDialog,
-                                                        duration:
-                                                            const Duration(
-                                                                milliseconds:
-                                                                    300),
-                                                      );
-                                                    },
-                                                  ),
-                                                ],
+                                                  ],
+                                                ),
                                               ),
-                                            ),
-                                          );
-                                        },
-                                      );
+                                            );
+                                          },
+                                        );
+                                      });
                                     },
                                     child: Icon(
                                       Icons.add,
@@ -4074,18 +4096,20 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                     'Message copied to clipboard', 5000);
                               },
                               child: Padding(
+                                // reduced outer padding to tighten spacing
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 4),
+                                    horizontal: 2, vertical: 2),
                                 child: Container(
-                                  padding: const EdgeInsets.all(6),
+                                  // reduced inner padding for a smaller footprint
+                                  padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
+                                      // lighter border color for both themes
                                       color: isDark
-                                          ? Colors.white
-                                          : const Color(
-                                              0xFF8D6E63), // Brown border like screenshot
-                                      width: 1.4,
+                                          ? Colors.white.withOpacity(0.14)
+                                          : Colors.black.withOpacity(0.12),
+                                      width: 1.0,
                                     ),
                                   ),
                                   child: Image.asset(
@@ -4093,14 +4117,14 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                     height: screenWidth > 450 ? 18 : 15,
                                     width: screenWidth > 450 ? 18 : 15,
                                     color: isDark
-                                        ? Colors.white.withOpacity(0.7)
-                                        : const Color(0xFF8D6E63).withOpacity(
-                                            0.7), // Brown icon like screenshot
+                                        ? Colors.white.withOpacity(0.8)
+                                        : Colors.black.withOpacity(
+                                            0.6), // lighter icon color
                                   ),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: 2),
                             InkWell(
                               onTap: () async {
                                 // Get screen size for sharePositionOrigin (required on iOS)
@@ -4118,26 +4142,25 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                               },
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 4),
+                                    horizontal: 2, vertical: 2),
                                 child: Container(
-                                  padding: const EdgeInsets.all(6),
+                                  padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
                                       color: isDark
-                                          ? Colors.white
-                                          : const Color(
-                                              0xFF8D6E63), // Brown border like screenshot
-                                      width: 1.4,
+                                          ? Colors.white.withOpacity(0.14)
+                                          : Colors.black.withOpacity(0.12),
+                                      width: 1.0,
                                     ),
                                   ),
                                   child: Icon(
                                     Icons.share,
                                     size: screenWidth > 450 ? 18 : 15,
                                     color: isDark
-                                        ? Colors.white.withOpacity(0.7)
-                                        : const Color(0xFF8D6E63).withOpacity(
-                                            0.7), // Brown icon like screenshot
+                                        ? Colors.white.withOpacity(0.8)
+                                        : Colors.black.withOpacity(
+                                            0.6), // lighter icon color
                                   ),
                                 ),
                               ),
