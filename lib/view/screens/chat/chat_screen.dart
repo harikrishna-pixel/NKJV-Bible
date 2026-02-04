@@ -3066,7 +3066,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
       padding: EdgeInsets.only(
         left: screenWidth > 450 ? 20 : 16,
         right: screenWidth > 450 ? 20 : 16,
-        top: 4,
+        top: 70,
         bottom: 4,
       ),
       child: Column(
