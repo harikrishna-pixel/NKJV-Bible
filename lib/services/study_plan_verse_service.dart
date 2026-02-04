@@ -105,8 +105,8 @@ class StudyPlanVerseService {
       }
 
       // Try alternative names (e.g., "Psalms" vs "Psalm")
-      final altName = bookName.endsWith('s') 
-          ? bookName.substring(0, bookName.length - 1) 
+      final altName = bookName.endsWith('s')
+          ? bookName.substring(0, bookName.length - 1)
           : '${bookName}s';
 
       result = await db.rawQuery(
@@ -145,10 +145,22 @@ class StudyPlanVerseService {
       final List<VerseBookContentModel> verseContents = [];
 
       for (final verseNum in verses) {
-        final result = await db.rawQuery(
+        // Primary query: use chapter - 1 (some DBs use 0-based chapter indexing)
+        var result = await db.rawQuery(
           "SELECT * FROM verse WHERE book_num = ? AND chapter_num = ? AND verse_num = ?",
-          [bookNum, chapter - 1, verseNum], // Use chapter - 1 to match reading Bible's 0-based indexing
+          [bookNum, chapter - 1, verseNum],
         );
+
+        // Fallback: if no rows returned, try using the chapter number as-is
+        // (handles DBs that store chapter numbers 1-based). This is a
+        // presentation-friendly fallback – it doesn't change core logic but
+        // increases robustness for different DB formats.
+        if (result.isEmpty) {
+          result = await db.rawQuery(
+            "SELECT * FROM verse WHERE book_num = ? AND chapter_num = ? AND verse_num = ?",
+            [bookNum, chapter, verseNum],
+          );
+        }
 
         if (result.isNotEmpty) {
           verseContents.add(VerseBookContentModel.fromJson(result[0]));

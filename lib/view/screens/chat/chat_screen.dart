@@ -2676,20 +2676,30 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                             controller: _scrollController,
                             padding:
                                 EdgeInsets.all(screenWidth > 450 ? 20 : 16),
-                            itemCount: _messages.length + (_isLoading ? 1 : 0),
+                            itemCount: _messages.length +
+                                (_isLoading ? 1 : 0) +
+                                1, // +1 for suggestions footer so it scrolls with content
                             itemBuilder: (context, index) {
-                              if (index == _messages.length) {
+                              if (index < _messages.length) {
+                                return _buildMessageBubble(
+                                    _messages[index], screenWidth);
+                              }
+                              if (_isLoading && index == _messages.length) {
                                 return _buildLoadingIndicator();
                               }
-                              return _buildMessageBubble(
-                                  _messages[index], screenWidth);
+                              // Footer: suggestions (when messages exist) so they scroll with content
+                              if (index ==
+                                  _messages.length + (_isLoading ? 1 : 0)) {
+                                return _messages.isNotEmpty
+                                    ? _buildFollowUpSuggestions(
+                                        screenWidth, isDark)
+                                    : const SizedBox(height: 8);
+                              }
+                              return const SizedBox.shrink();
                             },
                           ),
                   ),
                 ),
-                // Show follow-up suggestions when there are messages
-                if (_messages.isNotEmpty)
-                  _buildFollowUpSuggestions(screenWidth, isDark),
                 _buildInputArea(screenWidth, isDark),
               ],
             ),
@@ -3056,37 +3066,37 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
       padding: EdgeInsets.only(
         left: screenWidth > 450 ? 20 : 16,
         right: screenWidth > 450 ? 20 : 16,
-        top: screenWidth > 450 ? 4 : 2,
-        bottom: screenWidth > 450 ? 6 : 8,
+        top: 4,
+        bottom: 4,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            ChatTranslations.get('suggestions', AppApiConstant.chatLanguage),
+            ChatTranslations.get('Suggestions', AppApiConstant.chatLanguage),
             style: TextStyle(
               color: isDark
                   ? Colors.white.withOpacity(0.75)
                   : const Color(0xFF8D6E63).withOpacity(0.65),
-              fontSize: screenWidth > 450 ? 14 : 12.5,
+              fontSize: screenWidth > 450 ? 16 : 14.5,
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
           SizedBox(
             height: screenWidth > 450 ? 160 : 138,
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: suggestions.asMap().entries.map((entry) {
                   final index = entry.key;
                   final question = entry.value;
                   final isTapped = _selectedExampleQuestionIndex == index;
                   return Padding(
-                    padding: EdgeInsets.only(
-                        right: screenWidth > 450 ? 12 : 10,
-                        bottom: screenWidth > 450 ? 4 : 2),
+                    padding:
+                        EdgeInsets.only(right: screenWidth > 450 ? 12 : 10),
                     child: InkWell(
                       onTap: () {
                         setState(() {
@@ -3131,14 +3141,11 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                             Positioned(
                               top: 0,
                               right: 0,
-                              child: Padding(
-                                padding: EdgeInsets.only(left: 50.0),
-                                child: Icon(
-                                  Icons.north_east,
-                                  size: screenWidth > 450 ? 20 : 18,
-                                  color: const Color(0xFFF6F1E9)
-                                      .withOpacity(0.7), // Light beige icon
-                                ),
+                              child: Icon(
+                                Icons.north_east,
+                                size: screenWidth > 450 ? 20 : 18,
+                                color: const Color(0xFFF6F1E9)
+                                    .withOpacity(0.7), // Light beige icon
                               ),
                             ),
                             Text(

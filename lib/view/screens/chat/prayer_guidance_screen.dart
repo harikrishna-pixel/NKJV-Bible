@@ -1414,8 +1414,8 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                           mainAxisAlignment:
                                               MainAxisAlignment.end,
                                           children: [
-                                            // Copy (uses same asset as ChatScreen)
-                                            GestureDetector(
+                                            // Copy (same style as Chat screen)
+                                            InkWell(
                                               onTap: () async {
                                                 await Clipboard.setData(
                                                     ClipboardData(
@@ -1429,11 +1429,11 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                               child: Padding(
                                                 padding:
                                                     const EdgeInsets.symmetric(
-                                                        horizontal: 6,
-                                                        vertical: 4),
+                                                        horizontal: 2,
+                                                        vertical: 2),
                                                 child: Container(
                                                   padding:
-                                                      const EdgeInsets.all(6),
+                                                      const EdgeInsets.all(4),
                                                   decoration: BoxDecoration(
                                                     borderRadius:
                                                         BorderRadius.circular(
@@ -1441,9 +1441,11 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                                     border: Border.all(
                                                       color: isDark
                                                           ? Colors.white
-                                                          : const Color(
-                                                              0xFF8D6E63),
-                                                      width: 1.4,
+                                                              .withOpacity(0.14)
+                                                          : Colors.black
+                                                              .withOpacity(
+                                                                  0.12),
+                                                      width: 1.0,
                                                     ),
                                                   ),
                                                   child: Image.asset(
@@ -1456,17 +1458,16 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                                         : 15,
                                                     color: isDark
                                                         ? Colors.white
-                                                            .withOpacity(0.7)
-                                                        : const Color(
-                                                                0xFF8D6E63)
-                                                            .withOpacity(0.7),
+                                                            .withOpacity(0.8)
+                                                        : Colors.black
+                                                            .withOpacity(0.6),
                                                   ),
                                                 ),
                                               ),
                                             ),
-                                            const SizedBox(width: 4),
-                                            // Share
-                                            GestureDetector(
+                                            const SizedBox(width: 2),
+                                            // Share (same style as Chat screen)
+                                            InkWell(
                                               onTap: () async {
                                                 await RatingDialogHelper
                                                     .showRatingDialogOnFirstShare(
@@ -1490,11 +1491,11 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                               child: Padding(
                                                 padding:
                                                     const EdgeInsets.symmetric(
-                                                        horizontal: 6,
-                                                        vertical: 4),
+                                                        horizontal: 2,
+                                                        vertical: 2),
                                                 child: Container(
                                                   padding:
-                                                      const EdgeInsets.all(6),
+                                                      const EdgeInsets.all(4),
                                                   decoration: BoxDecoration(
                                                     borderRadius:
                                                         BorderRadius.circular(
@@ -1502,9 +1503,11 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                                     border: Border.all(
                                                       color: isDark
                                                           ? Colors.white
-                                                          : const Color(
-                                                              0xFF8D6E63),
-                                                      width: 1.4,
+                                                              .withOpacity(0.14)
+                                                          : Colors.black
+                                                              .withOpacity(
+                                                                  0.12),
+                                                      width: 1.0,
                                                     ),
                                                   ),
                                                   child: Icon(
@@ -1514,10 +1517,9 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                                         : 15,
                                                     color: isDark
                                                         ? Colors.white
-                                                            .withOpacity(0.7)
-                                                        : const Color(
-                                                                0xFF8D6E63)
-                                                            .withOpacity(0.7),
+                                                            .withOpacity(0.8)
+                                                        : Colors.black
+                                                            .withOpacity(0.6),
                                                   ),
                                                 ),
                                               ),

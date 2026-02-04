@@ -4800,79 +4800,79 @@ class _HomeScreenState extends State<HomeScreen>
                               style: CommanStyle.bothPrimary16600(context),
                             ),
                           ),
-                        ListTile(
-                          dense: true,
-                          onTap: () async {
-                            Get.back();
+                        // ListTile(
+                        //   dense: true,
+                        //   onTap: () async {
+                        //     Get.back();
 
-                            // Check internet connectivity before opening chat
-                            try {
-                              final hasInternet = await InternetConnection()
-                                  .hasInternetAccess
-                                  .timeout(const Duration(seconds: 3),
-                                      onTimeout: () => false);
+                        //     // Check internet connectivity before opening chat
+                        //     try {
+                        //       final hasInternet = await InternetConnection()
+                        //           .hasInternetAccess
+                        //           .timeout(const Duration(seconds: 3),
+                        //               onTimeout: () => false);
 
-                              if (!hasInternet) {
-                                Constants.showToast("No internet connection");
-                                return;
-                              }
-                            } catch (e) {
-                              Constants.showToast("No internet connection");
-                              return;
-                            }
+                        //       if (!hasInternet) {
+                        //         Constants.showToast("No internet connection");
+                        //         return;
+                        //       }
+                        //     } catch (e) {
+                        //       Constants.showToast("No internet connection");
+                        //       return;
+                        //     }
 
-                            if (controller.adFree.value == false) {
-                              controller.bannerAd?.dispose();
-                              controller.bannerAd?.load();
-                            }
-                            Get.to(() => const TawkChatScreen(),
-                                transition: Transition.cupertinoDialog,
-                                duration: const Duration(milliseconds: 300));
-                          },
-                          visualDensity:
-                              const VisualDensity(horizontal: 0, vertical: 0),
-                          leading: Icon(
-                            Icons.support_agent,
-                            size: 24,
-                            color:
-                                Provider.of<ThemeProvider>(context).themeMode ==
-                                        ThemeMode.dark
-                                    ? CommanColor.darkPrimaryColor
-                                    : CommanColor.lightModePrimary,
-                          ),
-                          title: Text(
-                            'Chat Us',
-                            style: CommanStyle.bothPrimary16600(context),
-                          ),
-                        ),
-                        ListTile(
-                          dense: true,
-                          onTap: () async {
-                            Get.back();
-                            await SharPreferences.setString('OpenAd', '1');
-                            if (controller.adFree.value == false) {
-                              controller.bannerAd?.dispose();
-                              controller.bannerAd?.load();
-                            }
-                            Get.to(
-                                () => SearchScreen(
-                                      controller: controller,
-                                    ),
-                                transition: Transition.cupertinoDialog,
-                                duration: const Duration(milliseconds: 300));
-                          },
-                          visualDensity:
-                              const VisualDensity(horizontal: 0, vertical: 0),
-                          leading: Image.asset(
-                            "assets/home icons/search.png",
-                            height: 24,
-                            width: 24,
-                          ),
-                          title: Text(
-                            'Search',
-                            style: CommanStyle.bothPrimary16600(context),
-                          ),
-                        ),
+                        //     if (controller.adFree.value == false) {
+                        //       controller.bannerAd?.dispose();
+                        //       controller.bannerAd?.load();
+                        //     }
+                        //     Get.to(() => const TawkChatScreen(),
+                        //         transition: Transition.cupertinoDialog,
+                        //         duration: const Duration(milliseconds: 300));
+                        //   },
+                        //   visualDensity:
+                        //       const VisualDensity(horizontal: 0, vertical: 0),
+                        //   leading: Icon(
+                        //     Icons.support_agent,
+                        //     size: 24,
+                        //     color:
+                        //         Provider.of<ThemeProvider>(context).themeMode ==
+                        //                 ThemeMode.dark
+                        //             ? CommanColor.darkPrimaryColor
+                        //             : CommanColor.lightModePrimary,
+                        //   ),
+                        //   title: Text(
+                        //     'Chat Us',
+                        //     style: CommanStyle.bothPrimary16600(context),
+                        //   ),
+                        // ),
+                        // ListTile(
+                        //   dense: true,
+                        //   onTap: () async {
+                        //     Get.back();
+                        //     await SharPreferences.setString('OpenAd', '1');
+                        //     if (controller.adFree.value == false) {
+                        //       controller.bannerAd?.dispose();
+                        //       controller.bannerAd?.load();
+                        //     }
+                        //     Get.to(
+                        //         () => SearchScreen(
+                        //               controller: controller,
+                        //             ),
+                        //         transition: Transition.cupertinoDialog,
+                        //         duration: const Duration(milliseconds: 300));
+                        //   },
+                        //   visualDensity:
+                        //       const VisualDensity(horizontal: 0, vertical: 0),
+                        //   leading: Image.asset(
+                        //     "assets/home icons/search.png",
+                        //     height: 24,
+                        //     width: 24,
+                        //   ),
+                        //   title: Text(
+                        //     'Search',
+                        //     style: CommanStyle.bothPrimary16600(context),
+                        //   ),
+                        // ),
                         ListTile(
                           dense: true,
                           onTap: () {
@@ -5027,74 +5027,74 @@ class _HomeScreenState extends State<HomeScreen>
                             style: CommanStyle.bothPrimary16600(context),
                           ),
                         ),
-                        ListTile(
-                          dense: true,
-                          onTap: () async {
-                            // If offline, show toast and do not navigate
-                            final connectivityResult =
-                                await Connectivity().checkConnectivity();
-                            final hasConnection = connectivityResult
-                                    .isNotEmpty &&
-                                (connectivityResult
-                                        .contains(ConnectivityResult.wifi) ||
-                                    connectivityResult
-                                        .contains(ConnectivityResult.mobile) ||
-                                    connectivityResult
-                                        .contains(ConnectivityResult.ethernet));
-                            if (!hasConnection) {
-                              await Future.delayed(
-                                  const Duration(milliseconds: 500));
-                              final retry =
-                                  await Connectivity().checkConnectivity();
-                              final retryHasConnection = retry.isNotEmpty &&
-                                  (retry.contains(ConnectivityResult.wifi) ||
-                                      retry.contains(
-                                          ConnectivityResult.mobile) ||
-                                      retry.contains(
-                                          ConnectivityResult.ethernet));
-                              if (!retryHasConnection) {
-                                try {
-                                  final hasInternet = await InternetConnection()
-                                      .hasInternetAccess;
-                                  if (!hasInternet) {
-                                    return Constants.showToast(
-                                        "No Internet Connection");
-                                  } else {
-                                    return Constants.showToast(
-                                        "Check your Internet connection");
-                                  }
-                                } catch (_) {
-                                  return Constants.showToast(
-                                      "No Internet Connection");
-                                }
-                              }
-                            }
+                        // ListTile(
+                        //   dense: true,
+                        //   onTap: () async {
+                        //     // If offline, show toast and do not navigate
+                        //     final connectivityResult =
+                        //         await Connectivity().checkConnectivity();
+                        //     final hasConnection = connectivityResult
+                        //             .isNotEmpty &&
+                        //         (connectivityResult
+                        //                 .contains(ConnectivityResult.wifi) ||
+                        //             connectivityResult
+                        //                 .contains(ConnectivityResult.mobile) ||
+                        //             connectivityResult
+                        //                 .contains(ConnectivityResult.ethernet));
+                        //     if (!hasConnection) {
+                        //       await Future.delayed(
+                        //           const Duration(milliseconds: 500));
+                        //       final retry =
+                        //           await Connectivity().checkConnectivity();
+                        //       final retryHasConnection = retry.isNotEmpty &&
+                        //           (retry.contains(ConnectivityResult.wifi) ||
+                        //               retry.contains(
+                        //                   ConnectivityResult.mobile) ||
+                        //               retry.contains(
+                        //                   ConnectivityResult.ethernet));
+                        //       if (!retryHasConnection) {
+                        //         try {
+                        //           final hasInternet = await InternetConnection()
+                        //               .hasInternetAccess;
+                        //           if (!hasInternet) {
+                        //             return Constants.showToast(
+                        //                 "No Internet Connection");
+                        //           } else {
+                        //             return Constants.showToast(
+                        //                 "Check your Internet connection");
+                        //           }
+                        //         } catch (_) {
+                        //           return Constants.showToast(
+                        //               "No Internet Connection");
+                        //         }
+                        //       }
+                        //     }
 
-                            Get.back();
-                            if (controller.adFree.value == false) {
-                              controller.bannerAd?.dispose();
-                              controller.bannerAd?.load();
-                            }
-                            Get.to(() => const biblebookapp.StudyPlansScreen(),
-                                transition: Transition.cupertinoDialog,
-                                duration: const Duration(milliseconds: 300));
-                          },
-                          visualDensity:
-                              const VisualDensity(horizontal: 0, vertical: 0),
-                          leading: Icon(
-                            Icons.menu_book,
-                            size: 24,
-                            color:
-                                Provider.of<ThemeProvider>(context).themeMode ==
-                                        ThemeMode.dark
-                                    ? CommanColor.darkPrimaryColor
-                                    : CommanColor.lightModePrimary,
-                          ),
-                          title: Text(
-                            'Study Plans',
-                            style: CommanStyle.bothPrimary16600(context),
-                          ),
-                        ),
+                        //     Get.back();
+                        //     if (controller.adFree.value == false) {
+                        //       controller.bannerAd?.dispose();
+                        //       controller.bannerAd?.load();
+                        //     }
+                        //     Get.to(() => const biblebookapp.StudyPlansScreen(),
+                        //         transition: Transition.cupertinoDialog,
+                        //         duration: const Duration(milliseconds: 300));
+                        //   },
+                        //   visualDensity:
+                        //       const VisualDensity(horizontal: 0, vertical: 0),
+                        //   leading: Icon(
+                        //     Icons.menu_book,
+                        //     size: 24,
+                        //     color:
+                        //         Provider.of<ThemeProvider>(context).themeMode ==
+                        //                 ThemeMode.dark
+                        //             ? CommanColor.darkPrimaryColor
+                        //             : CommanColor.lightModePrimary,
+                        //   ),
+                        //   title: Text(
+                        //     'Study Plans',
+                        //     style: CommanStyle.bothPrimary16600(context),
+                        //   ),
+                        // ),
                         // ListTile(
                         //   dense: true,
                         //   onTap: () {
@@ -6173,14 +6173,9 @@ class _HomeScreenState extends State<HomeScreen>
                     debugPrint(
                         "urldata - $deviceType - $packageName - $appName - $deviceModel - $deviceId");
 
-                    final url =
-                        "https://bibleoffice.com/m_feedback/API/feedback_form/index.php?device_type=$deviceType&group_id=1&package_name=$packageName&app_name=$appName&device_id=$deviceId&device_model=$deviceModel&device_name=$deviceName&app_version=$appVersion&os_version=$osVersion&app_type=$deviceType&language=$language&country_code=$countryCode";
-
-                    if (await canLaunchUrl(Uri.parse(url))) {
-                      await launchUrl(Uri.parse(url));
-                    } else {
-                      throw 'Could not launch $url';
-                    }
+                    // Open in-app chat screen (TAWK) instead of external feedback URL
+                    // This keeps the feedback experience inside the app.
+                    Get.to(() => const TawkChatScreen());
                   },
                   style:
                       ElevatedButton.styleFrom(backgroundColor: Colors.brown),
