@@ -16,9 +16,9 @@ class TawkChatScreen extends StatelessWidget {
     final link = _directChatLink;
 
     return Scaffold(
-        backgroundColor: CommanColor.Blackwhite(context),
+        backgroundColor: Color(0XFF0803A8),
         appBar: AppBar(
-          backgroundColor: Color(0XFF03A84E),
+          backgroundColor: Color(0XFF0803A8),
           title: const Text(
             'Chat Us',
             style: TextStyle(color: Colors.white),
