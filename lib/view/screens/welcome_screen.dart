@@ -32,22 +32,47 @@ class WelcomeScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-
-                  SizedBox(height: 100,),
-                  // Welcome Image
-                  Image.asset(
-                    "assets/new_ico.png",
-                    height: isTablet ? 150 : 100,
-                    width: isTablet ? 150 : 100,
-                    fit: BoxFit.contain,
+                  SizedBox(height: isTablet ? 190 : 170),
+                  // Old logo → New logo
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Image.asset(
+                          "assets/Icon-1024.png",
+                          height: isTablet ? 128 : 100,
+                          width: isTablet ? 128 : 100,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: isTablet ? 28 : 24),
+                        child: Icon(
+                          Icons.arrow_forward,
+                          size: isTablet ? 32 : 24,
+                          color: const Color(0xFF5D4037),
+                        ),
+                      ),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Image.asset(
+                          "assets/new_logos.jpg",
+                          height: isTablet ? 128 : 100,
+                          width: isTablet ? 128 : 100,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 30,),
+                  SizedBox(height: isTablet ? 28 : 24),
                   // Title
                   Text(
-                    "Begin Your Daily \n Bible Journey!",
+                    "New Look, Same Bible",
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: isTablet ? 34 : 30,
+                      fontSize: isTablet ? 30 : 27,
                       fontWeight: FontWeight.w500,
                       color: Colors.black87,
                     ),
@@ -55,44 +80,29 @@ class WelcomeScreen extends StatelessWidget {
 
                   SizedBox(height: isTablet ? 20 : 12),
 
-                  // Subtitle
-                  RichText(
-                    textAlign: TextAlign.center,
-                    text: TextSpan(
-                      style: TextStyle(
-                        fontSize: isTablet ? 20 : 17,
-                        height: 1.5,
-                        color: Colors.black87,
-                      ),
-                      children: const [
-                        TextSpan(
-                          text: "We’re grateful you’re here.\n",
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        TextSpan(
-                          text:
-                          "Let’s personalize your Bible experience \n"
-                              "to make every reading more meaningful, powerful, and peaceful.",
-                        ),
-                      ],
-                    ),
-                  ),
-
-
-                  SizedBox(height: isTablet ? 16 : 30),
-
-                  // Italic line
+                  // First paragraph
                   Text(
-                    "Just a few quick steps to get started..",
+                    "We're grateful you're here.",
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: isTablet ? 20 : 17,
-                      fontStyle: FontStyle.italic,
-                      fontWeight: FontWeight.w400,
+                      height: 1.5,
+                      fontWeight: FontWeight.bold,
                       color: Colors.black87,
                     ),
                   ),
+                  SizedBox(height: isTablet ? 12 : 8),
 
+                  // Second paragraph
+                  Text(
+                    "We've refreshed our app with a new look and added helpful ways to connect with God, including prayer and guided conversations.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: isTablet ? 20 : 17,
+                      height: 1.5,
+                      color: Colors.black87,
+                    ),
+                  ),
                   SizedBox(height: isTablet ? 40 : 24),
 
                   // Button
@@ -118,9 +128,7 @@ class WelcomeScreen extends StatelessWidget {
                               colors: [
                                 Color(0xFF763201),
                                 Color(0xFFD5821F),
-
                                 Color(0xFF763201),
-
                               ],
                             ),
                             borderRadius: BorderRadius.circular(10),
@@ -155,7 +163,6 @@ class WelcomeScreen extends StatelessWidget {
                   //     color: Colors.black87,
                   //   ),
                   // ),
-
                 ],
               ),
             ),

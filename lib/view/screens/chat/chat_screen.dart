@@ -2370,7 +2370,9 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                                               const Duration(
                                                                   milliseconds:
                                                                       300),
-                                                        );
+                                                        )?.then((result) {
+                                                          if (result == true) _loadRecentConversations();
+                                                        });
                                                       },
                                                     ),
                                                   ],
@@ -2487,7 +2489,9 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                                               const Duration(
                                                                   milliseconds:
                                                                       300),
-                                                        );
+                                                        )?.then((result) {
+                                                          if (result == true) _loadRecentConversations();
+                                                        });
                                                       },
                                                     ),
                                                   ],
@@ -2938,7 +2942,9 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                     () => const ChatHistoryScreen(),
                     transition: Transition.cupertinoDialog,
                     duration: const Duration(milliseconds: 300),
-                  );
+                  )?.then((result) {
+                    if (result == true) _loadRecentConversations();
+                  });
                 },
                 child: Text(
                   ChatTranslations.get('view_all', AppApiConstant.chatLanguage),
@@ -4324,13 +4330,6 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
       ),
       decoration: BoxDecoration(
         color: Colors.transparent,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12.withOpacity(0.08),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
       ),
       child: SafeArea(
         top: false,

@@ -337,6 +337,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   /// Check if exit offer should be shown and display it (for purchase cancellation)
   Future<void> _checkAndShowExitOffer(DashBoardController controller) async {
     try {
+      final hasInternet = await InternetConnection().hasInternetAccess;
+      if (!hasInternet) {
+        Constants.showToast("No internet connection", 5000);
+        return;
+      }
       final isFirstTimeCancel =
           await SharPreferences.getBoolean('is_first_time_paywall_cancel') ??
               false;
@@ -396,6 +401,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   static Future<void> showExitOfferFromHomeScreen(
       BuildContext context, DashBoardController controller) async {
     try {
+      final hasInternet = await InternetConnection().hasInternetAccess;
+      if (!hasInternet) {
+        Constants.showToast("No internet connection", 5000);
+        return;
+      }
       final exitOfferFirstShownTime =
           await SharPreferences.getString('exit_offer_first_shown_time');
       final now = DateTime.now();
@@ -468,7 +478,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       DashBoardController controller) async {
     try {
       debugPrint('🚪 User is closing/navigating away from paywall');
-
+      final hasInternet = await InternetConnection().hasInternetAccess;
+      if (!hasInternet) {
+        Constants.showToast("No internet connection", 5000);
+        _navigateAwayFromPaywall();
+        return;
+      }
       // First, check if exit offer timer has expired (10 minutes check)
       final hasShownExitOffer =
           await SharPreferences.getBoolean('has_shown_exit_offer') ?? false;

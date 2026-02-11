@@ -41,6 +41,9 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
+  static final MainBookListModel _allChapterItem =
+      MainBookListModel(id: -1, title: "All Chapter", bookNum: -1);
+
   int selectedValueFilterIndex = 0;
   String selectedValueFilter = "ALL";
   MainBookListModel selectedBook = MainBookListModel(bookNum: -1);
@@ -555,14 +558,6 @@ class _SearchScreenState extends State<SearchScreen> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: CommanColor.primaryShadow(context),
-                            blurRadius: 0.5,
-                            spreadRadius: 0.5,
-                            offset: const Offset(0, 1),
-                          ),
-                        ],
                       ),
                       margin: EdgeInsets.only(
                         bottom: 20.0,
@@ -800,33 +795,60 @@ class _SearchScreenState extends State<SearchScreen> {
                             child: DropdownButton2<MainBookListModel>(
                               isExpanded: true,
                               items: selectedValueFilterIndex == 0
-                                  ? bookList
-                                      .map((item) =>
-                                          DropdownMenuItem<MainBookListModel>(
-                                            value: item,
-                                            child: Text(
-                                              item.title.toString(),
-                                              style: TextStyle(
-                                                letterSpacing:
-                                                    BibleInfo.letterSpacing,
-                                                fontSize:
-                                                    BibleInfo.fontSizeScale *
-                                                                screenWidth >
-                                                            450
-                                                        ? 19
-                                                        : 15,
-                                                fontWeight: FontWeight.w400,
-                                                color: selectedBook.title ==
-                                                        item.title
-                                                    ? CommanColor
-                                                        .lightDarkPrimary(
-                                                            context)
-                                                    : Colors.black,
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
+                                  ? [
+                                      DropdownMenuItem<
+                                          MainBookListModel>(
+                                        value: _allChapterItem,
+                                        child: Text(
+                                          _allChapterItem.title ?? "All Chapter",
+                                          style: TextStyle(
+                                            letterSpacing:
+                                                BibleInfo.letterSpacing,
+                                            fontSize:
+                                                BibleInfo.fontSizeScale *
+                                                            screenWidth >
+                                                        450
+                                                    ? 19
+                                                    : 15,
+                                            fontWeight: FontWeight.w400,
+                                            color: selectedBook.bookNum == -1
+                                                ? CommanColor
+                                                    .lightDarkPrimary(context)
+                                                : Colors.black,
                                             ),
-                                          ))
-                                      .toList()
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ...bookList
+                                          .where((b) => b.bookNum != -1)
+                                          .map((item) =>
+                                              DropdownMenuItem<
+                                                      MainBookListModel>(
+                                                  value: item,
+                                                  child: Text(
+                                                    item.title.toString(),
+                                                    style: TextStyle(
+                                                      letterSpacing:
+                                                          BibleInfo.letterSpacing,
+                                                      fontSize:
+                                                          BibleInfo.fontSizeScale *
+                                                                      screenWidth >
+                                                                  450
+                                                              ? 19
+                                                              : 15,
+                                                      fontWeight: FontWeight.w400,
+                                                      color: selectedBook.title ==
+                                                              item.title
+                                                          ? CommanColor
+                                                              .lightDarkPrimary(
+                                                                  context)
+                                                          : Colors.black,
+                                                    ),
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                )),
+                                    ]
                                   : selectedValueFilterIndex == 1
                                       ? oTBookList
                                           .map((item) => DropdownMenuItem<
@@ -885,7 +907,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                               ))
                                           .toList(),
                               value: selectedBook.bookNum == -1
-                                  ? null
+                                  ? _allChapterItem
                                   : selectedBook,
                               onChanged: (newValue) async {
                                 FocusScopeNode currentFocus =

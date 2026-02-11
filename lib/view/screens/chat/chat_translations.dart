@@ -52,6 +52,11 @@ class ChatTranslations {
       'HI': 'सुरक्षा',
       'TN': 'பாதுகாப்பு'
     },
+    'prayer_feelings': {
+      'EN': 'Feelings',
+      'HI': 'भावनाएं',
+      'TN': 'உணர்வுகள்'
+    },
     'amen_button': {'EN': 'AMEN', 'HI': 'आमीन', 'TN': 'ஆமென்'},
 
     // ========== CHAT SCREEN TRANSLATIONS ==========

@@ -694,13 +694,17 @@ class _DailyVerseState extends State<DailyVerse> {
                                           mainAxisAlignment:
                                               MainAxisAlignment.end,
                                           children: [
-                                            Text(
-                                              "${data.book} ${data.chapter! + 1}:${data.verseNum! + 1}",
-                                              style:
-                                                  CommanStyle.bwWithChangeFont(
-                                                      context,
-                                                      fontSize,
-                                                      selectedFontFamily),
+                                            Expanded(
+                                              child: Text(
+                                                "${data.book} ${data.chapter! + 1}:${data.verseNum! + 1}",
+                                                style:
+                                                    CommanStyle.bwWithChangeFont(
+                                                        context,
+                                                        fontSize,
+                                                        selectedFontFamily),
+                                                textAlign: TextAlign.end,
+                                                softWrap: true,
+                                              ),
                                             ),
                                           ],
                                         )

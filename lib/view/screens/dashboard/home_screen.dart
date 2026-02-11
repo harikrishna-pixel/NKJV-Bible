@@ -5466,6 +5466,13 @@ class _HomeScreenState extends State<HomeScreen>
                           dense: true,
                           onTap: (() async {
                             Get.back();
+                            final hasInternet =
+                                await InternetConnection().hasInternetAccess;
+                            if (!hasInternet) {
+                              Constants.showToast(
+                                  "No Internet Connection", 5000);
+                              return;
+                            }
                             await SharPreferences.setString('OpenAd', '1');
                             // Open Tawk chat screen instead of external feedback form
                             Get.to(() => const TawkChatScreen());

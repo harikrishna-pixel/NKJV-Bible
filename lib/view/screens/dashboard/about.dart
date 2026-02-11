@@ -207,6 +207,12 @@ class _AboutUsState extends State<AboutUs> {
                         backgroundColor:
                             CommanColor.inDarkWhiteAndInLightPrimary(context)),
                     onPressed: () async {
+                      final hasInternet =
+                          await InternetConnection().hasInternetAccess;
+                      if (!hasInternet) {
+                        Constants.showToast("No Internet Connection", 5000);
+                        return;
+                      }
                       await SharPreferences.setString('OpenAd', '1');
                       final DeviceInfoPlugin deviceInfoPlugin =
                           DeviceInfoPlugin();

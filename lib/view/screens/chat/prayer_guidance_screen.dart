@@ -109,6 +109,11 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
       'prompt':
           'Give me a prayer for protection and safety. Include 1-2 Geneva Bible verse references.',
     },
+    {
+      'titleKey': 'prayer_feelings',
+      'prompt':
+          'Give me a prayer to bring my feelings and emotions before God. Include 1-2 Geneva Bible verse references.',
+    },
   ];
 
   // Get categories with translated titles
@@ -176,6 +181,9 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
 
   Future<void> _sendPrayerRequest(int categoryIndex) async {
     if (_isLoading) return;
+
+    // Stop any currently playing prayer audio so only one audio plays at a time
+    await _audioPlayer.stop();
 
     // Check internet connection
     final isConnected = await InternetConnection().hasInternetAccess;
@@ -411,6 +419,9 @@ ${category.prompt}
       Constants.showToast("Please enter your prayer request", 3000);
       return;
     }
+
+    // Stop any currently playing prayer audio so only one audio plays at a time
+    await _audioPlayer.stop();
 
     // Check internet connection
     final isConnected = await InternetConnection().hasInternetAccess;
@@ -992,6 +1003,9 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
               chapter.toString(),
             );
 
+            // Stop prayer audio when navigating to Reading screen so only one audio plays
+            await _audioPlayer.stop();
+
             // Navigate to HomeScreen with verse details
             Get.to(() => HomeScreen(
                   From: "prayer",
@@ -1116,7 +1130,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                             onPressed: _toggleAudio,
                             icon: Icon(
                               _isAudioMuted
-                                  ? Icons.volume_off
+                                  ? Icons.music_off
                                   : Icons.music_note,
                               color: CommanColor.whiteBlack(context),
                               size: 22,
@@ -1248,7 +1262,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                   // Get icon for each category
                                   IconData categoryIcon;
 
-                                  switch (categoryIndex % 8) {
+                                  switch (categoryIndex % 9) {
                                     case 0: // Thanksgiving
                                       categoryIcon = Icons.celebration;
                                       break;
@@ -1270,8 +1284,11 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                     case 6: // Strength
                                       categoryIcon = Icons.fitness_center;
                                       break;
-                                    default: // Protection
+                                    case 7: // Protection
                                       categoryIcon = Icons.shield;
+                                      break;
+                                    default: // Feelings
+                                      categoryIcon = Icons.mood;
                                       break;
                                   }
 

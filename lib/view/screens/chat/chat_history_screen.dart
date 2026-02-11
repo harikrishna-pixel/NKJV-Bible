@@ -394,9 +394,9 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                                 ),
                               ),
                               TextButton(
-                                onPressed: () {
-                                  Get.back();
-                                  _clearAllHistory();
+                                onPressed: () async {
+                                  Get.back(result: true);
+                                  await _clearAllHistory();
                                 },
                                 child: Text(
                                   'Delete',
