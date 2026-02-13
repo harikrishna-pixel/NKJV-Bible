@@ -2033,6 +2033,11 @@ class floatingButtonState extends State<floatingButton>
                               });
                             }
                           }
+                          // After stop() the player has no source; re-set source then resume so Play works again
+                          if (audioPlayer.state == PlayerState.stopped &&
+                              audioBaseUrl.isNotEmpty) {
+                            await setAudio();
+                          }
                           await audioPlayer.resume();
                           if (context.mounted) {
                             setState(() => isAudioPlaying = true);
