@@ -255,63 +255,124 @@ class _LibraryScreenState extends State<LibraryScreen>
                           showDialog(
                             context: context,
                             barrierDismissible: false,
-                            builder: (ctx) => AlertDialog(
-                              backgroundColor: CommanColor.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              title: null,
-                              content: Text(
-                                "You're not subscribed. Subscribe to export and import your data.",
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: CommanColor.black,
-                                  fontSize: screenWidth > 450 ? 19 : 15,
+                            builder: (ctx) {
+                              final dlgWidth =
+                                  MediaQuery.of(ctx).size.width;
+                              return Dialog(
+                                backgroundColor: CommanColor.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(15),
                                 ),
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(ctx),
-                                  child: Text(
-                                    'Cancel',
-                                    style: TextStyle(
-                                      color: Colors.grey.shade700,
-                                      fontSize: BibleInfo.fontSizeScale * 14,
-                                    ),
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.pop(ctx);
-                                    final sixMonthPlan =
-                                        BibleInfo.sixMonthPlanid;
-                                    final oneYearPlan =
-                                        BibleInfo.oneYearPlanid;
-                                    final lifeTimePlan =
-                                        BibleInfo.lifeTimePlanid;
-                                    Get.to(
-                                      () => SubscriptionScreen(
-                                        sixMonthPlan: sixMonthPlan,
-                                        oneYearPlan: oneYearPlan,
-                                        lifeTimePlan: lifeTimePlan,
-                                        checkad: 'library',
+                                elevation: 16,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 24),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Text(
+                                        "You're not subscribed. Subscribe to export and import your data.",
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: CommanColor.black,
+                                          fontSize:
+                                              dlgWidth > 450 ? 19 : 15,
+                                        ),
                                       ),
-                                      transition: Transition.cupertinoDialog,
-                                      duration:
-                                          const Duration(milliseconds: 300),
-                                    );
-                                  },
-                                  child: Text(
-                                    'Subscribe',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      color: CommanColor.darkPrimaryColor,
-                                      fontSize: BibleInfo.fontSizeScale * 14,
-                                    ),
+                                      const SizedBox(height: 20),
+                                      GestureDetector(
+                                        onTap: () {
+                                          Navigator.pop(ctx);
+                                          final sixMonthPlan =
+                                              BibleInfo.sixMonthPlanid;
+                                          final oneYearPlan =
+                                              BibleInfo.oneYearPlanid;
+                                          final lifeTimePlan =
+                                              BibleInfo.lifeTimePlanid;
+                                          Get.to(
+                                            () => SubscriptionScreen(
+                                              sixMonthPlan: sixMonthPlan,
+                                              oneYearPlan: oneYearPlan,
+                                              lifeTimePlan: lifeTimePlan,
+                                              checkad: 'library',
+                                            ),
+                                            transition:
+                                                Transition.cupertinoDialog,
+                                            duration: const Duration(
+                                                milliseconds: 300),
+                                          );
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets
+                                              .symmetric(vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: CommanColor
+                                                .whiteLightModePrimary(ctx),
+                                            borderRadius:
+                                                const BorderRadius.all(
+                                                    Radius.circular(5)),
+                                            boxShadow: const [
+                                              BoxShadow(
+                                                  color: Colors.black26,
+                                                  blurRadius: 2)
+                                            ],
+                                          ),
+                                          child: Text(
+                                            'Subscribe',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              letterSpacing:
+                                                  BibleInfo.letterSpacing,
+                                              fontSize:
+                                                  BibleInfo.fontSizeScale *
+                                                      14,
+                                              fontWeight: FontWeight.w500,
+                                              color: CommanColor
+                                                  .darkModePrimaryWhite(ctx),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      GestureDetector(
+                                        onTap: () =>
+                                            Navigator.pop(ctx),
+                                        child: Container(
+                                          padding: const EdgeInsets
+                                              .symmetric(vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: CommanColor.lightGrey1,
+                                            borderRadius:
+                                                const BorderRadius.all(
+                                                    Radius.circular(5)),
+                                            boxShadow: const [
+                                              BoxShadow(
+                                                  color: Colors.black26,
+                                                  blurRadius: 2)
+                                            ],
+                                          ),
+                                          child: Text(
+                                            'Cancel',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              letterSpacing:
+                                                  BibleInfo.letterSpacing,
+                                              fontSize:
+                                                  BibleInfo.fontSizeScale *
+                                                      14,
+                                              fontWeight: FontWeight.w500,
+                                              color: CommanColor.black),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ],
-                            ),
+                              );
+                            },
                           );
                         }
                       },
