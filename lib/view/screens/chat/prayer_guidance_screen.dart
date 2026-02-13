@@ -601,6 +601,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                 TextField(
                   controller: _customPrayerController,
                   maxLines: 5,
+                  maxLength: 300,
                   decoration: InputDecoration(
                     hintText: 'Enter your prayer request...',
                     hintStyle: TextStyle(
@@ -623,11 +624,30 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                     ),
                     filled: true,
                     fillColor: Colors.grey.shade50,
+                    counterText: '',
                   ),
                   style: TextStyle(
                     color: CommanColor.black,
                     fontSize: 15,
                   ),
+                ),
+                ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _customPrayerController,
+                  builder: (context, value, _) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          '${value.text.length}/300',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 20),
                 SizedBox(
@@ -1118,26 +1138,41 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                         icon: Icon(Icons.arrow_back_ios,
                             color: CommanColor.whiteBlack(context), size: 18),
                       ),
-                      const Spacer(),
-                      // Audio ON/OFF toggle button - only show when responses are displayed
-                      if (_messages.isNotEmpty)
-                        Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.grey.withOpacity(0.2),
-                          ),
-                          child: IconButton(
-                            onPressed: _toggleAudio,
-                            icon: Icon(
-                              _isAudioMuted
-                                  ? Icons.music_off
-                                  : Icons.music_note,
-                              color: CommanColor.whiteBlack(context),
-                              size: 22,
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            ChatTranslations.get('prayer_guidance_title',
+                                AppApiConstant.chatLanguage),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: CommanColor.whiteBlack(context)
+                                  .withOpacity(0.7),
+                              fontSize: size.width > 450 ? 22 : 18,
                             ),
-                            tooltip: _isAudioMuted ? 'Audio Off' : 'Audio On',
                           ),
                         ),
+                      ),
+                      // Audio ON/OFF toggle or placeholder for balance
+                      _messages.isNotEmpty
+                          ? Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.grey.withOpacity(0.2),
+                              ),
+                              child: IconButton(
+                                onPressed: _toggleAudio,
+                                icon: Icon(
+                                  _isAudioMuted
+                                      ? Icons.music_off
+                                      : Icons.music_note,
+                                  color: CommanColor.whiteBlack(context),
+                                  size: 22,
+                                ),
+                                tooltip:
+                                    _isAudioMuted ? 'Audio Off' : 'Audio On',
+                              ),
+                            )
+                          : const SizedBox(width: 48, height: 48),
                     ],
                   ),
                 ),
@@ -1148,17 +1183,6 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Column(
                             children: [
-                              const SizedBox(height: 20),
-                              Text(
-                                ChatTranslations.get('prayer_guidance_title',
-                                    AppApiConstant.chatLanguage),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  color: CommanColor.whiteBlack(context)
-                                      .withOpacity(0.7),
-                                  fontSize: size.width > 450 ? 26 : 23,
-                                ),
-                              ),
                               const SizedBox(height: 8),
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 20),

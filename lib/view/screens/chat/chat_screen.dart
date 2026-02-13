@@ -4411,22 +4411,11 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                     shape: BoxShape.circle,
                   ),
                   child: IconButton(
-                    icon: _isLoading
-                        ? SizedBox(
-                            width: 15,
-                            height: 15,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 1,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                CommanColor.white,
-                              ),
-                            ),
-                          )
-                        : Image.asset(
-                            "assets/send-2.png",
-                            color: CommanColor.white,
-                            width: screenWidth > 450 ? 24 : 20,
-                          ),
+                    icon: Image.asset(
+                      "assets/send-2.png",
+                      color: CommanColor.white,
+                      width: screenWidth > 450 ? 24 : 20,
+                    ),
                     onPressed: (!_isLoading && hasText) ? _sendMessage : null,
                   ),
                 ),

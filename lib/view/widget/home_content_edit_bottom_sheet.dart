@@ -5941,6 +5941,15 @@ class NotesBottomSheet extends StatelessWidget {
                     onPressed: () async {
                       await SharPreferences.setString('OpenAd', '1');
                       FocusScope.of(context).unfocus();
+                      final isCancel =
+                          controller.selectedBookContent[
+                                  int.parse(verNum.toString()) - 1]
+                              .isNoted ==
+                              "no";
+                      if (isCancel) {
+                        Navigator.pop(context);
+                        return;
+                      }
                       final bookmarkProvider =
                           Provider.of<HomeContentEditProvider>(context,
                               listen: false);

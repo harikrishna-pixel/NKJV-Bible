@@ -6,6 +6,7 @@ import 'package:biblebookapp/utils/custom_share.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
+import 'package:biblebookapp/view/screens/chat/chat_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/preference_selection_screen.dart';
@@ -22,6 +23,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../Model/dailyVerseList.dart';
 import '../../constants/constant.dart';
 import '../../constants/images.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:biblebookapp/services/statsig/statsig_service.dart';
 
 class DailyVerse extends StatefulWidget {
@@ -476,6 +478,52 @@ class _DailyVerseState extends State<DailyVerse> {
                           ],
                         ),
                       ),
+                      const SizedBox(width: 30),
+                      InkWell(
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          Get.to(
+                            () => ChatScreen(
+                              verseContext: {
+                                'verseText':
+                                    parse(data.verse).body?.text.toString() ??
+                                        '',
+                                'book': data.book.toString(),
+                                'chapter':
+                                    '${int.parse(data.chapter.toString()) + 1}',
+                                'verse':
+                                    '${int.parse(data.verseNum.toString()) + 1}',
+                              },
+                            ),
+                            transition: Transition.cupertinoDialog,
+                            duration: const Duration(milliseconds: 300),
+                          );
+                        },
+                        child: Column(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              height: 40,
+                              width: 40,
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                    color: CommanColor.lightDarkPrimary(context),
+                                    width: 1.2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                CupertinoIcons.chat_bubble_2,
+                                size: 22,
+                                color: CommanColor.lightDarkPrimary(context),
+                              ),
+                            ),
+                            const SizedBox(height: 15),
+                            Text("Ask",
+                                style: CommanStyle.bothPrimary14500(context)),
+                          ],
+                        ),
+                      ),
+                      
                     ],
                   )
                 ],

@@ -997,15 +997,15 @@ class _SearchScreenState extends State<SearchScreen> {
                                   width: 160,
                                 ),
                                 SizedBox(height: 30),
-                                Text(
-                                  'Search by Words',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: CommanColor.whiteBlack(context),
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
+                                // Text(
+                                //   'Search by Words',
+                                //   style: TextStyle(
+                                //     fontSize: 20,
+                                //     fontWeight: FontWeight.bold,
+                                //     color: CommanColor.whiteBlack(context),
+                                //   ),
+                                //   textAlign: TextAlign.center,
+                                // ),
                                 SizedBox(height: 15),
                                 Padding(
                                   padding: EdgeInsets.symmetric(horizontal: 40),

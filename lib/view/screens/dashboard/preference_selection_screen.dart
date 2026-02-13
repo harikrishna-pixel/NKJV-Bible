@@ -1308,19 +1308,20 @@ class FaithJourneyDialog {
                         return;
                       }
 
-                      // Check connection speed for slow/2G networks
+                      // Check connection speed only for very slow networks (e.g. >12s)
+                      // Null/timeout or error: still show IAP so onboarding paywall is not skipped
                       try {
                         final connectionSpeed =
                             await InternetSpeedChecker.checkSpeed(
-                          timeout: const Duration(seconds: 5),
+                          timeout: const Duration(seconds: 8),
                         );
 
-                        // If connection speed is null (no response) or very slow (>5000ms), treat as 2G/low network
-                        final isSlowConnection =
-                            connectionSpeed == null || connectionSpeed > 5000;
+                        // Only bypass IAP when we have a measured speed and it's very slow (>12s)
+                        final isVerySlowConnection = connectionSpeed != null &&
+                            connectionSpeed > 12000;
 
-                        if (isSlowConnection) {
-                          // Slow/2G network - bypass IAP screen and go directly to HomeScreen
+                        if (isVerySlowConnection) {
+                          // Very slow network - bypass IAP and go to HomeScreen
                           Get.offAll(() => HomeScreen(
                                 From: "splash",
                                 selectedVerseNumForRead: "",
@@ -1334,16 +1335,7 @@ class FaithJourneyDialog {
                       } catch (e) {
                         debugPrint(
                             'Error checking connection speed in onboarding: $e');
-                        // On error, assume slow connection and bypass to HomeScreen
-                        Get.offAll(() => HomeScreen(
-                              From: "splash",
-                              selectedVerseNumForRead: "",
-                              selectedBookForRead: "",
-                              selectedChapterForRead: "",
-                              selectedBookNameForRead: "",
-                              selectedVerseForRead: "",
-                            ));
-                        return;
+                        // On error, still show IAP (don't skip onboarding paywall)
                       }
 
                       // Fast connection - proceed to SubscriptionScreen using constants only

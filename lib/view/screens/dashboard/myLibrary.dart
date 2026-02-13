@@ -1,6 +1,7 @@
 // ignore_for_file: use_full_hex_values_for_flutter_colors
 import 'package:biblebookapp/core/export_db.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
+import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/utils/custom_alert.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/images.dart';
@@ -9,6 +10,7 @@ import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/login_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
+import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/quotes_library_widget.dart';
 import 'package:biblebookapp/view/screens/dashboard/underLine_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/wallpaper_library_widget.dart';
@@ -232,7 +234,16 @@ class _LibraryScreenState extends State<LibraryScreen>
                     ),
                     GestureDetector(
                       onTap: () async {
-                        if (user != null) {
+                        final downloadProvider =
+                            Provider.of<DownloadProvider>(context,
+                                listen: false);
+                        final subscriptionPlan =
+                            await downloadProvider.getSubscriptionPlan();
+                        final isSubscribed = subscriptionPlan != null &&
+                            subscriptionPlan.isNotEmpty &&
+                            ['platinum', 'gold', 'silver'].contains(
+                                subscriptionPlan.toLowerCase());
+                        if (isSubscribed) {
                           showDialog(
                             context: context,
                             barrierDismissible: false,
@@ -240,11 +251,68 @@ class _LibraryScreenState extends State<LibraryScreen>
                           );
                         } else {
                           await SharPreferences.setString('OpenAd', '1');
-                          updateLoading(false);
-                          backupNotification(
-                              context: context,
-                              message:
-                                  " Account is required to access this feature ");
+                          if (!context.mounted) return;
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (ctx) => AlertDialog(
+                              backgroundColor: CommanColor.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              title: null,
+                              content: Text(
+                                "You're not subscribed. Subscribe to export and import your data.",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: CommanColor.black,
+                                  fontSize: screenWidth > 450 ? 19 : 15,
+                                ),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx),
+                                  child: Text(
+                                    'Cancel',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade700,
+                                      fontSize: BibleInfo.fontSizeScale * 14,
+                                    ),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.pop(ctx);
+                                    final sixMonthPlan =
+                                        BibleInfo.sixMonthPlanid;
+                                    final oneYearPlan =
+                                        BibleInfo.oneYearPlanid;
+                                    final lifeTimePlan =
+                                        BibleInfo.lifeTimePlanid;
+                                    Get.to(
+                                      () => SubscriptionScreen(
+                                        sixMonthPlan: sixMonthPlan,
+                                        oneYearPlan: oneYearPlan,
+                                        lifeTimePlan: lifeTimePlan,
+                                        checkad: 'library',
+                                      ),
+                                      transition: Transition.cupertinoDialog,
+                                      duration:
+                                          const Duration(milliseconds: 300),
+                                    );
+                                  },
+                                  child: Text(
+                                    'Subscribe',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: CommanColor.darkPrimaryColor,
+                                      fontSize: BibleInfo.fontSizeScale * 14,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
                         }
                       },
                       child: Icon(

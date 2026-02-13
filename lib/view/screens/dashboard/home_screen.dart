@@ -4796,7 +4796,7 @@ class _HomeScreenState extends State<HomeScreen>
                               width: 24,
                             ),
                             title: Text(
-                              'Chat',
+                              'About Us ',
                               style: CommanStyle.bothPrimary16600(context),
                             ),
                           ),
