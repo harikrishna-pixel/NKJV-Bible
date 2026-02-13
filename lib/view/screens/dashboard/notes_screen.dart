@@ -4,6 +4,7 @@ import 'package:biblebookapp/Model/saveNotesModel.dart';
 import 'package:biblebookapp/constant/size_config.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/utils/custom_share.dart';
+import 'package:biblebookapp/view/screens/chat/chat_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:flutter/material.dart';
@@ -432,6 +433,72 @@ class _NotesScreenState extends State<NotesScreen> {
                                                                 .bothPrimary14500(
                                                                     context)),
                                                       ],
+                                                    ),
+                                                    const SizedBox(
+                                                      width: 25,
+                                                    ),
+                                                    InkWell(
+                                                      onTap: () {
+                                                        Get.back();
+                                                        Get.to(
+                                                          () => ChatScreen(
+                                                            verseContext: {
+                                                              'verseText': parse(
+                                                                      data.content)
+                                                                  .body
+                                                                  ?.text
+                                                                  .toString() ??
+                                                                  '',
+                                                              'book': data
+                                                                  .bookName
+                                                                  .toString(),
+                                                              'chapter':
+                                                                  '${int.parse(data.chapterNum.toString()) + 1}',
+                                                              'verse':
+                                                                  '${int.parse(data.verseNum.toString()) + 1}',
+                                                            },
+                                                          ),
+                                                          transition: Transition
+                                                              .cupertinoDialog,
+                                                          duration: const Duration(
+                                                              milliseconds: 300),
+                                                        );
+                                                      },
+                                                      child: Column(
+                                                        children: [
+                                                          Container(
+                                                            padding: const EdgeInsets
+                                                                .all(8),
+                                                            height: 40,
+                                                            width: 40,
+                                                            decoration: BoxDecoration(
+                                                              border: Border.all(
+                                                                  color: CommanColor
+                                                                      .lightDarkPrimary(
+                                                                          context),
+                                                                  width: 1.2),
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          8),
+                                                            ),
+                                                            child: Icon(
+                                                              Icons
+                                                                  .question_answer_outlined,
+                                                              size: 22,
+                                                              color: CommanColor
+                                                                  .lightDarkPrimary(
+                                                                      context),
+                                                            ),
+                                                          ),
+                                                          const SizedBox(
+                                                              height: 15),
+                                                          Text("Ask",
+                                                              style: CommanStyle
+                                                                  .bothPrimary14500(
+                                                                      context)),
+                                                        ],
+                                                      ),
                                                     ),
                                                     const SizedBox(
                                                       width: 30,
@@ -987,6 +1054,68 @@ class _NotesScreenState extends State<NotesScreen> {
                                                             .bothPrimary14500(
                                                                 context)),
                                                   ],
+                                                ),
+                                                const SizedBox(width: 25),
+                                                InkWell(
+                                                  onTap: () {
+                                                    Get.back();
+                                                    Get.to(
+                                                      () => ChatScreen(
+                                                        verseContext: {
+                                                          'verseText': parse(
+                                                                  data.content)
+                                                              .body
+                                                              ?.text
+                                                              .toString() ??
+                                                              '',
+                                                          'book': data.bookName
+                                                              .toString(),
+                                                          'chapter':
+                                                              '${int.parse(data.chapterNum.toString()) + 1}',
+                                                          'verse':
+                                                              '${int.parse(data.verseNum.toString()) + 1}',
+                                                        },
+                                                      ),
+                                                      transition: Transition
+                                                          .cupertinoDialog,
+                                                      duration: const Duration(
+                                                          milliseconds: 300),
+                                                    );
+                                                  },
+                                                  child: Column(
+                                                    children: [
+                                                      Container(
+                                                        padding: const EdgeInsets
+                                                            .all(8),
+                                                        height: 40,
+                                                        width: 40,
+                                                        decoration: BoxDecoration(
+                                                          border: Border.all(
+                                                              color: CommanColor
+                                                                  .lightDarkPrimary(
+                                                                      context),
+                                                              width: 1.2),
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(8),
+                                                        ),
+                                                        child: Icon(
+                                                          Icons
+                                                              .question_answer_outlined,
+                                                          size: 22,
+                                                          color: CommanColor
+                                                              .lightDarkPrimary(
+                                                                  context),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(
+                                                          height: 15),
+                                                      Text("Ask",
+                                                          style: CommanStyle
+                                                              .bothPrimary14500(
+                                                                  context)),
+                                                    ],
+                                                  ),
                                                 ),
                                                 const SizedBox(
                                                   width: 30,

@@ -19,6 +19,7 @@ import 'package:share_plus/share_plus.dart';
 
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
+import 'package:biblebookapp/view/screens/chat/chat_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -996,7 +997,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                   height: 160,
                                   width: 160,
                                 ),
-                                SizedBox(height: 30),
+                              
                                 // Text(
                                 //   'Search by Words',
                                 //   style: TextStyle(
@@ -1006,7 +1007,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                 //   ),
                                 //   textAlign: TextAlign.center,
                                 // ),
-                                SizedBox(height: 15),
+                              
                                 Padding(
                                   padding: EdgeInsets.symmetric(horizontal: 40),
                                   child: Text(
@@ -1409,6 +1410,72 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                 .bothPrimary14500(
                                                                     context)),
                                                       ],
+                                                    ),
+                                                    const SizedBox(
+                                                      width: 30,
+                                                    ),
+                                                    InkWell(
+                                                      onTap: () {
+                                                        Navigator.of(context).pop();
+                                                        Get.to(
+                                                          () => ChatScreen(
+                                                            verseContext: {
+                                                              'verseText': parse(
+                                                                      data.content)
+                                                                  .body
+                                                                  ?.text
+                                                                  .toString() ??
+                                                                  '',
+                                                              'book':
+                                                                  bookName.toString(),
+                                                              'chapter':
+                                                                  '${int.parse(data.chapterNum.toString()) + 1}',
+                                                              'verse':
+                                                                  '${int.parse(data.verseNum.toString()) + 1}',
+                                                            },
+                                                          ),
+                                                          transition: Transition
+                                                              .cupertinoDialog,
+                                                          duration: const Duration(
+                                                              milliseconds: 300),
+                                                        );
+                                                      },
+                                                      child: Column(
+                                                        children: [
+                                                          Container(
+                                                            padding: const EdgeInsets
+                                                                .all(8),
+                                                            height: 40,
+                                                            width: 40,
+                                                            decoration: BoxDecoration(
+                                                              border: Border.all(
+                                                                  color: CommanColor
+                                                                      .lightDarkPrimary(
+                                                                          context),
+                                                                  width: 1.2),
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          8),
+                                                            ),
+                                                            child: Icon(
+                                                              Icons
+                                                                  .question_answer_outlined,
+                                                              size: 22,
+                                                              color: CommanColor
+                                                                  .lightDarkPrimary(
+                                                                      context),
+                                                            ),
+                                                          ),
+                                                          const SizedBox(
+                                                              height: 15),
+                                                          Text(
+                                                              "Ask",
+                                                              style: CommanStyle
+                                                                  .bothPrimary14500(
+                                                                      context)),
+                                                        ],
+                                                      ),
                                                     ),
                                                   ],
                                                 )
@@ -1815,6 +1882,60 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                           .bothPrimary14500(
                                                                               context)),
                                                                 ],
+                                                              ),
+                                                              const SizedBox(
+                                                                  width: 30),
+                                                              InkWell(
+                                                                onTap: () {
+                                                                  Navigator.of(
+                                                                          context)
+                                                                      .pop();
+                                                                  Get.to(
+                                                                    () => ChatScreen(
+                                                                      verseContext: {
+                                                                        'verseText': parse(data.content)
+                                                                            .body
+                                                                            ?.text
+                                                                            .toString() ??
+                                                                            '',
+                                                                        'book':
+                                                                            bookName.toString(),
+                                                                        'chapter':
+                                                                            '${int.parse(data.chapterNum.toString()) + 1}',
+                                                                        'verse':
+                                                                            '${int.parse(data.verseNum.toString()) + 1}',
+                                                                      },
+                                                                    ),
+                                                                    transition:
+                                                                        Transition
+                                                                            .cupertinoDialog,
+                                                                    duration: const Duration(
+                                                                        milliseconds: 300),
+                                                                  );
+                                                                },
+                                                                child: Column(
+                                                                  children: [
+                                                                    Container(
+                                                                      padding: const EdgeInsets.all(8),
+                                                                      height: 40,
+                                                                      width: 40,
+                                                                      decoration: BoxDecoration(
+                                                                        border: Border.all(
+                                                                            color: CommanColor.lightDarkPrimary(context),
+                                                                            width: 1.2),
+                                                                        borderRadius: BorderRadius.circular(8),
+                                                                      ),
+                                                                      child: Icon(
+                                                                        Icons.question_answer_outlined,
+                                                                        size: 22,
+                                                                        color: CommanColor.lightDarkPrimary(context),
+                                                                      ),
+                                                                    ),
+                                                                    const SizedBox(height: 15),
+                                                                    Text("Ask",
+                                                                        style: CommanStyle.bothPrimary14500(context)),
+                                                                  ],
+                                                                ),
                                                               ),
                                                             ],
                                                           )

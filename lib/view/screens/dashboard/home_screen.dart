@@ -1119,20 +1119,28 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _refreshExitOfferCooldown() async {
-    final prefs = await SharedPreferences.getInstance();
-    final active = prefs.getBool('exit_offer_cooldown_active') ?? false;
-    final ts = await SharPreferences.getString('exit_offer_first_shown_time');
-    bool show = active;
-    if (active && ts != null) {
-      try {
-        final firstShown = DateTime.parse(ts);
-        final diff = DateTime.now().difference(firstShown).inMinutes;
-        if (diff >= 10) {
-          await SharPreferences.setBoolean('exit_offer_cooldown_active', false);
-          show = false;
+    // Red dot: show after 5 days since first paywall view, and hide when 10 min passed since exit offer was shown (limitation expired)
+    bool show = false;
+    final firstSeenStr =
+        await SharPreferences.getString('paywall_first_seen_date');
+    final exitOfferShownTime =
+        await SharPreferences.getString('exit_offer_first_shown_time');
+    final now = DateTime.now();
+    try {
+      if (firstSeenStr != null && firstSeenStr.isNotEmpty) {
+        final firstSeen = DateTime.parse(firstSeenStr);
+        if (now.difference(firstSeen).inDays >= 5) {
+          if (exitOfferShownTime == null || exitOfferShownTime.isEmpty) {
+            show = true;
+          } else {
+            final shownAt = DateTime.parse(exitOfferShownTime);
+            if (now.difference(shownAt).inMinutes < 10) {
+              show = true;
+            }
+          }
         }
-      } catch (_) {}
-    }
+      }
+    } catch (_) {}
     if (mounted) {
       setState(() {
         _exitOfferCooldownActive = show;
@@ -4796,7 +4804,7 @@ class _HomeScreenState extends State<HomeScreen>
                               width: 24,
                             ),
                             title: Text(
-                              'About Us ',
+                              'Ask Me',
                               style: CommanStyle.bothPrimary16600(context),
                             ),
                           ),

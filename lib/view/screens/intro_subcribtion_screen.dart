@@ -37,6 +37,7 @@ class SubscriptionScreen extends StatefulWidget {
   final String oneYearPlan;
   final String lifeTimePlan;
   final String checkad;
+  final bool fromHomeExitOffer;
 
   const SubscriptionScreen({
     super.key,
@@ -44,6 +45,7 @@ class SubscriptionScreen extends StatefulWidget {
     required this.oneYearPlan,
     required this.lifeTimePlan,
     required this.checkad,
+    this.fromHomeExitOffer = false,
   });
 
   /// Public entry point to show the exit offer from Home.
@@ -332,6 +334,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       await SharPreferences.setBoolean('has_shown_paywall_first_time', true);
       await SharPreferences.setBoolean('is_first_time_paywall_cancel', true);
     }
+    // Store first time user sees paywall (for 5-day gate before exit offer / red dot)
+    final firstSeen = await SharPreferences.getString('paywall_first_seen_date');
+    if (firstSeen == null || firstSeen.isEmpty) {
+      await SharPreferences.setString(
+          'paywall_first_seen_date', DateTime.now().toIso8601String());
+    }
   }
 
   /// Check if exit offer should be shown and display it (for purchase cancellation)
@@ -341,6 +349,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       if (!hasInternet) {
         Constants.showToast("No internet connection", 5000);
         return;
+      }
+      // Show exit offer only after 5 days since first paywall view
+      final firstSeenStr =
+          await SharPreferences.getString('paywall_first_seen_date');
+      if (firstSeenStr != null && firstSeenStr.isNotEmpty) {
+        try {
+          final firstSeen = DateTime.parse(firstSeenStr);
+          if (DateTime.now().difference(firstSeen).inDays < 5) {
+            return;
+          }
+        } catch (_) {}
       }
       final isFirstTimeCancel =
           await SharPreferences.getBoolean('is_first_time_paywall_cancel') ??
@@ -397,7 +416,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     }
   }
 
-  /// Show exit offer from home screen (checking 10 minute limit)
+  /// Show exit offer from home screen (checking 10 minute limit).
+  /// When not expired: show exit offer in bottom sheet on Home; Unlock -> IAP, Maybe later -> close.
+  /// When expired: show toast and navigate to IAP as usual.
   static Future<void> showExitOfferFromHomeScreen(
       BuildContext context, DashBoardController controller) async {
     try {
@@ -409,6 +430,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       final exitOfferFirstShownTime =
           await SharPreferences.getString('exit_offer_first_shown_time');
       final now = DateTime.now();
+      bool isExpired = false;
 
       if (exitOfferFirstShownTime != null) {
         try {
@@ -416,7 +438,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           final difference = now.difference(firstShownDateTime);
 
           if (difference.inMinutes >= 10) {
-            // 10 minutes have passed, don't show forever
+            isExpired = true;
             final alreadyNotified = await SharPreferences.getBoolean(
                     'exit_offer_expired_toast_shown') ??
                 false;
@@ -425,10 +447,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   'exit_offer_expired_toast_shown', true);
               Constants.showToast("Limited time offer has expired");
             }
-            // Proceed to paywall without exit offer
           }
         } catch (e) {
           debugPrint('Error parsing exit offer timestamp: $e');
+          isExpired = true;
           final alreadyNotified = await SharPreferences.getBoolean(
                   'exit_offer_expired_toast_shown') ??
               false;
@@ -437,19 +459,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 'exit_offer_expired_toast_shown', true);
             Constants.showToast("Limited time offer has expired");
           }
-          // Proceed to paywall without exit offer
         }
-      } else {
-        // First time access from home: start the 10-minute window
-        await SharPreferences.setBoolean('has_shown_exit_offer', true);
-        await SharPreferences.setString(
-            'exit_offer_first_shown_time', now.toIso8601String());
       }
-      // Ensure flag is set for subsequent checks
-      await SharPreferences.setBoolean('has_shown_exit_offer', true);
 
-      // Navigate to subscription screen which will show the exit offer
-      // Use constants as fallback when SharedPreferences are empty (first time loading)
       final sixMonthPlan = await SharPreferences.getString('sixMonthPlan') ??
           BibleInfo.sixMonthPlanid;
       final oneYearPlan = await SharPreferences.getString('oneYearPlan') ??
@@ -457,15 +469,103 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       final lifeTimePlan = await SharPreferences.getString('lifeTimePlan') ??
           BibleInfo.lifeTimePlanid;
 
-      Get.to(
-        () => SubscriptionScreen(
-          sixMonthPlan: sixMonthPlan,
-          oneYearPlan: oneYearPlan,
-          lifeTimePlan: lifeTimePlan,
-          checkad: 'home',
-        ),
-        transition: Transition.cupertinoDialog,
-        duration: const Duration(milliseconds: 300),
+      if (isExpired) {
+        Get.to(
+          () => SubscriptionScreen(
+            sixMonthPlan: sixMonthPlan,
+            oneYearPlan: oneYearPlan,
+            lifeTimePlan: lifeTimePlan,
+            checkad: 'home',
+          ),
+          transition: Transition.cupertinoDialog,
+          duration: const Duration(milliseconds: 300),
+        );
+        return;
+      }
+
+      // Not expired: show exit offer in bottom sheet on Home
+      if (exitOfferFirstShownTime == null) {
+        await SharPreferences.setBoolean('has_shown_exit_offer', true);
+        await SharPreferences.setString(
+            'exit_offer_first_shown_time', now.toIso8601String());
+      }
+
+      final exitOffer = await getExitOfferFromApiStatic(controller);
+      if (exitOffer == null || !context.mounted) {
+        Get.to(
+          () => SubscriptionScreen(
+            sixMonthPlan: sixMonthPlan,
+            oneYearPlan: oneYearPlan,
+            lifeTimePlan: lifeTimePlan,
+            checkad: 'home',
+          ),
+          transition: Transition.cupertinoDialog,
+          duration: const Duration(milliseconds: 300),
+        );
+        return;
+      }
+
+      String lifetimePrice = "\$24.99";
+      String originalLifetimePrice = "\$24.99";
+      final productId = exitOffer.identifier ?? lifeTimePlan;
+      try {
+        final response = await InAppPurchase.instance
+            .queryProductDetails(<String>{productId});
+        if (response.productDetails.isNotEmpty) {
+          lifetimePrice = response.productDetails.first.price;
+          originalLifetimePrice = lifetimePrice;
+        }
+      } catch (_) {}
+
+      final screenWidth = MediaQuery.sizeOf(context).width;
+      int remainingSeconds = 600;
+      try {
+        final stored =
+            await SharPreferences.getString('exit_offer_first_shown_time');
+        if (stored != null && stored.isNotEmpty) {
+          final firstShown = DateTime.parse(stored);
+          final diffSeconds = DateTime.now().difference(firstShown).inSeconds;
+          remainingSeconds = (600 - diffSeconds).clamp(0, 600);
+        }
+      } catch (_) {}
+      final initialMinutes = remainingSeconds ~/ 60;
+      final initialSeconds = remainingSeconds % 60;
+
+      if (!context.mounted) return;
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        isDismissible: false,
+        enableDrag: false,
+        builder: (BuildContext sheetContext) {
+          return _ExitOfferBottomSheetContent(
+            exitOffer: exitOffer,
+            lifetimePrice: lifetimePrice,
+            originalLifetimePrice: originalLifetimePrice,
+            screenWidth: screenWidth,
+            initialMinutes: initialMinutes,
+            initialSeconds: initialSeconds,
+            onUnlockPremium: () {
+              Navigator.of(sheetContext).pop();
+              Get.to(
+                () => SubscriptionScreen(
+                  sixMonthPlan: sixMonthPlan,
+                  oneYearPlan: oneYearPlan,
+                  lifeTimePlan: lifeTimePlan,
+                  checkad: 'home',
+                  fromHomeExitOffer: true,
+                ),
+                transition: Transition.cupertinoDialog,
+                duration: const Duration(milliseconds: 300),
+              );
+            },
+            onMaybeLater: () {
+              SharPreferences.setBoolean('exit_offer_cooldown_active', true);
+              Navigator.of(sheetContext).pop();
+            },
+          );
+        },
       );
     } catch (e) {
       debugPrint('Error showing exit offer from home: $e');
@@ -483,6 +583,18 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         Constants.showToast("No internet connection", 5000);
         _navigateAwayFromPaywall();
         return;
+      }
+      // Show exit offer only after 5 days since first paywall view
+      final firstSeenStr =
+          await SharPreferences.getString('paywall_first_seen_date');
+      if (firstSeenStr != null && firstSeenStr.isNotEmpty) {
+        try {
+          final firstSeen = DateTime.parse(firstSeenStr);
+          if (DateTime.now().difference(firstSeen).inDays < 5) {
+            _navigateAwayFromPaywall();
+            return;
+          }
+        } catch (_) {}
       }
       // First, check if exit offer timer has expired (10 minutes check)
       final hasShownExitOffer =
@@ -686,6 +798,62 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             '❌ Error creating fallback exit offer after error: $fallbackError');
         return null;
       }
+    }
+  }
+
+  /// Static helper to get exit offer (for showing on Home without SubscriptionScreen instance)
+  static Future<GetAudioModelDataSubFields?> getExitOfferFromApiStatic(
+      DashBoardController controller) async {
+    try {
+      GetAudioModel? apiData = controller.audioData.value;
+      List<GetAudioModelDataSubFields?>? subFields = apiData.data?.subFields;
+
+      if (subFields == null || subFields.isEmpty) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final cachedJson = prefs.getString('cached_api_response');
+          if (cachedJson != null && cachedJson.isNotEmpty) {
+            final jsonData = jsonDecode(cachedJson);
+            apiData = GetAudioModel.fromJson(jsonData);
+            subFields = apiData.data?.subFields;
+          } else {
+            try {
+              final loadedData = await getMusicDetails();
+              if (loadedData != null && loadedData.data != null) {
+                final jsonString = jsonEncode(loadedData.toJson());
+                await prefs.setString('cached_api_response', jsonString);
+                controller.audioData.value = loadedData;
+                apiData = loadedData;
+                subFields = loadedData.data?.subFields;
+              }
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
+
+      final exitOfferId = await SharPreferences.getString('exitOfferPlan') ??
+          BibleInfo.exitOfferPlanid;
+
+      if (subFields != null && subFields.isNotEmpty) {
+        for (var field in subFields) {
+          if (field?.identifier == exitOfferId) return field;
+        }
+      }
+
+      return GetAudioModelDataSubFields(
+        identifier: BibleInfo.lifeTimePlanid,
+        item_1: "Unlock every Premium Bible feature",
+        item_2: "30% Off for the next 10 minutes",
+        value: "30",
+      );
+    } catch (e) {
+      debugPrint('getExitOfferFromApiStatic error: $e');
+      return GetAudioModelDataSubFields(
+        identifier: BibleInfo.lifeTimePlanid,
+        item_1: "Unlock every Premium Bible feature",
+        item_2: "30% Off for the next 10 minutes",
+        value: "30",
+      );
     }
   }
 
@@ -1351,6 +1519,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           });
         }
       }
+    }
+
+    if (widget.fromHomeExitOffer && mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        final ctrl = Get.find<DashBoardController>();
+        final offer = await _getExitOfferFromApi(ctrl);
+        if (offer != null && mounted) _showExitOfferBottomSheet(offer);
+      });
     }
   }
 

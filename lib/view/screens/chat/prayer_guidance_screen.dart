@@ -1178,29 +1178,48 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                 ),
                 Expanded(
                   child: _messages.isEmpty
-                      ? SingleChildScrollView(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Column(
-                            children: [
-                              const SizedBox(height: 8),
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 20),
-                                child: Text(
-                                  ChatTranslations.get('get_guidance_need',
-                                      AppApiConstant.chatLanguage),
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: CommanColor.whiteBlack(context)
-                                        .withOpacity(0.5),
-                                    fontSize: size.width > 450 ? 16 : 15,
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Fixed header: subtext stays visible when scrolling
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16),
+                              child: Column(
+                                children: [
+                                  const SizedBox(height: 2),
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                        bottom: 20),
+                                    child: Text(
+                                      ChatTranslations.get(
+                                          'get_guidance_need',
+                                          AppApiConstant.chatLanguage),
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: CommanColor.whiteBlack(
+                                                context)
+                                            .withOpacity(0.5),
+                                        fontSize:
+                                            size.width > 450 ? 16 : 15,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
-                              // Category cards in grid - 2 per row, each card triggers AI directly
-                              GridView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
+                            ),
+                            // Only the grid scrolls
+                            Expanded(
+                              child: SingleChildScrollView(
+                                controller: _scrollController,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16),
+                                child: Column(
+                                  children: [
+                                    GridView.builder(
+                                      shrinkWrap: true,
+                                      physics:
+                                          const NeverScrollableScrollPhysics(),
                                 gridDelegate:
                                     SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 2,
@@ -1379,10 +1398,13 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                     ),
                                   );
                                 },
+                                    ),
+                                    const SizedBox(height: 20),
+                                  ],
+                                ),
                               ),
-                              const SizedBox(height: 20),
-                            ],
-                          ),
+                            ),
+                          ],
                         )
                       : ListView.builder(
                           controller: _scrollController,
@@ -1575,8 +1597,8 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                           },
                         ),
                 ),
-                // AMEN button at the bottom - only show when there are messages (responses)
-                if (_messages.isNotEmpty)
+                // AMEN button at the bottom - only show after prayer is generated (at least one AI response)
+                if (_messages.any((m) => !m.isUser))
                   Padding(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 12),
