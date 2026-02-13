@@ -1011,7 +1011,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                 Padding(
                                   padding: EdgeInsets.symmetric(horizontal: 40),
                                   child: Text(
-                                    'Search by word or book name.\nExample: Love or Genesis',
+                                    'Search by word or book name\nExample: Love or Genesis',
                                     style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.normal,

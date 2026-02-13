@@ -86,8 +86,8 @@ class Images {
 
   static String adFree(BuildContext context) {
     return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? 'assets/adFree.png'
-        : 'assets/adFree.png';
+        ? 'assets/icons/crown.png'
+        : 'assets/icons/crown.png';
   }
 
   static String bookmarkPlaceHolder(BuildContext context) {

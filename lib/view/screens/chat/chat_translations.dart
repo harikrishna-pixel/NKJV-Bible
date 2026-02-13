@@ -53,7 +53,7 @@ class ChatTranslations {
       'TN': 'பாதுகாப்பு'
     },
     'prayer_feelings': {
-      'EN': 'Feelings',
+      'EN': 'Hope',
       'HI': 'भावनाएं',
       'TN': 'உணர்வுகள்'
     },

@@ -1119,7 +1119,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _refreshExitOfferCooldown() async {
-    // Red dot: show after 5 days since first paywall view, and hide when 10 min passed since exit offer was shown (limitation expired)
+    // Red dot: show only after 5 days since first paywall view, and at most once per 20 days (then 10 min window)
     bool show = false;
     final firstSeenStr =
         await SharPreferences.getString('paywall_first_seen_date');
@@ -1127,17 +1127,27 @@ class _HomeScreenState extends State<HomeScreen>
         await SharPreferences.getString('exit_offer_first_shown_time');
     final now = DateTime.now();
     try {
-      if (firstSeenStr != null && firstSeenStr.isNotEmpty) {
-        final firstSeen = DateTime.parse(firstSeenStr);
-        if (now.difference(firstSeen).inDays >= 5) {
-          if (exitOfferShownTime == null || exitOfferShownTime.isEmpty) {
-            show = true;
-          } else {
-            final shownAt = DateTime.parse(exitOfferShownTime);
-            if (now.difference(shownAt).inMinutes < 10) {
-              show = true;
-            }
-          }
+      if (firstSeenStr == null || firstSeenStr.isEmpty) {
+        // No paywall first-seen date: user has not seen paywall yet → never show dot
+        return;
+      }
+      final firstSeen = DateTime.parse(firstSeenStr);
+      if (now.difference(firstSeen).inDays < 5) {
+        // Before 5 days → never show dot
+        if (mounted) setState(() => _exitOfferCooldownActive = false);
+        return;
+      }
+      // After 5 days: show dot only if (a) never shown, or (b) 20+ days since last shown, or (c) same cycle and within 10 min
+      if (exitOfferShownTime == null || exitOfferShownTime.isEmpty) {
+        show = true;
+      } else {
+        final shownAt = DateTime.parse(exitOfferShownTime);
+        final minsSince = now.difference(shownAt).inMinutes;
+        final daysSince = now.difference(shownAt).inDays;
+        if (daysSince >= 20) {
+          show = true; // New 20-day cycle
+        } else if (minsSince < 10) {
+          show = true; // Same cycle, still in 10-min window
         }
       }
     } catch (_) {}
@@ -4804,55 +4814,34 @@ class _HomeScreenState extends State<HomeScreen>
                               width: 24,
                             ),
                             title: Text(
-                              'Ask Me',
+                              'Ask Anything',
                               style: CommanStyle.bothPrimary16600(context),
                             ),
                           ),
-                        // ListTile(
-                        //   dense: true,
-                        //   onTap: () async {
-                        //     Get.back();
-
-                        //     // Check internet connectivity before opening chat
-                        //     try {
-                        //       final hasInternet = await InternetConnection()
-                        //           .hasInternetAccess
-                        //           .timeout(const Duration(seconds: 3),
-                        //               onTimeout: () => false);
-
-                        //       if (!hasInternet) {
-                        //         Constants.showToast("No internet connection");
-                        //         return;
-                        //       }
-                        //     } catch (e) {
-                        //       Constants.showToast("No internet connection");
-                        //       return;
-                        //     }
-
-                        //     if (controller.adFree.value == false) {
-                        //       controller.bannerAd?.dispose();
-                        //       controller.bannerAd?.load();
-                        //     }
-                        //     Get.to(() => const TawkChatScreen(),
-                        //         transition: Transition.cupertinoDialog,
-                        //         duration: const Duration(milliseconds: 300));
-                        //   },
-                        //   visualDensity:
-                        //       const VisualDensity(horizontal: 0, vertical: 0),
-                        //   leading: Icon(
-                        //     Icons.support_agent,
-                        //     size: 24,
-                        //     color:
-                        //         Provider.of<ThemeProvider>(context).themeMode ==
-                        //                 ThemeMode.dark
-                        //             ? CommanColor.darkPrimaryColor
-                        //             : CommanColor.lightModePrimary,
-                        //   ),
-                        //   title: Text(
-                        //     'Chat Us',
-                        //     style: CommanStyle.bothPrimary16600(context),
-                        //   ),
-                        // ),
+                        ListTile(
+                          dense: true,
+                          onTap: () async {
+                            Get.back();
+                            Get.to(() => const PrayerGuidanceScreen(),
+                                transition: Transition.cupertinoDialog,
+                                duration: const Duration(milliseconds: 300));
+                          },
+                          visualDensity:
+                              const VisualDensity(horizontal: 0, vertical: 0),
+                          leading: Icon(
+                            Icons.self_improvement,
+                            size: 24,
+                            color:
+                                Provider.of<ThemeProvider>(context).themeMode ==
+                                        ThemeMode.dark
+                                    ? CommanColor.darkPrimaryColor
+                                    : CommanColor.lightModePrimary,
+                          ),
+                          title: Text(
+                            'Get Prayer',
+                            style: CommanStyle.bothPrimary16600(context),
+                          ),
+                        ),
                         // ListTile(
                         //   dense: true,
                         //   onTap: () async {
@@ -5144,20 +5133,147 @@ class _HomeScreenState extends State<HomeScreen>
                         //   ),
                         // ),
                         GestureDetector(
-                          onTap: () {
+                          onTap: () async {
                             Navigator.of(context).pop();
-                            if (isLoggedIn) {
+                            // Same logic as Library hamburger: subscription check, then MainBackupDialog or Subscribe dialog
+                            final downloadProvider =
+                                Provider.of<DownloadProvider>(context,
+                                    listen: false);
+                            final subscriptionPlan =
+                                await downloadProvider.getSubscriptionPlan();
+                            final isSubscribed = subscriptionPlan != null &&
+                                subscriptionPlan.isNotEmpty &&
+                                ['platinum', 'gold', 'silver']
+                                    .contains(subscriptionPlan.toLowerCase());
+                            if (isSubscribed) {
                               showDialog(
                                 context: context,
                                 barrierDismissible: false,
                                 builder: (context) => const MainBackupDialog(),
                               );
                             } else {
-                              backupNotification(
-                                  context: context,
-                                  message:
-                                      " Account is required to access this feature ");
-                              //     }
+                              await SharPreferences.setString('OpenAd', '1');
+                              if (!context.mounted) return;
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (ctx) {
+                                  final dlgWidth =
+                                      MediaQuery.of(ctx).size.width;
+                                  return Dialog(
+                                    backgroundColor: CommanColor.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(15),
+                                    ),
+                                    elevation: 16,
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 24),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          Text(
+                                            "You're not subscribed. Subscribe to export and import your data.",
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              color: CommanColor.black,
+                                              fontSize:
+                                                  dlgWidth > 450 ? 19 : 15,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 20),
+                                          GestureDetector(
+                                            onTap: () {
+                                              Navigator.pop(ctx);
+                                              Get.to(
+                                                () => SubscriptionScreen(
+                                                  sixMonthPlan:
+                                                      BibleInfo.sixMonthPlanid,
+                                                  oneYearPlan:
+                                                      BibleInfo.oneYearPlanid,
+                                                  lifeTimePlan:
+                                                      BibleInfo.lifeTimePlanid,
+                                                  checkad: 'drawer',
+                                                ),
+                                                transition:
+                                                    Transition.cupertinoDialog,
+                                                duration: const Duration(
+                                                    milliseconds: 300),
+                                              );
+                                            },
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      vertical: 8),
+                                              decoration: BoxDecoration(
+                                                color: CommanColor
+                                                    .whiteLightModePrimary(ctx),
+                                                borderRadius:
+                                                    const BorderRadius.all(
+                                                        Radius.circular(5)),
+                                                boxShadow: const [
+                                                  BoxShadow(
+                                                      color: Colors.black26,
+                                                      blurRadius: 2)
+                                                ],
+                                              ),
+                                              child: Text(
+                                                'Subscribe',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  letterSpacing:
+                                                      BibleInfo.letterSpacing,
+                                                  fontSize:
+                                                      BibleInfo.fontSizeScale *
+                                                          14,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: CommanColor
+                                                      .darkModePrimaryWhite(
+                                                          ctx),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 12),
+                                          GestureDetector(
+                                            onTap: () => Navigator.pop(ctx),
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      vertical: 8),
+                                              decoration: BoxDecoration(
+                                                color: CommanColor.lightGrey1,
+                                                borderRadius:
+                                                    const BorderRadius.all(
+                                                        Radius.circular(5)),
+                                                boxShadow: const [
+                                                  BoxShadow(
+                                                      color: Colors.black26,
+                                                      blurRadius: 2)
+                                                ],
+                                              ),
+                                              child: Text(
+                                                'Cancel',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    letterSpacing:
+                                                        BibleInfo.letterSpacing,
+                                                    fontSize: BibleInfo
+                                                            .fontSizeScale *
+                                                        14,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: CommanColor.black),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
                             }
                           },
                           child: Padding(
@@ -5766,12 +5882,24 @@ class _HomeScreenState extends State<HomeScreen>
                                             },
                                             visualDensity: const VisualDensity(
                                                 horizontal: 0, vertical: 0),
-                                            leading: Image.asset(
-                                              Images.adFree(context),
-                                              height: 24,
+                                            leading: SizedBox(
                                               width: 24,
+                                              height: 24,
+                                              child: Image.asset(
+                                                Images.adFree(context),
+                                                height: 24,
+                                                width: 24,
+                                                errorBuilder: (_, __, ___) =>
+                                                    Icon(
+                                                  Icons.workspace_premium,
+                                                  size: 24,
+                                                  color: CommanColor
+                                                      .darkModePrimaryWhite(
+                                                          context),
+                                                ),
+                                              ),
                                             ),
-                                            title: const Text("Remove Ads",
+                                            title: const Text("",
                                                 style: TextStyle(
                                                     color: Colors.white,
                                                     letterSpacing:
@@ -5825,12 +5953,23 @@ class _HomeScreenState extends State<HomeScreen>
                                         },
                                         visualDensity: const VisualDensity(
                                             horizontal: 0, vertical: 0),
-                                        leading: Image.asset(
-                                          Images.adFree(context),
-                                          height: 24,
+                                        leading: SizedBox(
                                           width: 24,
+                                          height: 24,
+                                          child: Image.asset(
+                                            Images.adFree(context),
+                                            height: 24,
+                                            width: 24,
+                                            errorBuilder: (_, __, ___) => Icon(
+                                              Icons.workspace_premium,
+                                              size: 24,
+                                              color: CommanColor
+                                                  .darkModePrimaryWhite(
+                                                      context),
+                                            ),
+                                          ),
                                         ),
-                                        title: const Text("Remove Ads",
+                                        title: const Text("Get Premium",
                                             style: TextStyle(
                                                 color: Colors.white,
                                                 letterSpacing:

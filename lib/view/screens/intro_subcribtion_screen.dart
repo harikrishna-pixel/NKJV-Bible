@@ -416,7 +416,28 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     }
   }
 
+  /// Navigate to paywall from home (no exit offer).
+  static Future<void> _navigateToPaywallFromHome(BuildContext context) async {
+    final sixMonthPlan = await SharPreferences.getString('sixMonthPlan') ??
+        BibleInfo.sixMonthPlanid;
+    final oneYearPlan = await SharPreferences.getString('oneYearPlan') ??
+        BibleInfo.oneYearPlanid;
+    final lifeTimePlan = await SharPreferences.getString('lifeTimePlan') ??
+        BibleInfo.lifeTimePlanid;
+    Get.to(
+      () => SubscriptionScreen(
+        sixMonthPlan: sixMonthPlan,
+        oneYearPlan: oneYearPlan,
+        lifeTimePlan: lifeTimePlan,
+        checkad: 'home',
+      ),
+      transition: Transition.cupertinoDialog,
+      duration: const Duration(milliseconds: 300),
+    );
+  }
+
   /// Show exit offer from home screen (checking 10 minute limit).
+  /// Exit offer only after 5 days since first paywall view; before that, just open paywall.
   /// When not expired: show exit offer in bottom sheet on Home; Unlock -> IAP, Maybe later -> close.
   /// When expired: show toast and navigate to IAP as usual.
   static Future<void> showExitOfferFromHomeScreen(
@@ -427,6 +448,24 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         Constants.showToast("No internet connection", 5000);
         return;
       }
+      // Exit offer only after 5 days of app use (first paywall seen); before that just open paywall
+      final paywallFirstSeenStr =
+          await SharPreferences.getString('paywall_first_seen_date');
+      if (paywallFirstSeenStr == null || paywallFirstSeenStr.isEmpty) {
+        await _navigateToPaywallFromHome(context);
+        return;
+      }
+      try {
+        final firstSeen = DateTime.parse(paywallFirstSeenStr);
+        if (DateTime.now().difference(firstSeen).inDays < 5) {
+          await _navigateToPaywallFromHome(context);
+          return;
+        }
+      } catch (_) {
+        await _navigateToPaywallFromHome(context);
+        return;
+      }
+
       final exitOfferFirstShownTime =
           await SharPreferences.getString('exit_offer_first_shown_time');
       final now = DateTime.now();
