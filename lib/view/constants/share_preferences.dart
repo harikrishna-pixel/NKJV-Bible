@@ -66,6 +66,8 @@ class SharPreferences {
   static const markAsReadMessageIndex = 'markAsReadMessageIndex';
   static const chatLanguage =
       'chatLanguage'; // EN, HI, TN - for Prayer Guidance & Chat
+  /// Last time back interstitial was shown (Chat or Prayer). Used to limit to once per 3 minutes.
+  static const lastBackInterstitialTime = 'lastBackInterstitialTime';
 
   static Future<bool?> getBoolean(String key) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();

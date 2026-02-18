@@ -18,8 +18,8 @@ class AppApiConstant {
   static const bookofferapi =
       "https://saveigm.com/bookads/admin/api/book/book_list_by_cat";
 
-  // Language code for chat/Prayer (EN, HI, TN). Loaded from SharedPreferences so app language reflects here.
-  static String chatLanguage = "EN";
+  // Language code for chat/Prayer (EN, HI, TN, PT). Loaded from SharedPreferences so app language reflects here.
+  static String chatLanguage = "HE";
 
   static Future<void> loadChatLanguage() async {
     try {

@@ -11,6 +11,7 @@ import 'package:internet_connection_checker_plus/internet_connection_checker_plu
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/constant/app_api_constant.dart';
+import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/utils/rating_dialog_helper.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
@@ -29,6 +30,9 @@ import 'package:biblebookapp/view/constants/images.dart';
 import 'package:flutter/gestures.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
+import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -69,6 +73,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   // Recent conversations
   List<Map<String, dynamic>> _recentConversations = [];
+
+  // Back-button interstitial: show one interstitial when leaving Chat (for unsubscribed) after any activity
+  bool _hasShownBackInterstitial = false;
+  bool _userDidActivity = false;
+  bool _isHandlingBack = false; // Prevent multiple triggers (e.g. system back + app bar) showing ad repeatedly
+  final AdService _chatBackAdService = AdService();
 
   // Topic-based questions (translation keys)
   final List<Map<String, String>> _topicQuestionKeys = [
@@ -125,6 +135,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _messageController.addListener(() {
       setState(() {});
     });
+
+    // Load interstitial for back-button ad (one ad when leaving Chat for unsubscribed)
+    _chatBackAdService.loadInterstitialAd(() {});
   }
 
   @override
@@ -1061,6 +1074,81 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     return 'conv_${DateTime.now().millisecondsSinceEpoch}';
   }
 
+  /// Show interstitial and wait for dismiss (for back-button ad). One ad only for unsubscribed when leaving after activity.
+  Future<void> _showChatBackInterstitialAndWait() async {
+    final completer = Completer<void>();
+    final ad = _chatBackAdService.interstitialAd;
+    if (ad == null) {
+      completer.complete();
+      return completer.future;
+    }
+    ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (a) async {
+        a.dispose();
+        _chatBackAdService.loadInterstitialAd(() {});
+        if (!completer.isCompleted) completer.complete();
+      },
+      onAdFailedToShowFullScreenContent: (a, _) {
+        a.dispose();
+        _chatBackAdService.loadInterstitialAd(() {});
+        if (!completer.isCompleted) completer.complete();
+      },
+    );
+    ad.show();
+    return completer.future.timeout(
+      const Duration(seconds: 30),
+      onTimeout: () {
+        if (!completer.isCompleted) completer.complete();
+      },
+    );
+  }
+
+  Future<void> _handleBack() async {
+    // Only one back-handler runs at a time; avoid interstitial showing multiple times
+    if (_isHandlingBack) {
+      if (mounted) Get.back();
+      return;
+    }
+    _isHandlingBack = true;
+    if (_userDidActivity && !_hasShownBackInterstitial && mounted) {
+      final downloadProvider =
+          Provider.of<DownloadProvider>(context, listen: false);
+      final plan = await downloadProvider.getSubscriptionPlan();
+      final isSubscribed = plan != null &&
+          plan.isNotEmpty &&
+          ['platinum', 'gold', 'silver'].contains(plan.toLowerCase());
+      if (!isSubscribed) {
+        try {
+          // Show back interstitial at most once every 3 minutes (shared with Prayer)
+          final lastStr = await SharPreferences.getString(
+              SharPreferences.lastBackInterstitialTime);
+          final now = DateTime.now();
+          final canShowByTime = lastStr == null ||
+              lastStr.isEmpty ||
+              now.difference(DateTime.tryParse(lastStr) ?? now).inMinutes >= 3;
+          if (canShowByTime) {
+            final hasInternet =
+                await InternetConnection().hasInternetAccess;
+            if (hasInternet) {
+              final result = await Connectivity().checkConnectivity();
+              final isMobileOnly = result.contains(ConnectivityResult.mobile) &&
+                  !result.contains(ConnectivityResult.wifi) &&
+                  !result.contains(ConnectivityResult.ethernet);
+              if (!isMobileOnly) {
+                _hasShownBackInterstitial = true;
+                await _showChatBackInterstitialAndWait();
+                await SharPreferences.setString(
+                    SharPreferences.lastBackInterstitialTime,
+                    now.toIso8601String());
+              }
+            }
+          }
+        } catch (_) {}
+      }
+    }
+    if (mounted) Get.back();
+  }
+
   Future<void> _loadChatHistory() async {
     if (_currentConversationId == null) return;
 
@@ -1566,6 +1654,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
     setState(() {
       _messages.add(userMessage);
+      _userDidActivity = true; // Track for back-button interstitial (one ad when leaving)
       _isLoading = true;
       _selectedTopicIndex = null; // Reset selected button when message is sent
       _selectedExampleQuestionIndex = null; // Reset example question selection
@@ -2010,7 +2099,12 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
     final isVintage =
         themeProvider.currentCustomTheme == AppCustomTheme.vintage;
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, dynamic result) async {
+        if (!didPop) await _handleBack();
+      },
+      child: Scaffold(
       backgroundColor: isVintage
           ? (isDark ? CommanColor.black : themeProvider.backgroundColor)
           : (isDark
@@ -2176,7 +2270,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                           Icons.arrow_back_ios_new,
                           color: CommanColor.whiteBlack(context),
                         ),
-                        onPressed: () => Get.back(),
+                        onPressed: () => _handleBack(),
                       ),
                       // Show "Faith Chat" in center when messages exist
                       if (_messages.isNotEmpty)
@@ -2716,6 +2810,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
           ),
         ),
       ),
+    ),
     );
   }
 

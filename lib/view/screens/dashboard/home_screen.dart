@@ -2870,7 +2870,7 @@ class _HomeScreenState extends State<HomeScreen>
           //     }
           //   },
           // );
-          // await _initializeRatingDialog(state);
+          await _initializeRatingDialog(state);
           _attachScrollListener(state);
           _initializeControllerState(state);
           _handleAdExpiration(state);

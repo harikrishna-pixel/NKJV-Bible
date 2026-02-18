@@ -21,7 +21,6 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:biblebookapp/utils/rating_dialog_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -59,6 +58,9 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
 
   // Ad service for interstitial ads
   final AdService _adService = AdService();
+
+  // Prevent back-button interstitial from firing multiple times (one ad per leave)
+  bool _isClosingWithAd = false;
 
   // Counter for AMEN button taps (show ad every 10 taps)
   int _amenTapCount = 0;
@@ -245,6 +247,152 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
         case 'PT':
           languageInstruction =
               'IMPORTANT: Respond in PORTUGUESE language. Use Portuguese for your entire response.';
+          break;
+        case 'SQ':
+          languageInstruction =
+              'IMPORTANT: Respond in ALBANIAN language. Use Albanian for your entire response.';
+          break;
+        case 'AM':
+          languageInstruction =
+              'IMPORTANT: Respond in AMHARIC language. Use Amharic script for your entire response.';
+          break;
+        case 'AR':
+          languageInstruction =
+              'IMPORTANT: Respond in ARABIC language. Use Arabic script for your entire response.';
+          break;
+        case 'BN':
+          languageInstruction =
+              'IMPORTANT: Respond in BENGALI language. Use Bengali script for your entire response.';
+          break;
+        case 'ZH':
+          languageInstruction =
+              'IMPORTANT: Respond in CHINESE language. Use Chinese for your entire response.';
+          break;
+        case 'FR':
+          languageInstruction =
+              'IMPORTANT: Respond in FRENCH language. Use French for your entire response.';
+          break;
+        case 'DE':
+          languageInstruction =
+              'IMPORTANT: Respond in GERMAN language. Use German for your entire response.';
+          break;
+        case 'EL':
+          languageInstruction =
+              'IMPORTANT: Respond in GREEK language. Use Greek for your entire response.';
+          break;
+        case 'HE':
+          languageInstruction =
+              'IMPORTANT: Respond in HEBREW language. Use Hebrew script for your entire response.';
+          break;
+        case 'IG':
+          languageInstruction =
+              'IMPORTANT: Respond in IGBO language. Use Igbo for your entire response.';
+          break;
+        case 'ID':
+          languageInstruction =
+              'IMPORTANT: Respond in INDONESIAN language. Use Indonesian for your entire response.';
+          break;
+        case 'IT':
+          languageInstruction =
+              'IMPORTANT: Respond in ITALIAN language. Use Italian for your entire response.';
+          break;
+        case 'JA':
+          languageInstruction =
+              'IMPORTANT: Respond in JAPANESE language. Use Japanese for your entire response.';
+          break;
+        case 'KI':
+          languageInstruction =
+              'IMPORTANT: Respond in KIKUYU language. Use Kikuyu for your entire response.';
+          break;
+        case 'RW':
+          languageInstruction =
+              'IMPORTANT: Respond in KINYARWANDA language. Use Kinyarwanda for your entire response.';
+          break;
+        case 'KO':
+          languageInstruction =
+              'IMPORTANT: Respond in KOREAN language. Use Korean for your entire response.';
+          break;
+        case 'ML':
+          languageInstruction =
+              'IMPORTANT: Respond in MALAYALAM language. Use Malayalam script for your entire response.';
+          break;
+        case 'MY':
+          languageInstruction =
+              'IMPORTANT: Respond in BURMESE language. Use Burmese script for your entire response.';
+          break;
+        case 'NE':
+          languageInstruction =
+              'IMPORTANT: Respond in NEPALI language. Use Nepali (Devanagari) for your entire response.';
+          break;
+        case 'ES':
+          languageInstruction =
+              'IMPORTANT: Respond in SPANISH language. Use Spanish for your entire response.';
+          break;
+        case 'PA':
+        case 'PN':
+        case 'PAN':
+        case 'PUN':
+        case 'Punjabi':
+        case 'PUNJABI':
+          languageInstruction =
+              'IMPORTANT: Respond in PUNJABI language. Use Punjabi (Gurmukhi) for your entire response.';
+          break;
+        case 'RO':
+        case 'RM':
+        case 'ROM':
+        case 'Roman':
+        case 'ROMAN':
+        case 'Romanian':
+        case 'ROMANIAN':
+          languageInstruction =
+              'IMPORTANT: Respond in ROMANIAN language. Use Romanian for your entire response.';
+          break;
+        case 'RU':
+        case 'RUS':
+        case 'Russian':
+        case 'RUSSIAN':
+          languageInstruction =
+              'IMPORTANT: Respond in RUSSIAN language. Use Russian for your entire response.';
+          break;
+        case 'SW':
+          languageInstruction =
+              'IMPORTANT: Respond in SWAHILI language. Use Swahili for your entire response.';
+          break;
+        case 'SV':
+          languageInstruction =
+              'IMPORTANT: Respond in SWEDISH language. Use Swedish for your entire response.';
+          break;
+        case 'TL':
+          languageInstruction =
+              'IMPORTANT: Respond in TAGALOG language. Use Tagalog for your entire response.';
+          break;
+        case 'TE':
+          languageInstruction =
+              'IMPORTANT: Respond in TELUGU language. Use Telugu script for your entire response.';
+          break;
+        case 'TW':
+          languageInstruction =
+              'IMPORTANT: Respond in TWI language. Use Twi for your entire response.';
+          break;
+        case 'UK':
+          languageInstruction =
+              'IMPORTANT: Respond in UKRAINIAN language. Use Ukrainian for your entire response.';
+          break;
+        case 'UR':
+          languageInstruction =
+              'IMPORTANT: Respond in URDU language. Use Urdu script for your entire response.';
+          break;
+        case 'VI':
+          languageInstruction =
+              'IMPORTANT: Respond in VIETNAMESE language. Use Vietnamese for your entire response.';
+          break;
+        case 'YO':
+          languageInstruction =
+              'IMPORTANT: Respond in YORUBA language. Use Yoruba for your entire response.';
+          break;
+        case 'ZU':
+          languageInstruction =
+              'IMPORTANT: Respond in ZULU language. Use Zulu for your entire response.';
           break;
         default: // EN
           languageInstruction = 'IMPORTANT: Respond in ENGLISH language.';
@@ -485,6 +633,152 @@ ${category.prompt}
         case 'PT':
           languageInstruction =
               'IMPORTANT: Respond in PORTUGUESE language. Use Portuguese for your entire response.';
+          break;
+        case 'SQ':
+          languageInstruction =
+              'IMPORTANT: Respond in ALBANIAN language. Use Albanian for your entire response.';
+          break;
+        case 'AM':
+          languageInstruction =
+              'IMPORTANT: Respond in AMHARIC language. Use Amharic script for your entire response.';
+          break;
+        case 'AR':
+          languageInstruction =
+              'IMPORTANT: Respond in ARABIC language. Use Arabic script for your entire response.';
+          break;
+        case 'BN':
+          languageInstruction =
+              'IMPORTANT: Respond in BENGALI language. Use Bengali script for your entire response.';
+          break;
+        case 'ZH':
+          languageInstruction =
+              'IMPORTANT: Respond in CHINESE language. Use Chinese for your entire response.';
+          break;
+        case 'FR':
+          languageInstruction =
+              'IMPORTANT: Respond in FRENCH language. Use French for your entire response.';
+          break;
+        case 'DE':
+          languageInstruction =
+              'IMPORTANT: Respond in GERMAN language. Use German for your entire response.';
+          break;
+        case 'EL':
+          languageInstruction =
+              'IMPORTANT: Respond in GREEK language. Use Greek for your entire response.';
+          break;
+        case 'HE':
+          languageInstruction =
+              'IMPORTANT: Respond in HEBREW language. Use Hebrew script for your entire response.';
+          break;
+        case 'IG':
+          languageInstruction =
+              'IMPORTANT: Respond in IGBO language. Use Igbo for your entire response.';
+          break;
+        case 'ID':
+          languageInstruction =
+              'IMPORTANT: Respond in INDONESIAN language. Use Indonesian for your entire response.';
+          break;
+        case 'IT':
+          languageInstruction =
+              'IMPORTANT: Respond in ITALIAN language. Use Italian for your entire response.';
+          break;
+        case 'JA':
+          languageInstruction =
+              'IMPORTANT: Respond in JAPANESE language. Use Japanese for your entire response.';
+          break;
+        case 'KI':
+          languageInstruction =
+              'IMPORTANT: Respond in KIKUYU language. Use Kikuyu for your entire response.';
+          break;
+        case 'RW':
+          languageInstruction =
+              'IMPORTANT: Respond in KINYARWANDA language. Use Kinyarwanda for your entire response.';
+          break;
+        case 'KO':
+          languageInstruction =
+              'IMPORTANT: Respond in KOREAN language. Use Korean for your entire response.';
+          break;
+        case 'ML':
+          languageInstruction =
+              'IMPORTANT: Respond in MALAYALAM language. Use Malayalam script for your entire response.';
+          break;
+        case 'MY':
+          languageInstruction =
+              'IMPORTANT: Respond in BURMESE language. Use Burmese script for your entire response.';
+          break;
+        case 'NE':
+          languageInstruction =
+              'IMPORTANT: Respond in NEPALI language. Use Nepali (Devanagari) for your entire response.';
+          break;
+        case 'ES':
+          languageInstruction =
+              'IMPORTANT: Respond in SPANISH language. Use Spanish for your entire response.';
+          break;
+        case 'PA':
+        case 'PN':
+        case 'PAN':
+        case 'PUN':
+        case 'Punjabi':
+        case 'PUNJABI':
+          languageInstruction =
+              'IMPORTANT: Respond in PUNJABI language. Use Punjabi (Gurmukhi) for your entire response.';
+          break;
+        case 'RO':
+        case 'RM':
+        case 'ROM':
+        case 'Roman':
+        case 'ROMAN':
+        case 'Romanian':
+        case 'ROMANIAN':
+          languageInstruction =
+              'IMPORTANT: Respond in ROMANIAN language. Use Romanian for your entire response.';
+          break;
+        case 'RU':
+        case 'RUS':
+        case 'Russian':
+        case 'RUSSIAN':
+          languageInstruction =
+              'IMPORTANT: Respond in RUSSIAN language. Use Russian for your entire response.';
+          break;
+        case 'SW':
+          languageInstruction =
+              'IMPORTANT: Respond in SWAHILI language. Use Swahili for your entire response.';
+          break;
+        case 'SV':
+          languageInstruction =
+              'IMPORTANT: Respond in SWEDISH language. Use Swedish for your entire response.';
+          break;
+        case 'TL':
+          languageInstruction =
+              'IMPORTANT: Respond in TAGALOG language. Use Tagalog for your entire response.';
+          break;
+        case 'TE':
+          languageInstruction =
+              'IMPORTANT: Respond in TELUGU language. Use Telugu script for your entire response.';
+          break;
+        case 'TW':
+          languageInstruction =
+              'IMPORTANT: Respond in TWI language. Use Twi for your entire response.';
+          break;
+        case 'UK':
+          languageInstruction =
+              'IMPORTANT: Respond in UKRAINIAN language. Use Ukrainian for your entire response.';
+          break;
+        case 'UR':
+          languageInstruction =
+              'IMPORTANT: Respond in URDU language. Use Urdu script for your entire response.';
+          break;
+        case 'VI':
+          languageInstruction =
+              'IMPORTANT: Respond in VIETNAMESE language. Use Vietnamese for your entire response.';
+          break;
+        case 'YO':
+          languageInstruction =
+              'IMPORTANT: Respond in YORUBA language. Use Yoruba for your entire response.';
+          break;
+        case 'ZU':
+          languageInstruction =
+              'IMPORTANT: Respond in ZULU language. Use Zulu for your entire response.';
           break;
         default: // EN
           languageInstruction = 'IMPORTANT: Respond in ENGLISH language.';
@@ -822,6 +1116,51 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     }
   }
 
+  /// Show interstitial for unsubscribed users then pop. Call when user taps Back to leave the screen.
+  /// Guarded so only one interstitial shows per leave (no repeated triggers).
+  Future<void> _maybeShowInterstitialAndPop() async {
+    if (_isClosingWithAd) {
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
+    _isClosingWithAd = true;
+    final downloadProvider =
+        Provider.of<DownloadProvider>(context, listen: false);
+    final subscriptionPlan = await downloadProvider.getSubscriptionPlan();
+    final isSubscribed = subscriptionPlan != null &&
+        subscriptionPlan.isNotEmpty &&
+        ['platinum', 'gold', 'silver']
+            .contains(subscriptionPlan.toLowerCase());
+    if (!isSubscribed) {
+      try {
+        // Show back interstitial at most once every 3 minutes (shared with Chat)
+        final lastStr = await SharPreferences.getString(
+            SharPreferences.lastBackInterstitialTime);
+        final now = DateTime.now();
+        final canShowByTime = lastStr == null ||
+            lastStr.isEmpty ||
+            now.difference(DateTime.tryParse(lastStr) ?? now).inMinutes >= 3;
+        if (canShowByTime) {
+          final hasInternet = await InternetConnection().hasInternetAccess;
+          if (hasInternet) {
+            final connectivityResult = await Connectivity().checkConnectivity();
+            final isMobileOnly = connectivityResult
+                    .contains(ConnectivityResult.mobile) &&
+                !connectivityResult.contains(ConnectivityResult.wifi) &&
+                !connectivityResult.contains(ConnectivityResult.ethernet);
+            if (!isMobileOnly) {
+              await _showInterstitialAdAndWait();
+              await SharPreferences.setString(
+                  SharPreferences.lastBackInterstitialTime,
+                  now.toIso8601String());
+            }
+          }
+        }
+      } catch (_) {}
+    }
+    if (mounted) Navigator.of(context).pop();
+  }
+
   // Show interstitial ad and wait for dismissal
   Future<void> _showInterstitialAdAndWait() async {
     final completer = Completer<void>();
@@ -1100,9 +1439,9 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
           }
           return false; // Stay on screen, just clear messages
         }
-        // If on category selection view, close the screen
+        // If on category selection view, close the screen (show interstitial for unsubscribed then pop)
         debugPrint('🔙 BACK BUTTON: System back pressed, closing screen...');
-        Navigator.of(context).pop();
+        await _maybeShowInterstitialAndPop();
         return false;
       },
       child: Scaffold(
@@ -1143,10 +1482,10 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                             }
                             return;
                           }
-                          // If on category selection view, close the screen
+                          // If on category selection view, close the screen (show interstitial for unsubscribed then pop)
                           debugPrint(
                               '🔙 BACK BUTTON: Back arrow pressed, closing screen...');
-                          Navigator.of(context).pop();
+                          await _maybeShowInterstitialAndPop();
                         },
                         icon: Icon(Icons.arrow_back_ios,
                             color: CommanColor.whiteBlack(context), size: 18),
@@ -1563,10 +1902,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                             // Share (same style as Chat screen)
                                             InkWell(
                                               onTap: () async {
-                                                await RatingDialogHelper
-                                                    .showRatingDialogOnFirstShare(
-                                                        context);
-
+                                                // Rating request shown only on 2nd app open (see home_screen), not here
                                                 final screenSize =
                                                     MediaQuery.of(context).size;
                                                 final sharePositionOrigin =
@@ -1643,67 +1979,9 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                           debugPrint(
                               '🔍 AMEN: Tap count = $_amenTapCount / 10');
 
-                          // Check if user is subscribed
-                          final downloadProvider =
-                              Provider.of<DownloadProvider>(context,
-                                  listen: false);
-                          final subscriptionPlan =
-                              await downloadProvider.getSubscriptionPlan();
-                          final isSubscribed = subscriptionPlan != null &&
-                              subscriptionPlan.isNotEmpty &&
-                              ['platinum', 'gold', 'silver']
-                                  .contains(subscriptionPlan.toLowerCase());
+                          // Interstitial ad removed from Amen; shown only when user taps Back (see WillPopScope / app bar back).
 
-                          debugPrint(
-                              '🔍 AMEN: subscriptionPlan=$subscriptionPlan, isSubscribed=$isSubscribed');
-
-                          // Show interstitial ad only for non-subscribed users AND every 10th tap (starting from tap 1)
-                          if (!isSubscribed && _amenTapCount % 10 == 1) {
-                            debugPrint(
-                                '🔍 AMEN: 10th rotation reached (tap 1, 11, 21...)! User not subscribed, showing ad...');
-                            try {
-                              final hasInternet =
-                                  await InternetConnection().hasInternetAccess;
-                              if (hasInternet) {
-                                // Check connection type
-                                final connectivityResult =
-                                    await Connectivity().checkConnectivity();
-                                final isMobileOnly = connectivityResult
-                                        .contains(ConnectivityResult.mobile) &&
-                                    !connectivityResult
-                                        .contains(ConnectivityResult.wifi) &&
-                                    !connectivityResult
-                                        .contains(ConnectivityResult.ethernet);
-
-                                // Show ad if online with wifi/ethernet
-                                if (!isMobileOnly) {
-                                  debugPrint(
-                                      '🔍 AMEN: Attempting to show ad...');
-                                  try {
-                                    await _showInterstitialAdAndWait();
-                                    debugPrint(
-                                        '🔍 AMEN: Ad shown successfully');
-                                  } catch (e) {
-                                    debugPrint('❌ AMEN: Error showing ad: $e');
-                                  }
-                                } else {
-                                  debugPrint(
-                                      '🔍 AMEN: Skipping ad (mobile-only connection)');
-                                }
-                              }
-                            } catch (e) {
-                              debugPrint(
-                                  'Error checking subscription/internet: $e');
-                            }
-                          } else if (!isSubscribed) {
-                            debugPrint(
-                                '🔍 AMEN: Skipping ad (not 10th tap yet)');
-                          } else {
-                            debugPrint(
-                                '🔍 AMEN: Skipping ad (user is subscribed)');
-                          }
-
-                          // Show Amen message after ad (or immediately if no ad)
+                          // Show Amen message
                           // Only show once per AI response. Determine latest AI response index.
                           int latestAiIndex = -1;
                           for (int idx = _messages.length - 1;
