@@ -11,6 +11,7 @@ import 'package:biblebookapp/view/screens/notification_info_screen.dart';
 import 'package:biblebookapp/view/screens/onboarding_guidance_screen.dart';
 import 'package:biblebookapp/view/screens/welcome_screen.dart';
 import 'package:biblebookapp/view/widget/adhelper.dart';
+import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:flutter/material.dart';
@@ -120,13 +121,16 @@ Future<void> main() async {
 
   await MobileAds.instance.initialize();
   RewardedAdService();
-  
+
   // Initialize Statsig
   await StatsigService.initialize();
 
   // Start background API loading immediately (non-blocking)
   // This will load APIs while user goes through onboarding
   BackgroundApiService().startBackgroundLoading();
+
+  // Load chat/Prayer language so Prayer Guidance and Chat reflect app language
+  await AppApiConstant.loadChatLanguage();
 
   runApp(
     hooks.ProviderScope(
@@ -156,7 +160,6 @@ configLoading() {
     ..textColor = Colors.white
     ..maskColor = Colors.white
     ..indicatorColor = Colors.white
-
     ..userInteractions = false
     ..dismissOnTap = true;
 }
@@ -281,7 +284,7 @@ class MyApp extends StatelessWidget {
           themeMode: themeProvider.themeMode,
           theme: MyThemes.lightTheme(context, themeProvider.backgroundColor),
           darkTheme: MyThemes.darkTheme(context),
-            home:  SplashScreen(),
+          home: SplashScreen(),
           builder: EasyLoading.init(),
         );
       },

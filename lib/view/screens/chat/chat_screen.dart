@@ -101,6 +101,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _currentConversationId = _generateConversationId();
     }
     _loadChatHistory();
+    // Refresh chat language so AI suggestions and UI reflect app language
+    AppApiConstant.loadChatLanguage().then((_) {
+      if (mounted) setState(() {});
+    });
     // Track Geneva Bible Chat event
     StatsigService.trackGenevaBibleChat();
     _showChatIntroIfNeeded();
@@ -2371,7 +2375,8 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                                                   milliseconds:
                                                                       300),
                                                         )?.then((result) {
-                                                          if (result == true) _loadRecentConversations();
+                                                          if (result == true)
+                                                            _loadRecentConversations();
                                                         });
                                                       },
                                                     ),
@@ -2490,7 +2495,8 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                                                   milliseconds:
                                                                       300),
                                                         )?.then((result) {
-                                                          if (result == true) _loadRecentConversations();
+                                                          if (result == true)
+                                                            _loadRecentConversations();
                                                         });
                                                       },
                                                     ),

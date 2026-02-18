@@ -242,6 +242,10 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
           languageInstruction =
               'IMPORTANT: Respond in TAMIL language. Use Tamil script for your entire response.';
           break;
+        case 'PT':
+          languageInstruction =
+              'IMPORTANT: Respond in PORTUGUESE language. Use Portuguese for your entire response.';
+          break;
         default: // EN
           languageInstruction = 'IMPORTANT: Respond in ENGLISH language.';
       }
@@ -478,6 +482,10 @@ ${category.prompt}
           languageInstruction =
               'IMPORTANT: Respond in TAMIL language. Use Tamil script for your entire response.';
           break;
+        case 'PT':
+          languageInstruction =
+              'IMPORTANT: Respond in PORTUGUESE language. Use Portuguese for your entire response.';
+          break;
         default: // EN
           languageInstruction = 'IMPORTANT: Respond in ENGLISH language.';
       }
@@ -708,6 +716,11 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
 
     // Load interstitial ad for AMEN button
     _loadInterstitialAd();
+
+    // Refresh chat language so UI reflects app language
+    AppApiConstant.loadChatLanguage().then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   // Load interstitial ad
@@ -1183,25 +1196,21 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                           children: [
                             // Fixed header: subtext stays visible when scrolling
                             Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
                               child: Column(
                                 children: [
                                   const SizedBox(height: 2),
                                   Padding(
-                                    padding: const EdgeInsets.only(
-                                        bottom: 20),
+                                    padding: const EdgeInsets.only(bottom: 20),
                                     child: Text(
-                                      ChatTranslations.get(
-                                          'get_guidance_need',
+                                      ChatTranslations.get('get_guidance_need',
                                           AppApiConstant.chatLanguage),
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
-                                        color: CommanColor.whiteBlack(
-                                                context)
+                                        color: CommanColor.whiteBlack(context)
                                             .withOpacity(0.5),
-                                        fontSize:
-                                            size.width > 450 ? 16 : 15,
+                                        fontSize: size.width > 450 ? 16 : 15,
                                       ),
                                     ),
                                   ),
@@ -1212,192 +1221,214 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                             Expanded(
                               child: SingleChildScrollView(
                                 controller: _scrollController,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
                                 child: Column(
                                   children: [
                                     GridView.builder(
                                       shrinkWrap: true,
                                       physics:
                                           const NeverScrollableScrollPhysics(),
-                                gridDelegate:
-                                    SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  crossAxisSpacing: size.width > 450 ? 16 : 12,
-                                  mainAxisSpacing: size.width > 450 ? 16 : 12,
-                                  childAspectRatio:
-                                      size.width > 450 ? 1.4 : 1.3,
-                                ),
-                                itemCount: _categories.length + 1,
-                                itemBuilder: (context, index) {
-                                  // Check if this is the Custom Prayer card (first item)
-                                  if (index == 0) {
-                                    // Custom Prayer card
-                                    final paperColor = isDark
-                                        ? const Color(0xFF8B6F47)
-                                        : const Color(0xFFD4A574);
+                                      gridDelegate:
+                                          SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 2,
+                                        crossAxisSpacing:
+                                            size.width > 450 ? 16 : 12,
+                                        mainAxisSpacing:
+                                            size.width > 450 ? 16 : 12,
+                                        childAspectRatio:
+                                            size.width > 450 ? 1.4 : 1.3,
+                                      ),
+                                      itemCount: _categories.length + 1,
+                                      itemBuilder: (context, index) {
+                                        // Check if this is the Custom Prayer card (first item)
+                                        if (index == 0) {
+                                          // Custom Prayer card
+                                          final paperColor = isDark
+                                              ? const Color(0xFF8B6F47)
+                                              : const Color(0xFFD4A574);
 
-                                    return InkWell(
-                                      onTap: () {
-                                        _showCustomPrayerDialog(context);
-                                      },
-                                      borderRadius: BorderRadius.circular(20),
-                                      child: Container(
-                                        padding: EdgeInsets.symmetric(
-                                          horizontal:
-                                              size.width > 450 ? 16 : 12,
-                                          vertical: size.width > 450 ? 24 : 20,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: paperColor,
-                                          borderRadius:
-                                              BorderRadius.circular(20),
-                                          border: Border.all(
-                                            color: isDark
-                                                ? const Color(0xFF6B5638)
-                                                : const Color(0xFFB8956A),
-                                            width: 1.5,
-                                          ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black
-                                                  .withOpacity(0.15),
-                                              blurRadius: 8,
-                                              offset: const Offset(0, 3),
-                                              spreadRadius: 0,
-                                            ),
-                                          ],
-                                        ),
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              Icons.edit_note,
-                                              size: size.width > 450 ? 32 : 28,
-                                              color: isDark
-                                                  ? Colors.white
-                                                  : const Color(0xFF5C4033),
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Text(
-                                              ChatTranslations.get(
-                                                  'custom_prayer',
-                                                  AppApiConstant.chatLanguage),
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w700,
-                                                fontSize:
-                                                    size.width > 450 ? 17 : 15,
-                                                color: isDark
-                                                    ? Colors.white
-                                                    : const Color(0xFF5C4033),
+                                          return InkWell(
+                                            onTap: () {
+                                              _showCustomPrayerDialog(context);
+                                            },
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                            child: Container(
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal:
+                                                    size.width > 450 ? 16 : 12,
+                                                vertical:
+                                                    size.width > 450 ? 24 : 20,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: paperColor,
+                                                borderRadius:
+                                                    BorderRadius.circular(20),
+                                                border: Border.all(
+                                                  color: isDark
+                                                      ? const Color(0xFF6B5638)
+                                                      : const Color(0xFFB8956A),
+                                                  width: 1.5,
+                                                ),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black
+                                                        .withOpacity(0.15),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 3),
+                                                    spreadRadius: 0,
+                                                  ),
+                                                ],
+                                              ),
+                                              child: Column(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  Icon(
+                                                    Icons.edit_note,
+                                                    size: size.width > 450
+                                                        ? 32
+                                                        : 28,
+                                                    color: isDark
+                                                        ? Colors.white
+                                                        : const Color(
+                                                            0xFF5C4033),
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  Text(
+                                                    ChatTranslations.get(
+                                                        'custom_prayer',
+                                                        AppApiConstant
+                                                            .chatLanguage),
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      fontSize: size.width > 450
+                                                          ? 17
+                                                          : 15,
+                                                      color: isDark
+                                                          ? Colors.white
+                                                          : const Color(
+                                                              0xFF5C4033),
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  }
+                                          );
+                                        }
 
-                                  // Regular category cards (adjust index since Custom Prayer is at 0)
-                                  final categoryIndex = index - 1;
-                                  // Get icon for each category
-                                  IconData categoryIcon;
+                                        // Regular category cards (adjust index since Custom Prayer is at 0)
+                                        final categoryIndex = index - 1;
+                                        // Get icon for each category
+                                        IconData categoryIcon;
 
-                                  switch (categoryIndex % 9) {
-                                    case 0: // Thanksgiving
-                                      categoryIcon = Icons.celebration;
-                                      break;
-                                    case 1: // Forgiving
-                                      categoryIcon = Icons.favorite;
-                                      break;
-                                    case 2: // Guidance
-                                      categoryIcon = Icons.lightbulb;
-                                      break;
-                                    case 3: // Anxiety & Peace
-                                      categoryIcon = Icons.self_improvement;
-                                      break;
-                                    case 4: // Healing
-                                      categoryIcon = Icons.healing;
-                                      break;
-                                    case 5: // Family
-                                      categoryIcon = Icons.family_restroom;
-                                      break;
-                                    case 6: // Strength
-                                      categoryIcon = Icons.fitness_center;
-                                      break;
-                                    case 7: // Protection
-                                      categoryIcon = Icons.shield;
-                                      break;
-                                    default: // Feelings
-                                      categoryIcon = Icons.mood;
-                                      break;
-                                  }
+                                        switch (categoryIndex % 9) {
+                                          case 0: // Thanksgiving
+                                            categoryIcon = Icons.celebration;
+                                            break;
+                                          case 1: // Forgiving
+                                            categoryIcon = Icons.favorite;
+                                            break;
+                                          case 2: // Guidance
+                                            categoryIcon = Icons.lightbulb;
+                                            break;
+                                          case 3: // Anxiety & Peace
+                                            categoryIcon =
+                                                Icons.self_improvement;
+                                            break;
+                                          case 4: // Healing
+                                            categoryIcon = Icons.healing;
+                                            break;
+                                          case 5: // Family
+                                            categoryIcon =
+                                                Icons.family_restroom;
+                                            break;
+                                          case 6: // Strength
+                                            categoryIcon = Icons.fitness_center;
+                                            break;
+                                          case 7: // Protection
+                                            categoryIcon = Icons.shield;
+                                            break;
+                                          default: // Feelings
+                                            categoryIcon = Icons.mood;
+                                            break;
+                                        }
 
-                                  // Old paper/brown color
-                                  final paperColor = isDark
-                                      ? const Color(0xFF8B6F47)
-                                      : const Color(0xFFD4A574);
+                                        // Old paper/brown color
+                                        final paperColor = isDark
+                                            ? const Color(0xFF8B6F47)
+                                            : const Color(0xFFD4A574);
 
-                                  return InkWell(
-                                    onTap: () {
-                                      _sendPrayerRequest(categoryIndex);
-                                    },
-                                    borderRadius: BorderRadius.circular(20),
-                                    child: Container(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: size.width > 450 ? 16 : 12,
-                                        vertical: size.width > 450 ? 24 : 20,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: paperColor,
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(
-                                          color: isDark
-                                              ? const Color(0xFF6B5638)
-                                              : const Color(0xFFB8956A),
-                                          width: 1.5,
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color:
-                                                Colors.black.withOpacity(0.15),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 3),
-                                            spreadRadius: 0,
-                                          ),
-                                        ],
-                                      ),
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            categoryIcon,
-                                            size: size.width > 450 ? 32 : 28,
-                                            color: isDark
-                                                ? Colors.white
-                                                : const Color(0xFF5C4033),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            _categories[categoryIndex].title,
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              fontSize:
-                                                  size.width > 450 ? 17 : 15,
-                                              color: isDark
-                                                  ? Colors.white
-                                                  : const Color(0xFF5C4033),
+                                        return InkWell(
+                                          onTap: () {
+                                            _sendPrayerRequest(categoryIndex);
+                                          },
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                          child: Container(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal:
+                                                  size.width > 450 ? 16 : 12,
+                                              vertical:
+                                                  size.width > 450 ? 24 : 20,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: paperColor,
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                              border: Border.all(
+                                                color: isDark
+                                                    ? const Color(0xFF6B5638)
+                                                    : const Color(0xFFB8956A),
+                                                width: 1.5,
+                                              ),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black
+                                                      .withOpacity(0.15),
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 3),
+                                                  spreadRadius: 0,
+                                                ),
+                                              ],
+                                            ),
+                                            child: Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  categoryIcon,
+                                                  size: size.width > 450
+                                                      ? 32
+                                                      : 28,
+                                                  color: isDark
+                                                      ? Colors.white
+                                                      : const Color(0xFF5C4033),
+                                                ),
+                                                const SizedBox(height: 8),
+                                                Text(
+                                                  _categories[categoryIndex]
+                                                      .title,
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: size.width > 450
+                                                        ? 17
+                                                        : 15,
+                                                    color: isDark
+                                                        ? Colors.white
+                                                        : const Color(
+                                                            0xFF5C4033),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
+                                        );
+                                      },
                                     ),
                                     const SizedBox(height: 20),
                                   ],

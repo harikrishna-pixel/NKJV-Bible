@@ -64,6 +64,8 @@ class SharPreferences {
       'prayerAmenAdCounter'; // Counter for AMEN ad rotation (every 10 taps)
   static const verseOfDayAmenMessageIndex = 'verseOfDayAmenMessageIndex';
   static const markAsReadMessageIndex = 'markAsReadMessageIndex';
+  static const chatLanguage =
+      'chatLanguage'; // EN, HI, TN - for Prayer Guidance & Chat
 
   static Future<bool?> getBoolean(String key) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();

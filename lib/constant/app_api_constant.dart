@@ -1,3 +1,5 @@
+import 'package:biblebookapp/view/constants/share_preferences.dart';
+
 class AppApiConstant {
   static const appdata =
       "https://bibleoffice.com/BibleReplications/dev/v1/API/getAppInfo.php";
@@ -16,7 +18,16 @@ class AppApiConstant {
   static const bookofferapi =
       "https://saveigm.com/bookads/admin/api/book/book_list_by_cat";
 
-  // Language code for chat responses (e.g., 'TN' for Tamil, 'EN' for English, 'HI' for Hindi)
-  // Change this value to switch the entire chat screen language
-  static const String chatLanguage = "EN"; // Set to "EN", "HI", or "TN"
+  // Language code for chat/Prayer (EN, HI, TN). Loaded from SharedPreferences so app language reflects here.
+  static String chatLanguage = "EN";
+
+  static Future<void> loadChatLanguage() async {
+    try {
+      final lang =
+          await SharPreferences.getString(SharPreferences.chatLanguage);
+      if (lang != null && lang.isNotEmpty) {
+        chatLanguage = lang;
+      }
+    } catch (_) {}
+  }
 }
