@@ -1286,7 +1286,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
         ));
       }
 
-      // Add clickable verse reference
+      // Add verse reference (underlined, no navigation)
       final verseRef = match.group(0)!;
       spans.add(TextSpan(
         text: verseRef,
@@ -1295,99 +1295,10 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
               ? Colors.white
               : (isDark ? const Color(0xFF64B5F6) : const Color(0xFF1976D2)),
           decoration: TextDecoration.underline,
+          decorationThickness: 2,
+          decorationStyle: TextDecorationStyle.solid,
           fontWeight: FontWeight.w600,
         ),
-        recognizer: TapGestureRecognizer()
-          ..onTap = () async {
-            // Navigate to verse screen
-            final verseData = _parseVerseReference(verseRef);
-            if (verseData == null) {
-              Constants.showToast("Unable to parse verse reference");
-              return;
-            }
-
-            final bookName = verseData['bookName'] as String;
-            final chapter = verseData['chapter'] as int;
-            final verse = verseData['verse'] as int;
-
-            // Get book number from database using book name
-            int? bookNum;
-            try {
-              final db = await DBHelper().db;
-              if (db != null) {
-                // Try exact match first
-                var result = await db.rawQuery(
-                  "SELECT book_num FROM book WHERE title = ? LIMIT 1",
-                  [bookName],
-                );
-
-                // If no exact match, try case-insensitive search
-                if (result.isEmpty) {
-                  result = await db.rawQuery(
-                    "SELECT book_num FROM book WHERE LOWER(title) = LOWER(?) LIMIT 1",
-                    [bookName],
-                  );
-                }
-
-                // Try short_title
-                if (result.isEmpty) {
-                  result = await db.rawQuery(
-                    "SELECT book_num FROM book WHERE LOWER(short_title) = LOWER(?) LIMIT 1",
-                    [bookName],
-                  );
-                }
-
-                // Try singular/plural variants
-                if (result.isEmpty) {
-                  final altName = bookName.endsWith('s')
-                      ? bookName.substring(0, bookName.length - 1)
-                      : '${bookName}s';
-                  result = await db.rawQuery(
-                    "SELECT book_num FROM book WHERE LOWER(title) = LOWER(?) OR LOWER(short_title) = LOWER(?) LIMIT 1",
-                    [altName, altName],
-                  );
-                }
-
-                if (result.isNotEmpty) {
-                  bookNum = int.tryParse(result[0]['book_num'].toString());
-                }
-              }
-            } catch (e) {
-              debugPrint('Error getting book number: $e');
-            }
-
-            if (bookNum == null) {
-              Constants.showToast("Book not found in database");
-              return;
-            }
-
-            // Save selected book and book number
-            await SharPreferences.setString(
-              SharPreferences.selectedBook,
-              bookName,
-            );
-            await SharPreferences.setString(
-              SharPreferences.selectedBookNum,
-              bookNum.toString(),
-            );
-            await SharPreferences.setString(
-              SharPreferences.selectedChapter,
-              chapter.toString(),
-            );
-
-            // Stop prayer audio when navigating to Reading screen so only one audio plays
-            await _audioPlayer.stop();
-
-            // Navigate to HomeScreen with verse details
-            Get.to(() => HomeScreen(
-                  From: "prayer",
-                  selectedVerseNumForRead: verse.toString(),
-                  selectedBookForRead: bookNum.toString(),
-                  selectedChapterForRead: chapter.toString(),
-                  selectedBookNameForRead: bookName,
-                  selectedVerseForRead: "",
-                ));
-          },
       ));
 
       lastMatchEnd = match.end;

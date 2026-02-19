@@ -310,7 +310,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                               .symmetric(vertical: 8),
                                           decoration: BoxDecoration(
                                             color: CommanColor
-                                                .whiteLightModePrimary(ctx),
+                                                .lightDarkPrimary(ctx),
                                             borderRadius:
                                                 const BorderRadius.all(
                                                     Radius.circular(5)),
@@ -330,8 +330,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                                   BibleInfo.fontSizeScale *
                                                       14,
                                               fontWeight: FontWeight.w500,
-                                              color: CommanColor
-                                                  .darkModePrimaryWhite(ctx),
+                                              color: Colors.white,
                                             ),
                                           ),
                                         ),

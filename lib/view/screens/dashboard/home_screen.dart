@@ -5209,7 +5209,7 @@ class _HomeScreenState extends State<HomeScreen>
                                                       vertical: 8),
                                               decoration: BoxDecoration(
                                                 color: CommanColor
-                                                    .whiteLightModePrimary(ctx),
+                                                    .lightDarkPrimary(ctx),
                                                 borderRadius:
                                                     const BorderRadius.all(
                                                         Radius.circular(5)),
@@ -5229,9 +5229,7 @@ class _HomeScreenState extends State<HomeScreen>
                                                       BibleInfo.fontSizeScale *
                                                           14,
                                                   fontWeight: FontWeight.w500,
-                                                  color: CommanColor
-                                                      .darkModePrimaryWhite(
-                                                          ctx),
+                                                  color: Colors.white,
                                                 ),
                                               ),
                                             ),

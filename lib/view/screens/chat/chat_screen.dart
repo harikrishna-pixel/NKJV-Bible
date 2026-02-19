@@ -4046,17 +4046,21 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
               debugPrint('Error getting book number: $e');
             }
 
+            if (bookNum == null) {
+              Constants.showToast(
+                  'Verse not found. Please check it manually in the reading screen');
+              return;
+            }
+
             // Save selected book and book number
             await SharPreferences.setString(
               SharPreferences.selectedBook,
               bookName,
             );
-            if (bookNum != null) {
-              await SharPreferences.setString(
-                SharPreferences.selectedBookNum,
-                bookNum.toString(),
-              );
-            }
+            await SharPreferences.setString(
+              SharPreferences.selectedBookNum,
+              bookNum.toString(),
+            );
             await SharPreferences.setString(
               SharPreferences.selectedChapter,
               chapter.toString(),
@@ -4066,7 +4070,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
             Get.to(() => HomeScreen(
                   From: "chat",
                   selectedVerseNumForRead: verse.toString(),
-                  selectedBookForRead: bookNum?.toString() ?? "",
+                  selectedBookForRead: bookNum.toString(),
                   selectedChapterForRead: chapter.toString(),
                   selectedBookNameForRead: bookName,
                   selectedVerseForRead: "",
@@ -4084,6 +4088,8 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
               ? FontWeight.w700
               : FontWeight.w600, // Bolder in dark mode for better visibility
           decoration: TextDecoration.underline,
+          decorationThickness: 2,
+          decorationStyle: TextDecorationStyle.solid,
         ),
         recognizer: recognizer,
       ));

@@ -663,7 +663,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                                         decoration:
                                                             BoxDecoration(
                                                           color: CommanColor
-                                                              .whiteLightModePrimary(
+                                                              .lightDarkPrimary(
                                                                   ctx),
                                                           borderRadius:
                                                               const BorderRadius
@@ -690,9 +690,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                                             fontWeight:
                                                                 FontWeight
                                                                     .w500,
-                                                            color: CommanColor
-                                                                .darkModePrimaryWhite(
-                                                                    ctx),
+                                                            color: Colors.white,
                                                           ),
                                                         ),
                                                       ),

@@ -551,6 +551,8 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
           height: 1.4,
           fontWeight: FontWeight.w600,
           decoration: TextDecoration.underline,
+          decorationThickness: 2,
+          decorationStyle: TextDecorationStyle.solid,
         ),
       ));
       
@@ -972,6 +974,8 @@ class _ConversationBottomSheetState extends State<_ConversationBottomSheet> {
           height: 1.4,
           fontWeight: FontWeight.w600,
           decoration: TextDecoration.underline,
+          decorationThickness: 2,
+          decorationStyle: TextDecorationStyle.solid,
         ),
       ));
       

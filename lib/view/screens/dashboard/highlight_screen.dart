@@ -459,10 +459,12 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                                 'book': data
                                                                     .bookName
                                                                     .toString(),
-                                                                'chapter':
-                                                                    '${int.parse(data.chapterNum.toString()) + 1}',
-                                                                'verse':
-                                                                    '${int.parse(data.verseNum.toString()) + 1}',
+                                                                'chapter': data
+                                                                    .chapterNum
+                                                                    .toString(),
+                                                                'verse': data
+                                                                    .verseNum
+                                                                    .toString(),
                                                               },
                                                             ),
                                                             transition:
@@ -1068,10 +1070,12 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                               '',
                                                           'book': data.bookName
                                                               .toString(),
-                                                          'chapter':
-                                                              '${int.parse(data.chapterNum.toString()) + 1}',
-                                                          'verse':
-                                                              '${int.parse(data.verseNum.toString()) + 1}',
+                                                          'chapter': data
+                                                              .chapterNum
+                                                              .toString(),
+                                                          'verse': data
+                                                              .verseNum
+                                                              .toString(),
                                                         },
                                                       ),
                                                       transition: Transition
