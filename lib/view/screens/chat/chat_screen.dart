@@ -867,6 +867,72 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     await _checkAndHandlePermissionIssue();
   }
 
+  void _showPleaseNoteDialog() {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDark = themeProvider.themeMode == ThemeMode.dark;
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: isDark
+            ? CommanColor.darkPrimaryColor
+            : CommanColor.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Please Note',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: CommanColor.whiteBlack(ctx),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "This chat is here for spiritual encouragement and support, not for professional counseling or medical advice. If you're facing a mental, emotional, or medical crisis, consider seeking help from a licensed professional or appropriate support network.",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark
+                      ? Colors.white70
+                      : Colors.grey.shade700,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 20),
+              GestureDetector(
+                onTap: () => Navigator.pop(ctx),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: CommanColor.lightDarkPrimary(ctx),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'OK',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showMicrophonePermissionDialog() {
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth > 600;
@@ -2610,6 +2676,20 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                           : const Color(0xFF8D6E63),
                                     ),
                                   ),
+                                SizedBox(width: screenWidth > 450 ? 6 : 4),
+                                IconButton(
+                                  onPressed: () => _showPleaseNoteDialog(),
+                                  icon: Icon(
+                                    Icons.info_outline_rounded,
+                                    size: screenWidth > 450 ? 22 : 20,
+                                    color: isDark
+                                        ? Colors.white
+                                        : const Color(0xFF8D6E63),
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  tooltip: 'Please Note',
+                                ),
                               ],
                             ),
                           ),

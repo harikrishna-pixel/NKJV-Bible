@@ -127,6 +127,72 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
           ))
       .toList();
 
+  void _showPleaseNoteDialog() {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDark = themeProvider.themeMode == ThemeMode.dark;
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: isDark
+            ? CommanColor.darkPrimaryColor
+            : CommanColor.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Please Note',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: CommanColor.whiteBlack(ctx),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "This chat is here for spiritual encouragement and support, not for professional counseling or medical advice. If you're facing a mental, emotional, or medical crisis, consider seeking help from a licensed professional or appropriate support network.",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark
+                      ? Colors.white70
+                      : Colors.grey.shade700,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 20),
+              GestureDetector(
+                onTap: () => Navigator.pop(ctx),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: CommanColor.lightDarkPrimary(ctx),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'OK',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // Show insufficient credits toast with "Add Credits" button
   void _showInsufficientCreditsDialog() {
     // Show a styled snackbar with action button
@@ -1415,9 +1481,22 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                           ),
                         ),
                       ),
-                      // Audio ON/OFF toggle or placeholder for balance
-                      _messages.isNotEmpty
-                          ? Container(
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            onPressed: _showPleaseNoteDialog,
+                            icon: Icon(
+                              Icons.info_outline_rounded,
+                              color: CommanColor.whiteBlack(context),
+                              size: 22,
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            tooltip: 'Please Note',
+                          ),
+                          if (_messages.isNotEmpty)
+                            Container(
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: Colors.grey.withOpacity(0.2),
@@ -1435,7 +1514,10 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                     _isAudioMuted ? 'Audio Off' : 'Audio On',
                               ),
                             )
-                          : const SizedBox(width: 48, height: 48),
+                          else
+                            const SizedBox(width: 24, height: 48),
+                        ],
+                      ),
                     ],
                   ),
                 ),

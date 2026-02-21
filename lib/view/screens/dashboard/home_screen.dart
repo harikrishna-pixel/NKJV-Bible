@@ -1119,7 +1119,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _refreshExitOfferCooldown() async {
-    // Red dot: show only after 5 days since first paywall view, and at most once per 20 days (then 10 min window)
+    // Red dot: show only after 3 days since first paywall view, and at most once per 20 days (then 10 min window)
     bool show = false;
     final firstSeenStr =
         await SharPreferences.getString('paywall_first_seen_date');
@@ -1132,12 +1132,12 @@ class _HomeScreenState extends State<HomeScreen>
         return;
       }
       final firstSeen = DateTime.parse(firstSeenStr);
-      if (now.difference(firstSeen).inDays < 5) {
-        // Before 5 days → never show dot
+      if (now.difference(firstSeen).inDays < 3) {
+        // Before 3 days → never show dot
         if (mounted) setState(() => _exitOfferCooldownActive = false);
         return;
       }
-      // After 5 days: show dot only if (a) never shown, or (b) 20+ days since last shown, or (c) same cycle and within 10 min
+      // After 3 days: show dot only if (a) never shown, or (b) 20+ days since last shown, or (c) same cycle and within 10 min
       if (exitOfferShownTime == null || exitOfferShownTime.isEmpty) {
         show = true;
       } else {
