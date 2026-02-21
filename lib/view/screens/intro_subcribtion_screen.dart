@@ -48,6 +48,26 @@ class SubscriptionScreen extends StatefulWidget {
     this.fromHomeExitOffer = false,
   });
 
+  /// Navigate to paywall from home (direct, no exit offer).
+  static Future<void> navigateToPaywallFromHome(BuildContext context) async {
+    final sixMonthPlan = await SharPreferences.getString('sixMonthPlan') ??
+        BibleInfo.sixMonthPlanid;
+    final oneYearPlan = await SharPreferences.getString('oneYearPlan') ??
+        BibleInfo.oneYearPlanid;
+    final lifeTimePlan = await SharPreferences.getString('lifeTimePlan') ??
+        BibleInfo.lifeTimePlanid;
+    Get.to(
+      () => SubscriptionScreen(
+        sixMonthPlan: sixMonthPlan,
+        oneYearPlan: oneYearPlan,
+        lifeTimePlan: lifeTimePlan,
+        checkad: 'home',
+      ),
+      transition: Transition.cupertinoDialog,
+      duration: const Duration(milliseconds: 300),
+    );
+  }
+
   /// Public entry point to show the exit offer from Home.
   /// Forwards to the state helper while keeping existing logic intact.
   static Future<void> showExitOfferFromHomeScreen(
@@ -416,26 +436,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     }
   }
 
-  /// Navigate to paywall from home (no exit offer).
-  static Future<void> _navigateToPaywallFromHome(BuildContext context) async {
-    final sixMonthPlan = await SharPreferences.getString('sixMonthPlan') ??
-        BibleInfo.sixMonthPlanid;
-    final oneYearPlan = await SharPreferences.getString('oneYearPlan') ??
-        BibleInfo.oneYearPlanid;
-    final lifeTimePlan = await SharPreferences.getString('lifeTimePlan') ??
-        BibleInfo.lifeTimePlanid;
-    Get.to(
-      () => SubscriptionScreen(
-        sixMonthPlan: sixMonthPlan,
-        oneYearPlan: oneYearPlan,
-        lifeTimePlan: lifeTimePlan,
-        checkad: 'home',
-      ),
-      transition: Transition.cupertinoDialog,
-      duration: const Duration(milliseconds: 300),
-    );
-  }
-
   /// Show exit offer from home screen (checking 10 minute limit).
   /// Exit offer only after 5 days since first paywall view; before that, just open paywall.
   /// When not expired: show exit offer in bottom sheet on Home; Unlock -> IAP, Maybe later -> close.
@@ -452,17 +452,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       final paywallFirstSeenStr =
           await SharPreferences.getString('paywall_first_seen_date');
       if (paywallFirstSeenStr == null || paywallFirstSeenStr.isEmpty) {
-        await _navigateToPaywallFromHome(context);
+        await SubscriptionScreen.navigateToPaywallFromHome(context);
         return;
       }
       try {
         final firstSeen = DateTime.parse(paywallFirstSeenStr);
         if (DateTime.now().difference(firstSeen).inDays < 3) {
-          await _navigateToPaywallFromHome(context);
+          await SubscriptionScreen.navigateToPaywallFromHome(context);
           return;
         }
       } catch (_) {
-        await _navigateToPaywallFromHome(context);
+        await SubscriptionScreen.navigateToPaywallFromHome(context);
         return;
       }
 
@@ -2057,8 +2057,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
 
-        // Check for exit offer before navigating away
-        await _checkAndShowExitOfferBeforeClose(controller);
+        _navigateAwayFromPaywall();
       },
       child: Scaffold(
         body: Container(
@@ -2323,8 +2322,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       const SizedBox(height: 5),
                       TextButton(
                         onPressed: () async {
-                          // Check for exit offer before navigating away
-                          await _checkAndShowExitOfferBeforeClose(controller);
+                          _navigateAwayFromPaywall();
                         },
                         child: Text(
                           "Continue Free Version",
@@ -2403,8 +2401,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                       onPressed: () async {
-                        // Check for exit offer before navigating away
-                        await _checkAndShowExitOfferBeforeClose(controller);
+                        _navigateAwayFromPaywall();
                       },
                     ),
                   ),

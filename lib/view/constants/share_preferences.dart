@@ -66,6 +66,7 @@ class SharPreferences {
   static const markAsReadMessageIndex = 'markAsReadMessageIndex';
   static const chatLanguage =
       'chatLanguage'; // EN, HI, TN - for Prayer Guidance & Chat
+  static const aiDisclaimerAgreed = 'aiDisclaimerAgreed'; // User agreed to AI disclaimer
   /// Last time back interstitial was shown (Chat or Prayer). Used to limit to once per 3 minutes.
   static const lastBackInterstitialTime = 'lastBackInterstitialTime';
 

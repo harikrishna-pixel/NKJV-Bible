@@ -1082,14 +1082,11 @@ class _HomeScreenState extends State<HomeScreen>
   bool _hasInitialized = false;
   bool _showUI = true; // Track UI visibility for scroll-based hide/show
   BuildContext? _bottomSheetContext; // Track bottom sheet context to dismiss it
-  bool _exitOfferCooldownActive = false; // Dot indicator flag
-
   // dailyverse
   static const int _targetSeconds =
       15; // Show after 15 seconds on Reading screen (allows app-open ad to show and dismiss first)
   final Stopwatch _stopwatch = Stopwatch();
   Timer? _checkerTimer;
-  Timer? _exitOfferCooldownRefreshTimer; // Refresh red dot so it dismisses after 10 mins
   bool _verseShown = false;
 
   @override
@@ -1106,12 +1103,6 @@ class _HomeScreenState extends State<HomeScreen>
     _hasInitialized = true;
 
     await _loadFontSize();
-    await _refreshExitOfferCooldown();
-
-    // Periodic refresh so red dot dismisses after 10 minutes
-    _exitOfferCooldownRefreshTimer?.cancel();
-    _exitOfferCooldownRefreshTimer = Timer.periodic(
-        const Duration(minutes: 1), (_) => _refreshExitOfferCooldown());
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
 //  await _checkAndShowVerse();
@@ -1122,46 +1113,6 @@ class _HomeScreenState extends State<HomeScreen>
 
     // _initializeAds();
     loadAds();
-  }
-
-  Future<void> _refreshExitOfferCooldown() async {
-    // Red dot: show only after 3 days since first paywall view, and at most once per 20 days (then 10 min window)
-    bool show = false;
-    final firstSeenStr =
-        await SharPreferences.getString('paywall_first_seen_date');
-    final exitOfferShownTime =
-        await SharPreferences.getString('exit_offer_first_shown_time');
-    final now = DateTime.now();
-    try {
-      if (firstSeenStr == null || firstSeenStr.isEmpty) {
-        // No paywall first-seen date: user has not seen paywall yet → never show dot
-        return;
-      }
-      final firstSeen = DateTime.parse(firstSeenStr);
-      if (now.difference(firstSeen).inDays < 3) {
-        // Before 3 days → never show dot
-        if (mounted) setState(() => _exitOfferCooldownActive = false);
-        return;
-      }
-      // After 3 days: show dot only if (a) never shown, or (b) 20+ days since last shown, or (c) same cycle and within 10 min
-      if (exitOfferShownTime == null || exitOfferShownTime.isEmpty) {
-        show = true;
-      } else {
-        final shownAt = DateTime.parse(exitOfferShownTime);
-        final minsSince = now.difference(shownAt).inMinutes;
-        final daysSince = now.difference(shownAt).inDays;
-        if (daysSince >= 20) {
-          show = true; // New 20-day cycle
-        } else if (minsSince < 10) {
-          show = true; // Same cycle, still in 10-min window
-        }
-      }
-    } catch (_) {}
-    if (mounted) {
-      setState(() {
-        _exitOfferCooldownActive = show;
-      });
-    }
   }
 
   Future<void> _handleAppLaunchCount() async {
@@ -2218,8 +2169,6 @@ class _HomeScreenState extends State<HomeScreen>
         state == AppLifecycleState.inactive) {
       _onHidden();
     } else if (state == AppLifecycleState.resumed) {
-      // Refresh red dot so it dismisses after 10 mins when returning from background
-      _refreshExitOfferCooldown();
       // only resume if this route is still current
       if (ModalRoute.of(context)?.isCurrent == true) {
         _onVisible();
@@ -2437,7 +2386,6 @@ class _HomeScreenState extends State<HomeScreen>
     disposead();
     WidgetsBinding.instance.removeObserver(this);
     _checkerTimer?.cancel();
-    _exitOfferCooldownRefreshTimer?.cancel();
     routeObserver.unsubscribe(this);
     super.dispose();
   }
@@ -3159,40 +3107,21 @@ class _HomeScreenState extends State<HomeScreen>
                                               debugPrint(
                                                   "all plans - ${controller.sixMonthPlan} ${controller.oneYearPlan}  ${controller.lifeTimePlan}");
                                               SubscriptionScreen
-                                                  .showExitOfferFromHomeScreen(
-                                                      context, controller);
+                                                  .navigateToPaywallFromHome(
+                                                      context);
                                             } else {
                                               Constants.showToast(
                                                   "Check your Internet Connection");
                                             }
                                           },
-                                          child: Stack(
-                                            clipBehavior: Clip.none,
-                                            children: [
-                                              Image.asset(
-                                                'assets/no-ad.png',
-                                                height:
-                                                    screenWidth > 450 ? 40 : 24,
-                                                width:
-                                                    screenWidth > 450 ? 40 : 24,
-                                                color: CommanColor.whiteBlack(
-                                                    context),
-                                              ),
-                                              if (_exitOfferCooldownActive)
-                                                Positioned(
-                                                  right: -2,
-                                                  top: -2,
-                                                  child: Container(
-                                                    width: 10,
-                                                    height: 10,
-                                                    decoration:
-                                                        const BoxDecoration(
-                                                      color: Colors.red,
-                                                      shape: BoxShape.circle,
-                                                    ),
-                                                  ),
-                                                ),
-                                            ],
+                                          child: Image.asset(
+                                            'assets/no-ad.png',
+                                            height:
+                                                screenWidth > 450 ? 40 : 24,
+                                            width:
+                                                screenWidth > 450 ? 40 : 24,
+                                            color: CommanColor.whiteBlack(
+                                                context),
                                           ),
                                         ))
                                 : Visibility(
@@ -3202,33 +3131,15 @@ class _HomeScreenState extends State<HomeScreen>
                                       onTap: () {
                                         adsIcon = false;
                                         SubscriptionScreen
-                                            .showExitOfferFromHomeScreen(
-                                                context, controller);
+                                            .navigateToPaywallFromHome(
+                                                context);
                                       },
-                                      child: Stack(
-                                        clipBehavior: Clip.none,
-                                        children: [
-                                          Image.asset(
-                                            'assets/no-ad.png',
-                                            height: screenWidth > 450 ? 35 : 24,
-                                            width: screenWidth > 450 ? 35 : 24,
-                                            color:
-                                                CommanColor.whiteBlack(context),
-                                          ),
-                                          if (_exitOfferCooldownActive)
-                                            Positioned(
-                                              right: -2,
-                                              top: -2,
-                                              child: Container(
-                                                width: 10,
-                                                height: 10,
-                                                decoration: const BoxDecoration(
-                                                  color: Colors.red,
-                                                  shape: BoxShape.circle,
-                                                ),
-                                              ),
-                                            ),
-                                        ],
+                                      child: Image.asset(
+                                        'assets/no-ad.png',
+                                        height: screenWidth > 450 ? 35 : 24,
+                                        width: screenWidth > 450 ? 35 : 24,
+                                        color:
+                                            CommanColor.whiteBlack(context),
                                       ),
                                     ),
                                   ),

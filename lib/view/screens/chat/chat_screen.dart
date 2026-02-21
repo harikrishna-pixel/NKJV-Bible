@@ -867,70 +867,128 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     await _checkAndHandlePermissionIssue();
   }
 
-  void _showPleaseNoteDialog() {
+  Future<bool> _showPleaseNoteDialog() async {
+    final agreed = await SharPreferences.getBoolean(SharPreferences.aiDisclaimerAgreed);
+    if (agreed == true) return true;
+
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
-    showDialog(
+    bool checkboxChecked = false;
+
+    return await showDialog<bool>(
       context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: isDark
-            ? CommanColor.darkPrimaryColor
-            : CommanColor.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Please Note',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: CommanColor.whiteBlack(ctx),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                "This chat is here for spiritual encouragement and support, not for professional counseling or medical advice. If you're facing a mental, emotional, or medical crisis, consider seeking help from a licensed professional or appropriate support network.",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: isDark
-                      ? Colors.white70
-                      : Colors.grey.shade700,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 20),
-              GestureDetector(
-                onTap: () => Navigator.pop(ctx),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: CommanColor.lightDarkPrimary(ctx),
-                    borderRadius: BorderRadius.circular(8),
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => Dialog(
+          backgroundColor: isDark ? CommanColor.darkPrimaryColor : CommanColor.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Please Note',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: CommanColor.whiteBlack(ctx),
                   ),
-                  child: Text(
-                    'OK',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  "This AI chat is for spiritual encouragement only and is not a substitute for professional medical or counseling advice. If you are in crisis, please seek professional help.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? Colors.white70 : Colors.grey.shade700,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  "To generate responses, the text you enter will be securely sent to a third-party AI service for processing.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? Colors.white70 : Colors.grey.shade700,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  "By continuing, you agree to our Privacy Policy:",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? Colors.white70 : Colors.grey.shade700,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                InkWell(
+                  onTap: () {
+                    setDialogState(() => checkboxChecked = !checkboxChecked);
+                  },
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Icon(
+                        checkboxChecked ? Icons.check_box : Icons.check_box_outline_blank,
+                        size: 24,
+                        color: checkboxChecked
+                            ? CommanColor.lightDarkPrimary(ctx)
+                            : (isDark ? Colors.white70 : Colors.grey.shade600),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          "I agree to the Privacy Policy and AI data processing.",
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: CommanColor.whiteBlack(ctx),
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                GestureDetector(
+                  onTap: checkboxChecked
+                      ? () async {
+                          await SharPreferences.setBoolean(SharPreferences.aiDisclaimerAgreed, true);
+                          if (ctx.mounted) Navigator.pop(ctx, true);
+                        }
+                      : null,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: checkboxChecked
+                          ? CommanColor.lightDarkPrimary(ctx)
+                          : Colors.grey.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Start Chatting',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    );
+    ) ?? false;
   }
 
   void _showMicrophonePermissionDialog() {
@@ -1695,6 +1753,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Future<void> _sendMessage() async {
     final message = _messageController.text.trim();
     if (message.isEmpty || _isLoading) return;
+
+    // Show Please Note dialog before first response (must agree to continue)
+    final agreed = await _showPleaseNoteDialog();
+    if (!agreed || !mounted) return;
 
     // Check internet connection
     final bool isConnected = await InternetConnection().hasInternetAccess;
@@ -2676,20 +2738,6 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                           : const Color(0xFF8D6E63),
                                     ),
                                   ),
-                                SizedBox(width: screenWidth > 450 ? 6 : 4),
-                                IconButton(
-                                  onPressed: () => _showPleaseNoteDialog(),
-                                  icon: Icon(
-                                    Icons.info_outline_rounded,
-                                    size: screenWidth > 450 ? 22 : 20,
-                                    color: isDark
-                                        ? Colors.white
-                                        : const Color(0xFF8D6E63),
-                                  ),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  tooltip: 'Please Note',
-                                ),
                               ],
                             ),
                           ),
