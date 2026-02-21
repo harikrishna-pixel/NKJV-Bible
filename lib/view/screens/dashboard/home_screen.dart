@@ -1089,6 +1089,7 @@ class _HomeScreenState extends State<HomeScreen>
       15; // Show after 15 seconds on Reading screen (allows app-open ad to show and dismiss first)
   final Stopwatch _stopwatch = Stopwatch();
   Timer? _checkerTimer;
+  Timer? _exitOfferCooldownRefreshTimer; // Refresh red dot so it dismisses after 10 mins
   bool _verseShown = false;
 
   @override
@@ -1106,6 +1107,11 @@ class _HomeScreenState extends State<HomeScreen>
 
     await _loadFontSize();
     await _refreshExitOfferCooldown();
+
+    // Periodic refresh so red dot dismisses after 10 minutes
+    _exitOfferCooldownRefreshTimer?.cancel();
+    _exitOfferCooldownRefreshTimer = Timer.periodic(
+        const Duration(minutes: 1), (_) => _refreshExitOfferCooldown());
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
 //  await _checkAndShowVerse();
@@ -2212,6 +2218,8 @@ class _HomeScreenState extends State<HomeScreen>
         state == AppLifecycleState.inactive) {
       _onHidden();
     } else if (state == AppLifecycleState.resumed) {
+      // Refresh red dot so it dismisses after 10 mins when returning from background
+      _refreshExitOfferCooldown();
       // only resume if this route is still current
       if (ModalRoute.of(context)?.isCurrent == true) {
         _onVisible();
@@ -2429,6 +2437,7 @@ class _HomeScreenState extends State<HomeScreen>
     disposead();
     WidgetsBinding.instance.removeObserver(this);
     _checkerTimer?.cancel();
+    _exitOfferCooldownRefreshTimer?.cancel();
     routeObserver.unsubscribe(this);
     super.dispose();
   }

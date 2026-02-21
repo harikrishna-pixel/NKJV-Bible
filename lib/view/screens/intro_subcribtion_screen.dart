@@ -334,7 +334,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       await SharPreferences.setBoolean('has_shown_paywall_first_time', true);
       await SharPreferences.setBoolean('is_first_time_paywall_cancel', true);
     }
-    // Store first time user sees paywall (for 5-day gate before exit offer / red dot)
+    // Store first time user sees paywall (for 3-day gate before exit offer / red dot)
     final firstSeen = await SharPreferences.getString('paywall_first_seen_date');
     if (firstSeen == null || firstSeen.isEmpty) {
       await SharPreferences.setString(
@@ -350,13 +350,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         Constants.showToast("No internet connection", 5000);
         return;
       }
-      // Show exit offer only after 5 days since first paywall view
+      // Show exit offer only after 3 days since first paywall view (matches red dot)
       final firstSeenStr =
           await SharPreferences.getString('paywall_first_seen_date');
       if (firstSeenStr != null && firstSeenStr.isNotEmpty) {
         try {
           final firstSeen = DateTime.parse(firstSeenStr);
-          if (DateTime.now().difference(firstSeen).inDays < 5) {
+          if (DateTime.now().difference(firstSeen).inDays < 3) {
             return;
           }
         } catch (_) {}
@@ -448,7 +448,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         Constants.showToast("No internet connection", 5000);
         return;
       }
-      // Exit offer only after 5 days of app use (first paywall seen); before that just open paywall
+      // Exit offer only after 3 days of app use (first paywall seen); matches red dot
       final paywallFirstSeenStr =
           await SharPreferences.getString('paywall_first_seen_date');
       if (paywallFirstSeenStr == null || paywallFirstSeenStr.isEmpty) {
@@ -457,7 +457,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       }
       try {
         final firstSeen = DateTime.parse(paywallFirstSeenStr);
-        if (DateTime.now().difference(firstSeen).inDays < 5) {
+        if (DateTime.now().difference(firstSeen).inDays < 3) {
           await _navigateToPaywallFromHome(context);
           return;
         }
@@ -623,13 +623,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         _navigateAwayFromPaywall();
         return;
       }
-      // Show exit offer only after 5 days since first paywall view
+      // Show exit offer only after 3 days since first paywall view (matches red dot)
       final firstSeenStr =
           await SharPreferences.getString('paywall_first_seen_date');
       if (firstSeenStr != null && firstSeenStr.isNotEmpty) {
         try {
           final firstSeen = DateTime.parse(firstSeenStr);
-          if (DateTime.now().difference(firstSeen).inDays < 5) {
+          if (DateTime.now().difference(firstSeen).inDays < 3) {
             _navigateAwayFromPaywall();
             return;
           }
