@@ -1082,6 +1082,10 @@ class _HomeScreenState extends State<HomeScreen>
   bool _hasInitialized = false;
   bool _showUI = true; // Track UI visibility for scroll-based hide/show
   BuildContext? _bottomSheetContext; // Track bottom sheet context to dismiss it
+  bool _exitOfferCooldownActive =
+      false; // Red dot indicator (show after 3 days)
+  Timer?
+      _exitOfferCooldownRefreshTimer; // Refresh so red dot dismisses after 10 mins
   // dailyverse
   static const int _targetSeconds =
       15; // Show after 15 seconds on Reading screen (allows app-open ad to show and dismiss first)
@@ -1103,6 +1107,11 @@ class _HomeScreenState extends State<HomeScreen>
     _hasInitialized = true;
 
     await _loadFontSize();
+    // Exit offer / red dot commented out
+    // await _refreshExitOfferCooldown();
+    // _exitOfferCooldownRefreshTimer?.cancel();
+    // _exitOfferCooldownRefreshTimer = Timer.periodic(
+    //     const Duration(minutes: 1), (_) => _refreshExitOfferCooldown());
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
 //  await _checkAndShowVerse();
@@ -1114,6 +1123,35 @@ class _HomeScreenState extends State<HomeScreen>
     // _initializeAds();
     loadAds();
   }
+
+  // Exit offer red dot: commented out
+  // Future<void> _refreshExitOfferCooldown() async {
+  //   bool show = false;
+  //   final firstSeenStr =
+  //       await SharPreferences.getString('paywall_first_seen_date');
+  //   final exitOfferShownTime =
+  //       await SharPreferences.getString('exit_offer_first_shown_time');
+  //   final now = DateTime.now();
+  //   try {
+  //     if (firstSeenStr == null || firstSeenStr.isEmpty) return;
+  //     final firstSeen = DateTime.parse(firstSeenStr);
+  //     if (now.difference(firstSeen).inDays < 3) {
+  //       if (mounted) setState(() => _exitOfferCooldownActive = false);
+  //       return;
+  //     }
+  //     if (exitOfferShownTime == null || exitOfferShownTime.isEmpty) {
+  //       show = true;
+  //     } else {
+  //       final shownAt = DateTime.parse(exitOfferShownTime);
+  //       final minsSince = now.difference(shownAt).inMinutes;
+  //       final daysSince = now.difference(shownAt).inDays;
+  //       if (daysSince >= 20)
+  //         show = true;
+  //       else if (minsSince < 10) show = true;
+  //     }
+  //   } catch (_) {}
+  //   if (mounted) setState(() => _exitOfferCooldownActive = show);
+  // }
 
   Future<void> _handleAppLaunchCount() async {
     final prefs = await SharedPreferences.getInstance();
@@ -2169,6 +2207,8 @@ class _HomeScreenState extends State<HomeScreen>
         state == AppLifecycleState.inactive) {
       _onHidden();
     } else if (state == AppLifecycleState.resumed) {
+      // Exit offer commented out
+      // _refreshExitOfferCooldown();
       // only resume if this route is still current
       if (ModalRoute.of(context)?.isCurrent == true) {
         _onVisible();
@@ -2386,6 +2426,7 @@ class _HomeScreenState extends State<HomeScreen>
     disposead();
     WidgetsBinding.instance.removeObserver(this);
     _checkerTimer?.cancel();
+    // _exitOfferCooldownRefreshTimer?.cancel();
     routeObserver.unsubscribe(this);
     super.dispose();
   }
@@ -3096,7 +3137,11 @@ class _HomeScreenState extends State<HomeScreen>
                                             controller.isSubscriptionEnabled ??
                                                 true,
                                         child: GestureDetector(
-                                          onTap: () {
+                                          onTap: () async {
+                                            // Navigate directly to the paywall from Home
+                                            // instead of showing the Home exit-offer bottom sheet.
+                                            // This keeps purchase logic unchanged and avoids
+                                            // displaying the in-place exit-offer sheet on Home.
                                             if (controller.connectionStatus
                                                         .first ==
                                                     ConnectivityResult.wifi ||
@@ -3106,7 +3151,7 @@ class _HomeScreenState extends State<HomeScreen>
                                               adsIcon = false;
                                               debugPrint(
                                                   "all plans - ${controller.sixMonthPlan} ${controller.oneYearPlan}  ${controller.lifeTimePlan}");
-                                              SubscriptionScreen
+                                              await SubscriptionScreen
                                                   .navigateToPaywallFromHome(
                                                       context);
                                             } else {
@@ -3128,11 +3173,10 @@ class _HomeScreenState extends State<HomeScreen>
                                     visible: controller.isSubscriptionEnabled ??
                                         false,
                                     child: GestureDetector(
-                                      onTap: () {
+                                      onTap: () async {
                                         adsIcon = false;
-                                        SubscriptionScreen
-                                            .navigateToPaywallFromHome(
-                                                context);
+                                        await SubscriptionScreen
+                                            .navigateToPaywallFromHome(context);
                                       },
                                       child: Image.asset(
                                         'assets/no-ad.png',
@@ -5342,7 +5386,7 @@ class _HomeScreenState extends State<HomeScreen>
                         //     ),
                         //   ),
                         //   title: Text(
-                        //     'Limited Time Offer',
+                        //     'SPECIAL FAITH Offer',
                         //     style: CommanStyle.bothPrimary16600(context),
                         //   ),
                         // ),

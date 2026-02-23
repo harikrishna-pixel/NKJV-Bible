@@ -129,132 +129,123 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
       .toList();
 
   Future<bool> _showPleaseNoteDialog() async {
-    final agreed = await SharPreferences.getBoolean(SharPreferences.aiDisclaimerAgreed);
+    final agreed =
+        await SharPreferences.getBoolean(SharPreferences.aiDisclaimerAgreed);
     if (agreed == true) return true;
 
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
-    bool checkboxChecked = false;
 
     return await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => Dialog(
-          backgroundColor: isDark ? CommanColor.darkPrimaryColor : CommanColor.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Please Note',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: CommanColor.whiteBlack(ctx),
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => Dialog(
+            backgroundColor:
+                isDark ? CommanColor.darkPrimaryColor : CommanColor.white,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Please Note',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: CommanColor.whiteBlack(ctx),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  "This AI chat is for spiritual encouragement only and is not a substitute for professional medical or counseling advice. If you are in crisis, please seek professional help.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDark ? Colors.white70 : Colors.grey.shade700,
-                    height: 1.5,
+                  const SizedBox(height: 16),
+                  Text(
+                    "This AI chat is for spiritual encouragement only and is not a substitute for professional medical or counseling advice. If you are in crisis, please seek professional help.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? Colors.white70 : Colors.grey.shade700,
+                      height: 1.5,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  "To generate responses, the text you enter will be securely sent to a third-party AI service for processing.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDark ? Colors.white70 : Colors.grey.shade700,
-                    height: 1.5,
+                  const SizedBox(height: 12),
+                  Text(
+                    "To generate responses, the text you enter will be securely sent to a third-party AI service for processing.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? Colors.white70 : Colors.grey.shade700,
+                      height: 1.5,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                InkWell(
-                  onTap: () {
-                    setDialogState(() => checkboxChecked = !checkboxChecked);
-                  },
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Icon(
-                        checkboxChecked ? Icons.check_box : Icons.check_box_outline_blank,
-                        size: 24,
-                        color: checkboxChecked
-                            ? CommanColor.lightDarkPrimary(ctx)
-                            : (isDark ? Colors.white70 : Colors.grey.shade600),
+                  const SizedBox(height: 20),
+                  GestureDetector(
+                    onTap: () async {
+                      await SharPreferences.setBoolean(
+                          SharPreferences.aiDisclaimerAgreed, true);
+                      if (ctx.mounted) Navigator.pop(ctx, true);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: CommanColor.lightDarkPrimary(ctx),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: RichText(
-                          text: TextSpan(
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: CommanColor.whiteBlack(ctx),
-                              height: 1.4,
-                            ),
-                            children: [
-                              const TextSpan(text: "I agree to the "),
-                              TextSpan(
-                                text: "Privacy Policy",
-                                style: TextStyle(
-                                  decoration: TextDecoration.underline,
-                                  color: CommanColor.whiteBlack(ctx),
-                                ),
-                                recognizer: TapGestureRecognizer()
-                                  ..onTap = () => launchUrlString(
-                                      'https://bibleoffice.com/privacy_policy.html'),
-                              ),
-                              const TextSpan(text: " and AI data processing."),
-                            ],
+                      child: Text(
+                        'Start Chatting',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      GestureDetector(
+                        onTap: () => launchUrlString(
+                            'https://bibleoffice.com/terms_conditions.html'),
+                        child: Text(
+                          "Terms",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: CommanColor.whiteBlack(ctx),
+                           
+                          ),
+                        ),
+                      ),
+                      Text(
+                        " | ",
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: CommanColor.whiteBlack(ctx),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => launchUrlString(
+                            'https://bibleoffice.com/privacy_policy.html'),
+                        child: Text(
+                          "Privacy",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: CommanColor.whiteBlack(ctx),
+                            
                           ),
                         ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 20),
-                GestureDetector(
-                  onTap: checkboxChecked
-                      ? () async {
-                          await SharPreferences.setBoolean(SharPreferences.aiDisclaimerAgreed, true);
-                          if (ctx.mounted) Navigator.pop(ctx, true);
-                        }
-                      : null,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: checkboxChecked
-                          ? CommanColor.lightDarkPrimary(ctx)
-                          : Colors.grey.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'Start Chatting',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      ),
-    ) ?? false;
+        ) ??
+        false;
   }
 
   // Show insufficient credits toast with "Add Credits" button
@@ -1263,8 +1254,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     final subscriptionPlan = await downloadProvider.getSubscriptionPlan();
     final isSubscribed = subscriptionPlan != null &&
         subscriptionPlan.isNotEmpty &&
-        ['platinum', 'gold', 'silver']
-            .contains(subscriptionPlan.toLowerCase());
+        ['platinum', 'gold', 'silver'].contains(subscriptionPlan.toLowerCase());
     if (!isSubscribed) {
       try {
         // Show back interstitial at most once every 3 minutes (shared with Chat)
@@ -1278,10 +1268,10 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
           final hasInternet = await InternetConnection().hasInternetAccess;
           if (hasInternet) {
             final connectivityResult = await Connectivity().checkConnectivity();
-            final isMobileOnly = connectivityResult
-                    .contains(ConnectivityResult.mobile) &&
-                !connectivityResult.contains(ConnectivityResult.wifi) &&
-                !connectivityResult.contains(ConnectivityResult.ethernet);
+            final isMobileOnly =
+                connectivityResult.contains(ConnectivityResult.mobile) &&
+                    !connectivityResult.contains(ConnectivityResult.wifi) &&
+                    !connectivityResult.contains(ConnectivityResult.ethernet);
             if (!isMobileOnly) {
               await _showInterstitialAdAndWait();
               await SharPreferences.setString(

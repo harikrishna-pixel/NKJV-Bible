@@ -355,7 +355,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       await SharPreferences.setBoolean('is_first_time_paywall_cancel', true);
     }
     // Store first time user sees paywall (for 3-day gate before exit offer / red dot)
-    final firstSeen = await SharPreferences.getString('paywall_first_seen_date');
+    final firstSeen =
+        await SharPreferences.getString('paywall_first_seen_date');
     if (firstSeen == null || firstSeen.isEmpty) {
       await SharPreferences.setString(
           'paywall_first_seen_date', DateTime.now().toIso8601String());
@@ -571,6 +572,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       final initialSeconds = remainingSeconds % 60;
 
       if (!context.mounted) return;
+      final homeContext = context;
       showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
@@ -586,18 +588,22 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             initialMinutes: initialMinutes,
             initialSeconds: initialSeconds,
             onUnlockPremium: () {
+              // Close bottom sheet first, then route to IAP using Home context
+              // so the full SubscriptionScreen opens instead of purchase sheets on the sheet.
               Navigator.of(sheetContext).pop();
-              Get.to(
-                () => SubscriptionScreen(
-                  sixMonthPlan: sixMonthPlan,
-                  oneYearPlan: oneYearPlan,
-                  lifeTimePlan: lifeTimePlan,
-                  checkad: 'home',
-                  fromHomeExitOffer: true,
-                ),
-                transition: Transition.cupertinoDialog,
-                duration: const Duration(milliseconds: 300),
-              );
+              if (homeContext.mounted) {
+                Navigator.of(homeContext).push(
+                  MaterialPageRoute(
+                    builder: (_) => SubscriptionScreen(
+                      sixMonthPlan: sixMonthPlan,
+                      oneYearPlan: oneYearPlan,
+                      lifeTimePlan: lifeTimePlan,
+                      checkad: 'home',
+                      fromHomeExitOffer: false,
+                    ),
+                  ),
+                );
+              }
             },
             onMaybeLater: () {
               SharPreferences.setBoolean('exit_offer_cooldown_active', true);
@@ -2057,6 +2063,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
 
+        // Exit offer commented out
+        // await _checkAndShowExitOfferBeforeClose(controller);
         _navigateAwayFromPaywall();
       },
       child: Scaffold(
@@ -2322,6 +2330,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       const SizedBox(height: 5),
                       TextButton(
                         onPressed: () async {
+                          // Exit offer commented out
+                          // await _checkAndShowExitOfferBeforeClose(controller);
                           _navigateAwayFromPaywall();
                         },
                         child: Text(
@@ -2401,6 +2411,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                       onPressed: () async {
+                        // Exit offer commented out
+                        // await _checkAndShowExitOfferBeforeClose(controller);
                         _navigateAwayFromPaywall();
                       },
                     ),

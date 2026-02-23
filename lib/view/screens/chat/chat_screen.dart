@@ -78,7 +78,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   // Back-button interstitial: show one interstitial when leaving Chat (for unsubscribed) after any activity
   bool _hasShownBackInterstitial = false;
   bool _userDidActivity = false;
-  bool _isHandlingBack = false; // Prevent multiple triggers (e.g. system back + app bar) showing ad repeatedly
+  bool _isHandlingBack =
+      false; // Prevent multiple triggers (e.g. system back + app bar) showing ad repeatedly
   final AdService _chatBackAdService = AdService();
 
   // Topic-based questions (translation keys)
@@ -869,132 +870,121 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   Future<bool> _showPleaseNoteDialog() async {
-    final agreed = await SharPreferences.getBoolean(SharPreferences.aiDisclaimerAgreed);
+    final agreed =
+        await SharPreferences.getBoolean(SharPreferences.aiDisclaimerAgreed);
     if (agreed == true) return true;
 
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
-    bool checkboxChecked = false;
 
     return await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => Dialog(
-          backgroundColor: isDark ? CommanColor.darkPrimaryColor : CommanColor.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Please Note',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: CommanColor.whiteBlack(ctx),
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => Dialog(
+            backgroundColor:
+                isDark ? CommanColor.darkPrimaryColor : CommanColor.white,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Please Note',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: CommanColor.whiteBlack(ctx),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  "This AI chat is for spiritual encouragement only and is not a substitute for professional medical or counseling advice. If you are in crisis, please seek professional help.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDark ? Colors.white70 : Colors.grey.shade700,
-                    height: 1.5,
+                  const SizedBox(height: 16),
+                  Text(
+                    "This AI chat is for spiritual encouragement only and is not a substitute for professional medical or counseling advice. If you are in crisis, please seek professional help.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? Colors.white70 : Colors.grey.shade700,
+                      height: 1.5,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  "To generate responses, the text you enter will be securely sent to a third-party AI service for processing.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDark ? Colors.white70 : Colors.grey.shade700,
-                    height: 1.5,
+                  const SizedBox(height: 12),
+                  Text(
+                    "To generate responses, the text you enter will be securely sent to a third-party AI service for processing.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? Colors.white70 : Colors.grey.shade700,
+                      height: 1.5,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                InkWell(
-                  onTap: () {
-                    setDialogState(() => checkboxChecked = !checkboxChecked);
-                  },
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Icon(
-                        checkboxChecked ? Icons.check_box : Icons.check_box_outline_blank,
-                        size: 24,
-                        color: checkboxChecked
-                            ? CommanColor.lightDarkPrimary(ctx)
-                            : (isDark ? Colors.white70 : Colors.grey.shade600),
+                  const SizedBox(height: 20),
+                  GestureDetector(
+                    onTap: () async {
+                      await SharPreferences.setBoolean(
+                          SharPreferences.aiDisclaimerAgreed, true);
+                      if (ctx.mounted) Navigator.pop(ctx, true);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: CommanColor.lightDarkPrimary(ctx),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: RichText(
-                          text: TextSpan(
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: CommanColor.whiteBlack(ctx),
-                              height: 1.4,
-                            ),
-                            children: [
-                              const TextSpan(text: "I agree to the "),
-                              TextSpan(
-                                text: "Privacy Policy",
-                                style: TextStyle(
-                                  decoration: TextDecoration.underline,
-                                  color: CommanColor.whiteBlack(ctx),
-                                ),
-                                recognizer: TapGestureRecognizer()
-                                  ..onTap = () => launchUrlString(
-                                      'https://bibleoffice.com/privacy_policy.html'),
-                              ),
-                              const TextSpan(text: " and AI data processing."),
-                            ],
+                      child: Text(
+                        'Start Chatting',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      GestureDetector(
+                        onTap: () => launchUrlString(
+                            'https://bibleoffice.com/terms_conditions.html'),
+                        child: Text(
+                          "Terms",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: CommanColor.whiteBlack(ctx),
+                          ),
+                        ),
+                      ),
+                      Text(
+                        " | ",
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: CommanColor.whiteBlack(ctx),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => launchUrlString(
+                            'https://bibleoffice.com/privacy_policy.html'),
+                        child: Text(
+                          "Privacy",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: CommanColor.whiteBlack(ctx),
                           ),
                         ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 20),
-                GestureDetector(
-                  onTap: checkboxChecked
-                      ? () async {
-                          await SharPreferences.setBoolean(SharPreferences.aiDisclaimerAgreed, true);
-                          if (ctx.mounted) Navigator.pop(ctx, true);
-                        }
-                      : null,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: checkboxChecked
-                          ? CommanColor.lightDarkPrimary(ctx)
-                          : Colors.grey.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'Start Chatting',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      ),
-    ) ?? false;
+        ) ??
+        false;
   }
 
   void _showMicrophonePermissionDialog() {
@@ -1257,8 +1247,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               lastStr.isEmpty ||
               now.difference(DateTime.tryParse(lastStr) ?? now).inMinutes >= 3;
           if (canShowByTime) {
-            final hasInternet =
-                await InternetConnection().hasInternetAccess;
+            final hasInternet = await InternetConnection().hasInternetAccess;
             if (hasInternet) {
               final result = await Connectivity().checkConnectivity();
               final isMobileOnly = result.contains(ConnectivityResult.mobile) &&
@@ -1788,7 +1777,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
     setState(() {
       _messages.add(userMessage);
-      _userDidActivity = true; // Track for back-button interstitial (one ad when leaving)
+      _userDidActivity =
+          true; // Track for back-button interstitial (one ad when leaving)
       _isLoading = true;
       _selectedTopicIndex = null; // Reset selected button when message is sent
       _selectedExampleQuestionIndex = null; // Reset example question selection
@@ -2239,712 +2229,727 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
         if (!didPop) await _handleBack();
       },
       child: Scaffold(
-      backgroundColor: isVintage
-          ? (isDark ? CommanColor.black : themeProvider.backgroundColor)
-          : (isDark
-              ? CommanColor.darkPrimaryColor
-              : themeProvider.backgroundColor),
-      // appBar: AppBar(
-      //   backgroundColor: isVintage
-      //       ? (isDark ? CommanColor.black : themeProvider.backgroundColor)
-      //       : (isDark ? CommanColor.darkPrimaryColor : themeProvider.backgroundColor),
-      //   flexibleSpace: isVintage
-      //       ? Container(
-      //     decoration: BoxDecoration(
-      //       color: isDark ? CommanColor.black : themeProvider.backgroundColor,
-      //       image: DecorationImage(
-      //         image: AssetImage(Images.bgImage(context)),
-      //         fit: BoxFit.cover,
-      //       ),
-      //     ),
-      //   )
-      //       : null,
-      //   elevation: 0,
-      //   leading: IconButton(
-      //     icon: Icon(
-      //       Icons.arrow_back_ios_new,
-      //       color: CommanColor.whiteBlack(context),
-      //     ),
-      //     onPressed: () => Get.back(),
-      //   ),
-      //   // title: Text(
-      //   //   'Bible Chat',
-      //   //   style: TextStyle(
-      //   //     color: CommanColor.whiteBlack(context),
-      //   //     fontSize: screenWidth > 450 ? 22 : 18,
-      //   //     fontWeight: FontWeight.w600,
-      //   //   ),
-      //   // ),
-      //   actions: [
-      //     // Show new chat icon only when user has typed something
-      //     if (_messageController.text.trim().isNotEmpty)
-      //       IconButton(
-      //         icon: Icon(
-      //           Icons.add_circle_outline,
-      //           color: CommanColor.whiteBlack(context),
-      //         ),
-      //         tooltip: 'New Chat',
-      //         onPressed: () {
-      //           if (_messages.isNotEmpty) {
-      //             showDialog(
-      //               context: context,
-      //               builder: (context) {
-      //                 final themeProvider = Provider.of<ThemeProvider>(context);
-      //                 final isDark = themeProvider.themeMode == ThemeMode.dark;
-      //                 final isVintage = themeProvider.currentCustomTheme == AppCustomTheme.vintage;
-      //                 return AlertDialog(
-      //                   backgroundColor: isDark
-      //                       ? CommanColor.darkPrimaryColor
-      //                       : (isVintage ? themeProvider.backgroundColor : CommanColor.white),
-      //                   shape: RoundedRectangleBorder(
-      //                     borderRadius: BorderRadius.circular(15),
-      //                   ),
-      //                   title: Text(
-      //                     'Start New Chat',
-      //                     style: TextStyle(
-      //                       color: CommanColor.whiteBlack(context),
-      //                     ),
-      //                   ),
-      //                   content: Text(
-      //                     'Are you sure you want to start a new chat? The current conversation will be cleared.',
-      //                     style: TextStyle(
-      //                       color: CommanColor.whiteBlack(context),
-      //                     ),
-      //                   ),
-      //                   actions: [
-      //                     TextButton(
-      //                       onPressed: () => Get.back(),
-      //                       child: Text(
-      //                         ChatTranslations.get('cancel', AppApiConstant.chatLanguage),
-      //                         style: TextStyle(
-      //                           color: isDark
-      //                               ? CommanColor.white.withOpacity(0.8)
-      //                               : CommanColor.lightDarkPrimary(context),
-      //                         ),
-      //                       ),
-      //                     ),
-      //                     TextButton(
-      //                       onPressed: () {
-      //                         Get.back();
-      //                         _startNewChat();
-      //                       },
-      //                       child: Text(
-      //                         ChatTranslations.get('new_chat', AppApiConstant.chatLanguage),
-      //                         style: TextStyle(
-      //                           color: isDark
-      //                               ? CommanColor.lightDarkPrimary(context)
-      //                               : CommanColor.lightDarkPrimary(context),
-      //                           fontWeight: FontWeight.w600,
-      //                         ),
-      //                       ),
-      //                     ),
-      //                   ],
-      //                 );
-      //               },
-      //             );
-      //           } else {
-      //             _startNewChat();
-      //           }
-      //         },
-      //       ),
-      //     IconButton(
-      //       icon: Image.asset(
-      //         "assets/message-time.png",
-      //         width: 24,
-      //         height: 24,
-      //       ),
-      //       tooltip: 'Chat History',
-      //       onPressed: () {
-      //         Get.to(
-      //               () => const ChatHistoryScreen(),
-      //           transition: Transition.cupertinoDialog,
-      //           duration: const Duration(milliseconds: 300),
-      //         );
-      //       },
-      //     ),
-      //   ],
-      // ),
-      body: Container(
-        decoration: isVintage
-            ? BoxDecoration(
-                color:
-                    isDark ? CommanColor.black : themeProvider.backgroundColor,
-                image: DecorationImage(
-                  image: AssetImage(Images.bgImage(context)),
-                  fit: BoxFit.cover,
-                ),
-              )
-            : BoxDecoration(
-                color: isDark
-                    ? CommanColor.darkPrimaryColor
-                    : themeProvider.backgroundColor,
-              ),
-        child: SafeArea(
-          bottom: false,
-          child: GestureDetector(
-            onTap: () {
-              // Dismiss keyboard when tapping anywhere on the screen
-              FocusScope.of(context).unfocus();
-              _messageFocusNode.unfocus();
-            },
-            behavior: HitTestBehavior.opaque,
-            child: Column(
-              children: [
-                // Top bar with back button and actions
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: screenWidth > 450 ? 8 : 4,
-                    vertical: screenWidth > 450 ? 8 : 4,
+        backgroundColor: isVintage
+            ? (isDark ? CommanColor.black : themeProvider.backgroundColor)
+            : (isDark
+                ? CommanColor.darkPrimaryColor
+                : themeProvider.backgroundColor),
+        // appBar: AppBar(
+        //   backgroundColor: isVintage
+        //       ? (isDark ? CommanColor.black : themeProvider.backgroundColor)
+        //       : (isDark ? CommanColor.darkPrimaryColor : themeProvider.backgroundColor),
+        //   flexibleSpace: isVintage
+        //       ? Container(
+        //     decoration: BoxDecoration(
+        //       color: isDark ? CommanColor.black : themeProvider.backgroundColor,
+        //       image: DecorationImage(
+        //         image: AssetImage(Images.bgImage(context)),
+        //         fit: BoxFit.cover,
+        //       ),
+        //     ),
+        //   )
+        //       : null,
+        //   elevation: 0,
+        //   leading: IconButton(
+        //     icon: Icon(
+        //       Icons.arrow_back_ios_new,
+        //       color: CommanColor.whiteBlack(context),
+        //     ),
+        //     onPressed: () => Get.back(),
+        //   ),
+        //   // title: Text(
+        //   //   'Bible Chat',
+        //   //   style: TextStyle(
+        //   //     color: CommanColor.whiteBlack(context),
+        //   //     fontSize: screenWidth > 450 ? 22 : 18,
+        //   //     fontWeight: FontWeight.w600,
+        //   //   ),
+        //   // ),
+        //   actions: [
+        //     // Show new chat icon only when user has typed something
+        //     if (_messageController.text.trim().isNotEmpty)
+        //       IconButton(
+        //         icon: Icon(
+        //           Icons.add_circle_outline,
+        //           color: CommanColor.whiteBlack(context),
+        //         ),
+        //         tooltip: 'New Chat',
+        //         onPressed: () {
+        //           if (_messages.isNotEmpty) {
+        //             showDialog(
+        //               context: context,
+        //               builder: (context) {
+        //                 final themeProvider = Provider.of<ThemeProvider>(context);
+        //                 final isDark = themeProvider.themeMode == ThemeMode.dark;
+        //                 final isVintage = themeProvider.currentCustomTheme == AppCustomTheme.vintage;
+        //                 return AlertDialog(
+        //                   backgroundColor: isDark
+        //                       ? CommanColor.darkPrimaryColor
+        //                       : (isVintage ? themeProvider.backgroundColor : CommanColor.white),
+        //                   shape: RoundedRectangleBorder(
+        //                     borderRadius: BorderRadius.circular(15),
+        //                   ),
+        //                   title: Text(
+        //                     'Start New Chat',
+        //                     style: TextStyle(
+        //                       color: CommanColor.whiteBlack(context),
+        //                     ),
+        //                   ),
+        //                   content: Text(
+        //                     'Are you sure you want to start a new chat? The current conversation will be cleared.',
+        //                     style: TextStyle(
+        //                       color: CommanColor.whiteBlack(context),
+        //                     ),
+        //                   ),
+        //                   actions: [
+        //                     TextButton(
+        //                       onPressed: () => Get.back(),
+        //                       child: Text(
+        //                         ChatTranslations.get('cancel', AppApiConstant.chatLanguage),
+        //                         style: TextStyle(
+        //                           color: isDark
+        //                               ? CommanColor.white.withOpacity(0.8)
+        //                               : CommanColor.lightDarkPrimary(context),
+        //                         ),
+        //                       ),
+        //                     ),
+        //                     TextButton(
+        //                       onPressed: () {
+        //                         Get.back();
+        //                         _startNewChat();
+        //                       },
+        //                       child: Text(
+        //                         ChatTranslations.get('new_chat', AppApiConstant.chatLanguage),
+        //                         style: TextStyle(
+        //                           color: isDark
+        //                               ? CommanColor.lightDarkPrimary(context)
+        //                               : CommanColor.lightDarkPrimary(context),
+        //                           fontWeight: FontWeight.w600,
+        //                         ),
+        //                       ),
+        //                     ),
+        //                   ],
+        //                 );
+        //               },
+        //             );
+        //           } else {
+        //             _startNewChat();
+        //           }
+        //         },
+        //       ),
+        //     IconButton(
+        //       icon: Image.asset(
+        //         "assets/message-time.png",
+        //         width: 24,
+        //         height: 24,
+        //       ),
+        //       tooltip: 'Chat History',
+        //       onPressed: () {
+        //         Get.to(
+        //               () => const ChatHistoryScreen(),
+        //           transition: Transition.cupertinoDialog,
+        //           duration: const Duration(milliseconds: 300),
+        //         );
+        //       },
+        //     ),
+        //   ],
+        // ),
+        body: Container(
+          decoration: isVintage
+              ? BoxDecoration(
+                  color: isDark
+                      ? CommanColor.black
+                      : themeProvider.backgroundColor,
+                  image: DecorationImage(
+                    image: AssetImage(Images.bgImage(context)),
+                    fit: BoxFit.cover,
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          Icons.arrow_back_ios_new,
-                          color: CommanColor.whiteBlack(context),
-                        ),
-                        onPressed: () => _handleBack(),
-                      ),
-                      // Show "Faith Chat" in center when messages exist
-                      if (_messages.isNotEmpty)
-                        Expanded(
-                          child: Center(
-                            child: Text(
-                              ChatTranslations.get(
-                                  'faith_chat', AppApiConstant.chatLanguage),
-                              style: TextStyle(
-                                color: isDark
-                                    ? Colors.white
-                                    : const Color(0xFF8D6E63),
-                                fontSize: screenWidth > 450 ? 18 : 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                )
+              : BoxDecoration(
+                  color: isDark
+                      ? CommanColor.darkPrimaryColor
+                      : themeProvider.backgroundColor,
+                ),
+          child: SafeArea(
+            bottom: false,
+            child: GestureDetector(
+              onTap: () {
+                // Dismiss keyboard when tapping anywhere on the screen
+                FocusScope.of(context).unfocus();
+                _messageFocusNode.unfocus();
+              },
+              behavior: HitTestBehavior.opaque,
+              child: Column(
+                children: [
+                  // Top bar with back button and actions
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: screenWidth > 450 ? 8 : 4,
+                      vertical: screenWidth > 450 ? 8 : 4,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            Icons.arrow_back_ios_new,
+                            color: CommanColor.whiteBlack(context),
                           ),
-                        )
-                      else
-                        Spacer(),
-                      // Right pill (Wallet/Credits + New Chat) + History icon
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: screenWidth > 450 ? 12 : 10,
-                              vertical: screenWidth > 450 ? 10 : 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? CommanColor.darkPrimaryColor
-                                      .withOpacity(0.35)
-                                  : const Color(0xFFF6F1E9).withOpacity(0.65),
-                              borderRadius: BorderRadius.circular(22),
-                              border: Border.all(
-                                color: isDark
-                                    ? Colors.white.withOpacity(0.18)
-                                    : const Color(0xFF8D6E63).withOpacity(0.18),
+                          onPressed: () => _handleBack(),
+                        ),
+                        // Show "Faith Chat" in center when messages exist
+                        if (_messages.isNotEmpty)
+                          Expanded(
+                            child: Center(
+                              child: Text(
+                                ChatTranslations.get(
+                                    'faith_chat', AppApiConstant.chatLanguage),
+                                style: TextStyle(
+                                  color: isDark
+                                      ? Colors.white
+                                      : const Color(0xFF8D6E63),
+                                  fontSize: screenWidth > 450 ? 18 : 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                InkWell(
-                                  borderRadius: BorderRadius.circular(18),
-                                  onTap: () {
-                                    Get.to(
-                                      () => const WalletScreen(),
-                                      transition: Transition.cupertinoDialog,
-                                      duration:
-                                          const Duration(milliseconds: 300),
-                                    )?.then((_) {
-                                      // Refresh credits when returning from wallet screen
-                                      _loadCreditsFromLocal();
-                                    });
-                                  },
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.account_balance_wallet,
-                                        size: screenWidth > 450 ? 22 : 20,
-                                        color: isDark
-                                            ? Colors.white
-                                            : const Color(0xFF8D6E63),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        '$_currentCredits',
-                                        style: TextStyle(
+                          )
+                        else
+                          Spacer(),
+                        // Right pill (Wallet/Credits + New Chat) + History icon
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: screenWidth > 450 ? 12 : 10,
+                                vertical: screenWidth > 450 ? 10 : 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? CommanColor.darkPrimaryColor
+                                        .withOpacity(0.35)
+                                    : const Color(0xFFF6F1E9).withOpacity(0.65),
+                                borderRadius: BorderRadius.circular(22),
+                                border: Border.all(
+                                  color: isDark
+                                      ? Colors.white.withOpacity(0.18)
+                                      : const Color(0xFF8D6E63)
+                                          .withOpacity(0.18),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  InkWell(
+                                    borderRadius: BorderRadius.circular(18),
+                                    onTap: () {
+                                      Get.to(
+                                        () => const WalletScreen(),
+                                        transition: Transition.cupertinoDialog,
+                                        duration:
+                                            const Duration(milliseconds: 300),
+                                      )?.then((_) {
+                                        // Refresh credits when returning from wallet screen
+                                        _loadCreditsFromLocal();
+                                      });
+                                    },
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.account_balance_wallet,
+                                          size: screenWidth > 450 ? 22 : 20,
                                           color: isDark
                                               ? Colors.white
                                               : const Color(0xFF8D6E63),
-                                          fontSize: screenWidth > 450 ? 14 : 13,
-                                          fontWeight: FontWeight.w700,
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                SizedBox(width: screenWidth > 450 ? 12 : 10),
-                                Container(
-                                  width: 1,
-                                  height: screenWidth > 450 ? 18 : 16,
-                                  color: isDark
-                                      ? Colors.white.withOpacity(0.22)
-                                      : const Color(0xFF8D6E63)
-                                          .withOpacity(0.22),
-                                ),
-                                SizedBox(width: screenWidth > 450 ? 12 : 10),
-                                // Keep the existing new-chat logic unchanged
-                                if (_messages.any((msg) => !msg.isUser))
-                                  InkWell(
-                                    borderRadius: BorderRadius.circular(18),
-                                    onTap: () {
-                                      // Delay the sheet opening slightly so the
-                                      // originating tap gesture (tap up) doesn't
-                                      // get delivered to the sheet and dismiss it
-                                      // immediately on iPad. This is a timing-only
-                                      // UI fix; logic remains unchanged.
-                                      Future.delayed(
-                                          const Duration(milliseconds: 100),
-                                          () {
-                                        showModalBottomSheet(
-                                          context: context,
-                                          backgroundColor: Colors.transparent,
-                                          builder: (_) {
-                                            final bg = isDark
-                                                ? CommanColor.darkPrimaryColor
-                                                    .withOpacity(0.96)
-                                                : const Color(0xFFF6F1E9);
-                                            return SafeArea(
-                                              child: Container(
-                                                margin:
-                                                    const EdgeInsets.all(12),
-                                                padding:
-                                                    const EdgeInsets.all(12),
-                                                decoration: BoxDecoration(
-                                                  color: bg,
-                                                  borderRadius:
-                                                      BorderRadius.circular(18),
-                                                ),
-                                                child: Column(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    ListTile(
-                                                      dense: true,
-                                                      leading: Icon(
-                                                        Icons.add,
-                                                        color: isDark
-                                                            ? Colors.white
-                                                            : const Color(
-                                                                0xFF8D6E63),
-                                                      ),
-                                                      title: Text(
-                                                        ChatTranslations.get(
-                                                            'new_chat',
-                                                            AppApiConstant
-                                                                .chatLanguage),
-                                                        style: TextStyle(
-                                                          color: isDark
-                                                              ? Colors.white
-                                                              : const Color(
-                                                                  0xFF8D6E63),
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                        ),
-                                                      ),
-                                                      onTap: () {
-                                                        Navigator.pop(context);
-                                                        if (_messages
-                                                            .isNotEmpty) {
-                                                          _showNewChatBottomSheet();
-                                                        } else {
-                                                          _startNewChat();
-                                                        }
-                                                      },
-                                                    ),
-                                                    const Divider(height: 1),
-                                                    ListTile(
-                                                      dense: true,
-                                                      leading: Image.asset(
-                                                        "assets/message-time.png",
-                                                        width: 22,
-                                                        height: 22,
-                                                        color: isDark
-                                                            ? Colors.white
-                                                            : const Color(
-                                                                0xFF8D6E63),
-                                                      ),
-                                                      title: Text(
-                                                        ChatTranslations.get(
-                                                            'history',
-                                                            AppApiConstant
-                                                                .chatLanguage),
-                                                        style: TextStyle(
-                                                          color: isDark
-                                                              ? Colors.white
-                                                              : const Color(
-                                                                  0xFF8D6E63),
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                        ),
-                                                      ),
-                                                      onTap: () {
-                                                        Navigator.pop(context);
-                                                        Get.to(
-                                                          () =>
-                                                              const ChatHistoryScreen(),
-                                                          transition: Transition
-                                                              .cupertinoDialog,
-                                                          duration:
-                                                              const Duration(
-                                                                  milliseconds:
-                                                                      300),
-                                                        )?.then((result) {
-                                                          if (result == true)
-                                                            _loadRecentConversations();
-                                                        });
-                                                      },
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                        );
-                                      });
-                                    },
-                                    child: Icon(
-                                      Icons.add,
-                                      size: screenWidth > 450 ? 22 : 20,
-                                      color: isDark
-                                          ? Colors.white
-                                          : const Color(0xFF8D6E63),
-                                    ),
-                                  )
-                                else
-                                  InkWell(
-                                    borderRadius: BorderRadius.circular(18),
-                                    onTap: () {
-                                      // See comment above: small delay prevents the
-                                      // tap event from being routed into the sheet
-                                      // and causing an immediate dismiss on iPad.
-                                      Future.delayed(
-                                          const Duration(milliseconds: 100),
-                                          () {
-                                        showModalBottomSheet(
-                                          context: context,
-                                          backgroundColor: Colors.transparent,
-                                          builder: (_) {
-                                            final bg = isDark
-                                                ? CommanColor.darkPrimaryColor
-                                                    .withOpacity(0.96)
-                                                : const Color(0xFFF6F1E9);
-                                            return SafeArea(
-                                              child: Container(
-                                                margin:
-                                                    const EdgeInsets.all(12),
-                                                padding:
-                                                    const EdgeInsets.all(12),
-                                                decoration: BoxDecoration(
-                                                  color: bg,
-                                                  borderRadius:
-                                                      BorderRadius.circular(18),
-                                                ),
-                                                child: Column(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    ListTile(
-                                                      dense: true,
-                                                      leading: Icon(
-                                                        Icons.add,
-                                                        color: isDark
-                                                            ? Colors.white
-                                                            : const Color(
-                                                                0xFF8D6E63),
-                                                      ),
-                                                      title: Text(
-                                                        ChatTranslations.get(
-                                                            'new_chat',
-                                                            AppApiConstant
-                                                                .chatLanguage),
-                                                        style: TextStyle(
-                                                          color: isDark
-                                                              ? Colors.white
-                                                              : const Color(
-                                                                  0xFF8D6E63),
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                        ),
-                                                      ),
-                                                      onTap: () {
-                                                        Navigator.pop(context);
-                                                        _startNewChat();
-                                                      },
-                                                    ),
-                                                    const Divider(height: 1),
-                                                    ListTile(
-                                                      dense: true,
-                                                      leading: Image.asset(
-                                                        "assets/message-time.png",
-                                                        width: 22,
-                                                        height: 22,
-                                                        color: isDark
-                                                            ? Colors.white
-                                                            : const Color(
-                                                                0xFF8D6E63),
-                                                      ),
-                                                      title: Text(
-                                                        ChatTranslations.get(
-                                                            'history',
-                                                            AppApiConstant
-                                                                .chatLanguage),
-                                                        style: TextStyle(
-                                                          color: isDark
-                                                              ? Colors.white
-                                                              : const Color(
-                                                                  0xFF8D6E63),
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                        ),
-                                                      ),
-                                                      onTap: () {
-                                                        Navigator.pop(context);
-                                                        Get.to(
-                                                          () =>
-                                                              const ChatHistoryScreen(),
-                                                          transition: Transition
-                                                              .cupertinoDialog,
-                                                          duration:
-                                                              const Duration(
-                                                                  milliseconds:
-                                                                      300),
-                                                        )?.then((result) {
-                                                          if (result == true)
-                                                            _loadRecentConversations();
-                                                        });
-                                                      },
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                        );
-                                      });
-                                    },
-                                    child: Icon(
-                                      Icons.add,
-                                      size: screenWidth > 450 ? 22 : 20,
-                                      color: isDark
-                                          ? Colors.white
-                                          : const Color(0xFF8D6E63),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          // IconButton(
-                          //   icon: Image.asset(
-                          //     "assets/message-time.png",
-                          //     width: 24,
-                          //     height: 24,
-                          //     color: isDark
-                          //         ? Colors.white
-                          //         : const Color(0xFF8D6E63),
-                          //   ),
-                          //   tooltip: 'Chat History',
-                          //   onPressed: () {
-                          //     Get.to(
-                          //       () => const ChatHistoryScreen(),
-                          //       transition: Transition.cupertinoDialog,
-                          //       duration: const Duration(milliseconds: 300),
-                          //     );
-                          //   },
-                          // ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                // Main content area - Result Section with distinct background
-                Expanded(
-                  child: Container(
-                    color: Colors
-                        .transparent, // Remove grey background - use transparent
-                    child: _messages.isEmpty
-                        ? SingleChildScrollView(
-                            padding: EdgeInsets.only(
-                              top: screenWidth > 450 ? 14 : 12,
-                              bottom: screenWidth > 450 ? 14 : 12,
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              children: [
-                                // Show verse context if available
-                                if (widget.verseContext != null)
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: screenWidth > 450 ? 20 : 16,
-                                    ),
-                                    child:
-                                        _buildVerseContext(screenWidth, isDark),
-                                  ),
-                                if (widget.verseContext != null)
-                                  const SizedBox(height: 20),
-                                // Hide illustration image when opened from verse popup
-                                if (widget.verseContext == null)
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: screenWidth > 450 ? 20 : 16,
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        SizedBox(
-                                            height: screenWidth > 450 ? 10 : 5),
-                                        Transform.translate(
-                                          offset: const Offset(0, -10),
-                                          child: Container(
-                                            width:
-                                                screenWidth > 450 ? 140 : 130,
-                                            height:
-                                                screenWidth > 450 ? 140 : 130,
-                                            decoration: const BoxDecoration(
-                                              color: Colors
-                                                  .transparent, // Transparent background for illustration
-                                            ),
-                                            child: Image.asset(
-                                              "assets/chat_img.png",
-                                              fit: BoxFit.contain,
-                                              errorBuilder:
-                                                  (context, error, stackTrace) {
-                                                // Fallback to icon if image doesn't load
-                                                return Icon(
-                                                  Icons.chat_bubble_outline,
-                                                  size: 100,
-                                                  color: CommanColor.whiteBlack(
-                                                          context)
-                                                      .withOpacity(0.5),
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 5),
+                                        const SizedBox(width: 6),
                                         Text(
-                                          ChatTranslations.get('faith_answers',
-                                              AppApiConstant.chatLanguage),
+                                          '$_currentCredits',
                                           style: TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            color:
-                                                CommanColor.whiteBlack(context)
-                                                    .withOpacity(0.7),
+                                            color: isDark
+                                                ? Colors.white
+                                                : const Color(0xFF8D6E63),
                                             fontSize:
-                                                screenWidth > 450 ? 26 : 23,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                              bottom:
-                                                  20), // Add bottom padding to prevent text from being hidden
-                                          child: Text(
-                                            ChatTranslations.get('get_guidance',
-                                                AppApiConstant.chatLanguage),
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              color: CommanColor.whiteBlack(
-                                                      context)
-                                                  .withOpacity(0.5),
-                                              fontSize:
-                                                  screenWidth > 450 ? 16 : 15,
-                                            ),
+                                                screenWidth > 450 ? 14 : 13,
+                                            fontWeight: FontWeight.w700,
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
-                                // Show verse context text if available
-                                if (widget.verseContext != null)
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: screenWidth > 450 ? 20 : 16,
+                                  SizedBox(width: screenWidth > 450 ? 12 : 10),
+                                  Container(
+                                    width: 1,
+                                    height: screenWidth > 450 ? 18 : 16,
+                                    color: isDark
+                                        ? Colors.white.withOpacity(0.22)
+                                        : const Color(0xFF8D6E63)
+                                            .withOpacity(0.22),
+                                  ),
+                                  SizedBox(width: screenWidth > 450 ? 12 : 10),
+                                  // Keep the existing new-chat logic unchanged
+                                  if (_messages.any((msg) => !msg.isUser))
+                                    InkWell(
+                                      borderRadius: BorderRadius.circular(18),
+                                      onTap: () {
+                                        // Delay the sheet opening slightly so the
+                                        // originating tap gesture (tap up) doesn't
+                                        // get delivered to the sheet and dismiss it
+                                        // immediately on iPad. This is a timing-only
+                                        // UI fix; logic remains unchanged.
+                                        Future.delayed(
+                                            const Duration(milliseconds: 100),
+                                            () {
+                                          showModalBottomSheet(
+                                            context: context,
+                                            backgroundColor: Colors.transparent,
+                                            builder: (_) {
+                                              final bg = isDark
+                                                  ? CommanColor.darkPrimaryColor
+                                                      .withOpacity(0.96)
+                                                  : const Color(0xFFF6F1E9);
+                                              return SafeArea(
+                                                child: Container(
+                                                  margin:
+                                                      const EdgeInsets.all(12),
+                                                  padding:
+                                                      const EdgeInsets.all(12),
+                                                  decoration: BoxDecoration(
+                                                    color: bg,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            18),
+                                                  ),
+                                                  child: Column(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      ListTile(
+                                                        dense: true,
+                                                        leading: Icon(
+                                                          Icons.add,
+                                                          color: isDark
+                                                              ? Colors.white
+                                                              : const Color(
+                                                                  0xFF8D6E63),
+                                                        ),
+                                                        title: Text(
+                                                          ChatTranslations.get(
+                                                              'new_chat',
+                                                              AppApiConstant
+                                                                  .chatLanguage),
+                                                          style: TextStyle(
+                                                            color: isDark
+                                                                ? Colors.white
+                                                                : const Color(
+                                                                    0xFF8D6E63),
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                          ),
+                                                        ),
+                                                        onTap: () {
+                                                          Navigator.pop(
+                                                              context);
+                                                          if (_messages
+                                                              .isNotEmpty) {
+                                                            _showNewChatBottomSheet();
+                                                          } else {
+                                                            _startNewChat();
+                                                          }
+                                                        },
+                                                      ),
+                                                      const Divider(height: 1),
+                                                      ListTile(
+                                                        dense: true,
+                                                        leading: Image.asset(
+                                                          "assets/message-time.png",
+                                                          width: 22,
+                                                          height: 22,
+                                                          color: isDark
+                                                              ? Colors.white
+                                                              : const Color(
+                                                                  0xFF8D6E63),
+                                                        ),
+                                                        title: Text(
+                                                          ChatTranslations.get(
+                                                              'history',
+                                                              AppApiConstant
+                                                                  .chatLanguage),
+                                                          style: TextStyle(
+                                                            color: isDark
+                                                                ? Colors.white
+                                                                : const Color(
+                                                                    0xFF8D6E63),
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                          ),
+                                                        ),
+                                                        onTap: () {
+                                                          Navigator.pop(
+                                                              context);
+                                                          Get.to(
+                                                            () =>
+                                                                const ChatHistoryScreen(),
+                                                            transition: Transition
+                                                                .cupertinoDialog,
+                                                            duration:
+                                                                const Duration(
+                                                                    milliseconds:
+                                                                        300),
+                                                          )?.then((result) {
+                                                            if (result == true)
+                                                              _loadRecentConversations();
+                                                          });
+                                                        },
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          );
+                                        });
+                                      },
+                                      child: Icon(
+                                        Icons.add,
+                                        size: screenWidth > 450 ? 22 : 20,
+                                        color: isDark
+                                            ? Colors.white
+                                            : const Color(0xFF8D6E63),
+                                      ),
+                                    )
+                                  else
+                                    InkWell(
+                                      borderRadius: BorderRadius.circular(18),
+                                      onTap: () {
+                                        // See comment above: small delay prevents the
+                                        // tap event from being routed into the sheet
+                                        // and causing an immediate dismiss on iPad.
+                                        Future.delayed(
+                                            const Duration(milliseconds: 100),
+                                            () {
+                                          showModalBottomSheet(
+                                            context: context,
+                                            backgroundColor: Colors.transparent,
+                                            builder: (_) {
+                                              final bg = isDark
+                                                  ? CommanColor.darkPrimaryColor
+                                                      .withOpacity(0.96)
+                                                  : const Color(0xFFF6F1E9);
+                                              return SafeArea(
+                                                child: Container(
+                                                  margin:
+                                                      const EdgeInsets.all(12),
+                                                  padding:
+                                                      const EdgeInsets.all(12),
+                                                  decoration: BoxDecoration(
+                                                    color: bg,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            18),
+                                                  ),
+                                                  child: Column(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      ListTile(
+                                                        dense: true,
+                                                        leading: Icon(
+                                                          Icons.add,
+                                                          color: isDark
+                                                              ? Colors.white
+                                                              : const Color(
+                                                                  0xFF8D6E63),
+                                                        ),
+                                                        title: Text(
+                                                          ChatTranslations.get(
+                                                              'new_chat',
+                                                              AppApiConstant
+                                                                  .chatLanguage),
+                                                          style: TextStyle(
+                                                            color: isDark
+                                                                ? Colors.white
+                                                                : const Color(
+                                                                    0xFF8D6E63),
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                          ),
+                                                        ),
+                                                        onTap: () {
+                                                          Navigator.pop(
+                                                              context);
+                                                          _startNewChat();
+                                                        },
+                                                      ),
+                                                      const Divider(height: 1),
+                                                      ListTile(
+                                                        dense: true,
+                                                        leading: Image.asset(
+                                                          "assets/message-time.png",
+                                                          width: 22,
+                                                          height: 22,
+                                                          color: isDark
+                                                              ? Colors.white
+                                                              : const Color(
+                                                                  0xFF8D6E63),
+                                                        ),
+                                                        title: Text(
+                                                          ChatTranslations.get(
+                                                              'history',
+                                                              AppApiConstant
+                                                                  .chatLanguage),
+                                                          style: TextStyle(
+                                                            color: isDark
+                                                                ? Colors.white
+                                                                : const Color(
+                                                                    0xFF8D6E63),
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                          ),
+                                                        ),
+                                                        onTap: () {
+                                                          Navigator.pop(
+                                                              context);
+                                                          Get.to(
+                                                            () =>
+                                                                const ChatHistoryScreen(),
+                                                            transition: Transition
+                                                                .cupertinoDialog,
+                                                            duration:
+                                                                const Duration(
+                                                                    milliseconds:
+                                                                        300),
+                                                          )?.then((result) {
+                                                            if (result == true)
+                                                              _loadRecentConversations();
+                                                          });
+                                                        },
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          );
+                                        });
+                                      },
+                                      child: Icon(
+                                        Icons.add,
+                                        size: screenWidth > 450 ? 22 : 20,
+                                        color: isDark
+                                            ? Colors.white
+                                            : const Color(0xFF8D6E63),
+                                      ),
                                     ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(
-                                          bottom:
-                                              20), // Add bottom padding to prevent text from being hidden
-                                      child: Text(
-                                        ChatTranslations.get(
-                                            'ask_questions_verse',
-                                            AppApiConstant.chatLanguage),
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: CommanColor.whiteBlack(context)
-                                              .withOpacity(0.5),
-                                          fontSize: screenWidth > 450 ? 16 : 15,
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            // IconButton(
+                            //   icon: Image.asset(
+                            //     "assets/message-time.png",
+                            //     width: 24,
+                            //     height: 24,
+                            //     color: isDark
+                            //         ? Colors.white
+                            //         : const Color(0xFF8D6E63),
+                            //   ),
+                            //   tooltip: 'Chat History',
+                            //   onPressed: () {
+                            //     Get.to(
+                            //       () => const ChatHistoryScreen(),
+                            //       transition: Transition.cupertinoDialog,
+                            //       duration: const Duration(milliseconds: 300),
+                            //     );
+                            //   },
+                            // ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Main content area - Result Section with distinct background
+                  Expanded(
+                    child: Container(
+                      color: Colors
+                          .transparent, // Remove grey background - use transparent
+                      child: _messages.isEmpty
+                          ? SingleChildScrollView(
+                              padding: EdgeInsets.only(
+                                top: screenWidth > 450 ? 14 : 12,
+                                bottom: screenWidth > 450 ? 14 : 12,
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                children: [
+                                  // Show verse context if available
+                                  if (widget.verseContext != null)
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: screenWidth > 450 ? 20 : 16,
+                                      ),
+                                      child: _buildVerseContext(
+                                          screenWidth, isDark),
+                                    ),
+                                  if (widget.verseContext != null)
+                                    const SizedBox(height: 20),
+                                  // Hide illustration image when opened from verse popup
+                                  if (widget.verseContext == null)
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: screenWidth > 450 ? 20 : 16,
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          SizedBox(
+                                              height:
+                                                  screenWidth > 450 ? 10 : 5),
+                                          Transform.translate(
+                                            offset: const Offset(0, -10),
+                                            child: Container(
+                                              width:
+                                                  screenWidth > 450 ? 140 : 130,
+                                              height:
+                                                  screenWidth > 450 ? 140 : 130,
+                                              decoration: const BoxDecoration(
+                                                color: Colors
+                                                    .transparent, // Transparent background for illustration
+                                              ),
+                                              child: Image.asset(
+                                                "assets/chat_img.png",
+                                                fit: BoxFit.contain,
+                                                errorBuilder: (context, error,
+                                                    stackTrace) {
+                                                  // Fallback to icon if image doesn't load
+                                                  return Icon(
+                                                    Icons.chat_bubble_outline,
+                                                    size: 100,
+                                                    color:
+                                                        CommanColor.whiteBlack(
+                                                                context)
+                                                            .withOpacity(0.5),
+                                                  );
+                                                },
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 5),
+                                          Text(
+                                            ChatTranslations.get(
+                                                'faith_answers',
+                                                AppApiConstant.chatLanguage),
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              color: CommanColor.whiteBlack(
+                                                      context)
+                                                  .withOpacity(0.7),
+                                              fontSize:
+                                                  screenWidth > 450 ? 26 : 23,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                                bottom:
+                                                    20), // Add bottom padding to prevent text from being hidden
+                                            child: Text(
+                                              ChatTranslations.get(
+                                                  'get_guidance',
+                                                  AppApiConstant.chatLanguage),
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                color: CommanColor.whiteBlack(
+                                                        context)
+                                                    .withOpacity(0.5),
+                                                fontSize:
+                                                    screenWidth > 450 ? 16 : 15,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  // Show verse context text if available
+                                  if (widget.verseContext != null)
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: screenWidth > 450 ? 20 : 16,
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(
+                                            bottom:
+                                                20), // Add bottom padding to prevent text from being hidden
+                                        child: Text(
+                                          ChatTranslations.get(
+                                              'ask_questions_verse',
+                                              AppApiConstant.chatLanguage),
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color:
+                                                CommanColor.whiteBlack(context)
+                                                    .withOpacity(0.5),
+                                            fontSize:
+                                                screenWidth > 450 ? 16 : 15,
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                // Show default questions inside scrollable area
-                                widget.verseContext != null
-                                    ? _buildVerseSuggestedQuestions(
-                                        screenWidth, isDark)
-                                    : _buildDefaultQuestions(
+                                  // Show default questions inside scrollable area
+                                  widget.verseContext != null
+                                      ? _buildVerseSuggestedQuestions(
+                                          screenWidth, isDark)
+                                      : _buildDefaultQuestions(
+                                          screenWidth, isDark),
+                                  // Show recent conversations inside scrollable area only in Chat Home Screen (no verse context and no history date key)
+                                  if (_recentConversations.isNotEmpty &&
+                                      widget.verseContext == null &&
+                                      widget.historyDateKey == null) ...[
+                                    const SizedBox(height: 8),
+                                    _buildRecentConversations(
                                         screenWidth, isDark),
-                                // Show recent conversations inside scrollable area only in Chat Home Screen (no verse context and no history date key)
-                                if (_recentConversations.isNotEmpty &&
-                                    widget.verseContext == null &&
-                                    widget.historyDateKey == null) ...[
-                                  const SizedBox(height: 8),
-                                  _buildRecentConversations(
-                                      screenWidth, isDark),
+                                  ],
+                                  // Add extra bottom padding for better scrolling
+                                  const SizedBox(height: 20),
                                 ],
-                                // Add extra bottom padding for better scrolling
-                                const SizedBox(height: 20),
-                              ],
+                              ),
+                            )
+                          : ListView.builder(
+                              controller: _scrollController,
+                              padding:
+                                  EdgeInsets.all(screenWidth > 450 ? 20 : 16),
+                              itemCount: _messages.length +
+                                  (_isLoading ? 1 : 0) +
+                                  1, // +1 for suggestions footer so it scrolls with content
+                              itemBuilder: (context, index) {
+                                if (index < _messages.length) {
+                                  return _buildMessageBubble(
+                                      _messages[index], screenWidth);
+                                }
+                                if (_isLoading && index == _messages.length) {
+                                  return _buildLoadingIndicator();
+                                }
+                                // Footer: suggestions (when messages exist) so they scroll with content
+                                if (index ==
+                                    _messages.length + (_isLoading ? 1 : 0)) {
+                                  return _messages.isNotEmpty
+                                      ? _buildFollowUpSuggestions(
+                                          screenWidth, isDark)
+                                      : const SizedBox(height: 8);
+                                }
+                                return const SizedBox.shrink();
+                              },
                             ),
-                          )
-                        : ListView.builder(
-                            controller: _scrollController,
-                            padding:
-                                EdgeInsets.all(screenWidth > 450 ? 20 : 16),
-                            itemCount: _messages.length +
-                                (_isLoading ? 1 : 0) +
-                                1, // +1 for suggestions footer so it scrolls with content
-                            itemBuilder: (context, index) {
-                              if (index < _messages.length) {
-                                return _buildMessageBubble(
-                                    _messages[index], screenWidth);
-                              }
-                              if (_isLoading && index == _messages.length) {
-                                return _buildLoadingIndicator();
-                              }
-                              // Footer: suggestions (when messages exist) so they scroll with content
-                              if (index ==
-                                  _messages.length + (_isLoading ? 1 : 0)) {
-                                return _messages.isNotEmpty
-                                    ? _buildFollowUpSuggestions(
-                                        screenWidth, isDark)
-                                    : const SizedBox(height: 8);
-                              }
-                              return const SizedBox.shrink();
-                            },
-                          ),
+                    ),
                   ),
-                ),
-                _buildInputArea(screenWidth, isDark),
-              ],
+                  _buildInputArea(screenWidth, isDark),
+                ],
+              ),
             ),
           ),
         ),
       ),
-    ),
     );
   }
 
