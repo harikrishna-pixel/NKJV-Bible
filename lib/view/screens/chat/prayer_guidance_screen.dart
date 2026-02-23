@@ -19,6 +19,7 @@ import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/gestures.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
@@ -177,16 +178,6 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
                     height: 1.5,
                   ),
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  "By continuing, you agree to our Privacy Policy:",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDark ? Colors.white70 : Colors.grey.shade700,
-                    height: 1.5,
-                  ),
-                ),
                 const SizedBox(height: 16),
                 InkWell(
                   onTap: () {
@@ -204,12 +195,27 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          "I agree to the Privacy Policy and AI data processing.",
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: CommanColor.whiteBlack(ctx),
-                            height: 1.4,
+                        child: RichText(
+                          text: TextSpan(
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: CommanColor.whiteBlack(ctx),
+                              height: 1.4,
+                            ),
+                            children: [
+                              const TextSpan(text: "I agree to the "),
+                              TextSpan(
+                                text: "Privacy Policy",
+                                style: TextStyle(
+                                  decoration: TextDecoration.underline,
+                                  color: CommanColor.whiteBlack(ctx),
+                                ),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = () => launchUrlString(
+                                      'https://bibleoffice.com/privacy_policy.html'),
+                              ),
+                              const TextSpan(text: " and AI data processing."),
+                            ],
                           ),
                         ),
                       ),
