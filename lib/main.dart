@@ -13,6 +13,7 @@ import 'package:biblebookapp/view/screens/welcome_screen.dart';
 import 'package:biblebookapp/view/widget/adhelper.dart';
 import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
+import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -131,6 +132,9 @@ Future<void> main() async {
 
   // Load chat/Prayer language so Prayer Guidance and Chat reflect app language
   await AppApiConstant.loadChatLanguage();
+
+  // iOS Home Screen Widgets: set App Group so widget extension can read data
+  await initBibleHomeWidget();
 
   runApp(
     hooks.ProviderScope(

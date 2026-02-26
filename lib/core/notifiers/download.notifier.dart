@@ -9,6 +9,7 @@ import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/utils/custom_alert.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
+import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
@@ -842,6 +843,16 @@ class DownloadProvider with ChangeNotifier {
 
     isLoadingDailyVerse = false;
     notifyListeners();
+
+    // iOS Home Screen Widget: update Verse of the day (first verse for today)
+    if (dailyVerseList.isNotEmpty) {
+      final v = dailyVerseList.first;
+      final ref = '${v.book ?? ''} ${v.chapter ?? ''}:${v.verseNum ?? ''}'.trim();
+      updateVerseOfTheDayWidget(
+        verseText: v.verse ?? '',
+        reference: ref.isEmpty ? 'Daily Verse' : ref,
+      );
+    }
   }
 
   // Future<void> loadDailyVerses() async {

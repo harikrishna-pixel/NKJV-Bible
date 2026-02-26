@@ -43,6 +43,8 @@ import 'package:biblebookapp/view/screens/wallpaper_screen/wallpaper_screen.dart
 import 'package:biblebookapp/view/screens/chat/chat_screen.dart';
 import 'package:biblebookapp/view/screens/chat/prayer_guidance_screen.dart';
 import 'package:biblebookapp/streak/streak_ui.dart';
+import 'package:biblebookapp/home_widget/bible_home_widget.dart';
+import 'package:home_widget/home_widget.dart';
 import 'package:biblebookapp/view/screens/tawk_chat/tawk_chat_screen.dart';
 import 'package:biblebookapp/view/screens/study_plans/study_plans_screen.dart'
     as biblebookapp;
@@ -1093,6 +1095,7 @@ class _HomeScreenState extends State<HomeScreen>
   final Stopwatch _stopwatch = Stopwatch();
   Timer? _checkerTimer;
   bool _verseShown = false;
+  StreamSubscription<Uri?>? _widgetClickSubscription;
 
   @override
   void initState() {
@@ -1119,10 +1122,30 @@ class _HomeScreenState extends State<HomeScreen>
       await _handleAppLaunchCount();
       await checkUserLoggedIn();
       await _checkAndShowDailyWelcomeToast();
+      // iOS Home Widgets: update launcher widgets and handle widget tap
+      await updateAllLauncherWidgets();
+      final initialUri = await HomeWidget.initiallyLaunchedFromHomeWidget();
+      _navigateForWidgetRoute(getBibleWidgetRouteFromUri(initialUri));
+      _widgetClickSubscription ??=
+          HomeWidget.widgetClicked.listen((uri) {
+        if (!mounted) return;
+        _navigateForWidgetRoute(getBibleWidgetRouteFromUri(uri));
+      });
     });
 
     // _initializeAds();
     loadAds();
+  }
+
+  void _navigateForWidgetRoute(BibleWidgetRoute route) {
+    if (route == BibleWidgetRoute.none) return;
+    if (route == BibleWidgetRoute.verse) {
+      Get.to(() => const DailyVerse());
+    } else if (route == BibleWidgetRoute.prayer) {
+      Get.to(() => const PrayerGuidanceScreen());
+    } else if (route == BibleWidgetRoute.chat) {
+      Get.to(() => const ChatScreen());
+    }
   }
 
   // Exit offer red dot: commented out
@@ -2427,6 +2450,7 @@ class _HomeScreenState extends State<HomeScreen>
     disposead();
     WidgetsBinding.instance.removeObserver(this);
     _checkerTimer?.cancel();
+    _widgetClickSubscription?.cancel();
     // _exitOfferCooldownRefreshTimer?.cancel();
     routeObserver.unsubscribe(this);
     super.dispose();

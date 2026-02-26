@@ -32,6 +32,16 @@
 				<string>com.googleusercontent.apps.727999460969-6ph3vmtbq4o76rbtomvpe1aff341bgdo</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>Bible Home Widget</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>biblebookapp</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
