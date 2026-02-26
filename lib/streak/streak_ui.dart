@@ -135,16 +135,16 @@ class StreakUI {
                   color: isDark ? Colors.white70 : Colors.black87,
                 ),
               ),
-              SizedBox(height: isTablet ? 24 : 20),
-              Text(
-                'Use at least one every day to build your streak.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: isTablet ? 14 : 13,
-                  fontStyle: FontStyle.italic,
-                  color: isDark ? Colors.white60 : Colors.black54,
-                ),
-              ),
+              // SizedBox(height: isTablet ? 24 : 20),
+              // Text(
+              //   'Use at least one every day to build your streak.',
+              //   textAlign: TextAlign.center,
+              //   style: TextStyle(
+              //     fontSize: isTablet ? 14 : 13,
+              //     fontStyle: FontStyle.italic,
+              //     color: isDark ? Colors.white60 : Colors.black54,
+              //   ),
+              // ),
               SizedBox(height: isTablet ? 24 : 20),
               SizedBox(
                 width: double.infinity,
