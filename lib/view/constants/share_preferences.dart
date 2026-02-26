@@ -69,6 +69,10 @@ class SharPreferences {
   static const aiDisclaimerAgreed = 'aiDisclaimerAgreed'; // User agreed to AI disclaimer
   /// Last time back interstitial was shown (Chat or Prayer). Used to limit to once per 3 minutes.
   static const lastBackInterstitialTime = 'lastBackInterstitialTime';
+  /// Streak: last calendar day (YYYY-MM-DD) user used AI Chat or Prayer Guidance.
+  static const streakLastActivityDate = 'streak_last_activity_date';
+  /// Streak: current consecutive days count.
+  static const streakCount = 'streak_count';
 
   static Future<bool?> getBoolean(String key) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();

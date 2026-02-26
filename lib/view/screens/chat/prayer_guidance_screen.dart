@@ -7,6 +7,7 @@ import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
+import 'package:biblebookapp/streak/streak_service.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/images.dart';
@@ -581,6 +582,7 @@ ${category.prompt}
               responseText.toLowerCase().startsWith('error:');
       if (!isErrorResponse) {
         await WalletService.deductCredits(chatCost);
+        await StreakService.recordActivity();
         // Automatically unmute and play background music when prayer is generated
         _isAudioMuted = false;
         await _playBackgroundMusic();
@@ -968,6 +970,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
               responseText.toLowerCase().startsWith('error:');
       if (!isErrorResponse) {
         await WalletService.deductCredits(chatCost);
+        await StreakService.recordActivity();
         // Automatically unmute and play background music when prayer is generated
         _isAudioMuted = false;
         await _playBackgroundMusic();

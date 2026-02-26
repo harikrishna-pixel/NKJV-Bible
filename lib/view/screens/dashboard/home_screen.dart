@@ -42,6 +42,7 @@ import 'package:biblebookapp/view/screens/quote_screen/quote_screen.dart';
 import 'package:biblebookapp/view/screens/wallpaper_screen/wallpaper_screen.dart';
 import 'package:biblebookapp/view/screens/chat/chat_screen.dart';
 import 'package:biblebookapp/view/screens/chat/prayer_guidance_screen.dart';
+import 'package:biblebookapp/streak/streak_ui.dart';
 import 'package:biblebookapp/view/screens/tawk_chat/tawk_chat_screen.dart';
 import 'package:biblebookapp/view/screens/study_plans/study_plans_screen.dart'
     as biblebookapp;
@@ -3231,6 +3232,9 @@ class _HomeScreenState extends State<HomeScreen>
                             width: screenWidth > 450 ? 30 : 22,
                             color: CommanColor.whiteBlack(context),
                           )),
+                      StreakIconButton(
+                        iconSize: screenWidth > 450 ? 28 : 22,
+                      ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 10.0),
                         child: ChangeThemeButtonWidget(),

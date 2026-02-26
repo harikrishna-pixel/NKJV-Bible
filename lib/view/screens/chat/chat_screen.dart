@@ -18,6 +18,7 @@ import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/chat/chat_history_screen.dart';
 import 'package:biblebookapp/view/screens/chat/chat_translations.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
+import 'package:biblebookapp/streak/streak_service.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/services/statsig/statsig_service.dart';
@@ -2095,6 +2096,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
 
         if (!isErrorResponse) {
           await _deductChatCredits();
+          await StreakService.recordActivity();
         }
 
         // Scroll to top when answer comes to show at top of answer
