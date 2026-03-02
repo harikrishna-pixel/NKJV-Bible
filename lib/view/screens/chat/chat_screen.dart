@@ -406,7 +406,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                   'small',
                                   'Short Answer',
                                   'Quick & concise response',
-                                  20,
+                                  '20 Credits',
                                   setBottomSheetState,
                                 ),
                                 const SizedBox(height: 12),
@@ -417,7 +417,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                   'medium',
                                   'Medium Answer',
                                   'Balanced explanation',
-                                  50,
+                                  '50 Credits',
                                   setBottomSheetState,
                                 ),
                                 const SizedBox(height: 12),
@@ -428,7 +428,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                   'large',
                                   'Full Study',
                                   'Detailed & comprehensive',
-                                  100,
+                                  '100 Credits',
                                   setBottomSheetState,
                                 ),
                                 const SizedBox(height: 24),
@@ -513,7 +513,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     String length,
     String title,
     String description,
-    int cost,
+    String cost,
     StateSetter setBottomSheetState,
   ) {
     final isSelected = _introAnswerLength == length;
@@ -879,12 +879,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
 
+    final bodyColor = isDark ? Colors.white70 : const Color(0xFF4A3728);
     return await showDialog<bool>(
           context: context,
           barrierDismissible: false,
           builder: (ctx) => Dialog(
-            backgroundColor:
-                isDark ? CommanColor.darkPrimaryColor : CommanColor.white,
+            backgroundColor: isDark
+                ? CommanColor.darkPrimaryColor
+                : CommanColor.backgrondcolor,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
             child: Padding(
@@ -894,57 +897,116 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Please Note',
+                    'Important Notice',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 18,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       color: CommanColor.whiteBlack(ctx),
                     ),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    "This AI chat is for spiritual encouragement only and is not a substitute for professional medical or counseling advice. If you are in crisis, please seek professional help.",
-                    textAlign: TextAlign.center,
+                    'AI Chat is provided for spiritual encouragement and informational purposes only. It is not a substitute for professional medical, psychological, or counseling advice. If you are experiencing a crisis, please seek professional help immediately.',
+                    textAlign: TextAlign.left,
                     style: TextStyle(
                       fontSize: 14,
-                      color: isDark ? Colors.white70 : Colors.grey.shade700,
+                      color: bodyColor,
                       height: 1.5,
                     ),
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    "To generate responses, the text you enter will be securely sent to a third-party AI service for processing.",
-                    textAlign: TextAlign.center,
+                    'To generate responses, the text you enter will be securely transmitted to our third-party AI service provider (such as OpenAI or Google Gemini) for processing. Basic technical information such as app version or device type may also be transmitted as required to provide the service.',
+                    textAlign: TextAlign.left,
                     style: TextStyle(
                       fontSize: 14,
-                      color: isDark ? Colors.white70 : Colors.grey.shade700,
+                      color: bodyColor,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'We do not sell your personal data.',
+                    textAlign: TextAlign.left,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: bodyColor,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'By tapping "Agree & Continue", you acknowledge and consent to this processing in accordance with our Privacy Policy.',
+                    textAlign: TextAlign.left,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: bodyColor,
                       height: 1.5,
                     ),
                   ),
                   const SizedBox(height: 20),
-                  GestureDetector(
-                    onTap: () async {
-                      await SharPreferences.setBoolean(
-                          SharPreferences.aiDisclaimerAgreed, true);
-                      if (ctx.mounted) Navigator.pop(ctx, true);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: CommanColor.lightDarkPrimary(ctx),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'Start Chatting',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () async {
+                            await SharPreferences.setBoolean(
+                                SharPreferences.aiDisclaimerAgreed, true);
+                            if (ctx.mounted) Navigator.pop(ctx, true);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: CommanColor.lightDarkPrimary(ctx),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Agree & Continue',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            // Dismiss only; do not set aiDisclaimerAgreed so the notice
+                            // shows again when the user taps to send/chat next time.
+                            if (ctx.mounted) Navigator.pop(ctx, false);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.white12
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: CommanColor.lightDarkPrimary(ctx),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Text(
+                              'Cancel',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: CommanColor.lightDarkPrimary(ctx),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -954,7 +1016,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         onTap: () => launchUrlString(
                             'https://bibleoffice.com/terms_conditions.html'),
                         child: Text(
-                          "Terms",
+                          'Terms',
                           style: TextStyle(
                             fontSize: 12,
                             color: CommanColor.whiteBlack(ctx),
@@ -962,7 +1024,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         ),
                       ),
                       Text(
-                        " | ",
+                        ' | ',
                         style: TextStyle(
                           fontSize: 12,
                           color: CommanColor.whiteBlack(ctx),
@@ -972,7 +1034,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         onTap: () => launchUrlString(
                             'https://bibleoffice.com/privacy_policy.html'),
                         child: Text(
-                          "Privacy",
+                          'Privacy',
                           style: TextStyle(
                             fontSize: 12,
                             color: CommanColor.whiteBlack(ctx),
