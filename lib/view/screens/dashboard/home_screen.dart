@@ -3256,9 +3256,9 @@ class _HomeScreenState extends State<HomeScreen>
                             width: screenWidth > 450 ? 30 : 22,
                             color: CommanColor.whiteBlack(context),
                           )),
-                      StreakIconButton(
-                        iconSize: screenWidth > 450 ? 28 : 22,
-                      ),
+                      // StreakIconButton(
+                      //   iconSize: screenWidth > 450 ? 28 : 22,
+                      // ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 10.0),
                         child: ChangeThemeButtonWidget(),
