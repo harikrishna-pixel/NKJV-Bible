@@ -192,13 +192,13 @@ flutter:
       fonts:
         - asset: assets/fonts/BRUSHSCI.ttf
 
-    - family: Courier
-      fonts:
-        - asset: assets/fonts/Courier.ttf
+    # - family: Courier
+    #   fonts:
+    #     - asset: assets/fonts/Courier.ttf
 
-    - family: Alnile
-      fonts:
-        - asset: assets/fonts/Alnile.ttf
+    # - family: Alnile
+    #   fonts:
+    #     - asset: assets/fonts/Alnile.ttf
 
     - family: Avenir LT Std 65 Medium
       fonts:
