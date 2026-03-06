@@ -24,6 +24,7 @@ import 'package:biblebookapp/view/screens/books/books_screen.dart';
 import 'package:biblebookapp/view/screens/books/model/book_model.dart';
 import 'package:biblebookapp/view/screens/calendar_screen/view/calendar_screen.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
+import 'package:biblebookapp/view/screens/dashboard/add_widget_intro_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/eproducts_screen.dart';
 
@@ -4834,6 +4835,32 @@ class _HomeScreenState extends State<HomeScreen>
                           ),
                           title: Text(
                             'Get Prayer',
+                            style: CommanStyle.bothPrimary16600(context),
+                          ),
+                        ),
+                        ListTile(
+                          dense: true,
+                          onTap: () {
+                            Get.back();
+                            Get.to(
+                              () => const AddWidgetIntroScreen(),
+                              transition: Transition.cupertinoDialog,
+                              duration: const Duration(milliseconds: 300),
+                            );
+                          },
+                          visualDensity:
+                              const VisualDensity(horizontal: 0, vertical: 0),
+                          leading: Icon(
+                            Icons.widgets,
+                            size: 24,
+                            color:
+                                Provider.of<ThemeProvider>(context).themeMode ==
+                                        ThemeMode.dark
+                                    ? CommanColor.darkPrimaryColor
+                                    : CommanColor.lightModePrimary,
+                          ),
+                          title: Text(
+                            'Add Widget',
                             style: CommanStyle.bothPrimary16600(context),
                           ),
                         ),

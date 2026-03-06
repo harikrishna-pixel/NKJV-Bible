@@ -4,12 +4,36 @@
 //
 //  iOS Home Screen Widget Extension: Verse of the day, Bible Prayer, Bible Chat.
 //  Uses old-paper styling and default content when app has not yet provided data.
+//  Adopts containerBackground API for iOS 17+ so widgets render correctly on all devices.
 //
 
 import SwiftUI
 import WidgetKit
 
 private let appGroupId = "group.com.balaklrapps.genevabible"
+
+// MARK: - Container Background (iOS 17+)
+
+/// Wraps widget content with the correct background for the OS: containerBackground on iOS 17+,
+/// ZStack fallback on earlier iOS. Adopting containerBackground fixes "Please adopt containerBackground API" and widget not showing on iOS 17+ devices.
+struct WidgetContainerBackground<Content: View>: View {
+  let background: Color
+  @ViewBuilder let content: () -> Content
+
+  var body: some View {
+    if #available(iOS 17.0, *) {
+      content()
+        .containerBackground(for: .widget) {
+          background
+        }
+    } else {
+      ZStack {
+        background
+        content()
+      }
+    }
+  }
+}
 
 // MARK: - Old Paper Theme
 
@@ -58,8 +82,7 @@ struct VerseOfTheDayView: View {
   var entry: VerseOfTheDayEntry
 
   var body: some View {
-    ZStack {
-      oldPaperBackground
+    WidgetContainerBackground(background: oldPaperBackground) {
       VStack(alignment: .leading, spacing: 6) {
         Text("Verse of the Day")
           .font(.caption)
@@ -125,8 +148,7 @@ struct BiblePrayerView: View {
   var entry: BiblePrayerEntry
 
   var body: some View {
-    ZStack {
-      oldPaperBackground
+    WidgetContainerBackground(background: oldPaperBackground) {
       VStack(alignment: .leading, spacing: 6) {
         HStack(spacing: 4) {
           Image(systemName: "hands.sparkles")
@@ -194,8 +216,7 @@ struct BibleChatView: View {
   var entry: BibleChatEntry
 
   var body: some View {
-    ZStack {
-      oldPaperBackground
+    WidgetContainerBackground(background: oldPaperBackground) {
       VStack(alignment: .leading, spacing: 6) {
         HStack(spacing: 4) {
           Image(systemName: "message")

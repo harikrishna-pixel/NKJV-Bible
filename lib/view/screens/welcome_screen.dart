@@ -11,6 +11,9 @@ class WelcomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600; // Simple check for iPad vs i
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? const Color(0xFFE8E8E8) : const Color(0xFF1A1A1A);
+    final shadowColor = isDark ? const Color(0x40000000) : const Color(0x26000000);
     return Scaffold(
       body: Container(
         width: size.width,
@@ -67,20 +70,27 @@ class WelcomeScreen extends StatelessWidget {
                     ],
                   ),
                   SizedBox(height: isTablet ? 28 : 24),
-                  // Title
+                  // Title — high contrast for readability on any background
                   Text(
                     "New Look, Same Bible",
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: isTablet ? 30 : 27,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
+                      fontWeight: FontWeight.w600,
+                      color: textColor,
+                      shadows: [
+                        Shadow(
+                          color: shadowColor,
+                          offset: const Offset(0, 1),
+                          blurRadius: 2,
+                        ),
+                      ],
                     ),
                   ),
 
                   SizedBox(height: isTablet ? 20 : 12),
 
-                  // First paragraph
+                  // First paragraph — clear contrast on light or gradient background
                   Text(
                     "We're grateful you're here.",
                     textAlign: TextAlign.center,
@@ -88,19 +98,34 @@ class WelcomeScreen extends StatelessWidget {
                       fontSize: isTablet ? 20 : 17,
                       height: 1.5,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: textColor,
+                      shadows: [
+                        Shadow(
+                          color: shadowColor,
+                          offset: const Offset(0, 1),
+                          blurRadius: 2,
+                        ),
+                      ],
                     ),
                   ),
                   SizedBox(height: isTablet ? 12 : 8),
 
-                  // Second paragraph
+                  // Second paragraph — strong contrast so descriptive text is clearly visible
                   Text(
                     "We've refreshed our app with a new look and added helpful ways to connect with God, including prayer and guided conversations.",
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: isTablet ? 20 : 17,
                       height: 1.5,
-                      color: Colors.black87,
+                      fontWeight: FontWeight.w500,
+                      color: textColor,
+                      shadows: [
+                        Shadow(
+                          color: shadowColor,
+                          offset: const Offset(0, 1),
+                          blurRadius: 3,
+                        ),
+                      ],
                     ),
                   ),
                   SizedBox(height: isTablet ? 40 : 24),

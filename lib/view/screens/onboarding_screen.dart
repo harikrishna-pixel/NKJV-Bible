@@ -52,6 +52,104 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   //   }
   // }
 
+  /// First onboarding page: app logo, official typography, no book icon.
+  Widget _buildFirstOnboardingPage(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width > 600;
+    return Container(
+      width: size.width,
+      height: size.height,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF4A2C6A),
+            Color(0xFF5E3A7A),
+            Color(0xFFE8E0F0),
+            Colors.white,
+          ],
+        ),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: isTablet ? 48 : 24),
+          child: Column(
+            children: [
+              SizedBox(height: isTablet ? 50 : 36),
+              // App logo (replaces book icon)
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4A2C6A),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(20),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.asset(
+                    'assets/Icon-1024.png',
+                    width: isTablet ? 120 : 88,
+                    height: isTablet ? 120 : 88,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+              SizedBox(height: isTablet ? 36 : 28),
+              // Title — clean, official typography (sans-serif)
+              Text(
+                'Grow Closer to God\nEvery Day',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: isTablet ? 28 : 24,
+                  fontWeight: FontWeight.w600,
+                  height: 1.25,
+                  color: Colors.white,
+                  fontFamily: 'Arial',
+                  letterSpacing: 0.3,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withOpacity(0.25),
+                      offset: const Offset(0, 1),
+                      blurRadius: 4,
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: isTablet ? 20 : 16),
+              // Subtitle — readable contrast
+              Text(
+                'Your AI-powered Bible companion for reading, prayer, and spiritual guidance.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: isTablet ? 17 : 15,
+                  height: 1.4,
+                  fontWeight: FontWeight.w400,
+                  color: const Color(0xFF3D3D3D),
+                  fontFamily: 'Arial',
+                  shadows: [
+                    Shadow(
+                      color: Colors.white.withOpacity(0.9),
+                      offset: const Offset(0, 1),
+                      blurRadius: 2,
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     SystemChrome.setPreferredOrientations([
@@ -69,10 +167,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           children: [
             PageView.builder(
               controller: pageController,
-              itemBuilder: (context, index) => Image.asset(
-                boardingImages[index],
-                fit: BoxFit.cover,
-              ),
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return _buildFirstOnboardingPage(context);
+                }
+                return Image.asset(
+                  boardingImages[index],
+                  fit: BoxFit.cover,
+                );
+              },
               itemCount: boardingImages.length,
             ),
             Positioned(
@@ -83,16 +186,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   endNavigation();
                 },
                 child: Text("Skip",
-                    style: screenWidth > 450
+                    style: (screenWidth > 450
                         ? CommanStyle.bw14400(context).copyWith(
                             decoration: TextDecoration.underline,
-                            decorationColor: Colors.black,
+                            decorationColor: currentIndex == 0 ? Colors.white : Colors.black,
                             fontSize: BibleInfo.fontSizeScale * 25,
-                            color: Colors.black)
+                            color: currentIndex == 0 ? Colors.white : Colors.black)
                         : CommanStyle.bw14400(context).copyWith(
                             decoration: TextDecoration.underline,
-                            decorationColor: Colors.black,
-                            color: Colors.black)),
+                            decorationColor: currentIndex == 0 ? Colors.white : Colors.black,
+                            color: currentIndex == 0 ? Colors.white : Colors.black))),
               ),
             ),
             Positioned(

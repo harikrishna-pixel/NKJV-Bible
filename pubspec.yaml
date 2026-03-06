@@ -153,6 +153,7 @@ flutter:
     - assets/light_modes/
     - assets/music/
     - assets/study_plan_images/
+    - assets/home-widgets/
     - .env
 
   fonts:

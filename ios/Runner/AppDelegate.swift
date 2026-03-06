@@ -19,6 +19,27 @@ import flutter_local_notifications
     }
 
     GeneratedPluginRegistrant.register(with: self)
+
+    if let controller = window?.rootViewController as? FlutterViewController {
+      let channel = FlutterMethodChannel(
+        name: "com.biblebookapp/move_to_back",
+        binaryMessenger: controller.binaryMessenger)
+      channel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
+        guard call.method == "moveTaskToBack" else {
+          result(FlutterMethodNotImplemented)
+          return
+        }
+        if UIApplication.shared.responds(to: NSSelectorFromString("suspend")) {
+          DispatchQueue.main.async {
+            UIApplication.shared.perform(NSSelectorFromString("suspend"))
+          }
+          result(nil)
+        } else {
+          result(FlutterMethodNotImplemented)
+        }
+      }
+    }
+
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 }

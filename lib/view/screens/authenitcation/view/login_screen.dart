@@ -153,9 +153,13 @@ class LoginScreen extends HookConsumerWidget {
                         controller: loginState.passCon,
                         isPassword: true,
                         hintText: 'Password',
-                        validator: FormBuilderValidators.minLength(6,
-                            errorText:
-                                'Password should be at least 6 character length'),
+                        validator: FormBuilderValidators.compose([
+                          FormBuilderValidators.required(
+                              errorText: 'Please enter your password'),
+                          FormBuilderValidators.minLength(6,
+                              errorText:
+                                  'Password should be at least 6 character length'),
+                        ]),
                       ),
                       const SizedBox(height: 32),
                       GestureDetector(
