@@ -30,6 +30,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:http/http.dart' as http;
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PrayerGuidanceScreen extends StatefulWidget {
   const PrayerGuidanceScreen({super.key});
@@ -648,8 +649,14 @@ ${category.prompt}
       if (!isErrorResponse) {
         await WalletService.deductCredits(chatCost);
         if (mounted) {
-          Constants.showToast(
-              'Used $chatCost credits for this response', 5000);
+          final prefs = await SharedPreferences.getInstance();
+          final creditDebitShown =
+              prefs.getBool('prayer_credit_debit_shown') ?? false;
+          if (!creditDebitShown) {
+            Constants.showToast(
+                'Used $chatCost credits for this response', 5000);
+            await prefs.setBool('prayer_credit_debit_shown', true);
+          }
           _loadCreditsFromLocal();
         }
         await StreakService.recordActivity();
@@ -1046,8 +1053,14 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
       if (!isErrorResponse) {
         await WalletService.deductCredits(chatCost);
         if (mounted) {
-          Constants.showToast(
-              'Used $chatCost credits for this response', 5000);
+          final prefs = await SharedPreferences.getInstance();
+          final creditDebitShown =
+              prefs.getBool('prayer_credit_debit_shown') ?? false;
+          if (!creditDebitShown) {
+            Constants.showToast(
+                'Used $chatCost credits for this response', 5000);
+            await prefs.setBool('prayer_credit_debit_shown', true);
+          }
           _loadCreditsFromLocal();
         }
         await StreakService.recordActivity();

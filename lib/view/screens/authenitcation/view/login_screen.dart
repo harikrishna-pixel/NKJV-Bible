@@ -141,8 +141,12 @@ class LoginScreen extends HookConsumerWidget {
                       CustomTextFormField(
                         controller: loginState.emailCon,
                         hintText: 'Email',
-                        validator: FormBuilderValidators.email(
-                            errorText: 'Email is not valid'),
+                        validator: FormBuilderValidators.compose([
+                          FormBuilderValidators.required(
+                              errorText: 'Please enter your email address'),
+                          FormBuilderValidators.email(
+                              errorText: 'Email is not valid'),
+                        ]),
                       ),
                       const SizedBox(height: 20),
                       CustomTextFormField(
