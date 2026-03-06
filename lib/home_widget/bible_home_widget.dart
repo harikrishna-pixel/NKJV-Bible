@@ -32,6 +32,10 @@ const String _kBibleChatKind = 'BibleChatWidget';
 /// Data keys stored in UserDefaults (App Group) for the widgets.
 const String _kVerseTextKey = 'widget_verse_text';
 const String _kVerseReferenceKey = 'widget_verse_reference';
+
+/// Keys exposed so app can read widget verse when opening from widget tap.
+const String kWidgetVerseTextKey = _kVerseTextKey;
+const String kWidgetVerseReferenceKey = _kVerseReferenceKey;
 const String _kBiblePrayerTitleKey = 'widget_bible_prayer_title';
 const String _kPrayerTextKey = 'widget_prayer_text';
 const String _kChatQuestionKey = 'widget_chat_question';
@@ -42,6 +46,20 @@ const String _kBibleChatTitleKey = 'widget_bible_chat_title';
 const String kWidgetRouteVerse = 'verse';
 const String kWidgetRoutePrayer = 'prayer';
 const String kWidgetRouteChat = 'chat';
+
+/// Returns the verse text and reference currently shown on the Verse of the Day widget.
+/// Use when opening Daily Verse from widget tap so the same verse is displayed.
+Future<Map<String, String?>> getVerseOfTheDayWidgetData() async {
+  if (!Platform.isIOS) return {};
+  try {
+    final text = await HomeWidget.getWidgetData<String>(_kVerseTextKey);
+    final ref = await HomeWidget.getWidgetData<String>(_kVerseReferenceKey);
+    return {'text': text, 'reference': ref};
+  } catch (e) {
+    debugPrint('BibleHomeWidget: getVerseOfTheDayWidgetData failed: $e');
+    return {};
+  }
+}
 
 /// Call once at app startup (e.g. from main()) so the app can communicate with the Widget Extension.
 /// No-op on non-iOS. Does not change any existing logic.

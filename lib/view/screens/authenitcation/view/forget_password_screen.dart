@@ -93,8 +93,12 @@ class ForgetPasswordScreen extends HookConsumerWidget {
                         CustomTextFormField(
                           controller: forgetPasswordState.emailCon,
                           hintText: 'Email',
-                          validator: FormBuilderValidators.email(
-                              errorText: 'Email is not valid'),
+                          validator: FormBuilderValidators.compose([
+                            FormBuilderValidators.required(
+                                errorText: 'Please enter your email address'),
+                            FormBuilderValidators.email(
+                                errorText: 'Email is not valid'),
+                          ]),
                         ),
                         const SizedBox(height: 40),
                         GestureDetector(

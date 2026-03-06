@@ -93,6 +93,8 @@ class HomeScreen extends StatefulWidget {
   var selectedVerseNumForRead;
   var selectedVerseForRead;
   var From;
+  /// When true (e.g. opened from Search), verse is shown in default reading font, not user-selected font.
+  final bool fromSearch;
 
   HomeScreen(
       {super.key,
@@ -101,7 +103,8 @@ class HomeScreen extends StatefulWidget {
       required this.selectedVerseNumForRead,
       required this.From,
       required this.selectedBookNameForRead,
-      required this.selectedVerseForRead});
+      required this.selectedVerseForRead,
+      this.fromSearch = false});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -1140,7 +1143,7 @@ class _HomeScreenState extends State<HomeScreen>
   void _navigateForWidgetRoute(BibleWidgetRoute route) {
     if (route == BibleWidgetRoute.none) return;
     if (route == BibleWidgetRoute.verse) {
-      Get.to(() => const DailyVerse());
+      Get.to(() => const DailyVerse(fromWidget: true));
     } else if (route == BibleWidgetRoute.prayer) {
       Get.to(() => const PrayerGuidanceScreen());
     } else if (route == BibleWidgetRoute.chat) {
@@ -6680,7 +6683,13 @@ class _HomeScreenState extends State<HomeScreen>
         state.controller!.getSelectedChapterAndBook();
       }
 
-      state.controller!.getFont();
+      await state.controller!.getFont();
+      // When opened from Search, use default reading font instead of user-selected font
+      if (widget.fromSearch) {
+        state.controller!.selectedFontFamily.value = 'Arial';
+        state.controller!.fontSize.value =
+            MediaQuery.of(context).size.width > 450 ? 25.0 : 19.0;
+      }
     });
 
     Future.delayed(const Duration(seconds: 6), () {

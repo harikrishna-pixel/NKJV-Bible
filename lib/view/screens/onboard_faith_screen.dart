@@ -21,8 +21,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:biblebookapp/view/constants/images.dart';
 
-import '../constants/share_preferences.dart';
-
 /// Keys for persistence
 class _PrefsKeys {
   static const survey = 'faith_survey_v1';
@@ -145,14 +143,21 @@ class _FaithOnboardingScreenState extends State<FaithOnboardingScreen> {
     } else {
       await _repo.save(data);
       if (step == 4) {
-        await SharPreferences.setBoolean(SharPreferences.onboarding, true);
+        // Do NOT set onboarding=true here — set it only when user taps Continue
+        // on OnboardingGuidanceScreen, so that closing the app on that screen
+        // and reopening sends user back to onboarding instead of empty Home.
         // Request notification permission after completing all questions
         await _requestNotificationPermission();
 
         void goNext() {
-          // Show theme selection screen after OnboardingGuidanceScreen
+          // Do NOT set onboarding here — set it only when user completes theme
+          // selection (onThemeSelected), so closing on Theme screen reopens to onboarding.
           Get.to(() => OnboardingThemeSelectionScreen(
                 onThemeSelected: () {
+                  // Do NOT set onboarding here — set it only when user completes
+                  // preference/category selection (PreferenceSelectionScreen "Start now"
+                  // or BibleVersionsScreen completion), so closing on that screen
+                  // reopens to onboarding.
                   debugPrint("folders leng - ${BibleInfo.folders.length}");
                   if (BibleInfo.folders.length == 1) {
                     Get.off(() => PreferenceSelectionScreen(

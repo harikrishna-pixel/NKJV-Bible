@@ -25,9 +25,12 @@ import '../../constants/constant.dart';
 import '../../constants/images.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:biblebookapp/services/statsig/statsig_service.dart';
+import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 
 class DailyVerse extends StatefulWidget {
-  const DailyVerse({super.key});
+  const DailyVerse({super.key, this.fromWidget = false});
+
+  final bool fromWidget;
 
   @override
   State<DailyVerse> createState() => _DailyVerseState();
@@ -123,6 +126,23 @@ class _DailyVerseState extends State<DailyVerse> {
         })
         .toSet()
         .toList();
+
+    // When opened from Verse of the Day widget, show the same verse as on the widget first
+    if (widget.fromWidget && dailyVerseList.isNotEmpty) {
+      final widgetData = await getVerseOfTheDayWidgetData();
+      final widgetRef = (widgetData['reference'] ?? '').trim().replaceAll(RegExp(r'\s+'), ' ');
+      if (widgetRef.isNotEmpty) {
+        final idx = dailyVerseList.indexWhere((v) {
+          final listRef = '${v.book} ${(v.chapter ?? 0) + 1}:${(v.verseNum ?? 0) + 1}'.trim();
+          return listRef == widgetRef || listRef.replaceAll(' ', '') == widgetRef.replaceAll(' ', '');
+        });
+        if (idx > 0) {
+          final item = dailyVerseList.removeAt(idx);
+          dailyVerseList.insert(0, item);
+          if (mounted) setState(() {});
+        }
+      }
+    }
 
     // dailyVerseList.sort((a, b) {
     //   final dateA = DateTime.parse(a.date.toString());

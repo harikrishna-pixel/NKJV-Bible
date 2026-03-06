@@ -68,6 +68,10 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
   // Counter for AMEN button taps (show ad every 10 taps)
   int _amenTapCount = 0;
 
+  // Wallet credits (same as Chat screen)
+  int _currentCredits = 0;
+  Timer? _creditsTimer;
+
   // Background music asset path (without 'assets/' prefix as AssetSource adds it automatically)
   static const String _backgroundMusicUrl =
       'music/christian-rock-for-jesus-christ-always-301257.mp3';
@@ -643,6 +647,11 @@ ${category.prompt}
               responseText.toLowerCase().startsWith('error:');
       if (!isErrorResponse) {
         await WalletService.deductCredits(chatCost);
+        if (mounted) {
+          Constants.showToast(
+              'Used $chatCost credits for this response', 5000);
+          _loadCreditsFromLocal();
+        }
         await StreakService.recordActivity();
         await updateBiblePrayerWidget(prayerText: responseText);
         // Automatically unmute and play background music when prayer is generated
@@ -760,6 +769,10 @@ ${category.prompt}
       Constants.showToast("Please enter your prayer request", 3000);
       return;
     }
+
+    // Show Please Note dialog before first response (same as category prayer)
+    final agreed = await _showPleaseNoteDialog();
+    if (!agreed || !mounted) return;
 
     // Stop any currently playing prayer audio so only one audio plays at a time
     await _audioPlayer.stop();
@@ -1032,6 +1045,11 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
               responseText.toLowerCase().startsWith('error:');
       if (!isErrorResponse) {
         await WalletService.deductCredits(chatCost);
+        if (mounted) {
+          Constants.showToast(
+              'Used $chatCost credits for this response', 5000);
+          _loadCreditsFromLocal();
+        }
         await StreakService.recordActivity();
         await updateBiblePrayerWidget(prayerText: responseText);
         // Automatically unmute and play background music when prayer is generated
@@ -1206,6 +1224,25 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     AppApiConstant.loadChatLanguage().then((_) {
       if (mounted) setState(() {});
     });
+
+    // Load credits and refresh periodically (same as Chat screen)
+    _loadCreditsFromLocal();
+    _creditsTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      _loadCreditsFromLocal();
+    });
+  }
+
+  Future<void> _loadCreditsFromLocal() async {
+    try {
+      final credits = await WalletService.getCredits();
+      if (mounted && credits != _currentCredits) {
+        setState(() {
+          _currentCredits = credits;
+        });
+      }
+    } catch (e) {
+      debugPrint('Prayer credits load error: $e');
+    }
   }
 
   // Load interstitial ad
@@ -1236,6 +1273,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
 
   @override
   void dispose() {
+    _creditsTimer?.cancel();
     _amenToastTimer?.cancel();
     _amenToastEntry?.remove();
     _amenToastEntry = null;
@@ -1608,6 +1646,73 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          // Wallet icon and credits (same as Chat screen)
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: size.width > 450 ? 12 : 10,
+                              vertical: size.width > 450 ? 10 : 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Provider.of<ThemeProvider>(context)
+                                          .themeMode ==
+                                      ThemeMode.dark
+                                  ? CommanColor.darkPrimaryColor
+                                      .withOpacity(0.35)
+                                  : const Color(0xFFF6F1E9).withOpacity(0.65),
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(
+                                color: Provider.of<ThemeProvider>(context)
+                                            .themeMode ==
+                                        ThemeMode.dark
+                                    ? Colors.white.withOpacity(0.18)
+                                    : const Color(0xFF8D6E63)
+                                        .withOpacity(0.18),
+                              ),
+                            ),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(18),
+                              onTap: () {
+                                Get.to(
+                                  () => const WalletScreen(),
+                                  transition: Transition.cupertinoDialog,
+                                  duration:
+                                      const Duration(milliseconds: 300),
+                                )?.then((_) {
+                                  _loadCreditsFromLocal();
+                                });
+                              },
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.account_balance_wallet,
+                                    size: size.width > 450 ? 22 : 20,
+                                    color: Provider.of<ThemeProvider>(context)
+                                                .themeMode ==
+                                            ThemeMode.dark
+                                        ? Colors.white
+                                        : const Color(0xFF8D6E63),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '$_currentCredits',
+                                    style: TextStyle(
+                                      color: Provider.of<ThemeProvider>(
+                                                  context)
+                                              .themeMode ==
+                                          ThemeMode.dark
+                                          ? Colors.white
+                                          : const Color(0xFF8D6E63),
+                                      fontSize:
+                                          size.width > 450 ? 14 : 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: size.width > 450 ? 12 : 10),
                           if (_messages.isNotEmpty)
                             Container(
                               decoration: BoxDecoration(

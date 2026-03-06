@@ -104,23 +104,32 @@ class SignupScreen extends HookConsumerWidget {
                                 controller: signupState.nameCon,
                                 hintText: 'Name',
                                 validator: FormBuilderValidators.required(
-                                    errorText: 'Name cannot be empty'),
+                                    errorText: 'Please enter your name'),
                               ),
                               const SizedBox(height: 20),
                               CustomTextFormField(
                                 controller: signupState.emailCon,
                                 hintText: 'Email',
-                                validator: FormBuilderValidators.email(
-                                    errorText: 'Email is not valid'),
+                                validator: FormBuilderValidators.compose([
+                                  FormBuilderValidators.required(
+                                      errorText:
+                                          'Please enter your email address'),
+                                  FormBuilderValidators.email(
+                                      errorText: 'Email is not valid'),
+                                ]),
                               ),
                               const SizedBox(height: 20),
                               CustomTextFormField(
                                 controller: signupState.passCon,
                                 isPassword: true,
                                 hintText: 'Password',
-                                validator: FormBuilderValidators.minLength(8,
-                                    errorText:
-                                        'Password should be at least 8 character length'),
+                                validator: FormBuilderValidators.compose([
+                                  FormBuilderValidators.required(
+                                      errorText: 'Please enter password'),
+                                  FormBuilderValidators.minLength(8,
+                                      errorText:
+                                          'Password should be at least 8 character length'),
+                                ]),
                               ),
                               const SizedBox(height: 20),
                               CustomTextFormField(
@@ -128,11 +137,11 @@ class SignupScreen extends HookConsumerWidget {
                                 isPassword: true,
                                 hintText: 'Confirm Password',
                                 validator: (p0) {
+                                  if (p0 == null || p0.isEmpty) {
+                                    return 'Please confirm your password';
+                                  }
                                   if (p0 != signupState.passCon.text) {
                                     return 'Password is not matching';
-                                  }
-                                  if (p0 == null || p0.isEmpty) {
-                                    return 'Confirm Password cannot be empty';
                                   }
                                   return null;
                                 },

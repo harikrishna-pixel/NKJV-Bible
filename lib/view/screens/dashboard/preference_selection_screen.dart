@@ -1292,6 +1292,10 @@ class FaithJourneyDialog {
                   onPressed: () async {
                     Navigator.of(ctx).pop(); // Close dialog
                     if (isFromOnboarding) {
+                      // Mark onboarding complete only when user taps Start now (so
+                      // closing on preference/category screen reopens to onboarding).
+                      await SharPreferences.setBoolean(
+                          SharPreferences.onboarding, true);
                       // Check network speed - if slow/2G, bypass IAP screen and go to Home
                       final hasInternet =
                           await InternetConnection().hasInternetAccess;

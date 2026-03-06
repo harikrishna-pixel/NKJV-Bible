@@ -844,10 +844,10 @@ class DownloadProvider with ChangeNotifier {
     isLoadingDailyVerse = false;
     notifyListeners();
 
-    // iOS Home Screen Widget: update Verse of the day (first verse for today)
+    // iOS Home Screen Widget: update Verse of the day (same format as Daily Verse screen)
     if (dailyVerseList.isNotEmpty) {
       final v = dailyVerseList.first;
-      final ref = '${v.book ?? ''} ${v.chapter ?? ''}:${v.verseNum ?? ''}'.trim();
+      final ref = '${v.book ?? ''} ${(v.chapter ?? 0) + 1}:${(v.verseNum ?? 0) + 1}'.trim();
       updateVerseOfTheDayWidget(
         verseText: v.verse ?? '',
         reference: ref.isEmpty ? 'Daily Verse' : ref,

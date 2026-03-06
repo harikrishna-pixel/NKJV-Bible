@@ -557,7 +557,9 @@ class _SearchScreenState extends State<SearchScreen> {
                       width: MediaQuery.of(context).size.width,
                       height: screenWidth > 450 ? 55 : 42,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).brightness == Brightness.light
+                            ? Colors.grey.shade100
+                            : Colors.white,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       margin: EdgeInsets.only(
@@ -1260,7 +1262,8 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                     parse(data.content)
                                                                         .body
                                                                         ?.text
-                                                                        .toString()),
+                                                                        .toString(),
+                                                                fromSearch: true),
                                                             transition: Transition
                                                                 .cupertinoDialog,
                                                             duration:
@@ -1767,7 +1770,8 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                           selectedVerseForRead: parse(data.content)
                                                                               .body
                                                                               ?.text
-                                                                              .toString()),
+                                                                              .toString(),
+                                                                          fromSearch: true),
                                                                       transition:
                                                                           Transition
                                                                               .cupertinoDialog,

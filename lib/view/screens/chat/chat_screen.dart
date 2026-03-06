@@ -2664,9 +2664,8 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                                                 const Duration(
                                                                     milliseconds:
                                                                         300),
-                                                          )?.then((result) {
-                                                            if (result == true)
-                                                              _loadRecentConversations();
+                                                          )?.then((_) {
+                                                            _loadRecentConversations();
                                                           });
                                                         },
                                                       ),
@@ -2787,9 +2786,8 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                                                 const Duration(
                                                                     milliseconds:
                                                                         300),
-                                                          )?.then((result) {
-                                                            if (result == true)
-                                                              _loadRecentConversations();
+                                                          )?.then((_) {
+                                                            _loadRecentConversations();
                                                           });
                                                         },
                                                       ),
@@ -3248,8 +3246,8 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                     () => const ChatHistoryScreen(),
                     transition: Transition.cupertinoDialog,
                     duration: const Duration(milliseconds: 300),
-                  )?.then((result) {
-                    if (result == true) _loadRecentConversations();
+                  )?.then((_) {
+                    _loadRecentConversations();
                   });
                 },
                 child: Text(
