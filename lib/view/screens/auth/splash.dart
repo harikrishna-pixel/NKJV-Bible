@@ -43,6 +43,7 @@ import '../../../Model/verseBookContentModel.dart';
 import '../../../controller/dpProvider.dart';
 import '../../constants/images.dart';
 import '../../constants/share_preferences.dart';
+import 'package:biblebookapp/streak_flow/streak_flow_screens.dart';
 import '../dashboard/home_screen.dart';
 
 Future<List<MainBookListModel>> _parseAndPrepareBooks(String jsonString) async {
@@ -390,15 +391,9 @@ class _SplashScreenState extends State<SplashScreen> {
     } else {
       Future.delayed(
         const Duration(seconds: 1),
-        () {
+        () async {
           SharPreferences.setBoolean(SharPreferences.isLoadBookContent, true);
-          Get.offAll(() => HomeScreen(
-              From: "splash",
-              selectedVerseNumForRead: "",
-              selectedBookForRead: "",
-              selectedChapterForRead: "",
-              selectedBookNameForRead: "",
-              selectedVerseForRead: ""));
+          await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
         },
       );
     }

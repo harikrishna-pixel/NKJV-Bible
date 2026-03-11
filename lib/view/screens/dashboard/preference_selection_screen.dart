@@ -13,6 +13,7 @@ import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
+import 'package:biblebookapp/streak_flow/streak_flow_screens.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 import 'package:biblebookapp/view/screens/onboard_faith_screen.dart';
@@ -1300,15 +1301,7 @@ class FaithJourneyDialog {
                       final hasInternet =
                           await InternetConnection().hasInternetAccess;
                       if (!hasInternet) {
-                        // No internet - bypass to HomeScreen
-                        Get.offAll(() => HomeScreen(
-                              From: "splash",
-                              selectedVerseNumForRead: "",
-                              selectedBookForRead: "",
-                              selectedChapterForRead: "",
-                              selectedBookNameForRead: "",
-                              selectedVerseForRead: "",
-                            ));
+                        await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
                         return;
                       }
 
@@ -1325,15 +1318,7 @@ class FaithJourneyDialog {
                             connectionSpeed > 12000;
 
                         if (isVerySlowConnection) {
-                          // Very slow network - bypass IAP and go to HomeScreen
-                          Get.offAll(() => HomeScreen(
-                                From: "splash",
-                                selectedVerseNumForRead: "",
-                                selectedBookForRead: "",
-                                selectedChapterForRead: "",
-                                selectedBookNameForRead: "",
-                                selectedVerseForRead: "",
-                              ));
+                          await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
                           return;
                         }
                       } catch (e) {
@@ -1353,14 +1338,7 @@ class FaithJourneyDialog {
                             checkad: 'onboard',
                           ));
                     } else {
-                      Get.offAll(() => HomeScreen(
-                            From: "splash",
-                            selectedVerseNumForRead: "",
-                            selectedBookForRead: "",
-                            selectedChapterForRead: "",
-                            selectedBookNameForRead: "",
-                            selectedVerseForRead: "",
-                          ));
+                      await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
                     }
                   },
                   style: ElevatedButton.styleFrom(

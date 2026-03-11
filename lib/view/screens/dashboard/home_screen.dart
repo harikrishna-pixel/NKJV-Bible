@@ -44,6 +44,7 @@ import 'package:biblebookapp/view/screens/wallpaper_screen/wallpaper_screen.dart
 import 'package:biblebookapp/view/screens/chat/chat_screen.dart';
 import 'package:biblebookapp/view/screens/chat/prayer_guidance_screen.dart';
 import 'package:biblebookapp/streak/streak_ui.dart';
+import 'package:biblebookapp/streak_flow/daily_journey_screen.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:biblebookapp/view/screens/tawk_chat/tawk_chat_screen.dart';
@@ -3260,9 +3261,9 @@ class _HomeScreenState extends State<HomeScreen>
                             width: screenWidth > 450 ? 30 : 22,
                             color: CommanColor.whiteBlack(context),
                           )),
-                      // StreakIconButton(
-                      //   iconSize: screenWidth > 450 ? 28 : 22,
-                      // ),
+                      StreakIconButton(
+                        iconSize: screenWidth > 450 ? 28 : 22,
+                      ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 10.0),
                         child: ChangeThemeButtonWidget(),
@@ -4615,29 +4616,12 @@ class _HomeScreenState extends State<HomeScreen>
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      if (BibleInfo.chat == 1)
-                        Builder(
-                          builder: (buttonContext) => GestureDetector(
-                            onTap: () {
-                              if (isOpenChat) {
-                                // Close the popover by popping the navigator
-                                if (Navigator.of(buttonContext,
-                                        rootNavigator: false)
-                                    .canPop()) {
-                                  Navigator.of(buttonContext,
-                                          rootNavigator: false)
-                                      .pop();
-                                }
-                                setState(() {
-                                  isOpenChat = false;
-                                });
-                              } else {
-                                setState(() {
-                                  isOpenChat = true;
-                                });
-                                _showChatEntryPopover(buttonContext);
-                              }
-                            },
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          GestureDetector(
+                            onTap: () => Get.to(() => const DailyJourneyScreen()),
                             child: Padding(
                               padding: EdgeInsets.symmetric(
                                 horizontal: screenWidth > 600
@@ -4647,56 +4631,114 @@ class _HomeScreenState extends State<HomeScreen>
                                         : 32,
                               ),
                               child: Container(
-                                  height: screenWidth > 600
-                                      ? 56
-                                      : screenWidth > 450
-                                          ? 50
-                                          : 35,
-                                  width: screenWidth > 600
-                                      ? 56
-                                      : screenWidth > 450
-                                          ? 50
-                                          : 35,
-                                  decoration: BoxDecoration(
-                                    color: CommanColor.whiteLightModePrimary(
-                                        context),
-                                    shape: BoxShape.circle,
+                                height: screenWidth > 600
+                                    ? 56
+                                    : screenWidth > 450
+                                        ? 50
+                                        : 35,
+                                width: screenWidth > 600
+                                    ? 56
+                                    : screenWidth > 450
+                                        ? 50
+                                        : 35,
+                                decoration: BoxDecoration(
+                                  color: CommanColor.whiteLightModePrimary(context),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Center(
+                                  child: Icon(
+                                    Icons.local_fire_department_rounded,
+                                    color: const Color(0xFFE65100),
+                                    size: screenWidth > 450 ? 26 : 22,
                                   ),
-                                  child: Center(
-                                    child: isOpenChat
-                                        ? Icon(
-                                            Icons.close,
-                                            color: CommanColor
-                                                .darkModePrimaryWhite(context),
-                                            size: screenWidth > 450 ? 22 : 18,
-                                          )
-                                        : Image.asset(
-                                            CommanColor.isDarkTheme(context)
-                                                ? "assets/dark_modes/new-dark_chat.png"
-                                                : "assets/Chat white.png",
-                                            width: screenWidth > 600
-                                                ? 26
-                                                : screenWidth > 450
-                                                    ? 24
-                                                    : 22,
-                                            height: screenWidth > 600
-                                                ? 26
-                                                : screenWidth > 450
-                                                    ? 24
-                                                    : 22,
-                                          ),
-                                  )),
+                                ),
+                              ),
                             ),
                           ),
-                        )
-                      else
-                        SizedBox(
-                          width: screenWidth > 600
-                              ? 56 + (48 * 2)
-                              : screenWidth > 450
-                                  ? 50 + (40 * 2)
-                                  : 35 + (32 * 2),
-                        ),
+                          SizedBox(height: screenWidth > 450 ? 12 : 8),
+                          if (BibleInfo.chat == 1)
+                            Builder(
+                              builder: (buttonContext) => GestureDetector(
+                                onTap: () {
+                                  if (isOpenChat) {
+                                    if (Navigator.of(buttonContext,
+                                            rootNavigator: false)
+                                        .canPop()) {
+                                      Navigator.of(buttonContext,
+                                              rootNavigator: false)
+                                          .pop();
+                                    }
+                                    setState(() {
+                                      isOpenChat = false;
+                                    });
+                                  } else {
+                                    setState(() {
+                                      isOpenChat = true;
+                                  });
+                                    _showChatEntryPopover(buttonContext);
+                                  }
+                                },
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: screenWidth > 600
+                                        ? 48
+                                        : screenWidth > 450
+                                            ? 40
+                                            : 32,
+                                  ),
+                                  child: Container(
+                                      height: screenWidth > 600
+                                          ? 56
+                                          : screenWidth > 450
+                                              ? 50
+                                              : 35,
+                                      width: screenWidth > 600
+                                          ? 56
+                                          : screenWidth > 450
+                                              ? 50
+                                              : 35,
+                                      decoration: BoxDecoration(
+                                        color: CommanColor.whiteLightModePrimary(
+                                            context),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Center(
+                                        child: isOpenChat
+                                            ? Icon(
+                                                Icons.close,
+                                                color: CommanColor
+                                                    .darkModePrimaryWhite(context),
+                                                size: screenWidth > 450 ? 22 : 18,
+                                              )
+                                            : Image.asset(
+                                                CommanColor.isDarkTheme(context)
+                                                    ? "assets/dark_modes/new-dark_chat.png"
+                                                    : "assets/Chat white.png",
+                                                width: screenWidth > 600
+                                                    ? 26
+                                                    : screenWidth > 450
+                                                        ? 24
+                                                        : 22,
+                                                height: screenWidth > 600
+                                                    ? 26
+                                                    : screenWidth > 450
+                                                        ? 24
+                                                        : 22,
+                                              ),
+                                      )),
+                                ),
+                              ),
+                            )
+                          else
+                            SizedBox(
+                              width: screenWidth > 600
+                                  ? 56 + (48 * 2)
+                                  : screenWidth > 450
+                                      ? 50 + (40 * 2)
+                                      : 35 + (32 * 2),
+                            ),
+                        ],
+                      ),
                       floatingButton(
                         chapterNum: controller.selectedChapter.value,
                         bookName: controller.selectedBook.value,

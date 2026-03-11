@@ -73,6 +73,8 @@ class SharPreferences {
   static const streakLastActivityDate = 'streak_last_activity_date';
   /// Streak: current consecutive days count.
   static const streakCount = 'streak_count';
+  /// Streak flow (connection → verse → devotional → prayer): last calendar day shown (YYYY-MM-DD).
+  static const streakFlowLastShownDate = 'streak_flow_last_shown_date';
 
   static Future<bool?> getBoolean(String key) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();

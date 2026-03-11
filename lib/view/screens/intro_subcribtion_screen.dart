@@ -13,6 +13,7 @@ import 'package:biblebookapp/services/statsig/statsig_service.dart';
 import 'package:biblebookapp/services/paywall_preload_service.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
+import 'package:biblebookapp/streak_flow/streak_flow_screens.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/remove_add-screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -714,7 +715,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   /// Navigate away from paywall screen
-  void _navigateAwayFromPaywall() {
+  Future<void> _navigateAwayFromPaywall() async {
     if (_myProvider != null) {
       _myProvider?.enableAd();
     }
@@ -724,15 +725,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     if (widget.checkad == 'theme') {
       Get.back();
     } else {
-      // Route to Reader Screen (HomeScreen with From: "Read")
-      Get.offAll(() => HomeScreen(
-            From: "Read",
-            selectedVerseNumForRead: "",
-            selectedBookForRead: "",
-            selectedChapterForRead: "",
-            selectedBookNameForRead: "",
-            selectedVerseForRead: "",
-          ));
+      await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
     }
   }
 
@@ -1164,14 +1157,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         EasyLoading.dismiss();
         Constants.showToast(successToastMessage);
         await SharPreferences.setBoolean('closead', true);
-        return Get.offAll(() => HomeScreen(
-              From: "premium",
-              selectedVerseNumForRead: "",
-              selectedBookForRead: "",
-              selectedChapterForRead: "",
-              selectedBookNameForRead: "",
-              selectedVerseForRead: "",
-            ));
+        final ctx = context ?? Get.context;
+        if (ctx != null) await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
+        return;
       } else if (productId == widget.oneYearPlan) {
         final dur = DateTime(dateTime.year + 1, dateTime.month, dateTime.day);
         final diff = dur.difference(DateTime.now());
@@ -1184,14 +1172,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         EasyLoading.dismiss();
         Constants.showToast(successToastMessage);
         await SharPreferences.setBoolean('closead', true);
-        return Get.offAll(() => HomeScreen(
-              From: "premium",
-              selectedVerseNumForRead: "",
-              selectedBookForRead: "",
-              selectedChapterForRead: "",
-              selectedBookNameForRead: "",
-              selectedVerseForRead: "",
-            ));
+        final ctx2 = context ?? Get.context;
+        if (ctx2 != null) await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx2);
+        return;
       } else if (productId == widget.sixMonthPlan) {
         final dur = addSixMonths(customDate: dateTime);
         final diff = dur.difference(DateTime.now());
@@ -1204,14 +1187,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         EasyLoading.dismiss();
         Constants.showToast(successToastMessage);
         await SharPreferences.setBoolean('closead', true);
-        return Get.offAll(() => HomeScreen(
-              From: "premium",
-              selectedVerseNumForRead: "",
-              selectedBookForRead: "",
-              selectedChapterForRead: "",
-              selectedBookNameForRead: "",
-              selectedVerseForRead: "",
-            ));
+        final ctx3 = context ?? Get.context;
+        if (ctx3 != null) await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx3);
+        return;
       }
     }
     // final InAppPurchaseStoreKitPlatformAddition iosPlatformAddition =
@@ -1303,14 +1281,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   Constants.showToast('Purchase Successful');
                   await SharPreferences.setBoolean('closead', true);
                   debugPrint("restore data 2");
-                  return Get.offAll(() => HomeScreen(
-                        From: "premium",
-                        selectedVerseNumForRead: "",
-                        selectedBookForRead: "",
-                        selectedChapterForRead: "",
-                        selectedBookNameForRead: "",
-                        selectedVerseForRead: "",
-                      ));
+                  await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
+                  return;
                 } else if (purchaseDetails.productID == widget.oneYearPlan) {
                   await controller.disableAd(const Duration(days: 366));
                   await Future.delayed(Duration(seconds: 2));
@@ -1322,14 +1294,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   Constants.showToast('Purchase Successful');
                   await SharPreferences.setBoolean('closead', true);
                   debugPrint("restore data 3 ");
-                  return Get.offAll(() => HomeScreen(
-                        From: "premium",
-                        selectedVerseNumForRead: "",
-                        selectedBookForRead: "",
-                        selectedChapterForRead: "",
-                        selectedBookNameForRead: "",
-                        selectedVerseForRead: "",
-                      ));
+                  await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
+                  return;
                 } else if (purchaseDetails.productID == widget.lifeTimePlan) {
                   await controller.disableAd(const Duration(days: 3650012345));
                   // Set subscription plan to platinum for lifetime plan
@@ -1355,14 +1321,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   Constants.showToast('Purchase Successful');
                   await SharPreferences.setBoolean('closead', true);
                   debugPrint("restore data 4 ");
-                  return Get.offAll(() => HomeScreen(
-                        From: "premium",
-                        selectedVerseNumForRead: "",
-                        selectedBookForRead: "",
-                        selectedChapterForRead: "",
-                        selectedBookNameForRead: "",
-                        selectedVerseForRead: "",
-                      ));
+                  await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
+                  return;
                 } else {
                   // Check if this is exit offer purchase
                   final exitOfferId =
@@ -1398,14 +1358,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     await SharPreferences.setBoolean('closead', true);
                     debugPrint(
                         "exit offer purchase success - redirecting to home");
-                    return Get.offAll(() => HomeScreen(
-                          From: "premium",
-                          selectedVerseNumForRead: "",
-                          selectedBookForRead: "",
-                          selectedChapterForRead: "",
-                          selectedBookNameForRead: "",
-                          selectedVerseForRead: "",
-                        ));
+                    await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
+                    return;
                   } else {
                     // Fallback: If product ID doesn't match any known plan, treat as lifetime purchase
                     // This ensures loader stops and redirects even for unexpected product IDs
@@ -1423,14 +1377,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     await SharPreferences.setBoolean('closead', true);
                     debugPrint(
                         "purchase success (fallback) - redirecting to home");
-                    return Get.offAll(() => HomeScreen(
-                          From: "premium",
-                          selectedVerseNumForRead: "",
-                          selectedBookForRead: "",
-                          selectedChapterForRead: "",
-                          selectedBookNameForRead: "",
-                          selectedVerseForRead: "",
-                        ));
+                    await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
+                    return;
                   }
                 }
               }

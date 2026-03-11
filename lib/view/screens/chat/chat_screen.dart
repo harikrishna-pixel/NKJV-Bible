@@ -19,7 +19,6 @@ import 'package:biblebookapp/view/screens/chat/chat_history_screen.dart';
 import 'package:biblebookapp/view/screens/chat/chat_translations.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
-import 'package:biblebookapp/streak/streak_service.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/services/statsig/statsig_service.dart';
@@ -182,19 +181,26 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _showChatIntroIfNeeded() async {
+    // Show Important Notice first when entering chat; only then show intro bottom sheet.
+    final agreed = await _showPleaseNoteDialog();
+    if (!agreed || !mounted) {
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
+
     final prefs = await SharedPreferences.getInstance();
     final seenIntro = prefs.getBool('chat_intro_seen') ?? false;
     if (seenIntro || !mounted) return;
 
     final length = await WalletService.getAnswerLength();
-    if (mounted) {
-      setState(() {
-        _introAnswerLength = length;
-      });
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showChatIntroDialog();
-      });
-    }
+    if (!mounted) return;
+    setState(() {
+      _introAnswerLength = length;
+    });
+    // Brief delay so the dialog route is fully popped before showing bottom sheet.
+    await Future.delayed(const Duration(milliseconds: 150));
+    if (!mounted) return;
+    await _showChatIntroDialog();
   }
 
   Future<void> _showChatIntroDialog() async {
@@ -907,38 +913,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'AI Chat is provided for spiritual encouragement and informational purposes only. It is not a substitute for professional medical, psychological, or counseling advice. If you are experiencing a crisis, please seek professional help immediately.',
-                    textAlign: TextAlign.left,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: bodyColor,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'To generate responses, the text you enter will be securely transmitted to our third-party AI service provider (such as OpenAI or Google Gemini) for processing. Basic technical information such as app version or device type may also be transmitted as required to provide the service.',
-                    textAlign: TextAlign.left,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: bodyColor,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'We do not sell your personal data.',
-                    textAlign: TextAlign.left,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: bodyColor,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'By tapping "Agree & Continue", you acknowledge and consent to this processing in accordance with our Privacy Policy.',
+                    'AI Chat allows you to ask questions and receive Bible-based guidance.\n\n'
+                    'To generate responses, the message you type may be securely sent to Google Gemini for processing.\n\n'
+                    'The following data may be transmitted:\n'
+                    '• Your chat message\n'
+                    '• Device type\n'
+                    '• App version\n\n'
+                    'This data is used only to generate AI responses.\n\n'
+                    'We do not collect personal identity information such as your name, email, contacts, or location.\n\n'
+                    'By tapping "Agree & Continue", you allow your chat input to be processed by the AI service according to our Privacy Policy.',
                     textAlign: TextAlign.left,
                     style: TextStyle(
                       fontSize: 14,
@@ -978,8 +961,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       Expanded(
                         child: GestureDetector(
                           onTap: () {
-                            // Dismiss only; do not set aiDisclaimerAgreed so the notice
-                            // shows again when the user taps to send/chat next time.
                             if (ctx.mounted) Navigator.pop(ctx, false);
                           },
                           child: Container(
@@ -2159,7 +2140,6 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
 
         if (!isErrorResponse) {
           await _deductChatCredits();
-          await StreakService.recordActivity();
           await updateBibleChatWidget(question: message, answer: responseText);
         }
 

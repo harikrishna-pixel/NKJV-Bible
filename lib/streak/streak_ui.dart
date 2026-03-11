@@ -2,12 +2,14 @@
 // UI matches app theme (CommanColor, ThemeProvider).
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/streak/streak_service.dart';
+import 'package:biblebookapp/streak_flow/daily_journey_screen.dart';
 
-/// Streak icon button for Home app bar. Tapping shows streak popup.
+/// Streak icon button for Home app bar. Tapping opens Daily Journey screen.
 class StreakIconButton extends StatelessWidget {
   final double iconSize;
   final Color? iconColor;
@@ -26,7 +28,7 @@ class StreakIconButton extends StatelessWidget {
       builder: (context, snapshot) {
         final streak = snapshot.data ?? 0;
         return InkWell(
-          onTap: () => StreakUI.showStreakPopup(context),
+          onTap: () => Get.to(() => const DailyJourneyScreen()),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
@@ -126,8 +128,8 @@ class StreakUI {
               SizedBox(height: isTablet ? 12 : 10),
               Text(
                 streak > 0
-                    ? 'You’ve used AI Chat or Prayer Guidance for $streak day${streak == 1 ? '' : 's'} in a row. Keep it up!'
-                    : 'Use AI Chat or Prayer Guidance once today to start your streak.',
+                    ? 'You’ve completed your daily connection, verse, devotional and prayer for $streak day${streak == 1 ? '' : 's'} in a row. Keep it up!'
+                    : 'Complete your daily connection, verse, devotional and prayer to start your streak.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: isTablet ? 16 : 15,

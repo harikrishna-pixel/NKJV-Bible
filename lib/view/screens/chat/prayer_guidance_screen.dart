@@ -8,7 +8,6 @@ import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
-import 'package:biblebookapp/streak/streak_service.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/images.dart';
@@ -171,38 +170,15 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'AI Chat is provided for spiritual encouragement and informational purposes only. It is not a substitute for professional medical, psychological, or counseling advice. If you are experiencing a crisis, please seek professional help immediately.',
-                    textAlign: TextAlign.left,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: bodyColor,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'To generate responses, the text you enter will be securely transmitted to our third-party AI service provider (such as OpenAI or Google Gemini) for processing. Basic technical information such as app version or device type may also be transmitted as required to provide the service.',
-                    textAlign: TextAlign.left,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: bodyColor,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'We do not sell your personal data.',
-                    textAlign: TextAlign.left,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: bodyColor,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'By tapping "Agree & Continue", you acknowledge and consent to this processing in accordance with our Privacy Policy.',
+                    'AI Chat allows you to ask questions and receive Bible-based guidance.\n\n'
+                    'To generate responses, the message you type may be securely sent to Google Gemini for processing.\n\n'
+                    'The following data may be transmitted:\n'
+                    '• Your chat message\n'
+                    '• Device type\n'
+                    '• App version\n\n'
+                    'This data is used only to generate AI responses.\n\n'
+                    'We do not collect personal identity information such as your name, email, contacts, or location.\n\n'
+                    'By tapping "Agree & Continue", you allow your chat input to be processed by the AI service according to our Privacy Policy.',
                     textAlign: TextAlign.left,
                     style: TextStyle(
                       fontSize: 14,
@@ -242,8 +218,6 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
                       Expanded(
                         child: GestureDetector(
                           onTap: () {
-                            // Dismiss only; do not set aiDisclaimerAgreed so the notice
-                            // shows again when the user taps to send/prayer next time.
                             if (ctx.mounted) Navigator.pop(ctx, false);
                           },
                           child: Container(
@@ -659,7 +633,6 @@ ${category.prompt}
           }
           _loadCreditsFromLocal();
         }
-        await StreakService.recordActivity();
         await updateBiblePrayerWidget(prayerText: responseText);
         // Automatically unmute and play background music when prayer is generated
         _isAudioMuted = false;
@@ -1063,7 +1036,6 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
           }
           _loadCreditsFromLocal();
         }
-        await StreakService.recordActivity();
         await updateBiblePrayerWidget(prayerText: responseText);
         // Automatically unmute and play background music when prayer is generated
         _isAudioMuted = false;
