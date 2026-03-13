@@ -134,6 +134,8 @@ class RatingDialogHelper {
                             connectivityResult.contains(ConnectivityResult.mobile) ||
                             connectivityResult.contains(ConnectivityResult.wifi) ||
                             connectivityResult.contains(ConnectivityResult.ethernet);
+                        // Empty result (e.g. on some 5G/configs) — assume connected for rate us
+                        if (connectivityResult.isEmpty) hasConnection = true;
                         if (hasConnection) {
                           break; // Connection found, exit retry loop
                         }

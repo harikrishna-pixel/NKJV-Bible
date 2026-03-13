@@ -1,6 +1,9 @@
 import 'package:biblebookapp/streak_flow/take_moment_rest_screen.dart';
+import 'package:biblebookapp/view/constants/colors.dart';
+import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:provider/provider.dart';
 
 /// "Take a Moment With God" intro - "Let's slow down and release your worries", Start button.
 /// First screen of Find Peace flow.
@@ -13,19 +16,20 @@ class TakeMomentIntroScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width > 450;
+    final isDark = Provider.of<ThemeProvider>(context, listen: false).themeMode == ThemeMode.dark;
+    final List<Color> gradientColors = isDark
+        ? [CommanColor.darkPrimaryColor, CommanColor.darkPrimaryColor, CommanColor.darkPrimaryColor]
+        : [const Color(0xFFF5F0E6), const Color(0xFFE8DED0), const Color(0xFFDDD0C0)];
+    final Color textColor = isDark ? Colors.white : _brown;
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFF5F0E6),
-              Color(0xFFE8DED0),
-              Color(0xFFDDD0C0),
-            ],
+            colors: gradientColors,
           ),
         ),
         child: SafeArea(
@@ -35,11 +39,11 @@ class TakeMomentIntroScreen extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _dot(active: true),
+                  _dot(active: true, textColor: textColor),
                   const SizedBox(width: 12),
-                  _dot(active: false),
+                  _dot(active: false, textColor: textColor),
                   const SizedBox(width: 12),
-                  _dot(active: false),
+                  _dot(active: false, textColor: textColor),
                 ],
               ),
               const SizedBox(height: 40),
@@ -51,7 +55,7 @@ class TakeMomentIntroScreen extends StatelessWidget {
                   style: TextStyle(
                     fontSize: isTablet ? 28 : 24,
                     fontWeight: FontWeight.w600,
-                    color: _brown,
+                    color: textColor,
                     fontFamily: 'Georgia',
                   ),
                 ),
@@ -61,7 +65,7 @@ class TakeMomentIntroScreen extends StatelessWidget {
                 'Let\'s slow down and release your worries',
                 style: TextStyle(
                   fontSize: isTablet ? 17 : 15,
-                  color: _brown.withOpacity(0.9),
+                  color: textColor.withOpacity(0.9),
                   fontFamily: 'Georgia',
                 ),
               ),
@@ -71,9 +75,9 @@ class TakeMomentIntroScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _bullet('Breathe in God\'s peace'),
-                    _bullet('Rest in His presence'),
-                    _bullet('Release your worries to Him'),
+                    _bullet('Breathe in God\'s peace', textColor),
+                    _bullet('Rest in His presence', textColor),
+                    _bullet('Release your worries to Him', textColor),
                   ],
                 ),
               ),
@@ -91,7 +95,7 @@ class TakeMomentIntroScreen extends StatelessWidget {
     );
   }
 
-  Widget _dot({required bool active}) {
+  Widget _dot({required bool active, required Color textColor}) {
     return Container(
       width: 10,
       height: 10,
@@ -99,7 +103,7 @@ class TakeMomentIntroScreen extends StatelessWidget {
         shape: BoxShape.circle,
         color: active ? const Color(0xFFC9A227) : Colors.transparent,
         border: Border.all(
-          color: active ? const Color(0xFFC9A227) : _brown.withOpacity(0.3),
+          color: active ? const Color(0xFFC9A227) : textColor.withOpacity(0.3),
           width: active ? 2 : 1.5,
         ),
         boxShadow: active ? [BoxShadow(color: const Color(0xFFC9A227).withOpacity(0.5), blurRadius: 8)] : null,
@@ -107,7 +111,7 @@ class TakeMomentIntroScreen extends StatelessWidget {
     );
   }
 
-  Widget _bullet(String text) {
+  Widget _bullet(String text, Color textColor) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -119,7 +123,7 @@ class TakeMomentIntroScreen extends StatelessWidget {
             height: 6,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: _brown,
+              color: textColor,
             ),
           ),
           const SizedBox(width: 12),
@@ -129,7 +133,7 @@ class TakeMomentIntroScreen extends StatelessWidget {
               style: TextStyle(
                 fontSize: 16,
                 height: 1.4,
-                color: _brown,
+                color: textColor,
                 fontFamily: 'Georgia',
               ),
             ),
@@ -140,6 +144,7 @@ class TakeMomentIntroScreen extends StatelessWidget {
   }
 
   Widget _parchmentButton(BuildContext context, {required String label, required VoidCallback onPressed}) {
+    final isDark = Provider.of<ThemeProvider>(context, listen: false).themeMode == ThemeMode.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Material(
@@ -150,9 +155,9 @@ class TakeMomentIntroScreen extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
             decoration: BoxDecoration(
-              color: const Color(0xFF3D2914),
+              color: isDark ? Colors.white.withOpacity(0.2) : const Color(0xFF3D2914),
               borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: _cream.withOpacity(0.6), width: 2),
+              border: Border.all(color: (isDark ? Colors.white : _cream).withOpacity(0.6), width: 2),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black26,
@@ -167,7 +172,7 @@ class TakeMomentIntroScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: _cream,
+                  color: isDark ? Colors.white : _cream,
                   fontFamily: 'Georgia',
                 ),
               ),

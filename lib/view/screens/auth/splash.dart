@@ -382,6 +382,8 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   handleNavigation() async {
+    await NotificationsServices.storeLaunchPayloadIfFromNotification();
+
     final isOnboardingCompleted =
         await SharPreferences.getBoolean(SharPreferences.onboarding);
 

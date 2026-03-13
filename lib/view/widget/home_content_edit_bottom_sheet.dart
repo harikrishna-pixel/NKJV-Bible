@@ -4467,6 +4467,23 @@ class HomeContentEditBottomSheetState
                                   ? "Added in Highlight Successfully"
                                   : "Updated in Highlight Successfully",
                             );
+                            try {
+                              final prefs =
+                                  await SharedPreferences.getInstance();
+                              final current =
+                                  prefs.getInt('highlight_complete_count') ??
+                                      0;
+                              final shown = prefs
+                                      .getBool('highlight_feedback_shown') ??
+                                  false;
+                              final next = current + 1;
+                              await prefs.setInt(
+                                  'highlight_complete_count', next);
+                              if (next >= 2 && !shown) {
+                                await prefs.setBool(
+                                    'highlight_feedback_pending', true);
+                              }
+                            } catch (_) {}
                             widget.callback?.call(color.value.toString());
                             await Future.delayed(
                                 const Duration(milliseconds: 500));
@@ -5435,6 +5452,16 @@ class HomeContentEditBottomSheetState
             ? "Added in Highlight Successfully"
             : "Updated in Highlight Successfully",
       );
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final current = prefs.getInt('highlight_complete_count') ?? 0;
+        final shown = prefs.getBool('highlight_feedback_shown') ?? false;
+        final next = current + 1;
+        await prefs.setInt('highlight_complete_count', next);
+        if (next >= 2 && !shown) {
+          await prefs.setBool('highlight_feedback_pending', true);
+        }
+      } catch (_) {}
       widget.callback?.call(color.value.toString());
       await Future.delayed(const Duration(milliseconds: 500));
       if (mounted) Navigator.pop(context);

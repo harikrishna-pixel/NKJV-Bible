@@ -45,6 +45,10 @@ import 'package:biblebookapp/view/screens/chat/chat_screen.dart';
 import 'package:biblebookapp/view/screens/chat/prayer_guidance_screen.dart';
 import 'package:biblebookapp/streak/streak_ui.dart';
 import 'package:biblebookapp/streak_flow/daily_journey_screen.dart';
+import 'package:biblebookapp/services/smart_notification_helper.dart';
+import 'package:biblebookapp/services/streak_notification_helper.dart';
+import 'package:biblebookapp/streak_flow/streak_complete_celebration_dialog.dart';
+import 'package:biblebookapp/streak_flow/streak_flow_screens.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:biblebookapp/view/screens/tawk_chat/tawk_chat_screen.dart';
@@ -1125,8 +1129,14 @@ class _HomeScreenState extends State<HomeScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) async {
 //  await _checkAndShowVerse();
       await _handleAppLaunchCount();
+      await _checkAndShowHighlightFeedback();
       await checkUserLoggedIn();
       await _checkAndShowDailyWelcomeToast();
+      await _handlePendingNotificationAction();
+      await _showStreakCompleteCelebrationIfNeeded();
+      SmartNotificationHelper.recordAppOpen();
+      await StreakNotificationHelper.rescheduleStreakNotificationsIfEnabled();
+      SmartNotificationHelper.scheduleSmartNotificationIfNeeded();
       // iOS Home Widgets: update launcher widgets and handle widget tap
       await updateAllLauncherWidgets();
       final initialUri = await HomeWidget.initiallyLaunchedFromHomeWidget();
@@ -1140,6 +1150,78 @@ class _HomeScreenState extends State<HomeScreen>
 
     // _initializeAds();
     loadAds();
+  }
+
+  Future<void> _checkAndShowHighlightFeedback() async {
+    final prefs = await SharedPreferences.getInstance();
+    final pending = prefs.getBool('highlight_feedback_pending') ?? false;
+    if (!pending || !mounted) return;
+    await prefs.setBool('highlight_feedback_pending', false);
+    await prefs.setBool('highlight_feedback_shown', true);
+    if (!mounted) return;
+    showMainFeedbackDialog(context);
+  }
+
+  Future<void> _showStreakCompleteCelebrationIfNeeded() async {
+    final count = await SharPreferences.getInt(
+        SharPreferences.pendingStreakCompleteCelebration);
+    if (count == null || count < 1 || !mounted) return;
+    final today = DateTime.now().toIso8601String().split('T')[0];
+    final lastShown = await SharPreferences.getString(
+        SharPreferences.streakCelebrationShownDate);
+    if (lastShown == today) {
+      await SharPreferences.setInt(
+          SharPreferences.pendingStreakCompleteCelebration, 0);
+      return;
+    }
+    await SharPreferences.setString(
+        SharPreferences.streakCelebrationShownDate, today);
+    await SharPreferences.setInt(
+        SharPreferences.pendingStreakCompleteCelebration, 0);
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => StreakCompleteCelebrationDialog(
+        streakCount: count,
+        onContinueTomorrow: (dialogContext) {
+          Navigator.of(dialogContext).pop();
+        },
+      ),
+    );
+  }
+
+  Future<void> _handlePendingNotificationAction() async {
+    final action =
+        await SharPreferences.getString(SharPreferences.pendingNotificationAction);
+    if (action == null || action.isEmpty || !mounted) return;
+    await SharPreferences.setString(SharPreferences.pendingNotificationAction, '');
+    if (!mounted) return;
+    switch (action) {
+      case 'open_streak':
+        Get.to(() => const StreakConnectionScreen());
+        break;
+      case 'open_reading':
+        // Already on Home
+        break;
+      case 'open_chat':
+        Get.to(() => const ChatScreen());
+        break;
+      case 'open_verse':
+        await _showDailyVerseBottomSheet(_fontSize, fromNotification: true);
+        break;
+      case 'open_images':
+        Get.to(() => const DailyVerse(fromWidget: true));
+        break;
+      case 'open_premium':
+        if (mounted) SubscriptionScreen.navigateToPaywallFromHome(context);
+        break;
+      case 'open_quiz':
+        // Stay on Home; quiz screen can be added later
+        break;
+      default:
+        break;
+    }
   }
 
   void _navigateForWidgetRoute(BibleWidgetRoute route) {
@@ -1561,11 +1643,12 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  Future<void> _showDailyVerseBottomSheet(double fontSize) async {
+  Future<void> _showDailyVerseBottomSheet(double fontSize,
+      {bool fromNotification = false}) async {
     if (_isBottomSheetOpen) return;
 
-    // Verify we're still on Reader screen before showing
-    if (widget.From.toString() != "Read") {
+    // Verify we're still on Reader screen before showing (unless opened from notification tap)
+    if (!fromNotification && widget.From.toString() != "Read") {
       return;
     }
 
@@ -1620,10 +1703,12 @@ class _HomeScreenState extends State<HomeScreen>
         return;
       }
 
-      // Final check: ensure we're still on Reader screen and route is current before showing
-      if (widget.From.toString() != "Read" ||
-          !mounted ||
-          ModalRoute.of(context)?.isCurrent != true) {
+      // Final check: ensure we're still on Reader screen and route is current before showing (unless from notification)
+      if (!fromNotification && widget.From.toString() != "Read") {
+        _isBottomSheetOpen = false;
+        return;
+      }
+      if (!mounted || ModalRoute.of(context)?.isCurrent != true) {
         _isBottomSheetOpen = false;
         return;
       }
@@ -1689,7 +1774,8 @@ class _HomeScreenState extends State<HomeScreen>
                         children: [
                           FramedVerseContainer(
                             backgroundImagePath: randomBgImage,
-                            showFrame: Random().nextBool(),
+                            showFrame: false,
+                            useBackgroundImage: false,
                             child: Padding(
                               padding: const EdgeInsets.all(12),
                               child: Column(
@@ -1702,33 +1788,30 @@ class _HomeScreenState extends State<HomeScreen>
                                     child: AutoSizeHtmlWidget(
                                       html: todayVerse.verse.toString(),
                                       maxLines: 16,
-                                      color: CommanColor.white,
+                                      color: const Color(0xFF3E2723),
                                       maxFontSize: screenWidth < 380
-                                          ? BibleInfo.fontSizeScale * 14.9
+                                          ? BibleInfo.fontSizeScale * 22
                                           : screenWidth > 450
-                                              ? BibleInfo.fontSizeScale * 32
-                                              : DashBoardController()
-                                                      .fontSize
-                                                      .value *
-                                                  1.2,
+                                              ? BibleInfo.fontSizeScale * 36
+                                              : BibleInfo.fontSizeScale * 28,
                                       minFontSize:
-                                          screenWidth < 380 ? 11.5 : 10.9,
+                                          screenWidth < 380 ? 16 : 18,
                                     ),
                                   ),
                                   Padding(
-                                    padding: const EdgeInsets.only(top: 3.0),
+                                    padding: const EdgeInsets.only(top: 8.0),
                                     child: Align(
-                                      alignment: Alignment.centerRight,
+                                      alignment: Alignment.center,
                                       child: Text(
-                                        "${todayVerse.book} ${todayVerse.chapter! + 1}:${todayVerse.verseNum! + 1}",
+                                        "- ${todayVerse.book} ${todayVerse.chapter! + 1}:${todayVerse.verseNum! + 1}",
                                         style: TextStyle(
-                                          color: CommanColor.white,
+                                          color: const Color(0xFF3E2723),
                                           fontStyle: FontStyle.italic,
                                           fontSize: screenWidth < 380
-                                              ? 14
+                                              ? 16
                                               : screenWidth > 450
-                                                  ? BibleInfo.fontSizeScale * 28
-                                                  : fontSize - 2,
+                                                  ? BibleInfo.fontSizeScale * 22
+                                                  : 18,
                                         ),
                                       ),
                                     ),
@@ -1744,15 +1827,13 @@ class _HomeScreenState extends State<HomeScreen>
                             child: Text(
                               "Verse of the Day",
                               style: TextStyle(
-                                color: CommanColor.white,
-                                decoration: TextDecoration.underline,
-                                decorationColor: Colors.white,
-                                decorationThickness: 2.0,
+                                color: const Color(0xFF3E2723),
+                                fontWeight: FontWeight.w600,
                                 fontSize: screenWidth < 380
-                                    ? 17
+                                    ? 20
                                     : screenWidth > 450
-                                        ? 31
-                                        : 19,
+                                        ? 28
+                                        : 24,
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -1776,7 +1857,7 @@ class _HomeScreenState extends State<HomeScreen>
                                   Text(
                                     BibleInfo.bible_shortName,
                                     style: TextStyle(
-                                      color: Colors.white,
+                                      color: const Color(0xFF3E2723),
                                       letterSpacing: BibleInfo.letterSpacing,
                                       fontSize: BibleInfo.fontSizeScale * 15,
                                       fontWeight: FontWeight.w700,
@@ -4642,13 +4723,25 @@ class _HomeScreenState extends State<HomeScreen>
                                         ? 50
                                         : 35,
                                 decoration: BoxDecoration(
-                                  color: CommanColor.whiteLightModePrimary(context),
+                                  // Keep Light mode exactly as before; only adjust Dark mode.
+                                  color: Provider.of<ThemeProvider>(context,
+                                                  listen: false)
+                                              .themeMode ==
+                                          ThemeMode.dark
+                                      ? CommanColor.lightDarkPrimary(context)
+                                      : CommanColor.whiteLightModePrimary(
+                                          context),
                                   shape: BoxShape.circle,
                                 ),
                                 child: Center(
                                   child: Icon(
                                     Icons.local_fire_department_rounded,
-                                    color: const Color(0xFFE65100),
+                                    color: Provider.of<ThemeProvider>(context,
+                                                    listen: false)
+                                                .themeMode ==
+                                            ThemeMode.dark
+                                        ? Colors.white
+                                        : Colors.yellowAccent,
                                     size: screenWidth > 450 ? 26 : 22,
                                   ),
                                 ),
@@ -6231,11 +6324,13 @@ class _HomeScreenState extends State<HomeScreen>
                 ElevatedButton(
                   onPressed: () async {
                     Navigator.pop(context);
-                    // Add your rate app logic here
+                    // Rate us: only block when connectivity explicitly reports none (avoid false "no internet" on 5G etc.)
                     final connectivityResult =
                         await Connectivity().checkConnectivity();
-                    if (connectivityResult[0] == ConnectivityResult.none) {
+                    if (connectivityResult.isNotEmpty &&
+                        connectivityResult.first == ConnectivityResult.none) {
                       Constants.showToast("Check your Internet connection");
+                      return;
                     }
                     await SharPreferences.setString('OpenAd', '1');
                     _requestReview();
@@ -7125,26 +7220,18 @@ class FramedVerseContainer extends StatelessWidget {
   final String backgroundImagePath;
   final Widget child;
   final bool showFrame;
+  final bool useBackgroundImage;
 
   const FramedVerseContainer({
     super.key,
     required this.backgroundImagePath,
     required this.child,
     this.showFrame = true,
+    this.useBackgroundImage = true,
   });
 
   @override
   Widget build(BuildContext context) {
-    final random = Random();
-    final bgImages = [
-      "assets/im1.jpg",
-      "assets/im2.jpg",
-      "assets/im3.jpg",
-      "assets/im4.jpg",
-      "assets/im5.jpg",
-    ];
-    String randomBgImage = bgImages[random.nextInt(bgImages.length)];
-
     double screenWidth = MediaQuery.of(context).size.width;
     return SizedBox(
       height: screenWidth < 380
@@ -7156,35 +7243,34 @@ class FramedVerseContainer extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Background image with dark blend
-          Container(
-            decoration: BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage(randomBgImage),
-                fit: BoxFit.cover,
-                // colorFilter: ColorFilter.mode(
-
-                //   BlendMode.darken,
-                // ),
+          if (useBackgroundImage) ...[
+            Container(
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage(backgroundImagePath),
+                  fit: BoxFit.cover,
+                ),
+                borderRadius: BorderRadius.circular(3),
               ),
-              borderRadius: BorderRadius.circular(3),
             ),
-          ),
-
-          // Optional frame overlay
-          if (showFrame)
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Opacity(
-                opacity: 0.5,
-                child: Image.asset(
-                  'assets/icons/Frame_1.png',
-                  fit: BoxFit.fill,
+            if (showFrame)
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Opacity(
+                  opacity: 0.5,
+                  child: Image.asset(
+                    'assets/icons/Frame_1.png',
+                    fit: BoxFit.fill,
+                  ),
                 ),
               ),
+          ] else
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F0E6),
+                borderRadius: BorderRadius.circular(3),
+              ),
             ),
-
-          // Main content
           Padding(
             padding: EdgeInsets.all(screenWidth < 380
                 ? 19

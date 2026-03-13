@@ -1,0 +1,424 @@
+import 'package:biblebookapp/streak_flow/streak_saved_storage.dart';
+import 'package:biblebookapp/view/constants/colors.dart';
+import 'package:biblebookapp/view/constants/theme_provider.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+
+// App-style dialog colors (match streak celebration dialog)
+const Color _dialogCream = Color(0xFFF8F4EB);
+const Color _dialogBrown = Color(0xFF3D2914);
+const Color _dialogStripBg = Color(0xFFF0E6D0);
+
+String _removedMessageForType(String type) {
+  switch (type) {
+    case 'verse':
+      return 'Verse removed';
+    case 'devotional':
+      return 'Devotional removed';
+    case 'prayer':
+      return 'Prayer removed';
+    default:
+      return 'Removed';
+  }
+}
+
+void _showRemovedToast(BuildContext context, String type) {
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  messenger?.hideCurrentSnackBar();
+  messenger?.showSnackBar(
+    SnackBar(
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      duration: const Duration(milliseconds: 1400),
+      backgroundColor: _dialogCream,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: _dialogBrown.withOpacity(0.2),
+          width: 1.5,
+        ),
+      ),
+      content: Row(
+        children: [
+          Icon(
+            Icons.bookmark_remove_rounded,
+            color: _dialogBrown,
+            size: 24,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _removedMessageForType(type),
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: _dialogBrown,
+                fontFamily: 'Georgia',
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+void _showRemoveDialog(BuildContext context, VoidCallback onConfirmRemove) {
+  showDialog(
+    context: context,
+    builder: (ctx) => Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 360),
+        decoration: BoxDecoration(
+          color: _dialogCream,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _dialogBrown.withOpacity(0.2), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Remove?',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: _dialogBrown,
+                  fontFamily: 'Georgia',
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Remove this item from your saved list?',
+                style: TextStyle(
+                  fontSize: 16,
+                  height: 1.4,
+                  color: _dialogBrown.withOpacity(0.9),
+                  fontFamily: 'Georgia',
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: Text(
+                      'Cancel',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: _dialogBrown,
+                        fontFamily: 'Georgia',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Material(
+                    color: _dialogStripBg,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.of(ctx).pop();
+                        onConfirmRemove();
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                        child: Text(
+                          'Remove',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: _dialogBrown,
+                            fontFamily: 'Georgia',
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// Screen that shows all saved verses, devotionals, and prayers from Streak Flow.
+/// Opened from Daily Journey (Saved button) or Settings (Saved from Daily Journey).
+class StreakSavedListScreen extends StatefulWidget {
+  const StreakSavedListScreen({super.key});
+
+  @override
+  State<StreakSavedListScreen> createState() => _StreakSavedListScreenState();
+}
+
+class _StreakSavedListScreenState extends State<StreakSavedListScreen> {
+  static const Color _brown = Color(0xFF3D2914);
+  static const Color _gold = Color(0xFFC9A227);
+  static const Color _panel = Color(0xFFF8F4EB);
+
+  List<StreakSavedItem> _items = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final list = await StreakSavedStorage.getAll();
+    if (mounted) {
+      setState(() {
+        _items = list;
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isTablet = MediaQuery.of(context).size.width > 450;
+    Color bgColor;
+    try {
+      final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+      bgColor = themeProvider.themeMode == ThemeMode.dark
+          ? CommanColor.darkPrimaryColor
+          : themeProvider.backgroundColor;
+    } catch (_) {
+      bgColor = const Color(0xFFF5F0E6);
+    }
+    final isDark = bgColor == CommanColor.darkPrimaryColor;
+    final Color textColor = isDark ? Colors.white : _brown;
+    final Color panelColor = isDark ? Colors.white.withOpacity(0.12) : _panel;
+
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [bgColor, bgColor, bgColor],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.arrow_back_ios, color: textColor),
+                      onPressed: () => Get.back(),
+                    ),
+                    Expanded(
+                      child: Text(
+                        'Saved',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: isTablet ? 24 : 20,
+                          fontWeight: FontWeight.w700,
+                          color: textColor,
+                          fontFamily: 'Georgia',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 48),
+                  ],
+                ),
+              ),
+              if (_loading)
+                const Expanded(
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_items.isEmpty)
+                Expanded(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        'No saved verses, devotionals, or prayers yet.\nSave from your Daily Journey flow.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: textColor.withOpacity(0.8),
+                          fontFamily: 'Georgia',
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    itemCount: _items.length,
+                    itemBuilder: (context, index) {
+                      final item = _items[index];
+                      return _SavedItemCard(
+                        item: item,
+                        textColor: textColor,
+                        panelColor: panelColor,
+                        gold: _gold,
+                        onDelete: (String type) async {
+                          await StreakSavedStorage.removeAt(index);
+                          await _load();
+                          if (mounted) _showRemovedToast(context, type);
+                        },
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SavedItemCard extends StatelessWidget {
+  const _SavedItemCard({
+    required this.item,
+    required this.textColor,
+    required this.panelColor,
+    required this.gold,
+    required this.onDelete,
+  });
+
+  final StreakSavedItem item;
+  final Color textColor;
+  final Color panelColor;
+  final Color gold;
+  final void Function(String type) onDelete;
+
+  static String _typeLabel(String type) {
+    switch (type) {
+      case 'verse':
+        return 'Verse';
+      case 'devotional':
+        return 'Devotional';
+      case 'prayer':
+        return 'Prayer';
+      default:
+        return type;
+    }
+  }
+
+  static IconData _typeIcon(String type) {
+    switch (type) {
+      case 'verse':
+        return Icons.menu_book;
+      case 'devotional':
+        return Icons.auto_stories;
+      case 'prayer':
+        return Icons.favorite;
+      default:
+        return Icons.bookmark;
+    }
+  }
+
+  static String _formatSavedDate(String savedAt) {
+    try {
+      final dt = DateTime.parse(savedAt);
+      return 'Saved ${DateFormat('MMM d, yyyy').format(dt)}';
+    } catch (_) {
+      return savedAt.isNotEmpty ? 'Saved $savedAt' : '';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      color: panelColor,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(_typeIcon(item.type), size: 20, color: gold),
+                const SizedBox(width: 8),
+                Text(
+                  _typeLabel(item.type),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: gold,
+                    fontFamily: 'Georgia',
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: Icon(Icons.delete_outline, size: 22, color: textColor.withOpacity(0.7)),
+                  onPressed: () {
+                    _showRemoveDialog(context, () => onDelete(item.type));
+                  },
+                ),
+              ],
+            ),
+            if (item.title.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                item.title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: textColor,
+                  fontFamily: 'Georgia',
+                ),
+              ),
+            ],
+            if (item.savedAt.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                _formatSavedDate(item.savedAt),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: textColor.withOpacity(0.65),
+                  fontFamily: 'Georgia',
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Text(
+              item.body,
+              maxLines: 6,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 15,
+                height: 1.45,
+                color: textColor,
+                fontFamily: 'Georgia',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

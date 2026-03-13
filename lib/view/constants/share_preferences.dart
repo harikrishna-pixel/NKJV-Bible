@@ -75,6 +75,22 @@ class SharPreferences {
   static const streakCount = 'streak_count';
   /// Streak flow (connection → verse → devotional → prayer): last calendar day shown (YYYY-MM-DD).
   static const streakFlowLastShownDate = 'streak_flow_last_shown_date';
+  /// Streak flow: last day we awarded the +20 credits (YYYY-MM-DD).
+  static const streakFlowCreditsAwardedDate = 'streak_flow_credits_awarded_date';
+  /// Streak: set of YYYY-MM-DD dates completed (for weekly calendar coloring).
+  static const streakCompletedDates = 'streak_completed_dates';
+  /// Streak flow: calendar day (YYYY-MM-DD) user opened "How you're feeling" (started but may not have completed).
+  static const streakFlowStartedDate = 'streak_flow_started_date';
+  /// When user taps a streak notification: action to run on next Home open (open_streak, open_reading, open_chat, open_verse).
+  static const pendingNotificationAction = 'pending_notification_action';
+  /// JSON: last 7 days app open times for smart notification. Format: {"open_times":[{"date":"YYYY-MM-DD","time":"HH:mm"},...]}
+  static const appOpenTimes = 'app_open_times';
+  /// When user completes daily streak and will reach Home next: show "Day X Complete" celebration. Value = streak count (e.g. "1"); 0 or missing = don't show.
+  static const pendingStreakCompleteCelebration = 'pending_streak_complete_celebration';
+  /// Last calendar day (YYYY-MM-DD) the streak celebration dialog was shown. Used to show at most once per day.
+  static const streakCelebrationShownDate = 'streak_celebration_shown_date';
+  /// JSON array of saved streak items (verses, devotionals, prayers). See StreakSavedStorage.
+  static const streakSavedItems = 'streak_saved_items';
 
   static Future<bool?> getBoolean(String key) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();

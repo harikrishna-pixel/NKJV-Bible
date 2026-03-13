@@ -1,8 +1,12 @@
+import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
+import 'package:biblebookapp/view/constants/colors.dart';
+import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:provider/provider.dart';
 
 /// "You have released your worries to God." + verse 1 Peter 5:7, "Continue Your Journey".
-/// Final screen of Find Peace flow; pops back to Daily Journey.
+/// Final screen of Find Peace flow; tapping Continue goes to Home Screen.
 class TakeMomentReleasedScreen extends StatelessWidget {
   const TakeMomentReleasedScreen({super.key});
 
@@ -13,19 +17,20 @@ class TakeMomentReleasedScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width > 450;
+    final isDark = Provider.of<ThemeProvider>(context, listen: false).themeMode == ThemeMode.dark;
+    final List<Color> gradientColors = isDark
+        ? [CommanColor.darkPrimaryColor, CommanColor.darkPrimaryColor, CommanColor.darkPrimaryColor]
+        : [const Color(0xFFF5F0E6), const Color(0xFFE8DED0), const Color(0xFFDDD0C0)];
+    final Color textColor = isDark ? Colors.white : _brown;
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFF5F0E6),
-              Color(0xFFE8DED0),
-              Color(0xFFDDD0C0),
-            ],
+            colors: gradientColors,
           ),
         ),
         child: SafeArea(
@@ -35,11 +40,11 @@ class TakeMomentReleasedScreen extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _dot(active: false),
+                  _dot(active: false, textColor: textColor),
                   const SizedBox(width: 12),
-                  _dot(active: false),
+                  _dot(active: false, textColor: textColor),
                   const SizedBox(width: 12),
-                  _dot(active: true),
+                  _dot(active: true, textColor: textColor),
                 ],
               ),
               const SizedBox(height: 48),
@@ -51,7 +56,7 @@ class TakeMomentReleasedScreen extends StatelessWidget {
                   style: TextStyle(
                     fontSize: isTablet ? 24 : 20,
                     fontWeight: FontWeight.w600,
-                    color: _brown,
+                    color: textColor,
                     fontFamily: 'Georgia',
                     height: 1.35,
                   ),
@@ -66,7 +71,7 @@ class TakeMomentReleasedScreen extends StatelessWidget {
                   style: TextStyle(
                     fontSize: isTablet ? 18 : 16,
                     fontStyle: FontStyle.italic,
-                    color: _brown,
+                    color: textColor,
                     fontFamily: 'Georgia',
                     height: 1.5,
                   ),
@@ -77,7 +82,7 @@ class TakeMomentReleasedScreen extends StatelessWidget {
                 '— 1 Peter 5:7',
                 style: TextStyle(
                   fontSize: isTablet ? 16 : 14,
-                  color: _brown.withOpacity(0.85),
+                  color: textColor.withOpacity(0.85),
                   fontFamily: 'Georgia',
                 ),
               ),
@@ -90,15 +95,20 @@ class TakeMomentReleasedScreen extends StatelessWidget {
                     color: Colors.transparent,
                     child: InkWell(
                       onTap: () {
-                        Get.back();
-                        Get.back();
-                        Get.back(); // pop Released, Intro, PourOut -> back to Daily Journey
+                        Get.offAll(() => HomeScreen(
+                              From: "splash",
+                              selectedVerseNumForRead: "",
+                              selectedBookForRead: "",
+                              selectedChapterForRead: "",
+                              selectedBookNameForRead: "",
+                              selectedVerseForRead: "",
+                            ));
                       },
                       borderRadius: BorderRadius.circular(28),
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF8B7355),
+                          color: isDark ? Colors.white.withOpacity(0.2) : const Color(0xFF8B7355),
                           borderRadius: BorderRadius.circular(28),
                           border: Border.all(color: _gold, width: 2),
                           boxShadow: [
@@ -115,7 +125,7 @@ class TakeMomentReleasedScreen extends StatelessWidget {
                             style: TextStyle(
                               fontSize: isTablet ? 18 : 16,
                               fontWeight: FontWeight.w600,
-                              color: _cream,
+                              color: isDark ? Colors.white : _cream,
                               fontFamily: 'Georgia',
                             ),
                           ),
@@ -133,7 +143,7 @@ class TakeMomentReleasedScreen extends StatelessWidget {
     );
   }
 
-  Widget _dot({required bool active}) {
+  Widget _dot({required bool active, required Color textColor}) {
     return Container(
       width: 10,
       height: 10,
@@ -141,7 +151,7 @@ class TakeMomentReleasedScreen extends StatelessWidget {
         shape: BoxShape.circle,
         color: active ? _gold : Colors.transparent,
         border: Border.all(
-          color: active ? _gold : _brown.withOpacity(0.3),
+          color: active ? _gold : textColor.withOpacity(0.3),
           width: active ? 2 : 1.5,
         ),
         boxShadow: active ? [BoxShadow(color: _gold.withOpacity(0.5), blurRadius: 8)] : null,

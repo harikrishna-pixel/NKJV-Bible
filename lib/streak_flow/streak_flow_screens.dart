@@ -1,22 +1,68 @@
+import 'dart:io';
+
+import 'package:audioplayers/audioplayers.dart';
 import 'package:biblebookapp/streak_flow/mood_prayer_data.dart';
+import 'package:biblebookapp/streak_flow/streak_saved_storage.dart';
 import 'package:biblebookapp/streak/streak_service.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
+import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
+import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:biblebookapp/view/constants/theme_provider.dart';
+import 'package:biblebookapp/view/constants/colors.dart';
 
 // Streak flow colors (warm parchment / spiritual theme)
 const Color _kStreakBrown = Color(0xFF3D2914);
 const Color _kStreakGold = Color(0xFFC9A227);
 const Color _kStreakCream = Color(0xFFF5F0E6);
 
+bool _isStreakDark(BuildContext context) {
+  try {
+    return Provider.of<ThemeProvider>(context, listen: false).themeMode == ThemeMode.dark;
+  } catch (_) {
+    return false;
+  }
+}
+
+List<Color> _streakGradientColors(BuildContext context) {
+  try {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    if (themeProvider.themeMode == ThemeMode.dark) {
+      final Color dark = CommanColor.darkPrimaryColor;
+      return [dark, dark, dark];
+    }
+    final Color bg = themeProvider.backgroundColor;
+    return [bg, bg, bg];
+  } catch (_) {
+    return [const Color(0xFFE8DED0), const Color(0xFFD4C4B0), const Color(0xFFC9B896)];
+  }
+}
+
+Color _streakTextColor(BuildContext context) =>
+    _isStreakDark(context) ? Colors.white : _kStreakBrown;
+
+Color _streakPanelColor(BuildContext context) =>
+    _isStreakDark(context) ? Colors.white.withOpacity(0.12) : _kStreakCream;
+
+String _shareTextWithAppUrl(String content) {
+  final androidLink =
+      'https://play.google.com/store/apps/details?id=${BibleInfo.android_Package_Name}';
+  final iosLink = 'https://itunes.apple.com/app/id${BibleInfo.apple_AppId}';
+  final appUrl = Platform.isIOS ? iosLink : androidLink;
+  return '$content\n\nRead more at: $appUrl';
+}
+
 Future<void> _shareText(BuildContext context, String text) async {
   try {
+    final shareContent = _shareTextWithAppUrl(text);
     final RenderObject? renderObject = context.findRenderObject();
     final RenderBox? box = renderObject is RenderBox ? renderObject : null;
     await Share.share(
-      text,
+      shareContent,
       sharePositionOrigin: box != null
           ? box.localToGlobal(Offset.zero) & box.size
           : null,
@@ -31,8 +77,36 @@ void _showSavedToast(BuildContext context, {required bool saved}) {
   messenger?.hideCurrentSnackBar();
   messenger?.showSnackBar(
     SnackBar(
-      content: Text(saved ? 'Saved' : 'Removed'),
-      duration: const Duration(milliseconds: 900),
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      duration: const Duration(milliseconds: 1400),
+      backgroundColor: _kStreakCream,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: _kStreakBrown.withOpacity(0.2),
+          width: 1.5,
+        ),
+      ),
+      content: Row(
+        children: [
+          Icon(
+            saved ? Icons.bookmark_added_rounded : Icons.bookmark_remove_rounded,
+            color: _kStreakGold,
+            size: 24,
+          ),
+          const SizedBox(width: 12),
+          Text(
+            saved ? 'Saved' : 'Removed',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: _kStreakBrown,
+              fontFamily: 'Georgia',
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -46,6 +120,39 @@ void _goToHome(BuildContext context) {
         selectedBookNameForRead: "",
         selectedVerseForRead: "",
       ));
+}
+
+Widget _buildStepIndicator(BuildContext context, int step) {
+  final textColor = _streakTextColor(context);
+  return Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(
+        'Step $step of 4',
+        style: TextStyle(
+          fontSize: MediaQuery.of(context).size.width > 450 ? 15 : 13,
+          fontWeight: FontWeight.w600,
+          color: textColor.withOpacity(0.9),
+          fontFamily: 'Georgia',
+        ),
+      ),
+      const SizedBox(height: 6),
+      Transform.rotate(
+        angle: 0.785398, // 45 degrees for diamond
+        child: Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: _kStreakGold,
+            border: Border.all(
+              color: _kStreakGold.withOpacity(0.8),
+              width: 1,
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
 }
 
 /// Entry point for streak flow. Call when navigating to Home; shows flow once per day first.
@@ -74,45 +181,81 @@ class StreakConnectionScreen extends StatefulWidget {
 }
 
 class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
-  double _value = 0.5; // 0=Far, 0.5=Near, 1=Deeply Connected
+  // UI shows 5 stops (Far/Returning/Near/Close/Deeply Connected),
+  // but we still map it into the existing 3 buckets for content selection.
+  double _value = 0.5;
+
+  @override
+  void initState() {
+    super.initState();
+    _markStreakFlowStartedToday();
+  }
+
+  Future<void> _markStreakFlowStartedToday() async {
+    final today = DateTime.now().toIso8601String().split('T')[0];
+    final existing =
+        await SharPreferences.getString(SharPreferences.streakFlowStartedDate);
+    if (existing != today) {
+      await SharPreferences.setString(
+          SharPreferences.streakFlowStartedDate, today);
+    }
+  }
 
   int get _connectionIndex {
-    if (_value < 0.35) return 0;
-    if (_value < 0.65) return 1;
+    // 0.00 (Far) + 0.25 (Returning) => bucket 0
+    // 0.50 (Near) => bucket 1
+    // 0.75 (Close) + 1.00 (Deeply Connected) => bucket 2
+    if (_value <= 0.375) return 0;
+    if (_value <= 0.625) return 1;
     return 2;
   }
 
-  double _snap(double v) => (v * 2).round() / 2;
+  /// Which label to highlight for UI: 0=Far, 1=Returning, 2=Near, 3=Close, 4=Deeply Connected.
+  /// Each slider position highlights its own label.
+  int get _activeLabelIndex {
+    if (_value <= 0.125) return 0;
+    if (_value <= 0.375) return 1;
+    if (_value <= 0.625) return 2;
+    if (_value <= 0.875) return 3;
+    return 4;
+  }
+
+  double _snap(double v) => (v * 4).round() / 4;
 
   @override
   Widget build(BuildContext context) {
-    final active = _connectionIndex;
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFE8DED0),
-              Color(0xFFD4C4B0),
-              Color(0xFFC9B896),
-            ],
+            colors: _streakGradientColors(context),
           ),
         ),
         child: SafeArea(
           child: Column(
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios, color: _kStreakBrown),
-                  onPressed: () => _goToHome(context),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.arrow_back_ios, color: _streakTextColor(context)),
+                      onPressed: () => _goToHome(context),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: _buildStepIndicator(context, 1),
+                      ),
+                    ),
+                    const SizedBox(width: 48),
+                  ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Text(
@@ -121,7 +264,7 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                   style: TextStyle(
                     fontSize: MediaQuery.of(context).size.width > 450 ? 28 : 22,
                     fontWeight: FontWeight.w600,
-                    color: _kStreakBrown,
+                    color: _streakTextColor(context),
                     fontFamily: 'Georgia',
                   ),
                 ),
@@ -131,7 +274,7 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                 'Pause and reflect for a moment.',
                 style: TextStyle(
                   fontSize: MediaQuery.of(context).size.width > 450 ? 18 : 15,
-                  color: _kStreakBrown.withOpacity(0.9),
+                  color: _streakTextColor(context).withOpacity(0.9),
                   fontFamily: 'Georgia',
                 ),
               ),
@@ -140,39 +283,115 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 32),
                 child: Column(
                   children: [
-                    Stack(
-                      alignment: Alignment.center,
+                    Row(
                       children: [
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text('Far',
-                              style: _labelStyle(context, active: active == 0)),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text('Far',
+                                  textAlign: TextAlign.center,
+                                  style: _labelStyle(context, active: _activeLabelIndex == 0)),
+                            ),
+                          ),
                         ),
-                        Align(
-                          alignment: Alignment.center,
-                          child: Text('Near',
-                              style: _labelStyle(context, active: active == 1)),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.center,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                'Returning',
+                                textAlign: TextAlign.center,
+                                style: _labelStyle(context, active: _activeLabelIndex == 1),
+                              ),
+                            ),
+                          ),
                         ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Text('Deeply\nConnected',
-                              textAlign: TextAlign.right,
-                              style: _labelStyle(context, active: active == 2)),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.center,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text('Near',
+                                  textAlign: TextAlign.center,
+                                  style: _labelStyle(context, active: _activeLabelIndex == 2)),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.center,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                'Close',
+                                textAlign: TextAlign.center,
+                                style: _labelStyle(context, active: _activeLabelIndex == 3),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text('Deeply\nConnected',
+                                  textAlign: TextAlign.center,
+                                  style: _labelStyle(context, active: _activeLabelIndex == 4)),
+                            ),
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 16),
                     SliderTheme(
                       data: SliderTheme.of(context).copyWith(
-                        activeTrackColor: _kStreakBrown,
-                        inactiveTrackColor: _kStreakCream,
-                        thumbColor: Colors.white,
-                        overlayColor: _kStreakBrown.withOpacity(0.2),
+                        activeTrackColor: _streakTextColor(context),
+                        inactiveTrackColor: _streakPanelColor(context),
+                        thumbColor: _streakTextColor(context),
+                        overlayColor: _streakTextColor(context).withOpacity(0.2),
+                        trackHeight: 6,
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 12),
+                        overlayShape: const RoundSliderOverlayShape(overlayRadius: 20),
+                        activeTickMarkColor: Colors.transparent,
+                        inactiveTickMarkColor: Colors.transparent,
                       ),
-                      child: Slider(
-                        value: _value,
-                        divisions: 2,
-                        onChanged: (v) => setState(() => _value = _snap(v)),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          const double pad = 12;
+                          final w = constraints.maxWidth - pad * 2;
+                          const double smallR = 4.0;
+                          return Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Slider(
+                                value: _value,
+                                divisions: 4,
+                                onChanged: (v) => setState(() => _value = _snap(v)),
+                              ),
+                              for (int i = 0; i < 5; i++) ...[
+                                Positioned(
+                                  left: pad + (w * i / 4) - smallR,
+                                  top: 0,
+                                  bottom: 0,
+                                  child: Center(
+                                    child: Container(
+                                      width: smallR * 2,
+                                      height: smallR * 2,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: _streakTextColor(context).withOpacity(0.35),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ],
@@ -202,10 +421,11 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
   }
 
   TextStyle _labelStyle(BuildContext context, {required bool active}) {
+    final c = _streakTextColor(context);
     return TextStyle(
       fontSize: MediaQuery.of(context).size.width > 450 ? 16 : 14,
       fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-      color: active ? _kStreakBrown : _kStreakBrown.withOpacity(0.7),
+      color: active ? c : c.withOpacity(0.7),
       fontFamily: 'Georgia',
     );
   }
@@ -216,6 +436,9 @@ Widget _parchmentButton(
   required String label,
   required VoidCallback onPressed,
 }) {
+  final isDark = _isStreakDark(context);
+  final textColor = _streakTextColor(context);
+  final btnBg = isDark ? Colors.white.withOpacity(0.15) : const Color(0xFFE8DCC8);
   return Padding(
     padding: const EdgeInsets.symmetric(horizontal: 24),
     child: Material(
@@ -226,33 +449,36 @@ Widget _parchmentButton(
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
           decoration: BoxDecoration(
-            color: const Color(0xFFE8DCC8),
+            color: btnBg,
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: _kStreakBrown, width: 1.5),
+            border: Border.all(color: textColor, width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: _kStreakBrown.withOpacity(0.15),
+                color: textColor.withOpacity(0.15),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
             ],
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: MediaQuery.of(context).size.width > 450 ? 18 : 16,
-                  fontWeight: FontWeight.w600,
-                  color: _kStreakBrown,
-                  fontFamily: 'Georgia',
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: MediaQuery.of(context).size.width > 450 ? 18 : 16,
+                    fontWeight: FontWeight.w600,
+                    color: textColor,
+                    fontFamily: 'Georgia',
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(Icons.arrow_forward, color: _kStreakBrown, size: 20),
-            ],
+                const SizedBox(width: 8),
+                Icon(Icons.arrow_forward, color: textColor, size: 20),
+              ],
+            ),
           ),
         ),
       ),
@@ -273,45 +499,73 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
   bool _saved = false;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSaved());
+  }
+
+  Future<void> _loadSaved() async {
+    final item = widget.item;
+    final contained = await StreakSavedStorage.contains(
+        'verse', item.verseReference, item.verseText);
+    if (mounted) setState(() => _saved = contained);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final item = widget.item;
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/back1.png'),
+            fit: BoxFit.cover,
+          ),
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFFE5D5C4),
-              Color(0xFFD9C9B8),
-              Color(0xFFCFC0A8),
+              _streakTextColor(context).withOpacity(0.08),
+              _streakTextColor(context).withOpacity(0.12),
             ],
+            stops: const [0.0, 1.0],
           ),
         ),
         child: SafeArea(
           child: Column(
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios, color: _kStreakBrown),
-                  onPressed: () => Get.back(),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.arrow_back_ios, color: _streakTextColor(context)),
+                      onPressed: () => Get.back(),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: _buildStepIndicator(context, 2),
+                      ),
+                    ),
+                    const SizedBox(width: 48),
+                  ],
                 ),
               ),
+              const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.menu_book, color: _kStreakBrown, size: 28),
+                  Icon(Icons.menu_book, color: _streakTextColor(context), size: 32),
                   const SizedBox(width: 8),
                   Text(
                     'Verse of the Day',
                     style: TextStyle(
                       fontSize:
-                          MediaQuery.of(context).size.width > 450 ? 24 : 20,
+                          MediaQuery.of(context).size.width > 450 ? 26 : 22,
                       fontWeight: FontWeight.w600,
-                      color: _kStreakBrown,
+                      color: _streakTextColor(context),
                       fontFamily: 'Georgia',
                     ),
                   ),
@@ -319,46 +573,52 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
               ),
               const SizedBox(height: 24),
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              '"${item.verseText}"',
-                              style: TextStyle(
-                                fontSize: MediaQuery.of(context).size.width > 450
-                                    ? 20
-                                    : 17,
-                                height: 1.5,
-                                color: _kStreakBrown,
-                                fontFamily: 'Georgia',
-                              ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            const SizedBox(height: 12),
-                            Text(
-                              '- ${item.verseReference}',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontStyle: FontStyle.italic,
-                                color: _kStreakBrown,
-                                fontFamily: 'Georgia',
-                              ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '"${item.verseText}"',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: MediaQuery.of(context).size.width > 450
+                                        ? 26
+                                        : 22,
+                                    height: 1.5,
+                                    color: _streakTextColor(context),
+                                    fontFamily: 'Georgia',
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  '- ${item.verseReference}',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontStyle: FontStyle.italic,
+                                    color: _streakTextColor(context),
+                                    fontFamily: 'Georgia',
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ),
               Padding(
@@ -369,12 +629,26 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                     IconButton(
                       icon: Icon(
                         _saved ? Icons.bookmark : Icons.bookmark_border,
-                        color: _kStreakBrown,
+                        color: _streakTextColor(context),
                         size: 28,
                       ),
-                      onPressed: () {
-                        setState(() => _saved = !_saved);
-                        _showSavedToast(context, saved: _saved);
+                      onPressed: () async {
+                        final item = widget.item;
+                        if (_saved) {
+                          await StreakSavedStorage.remove(
+                              'verse', item.verseReference, item.verseText);
+                          if (mounted) setState(() => _saved = false);
+                          if (context.mounted) _showSavedToast(context, saved: false);
+                        } else {
+                          await StreakSavedStorage.add(StreakSavedItem(
+                            type: 'verse',
+                            title: item.verseReference,
+                            body: item.verseText,
+                            savedAt: DateTime.now().toIso8601String(),
+                          ));
+                          if (mounted) setState(() => _saved = true);
+                          if (context.mounted) _showSavedToast(context, saved: true);
+                        }
                       },
                     ),
                     Flexible(
@@ -387,8 +661,8 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                     ),
                     Builder(
                       builder: (shareContext) => IconButton(
-                        icon: const Icon(Icons.share,
-                            color: _kStreakBrown, size: 26),
+                        icon: Icon(Icons.share,
+                            color: Colors.white , size: 26),
                         onPressed: () => _shareText(
                             shareContext, '${item.verseText}\n- ${item.verseReference}'),
                       ),
@@ -415,6 +689,73 @@ class StreakDevotionalScreen extends StatefulWidget {
 
 class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
   bool _saved = false;
+  late AudioPlayer _audioPlayer;
+  bool _isAudioPlaying = false;
+  bool _isAudioMuted = false;
+  static const String _backgroundMusicUrl =
+      'music/christian-rock-for-jesus-christ-always-301257.mp3';
+
+  @override
+  void initState() {
+    super.initState();
+    _audioPlayer = AudioPlayer();
+    _audioPlayer.setReleaseMode(ReleaseMode.loop);
+    _audioPlayer.onPlayerStateChanged.listen((state) {
+      if (mounted) {
+        setState(() => _isAudioPlaying = state == PlayerState.playing);
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSaved();
+      _playBackgroundMusic();
+    });
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.stop();
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  Future<void> _playBackgroundMusic() async {
+    if (_isAudioMuted) return;
+    try {
+      if (_audioPlayer.state == PlayerState.playing) return;
+      if (_audioPlayer.state != PlayerState.stopped) {
+        await _audioPlayer.stop();
+      }
+      await _audioPlayer.setSource(AssetSource(_backgroundMusicUrl));
+      await Future.delayed(const Duration(milliseconds: 200));
+      await _audioPlayer.seek(Duration.zero);
+      await _audioPlayer.resume();
+    } catch (e) {
+      if (mounted) setState(() => _isAudioPlaying = false);
+    }
+  }
+
+  Future<void> _toggleAudio() async {
+    if (_isAudioMuted) {
+      _isAudioMuted = false;
+      if (_isAudioPlaying) {
+        await _audioPlayer.resume();
+      } else {
+        await _playBackgroundMusic();
+      }
+    } else {
+      _isAudioMuted = true;
+      await _audioPlayer.pause();
+    }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _loadSaved() async {
+    final item = widget.item;
+    const title = "Today's Devotional";
+    final contained = await StreakSavedStorage.contains(
+        'devotional', title, item.devotionalText);
+    if (mounted) setState(() => _saved = contained);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -423,58 +764,82 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/back2.png'),
+            fit: BoxFit.cover,
+          ),
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFFE2D8CC),
-              Color(0xFFD5C8BC),
-              Color(0xFFCBBEAF),
+              _streakTextColor(context).withOpacity(0.08),
+              _streakTextColor(context).withOpacity(0.12),
             ],
+            stops: const [0.0, 1.0],
           ),
         ),
         child: SafeArea(
           child: Column(
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios, color: _kStreakBrown),
-                  onPressed: () => Get.back(),
-                ),
-              ),
-              Text(
-                'Devotional Insight',
-                style: TextStyle(
-                  fontSize: MediaQuery.of(context).size.width > 450 ? 24 : 20,
-                  fontWeight: FontWeight.w600,
-                  color: _kStreakBrown,
-                  fontFamily: 'Georgia',
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.arrow_back_ios, color: _streakTextColor(context)),
+                      onPressed: () => Get.back(),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: _buildStepIndicator(context, 3),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _toggleAudio,
+                      icon: Icon(
+                        _isAudioMuted ? Icons.music_off : Icons.music_note,
+                        color: _streakTextColor(context),
+                        size: 26,
+                      ),
+                      tooltip: _isAudioMuted ? 'Audio Off' : 'Audio On',
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Today\'s Devotional',
                 style: TextStyle(
-                  fontSize: 16,
-                  color: _kStreakBrown.withOpacity(0.9),
+                  fontSize: 18,
+                  color: _streakTextColor(context).withOpacity(0.9),
                   fontFamily: 'Georgia',
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 24),
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Text(
-                    item.devotionalText,
-                    style: TextStyle(
-                      fontSize: MediaQuery.of(context).size.width > 450 ? 18 : 16,
-                      height: 1.6,
-                      color: _kStreakBrown,
-                      fontFamily: 'Georgia',
-                    ),
-                  ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                        child: Center(
+                          child: Text(
+                            item.devotionalText,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: MediaQuery.of(context).size.width > 450 ? 22 : 20,
+                              height: 1.6,
+                              color: _streakTextColor(context),
+                              fontFamily: 'Georgia',
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
               Padding(
@@ -485,12 +850,27 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                     IconButton(
                       icon: Icon(
                         _saved ? Icons.bookmark : Icons.bookmark_border,
-                        color: _kStreakBrown,
+                        color: _streakTextColor(context),
                         size: 28,
                       ),
-                      onPressed: () {
-                        setState(() => _saved = !_saved);
-                        _showSavedToast(context, saved: _saved);
+                      onPressed: () async {
+                        final item = widget.item;
+                        const title = "Today's Devotional";
+                        if (_saved) {
+                          await StreakSavedStorage.remove(
+                              'devotional', title, item.devotionalText);
+                          if (mounted) setState(() => _saved = false);
+                          if (context.mounted) _showSavedToast(context, saved: false);
+                        } else {
+                          await StreakSavedStorage.add(StreakSavedItem(
+                            type: 'devotional',
+                            title: title,
+                            body: item.devotionalText,
+                            savedAt: DateTime.now().toIso8601String(),
+                          ));
+                          if (mounted) setState(() => _saved = true);
+                          if (context.mounted) _showSavedToast(context, saved: true);
+                        }
                       },
                     ),
                     Flexible(
@@ -503,8 +883,8 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                     ),
                     Builder(
                       builder: (shareContext) => IconButton(
-                        icon: const Icon(Icons.share,
-                            color: _kStreakBrown, size: 26),
+                        icon: Icon(Icons.share,
+                            color: _streakTextColor(shareContext), size: 26),
                         onPressed: () => _shareText(shareContext, item.devotionalText),
                       ),
                     ),
@@ -530,6 +910,73 @@ class StreakPrayerScreen extends StatefulWidget {
 
 class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
   bool _saved = false;
+  late AudioPlayer _audioPlayer;
+  bool _isAudioPlaying = false;
+  bool _isAudioMuted = false;
+  static const String _backgroundMusicUrl =
+      'music/christian-rock-for-jesus-christ-always-301257.mp3';
+
+  @override
+  void initState() {
+    super.initState();
+    _audioPlayer = AudioPlayer();
+    _audioPlayer.setReleaseMode(ReleaseMode.loop);
+    _audioPlayer.onPlayerStateChanged.listen((state) {
+      if (mounted) {
+        setState(() => _isAudioPlaying = state == PlayerState.playing);
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSaved();
+      _playBackgroundMusic();
+    });
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.stop();
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  Future<void> _playBackgroundMusic() async {
+    if (_isAudioMuted) return;
+    try {
+      if (_audioPlayer.state == PlayerState.playing) return;
+      if (_audioPlayer.state != PlayerState.stopped) {
+        await _audioPlayer.stop();
+      }
+      await _audioPlayer.setSource(AssetSource(_backgroundMusicUrl));
+      await Future.delayed(const Duration(milliseconds: 200));
+      await _audioPlayer.seek(Duration.zero);
+      await _audioPlayer.resume();
+    } catch (e) {
+      if (mounted) setState(() => _isAudioPlaying = false);
+    }
+  }
+
+  Future<void> _toggleAudio() async {
+    if (_isAudioMuted) {
+      _isAudioMuted = false;
+      if (_isAudioPlaying) {
+        await _audioPlayer.resume();
+      } else {
+        await _playBackgroundMusic();
+      }
+    } else {
+      _isAudioMuted = true;
+      await _audioPlayer.pause();
+    }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _loadSaved() async {
+    final item = widget.item;
+    const title = 'A Prayer of Gratitude';
+    final contained = await StreakSavedStorage.contains(
+        'prayer', title, item.prayerText);
+    if (mounted) setState(() => _saved = contained);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -539,58 +986,81 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
         width: double.infinity,
         height: double.infinity,
         decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/back3.jpeg'),
+            fit: BoxFit.cover,
+          ),
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              const Color(0xFFD8CFC4),
-              const Color(0xFFCEC4B8),
-              const Color(0xFFC4B8A8),
+              _streakTextColor(context).withOpacity(0.08),
+              _streakTextColor(context).withOpacity(0.12),
             ],
+            stops: const [0.0, 1.0],
           ),
         ),
         child: SafeArea(
           child: Column(
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios, color: _kStreakBrown),
-                  onPressed: () => Get.back(),
-                ),
-              ),
-              Text(
-                'Prayer for Today',
-                style: TextStyle(
-                  fontSize: MediaQuery.of(context).size.width > 450 ? 24 : 20,
-                  fontWeight: FontWeight.w600,
-                  color: _kStreakBrown,
-                  fontFamily: 'Georgia',
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.arrow_back_ios, color: _streakTextColor(context)),
+                      onPressed: () => Get.back(),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: _buildStepIndicator(context, 4),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _toggleAudio,
+                      icon: Icon(
+                        _isAudioMuted ? Icons.music_off : Icons.music_note,
+                        color: _streakTextColor(context),
+                        size: 26,
+                      ),
+                      tooltip: _isAudioMuted ? 'Audio Off' : 'Audio On',
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 'A Prayer of Gratitude',
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 20,
                   fontWeight: FontWeight.w600,
-                  color: _kStreakBrown,
+                  color: _streakTextColor(context),
                   fontFamily: 'Georgia',
                 ),
               ),
               const SizedBox(height: 24),
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Text(
-                    item.prayerText,
-                    style: TextStyle(
-                      fontSize: MediaQuery.of(context).size.width > 450 ? 18 : 16,
-                      height: 1.7,
-                      color: _kStreakBrown,
-                      fontFamily: 'Georgia',
-                    ),
-                  ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                        child: Center(
+                          child: Text(
+                            item.prayerText,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: MediaQuery.of(context).size.width > 450 ? 22 : 20,
+                              height: 1.7,
+                              color: _streakTextColor(context),
+                              fontFamily: 'Georgia',
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
               Padding(
@@ -601,12 +1071,27 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                     IconButton(
                       icon: Icon(
                         _saved ? Icons.bookmark : Icons.bookmark_border,
-                        color: _kStreakBrown,
+                        color: _streakTextColor(context),
                         size: 28,
                       ),
-                      onPressed: () {
-                        setState(() => _saved = !_saved);
-                        _showSavedToast(context, saved: _saved);
+                      onPressed: () async {
+                        final item = widget.item;
+                        const title = 'A Prayer of Gratitude';
+                        if (_saved) {
+                          await StreakSavedStorage.remove(
+                              'prayer', title, item.prayerText);
+                          if (mounted) setState(() => _saved = false);
+                          if (context.mounted) _showSavedToast(context, saved: false);
+                        } else {
+                          await StreakSavedStorage.add(StreakSavedItem(
+                            type: 'prayer',
+                            title: title,
+                            body: item.prayerText,
+                            savedAt: DateTime.now().toIso8601String(),
+                          ));
+                          if (mounted) setState(() => _saved = true);
+                          if (context.mounted) _showSavedToast(context, saved: true);
+                        }
                       },
                     ),
                     Flexible(
@@ -615,9 +1100,24 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                         label: 'Amen',
                         onPressed: () async {
                           await StreakService.recordActivity();
+                          final today =
+                              DateTime.now().toIso8601String().split('T')[0];
+                          final lastAwarded = await SharPreferences.getString(
+                              SharPreferences.streakFlowCreditsAwardedDate);
+                          if (lastAwarded != today) {
+                            await WalletService.addCredits(20);
+                            await SharPreferences.setString(
+                                SharPreferences.streakFlowCreditsAwardedDate,
+                                today);
+                          }
                           await SharPreferences.setString(
                               SharPreferences.streakFlowLastShownDate,
                               DateTime.now().toIso8601String().split('T')[0]);
+                          if (!context.mounted) return;
+                          final streakCount = await StreakService.getCurrentStreak();
+                          await SharPreferences.setInt(
+                              SharPreferences.pendingStreakCompleteCelebration,
+                              streakCount);
                           if (!context.mounted) return;
                           Get.offAll(() => const StreakCompletedScreen());
                         },
@@ -625,8 +1125,8 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                     ),
                     Builder(
                       builder: (shareContext) => IconButton(
-                        icon: const Icon(Icons.share,
-                            color: _kStreakBrown, size: 26),
+                        icon: Icon(Icons.share,
+                            color: _streakTextColor(shareContext), size: 26),
                         onPressed: () => _shareText(shareContext, item.prayerText),
                       ),
                     ),
@@ -647,8 +1147,11 @@ class StreakCompletedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = _isStreakDark(context);
+    final textColor = _streakTextColor(context);
+    final bgColor = isDark ? CommanColor.darkPrimaryColor : _kStreakCream;
     return Scaffold(
-      backgroundColor: _kStreakCream,
+      backgroundColor: bgColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -658,7 +1161,7 @@ class StreakCompletedScreen extends StatelessWidget {
               height: 100,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF8B7355),
+                color: isDark ? Colors.white24 : const Color(0xFF8B7355),
                 border: Border.all(color: _kStreakGold, width: 3),
                 boxShadow: [
                   BoxShadow(
@@ -681,7 +1184,7 @@ class StreakCompletedScreen extends StatelessWidget {
               style: TextStyle(
                 fontSize: MediaQuery.of(context).size.width > 450 ? 26 : 22,
                 fontWeight: FontWeight.w700,
-                color: _kStreakBrown,
+                color: textColor,
                 fontFamily: 'Georgia',
               ),
             ),
@@ -690,7 +1193,7 @@ class StreakCompletedScreen extends StatelessWidget {
               'You\'re walking faithfully today.',
               style: TextStyle(
                 fontSize: 16,
-                color: _kStreakBrown,
+                color: textColor,
                 fontFamily: 'Georgia',
               ),
             ),
@@ -698,7 +1201,7 @@ class StreakCompletedScreen extends StatelessWidget {
               'Keep the light alive.',
               style: TextStyle(
                 fontSize: 16,
-                color: _kStreakBrown,
+                color: textColor,
                 fontFamily: 'Georgia',
               ),
             ),
@@ -707,7 +1210,7 @@ class StreakCompletedScreen extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 32),
               padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.8),
+                color: _streakPanelColor(context),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: _kStreakGold, width: 1.5),
               ),
@@ -719,7 +1222,7 @@ class StreakCompletedScreen extends StatelessWidget {
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 1.2,
-                      color: _kStreakBrown,
+                      color: textColor,
                       fontFamily: 'Georgia',
                     ),
                   ),
@@ -735,7 +1238,7 @@ class StreakCompletedScreen extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
-                          color: _kStreakBrown,
+                          color: textColor,
                           fontFamily: 'Georgia',
                         ),
                       ),
@@ -746,7 +1249,7 @@ class StreakCompletedScreen extends StatelessWidget {
                     'Added to your Wallet',
                     style: TextStyle(
                       fontSize: 14,
-                      color: _kStreakBrown.withOpacity(0.8),
+                      color: textColor.withOpacity(0.8),
                       fontFamily: 'Georgia',
                     ),
                   ),

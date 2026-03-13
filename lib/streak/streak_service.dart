@@ -1,7 +1,11 @@
 // Streak: 1 day added when user uses AI Chat or Prayer Guidance that day.
 // Consecutive days = streak. Missing a day resets to 1.
 
+import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
+
+/// Status for each day in the weekly calendar (Sun=0 .. Sat=6).
+enum WeekDayStatus { completed, missed, ongoing, future }
 
 class StreakService {
   static String _todayKey() =>
@@ -14,6 +18,17 @@ class StreakService {
     final lastStr =
         await SharPreferences.getString(SharPreferences.streakLastActivityDate);
     final count = await SharPreferences.getInt(SharPreferences.streakCount) ?? 0;
+
+    // Always mark today's completion for weekly calendar view.
+    try {
+      final existing = await SharPreferences.getStringList(
+              SharPreferences.streakCompletedDates) ??
+          <String>[];
+      if (!existing.contains(today)) {
+        await SharPreferences.setListString(
+            SharPreferences.streakCompletedDates, [...existing, today]);
+      }
+    } catch (_) {}
 
     if (lastStr == today) return; // already counted today
 
@@ -37,6 +52,10 @@ class StreakService {
     await SharPreferences.setString(
         SharPreferences.streakLastActivityDate, today);
     await SharPreferences.setInt(SharPreferences.streakCount, newCount);
+
+    if (newCount == 7) {
+      await WalletService.addCredits(100);
+    }
   }
 
   /// Current streak (consecutive days). 0 if never or broken.
@@ -63,5 +82,42 @@ class StreakService {
   /// Last activity date (YYYY-MM-DD) or null.
   static Future<String?> getLastActivityDate() async {
     return SharPreferences.getString(SharPreferences.streakLastActivityDate);
+  }
+
+  /// For the current week (Sun–Sat), returns status for each day.
+  /// completed = day had activity and is part of current streak;
+  /// missed = day in the past but not part of streak (gap or before streak);
+  /// ongoing = today (current day);
+  /// future = day not yet reached.
+  static Future<List<WeekDayStatus>> getWeekDayStatuses() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final weekday = now.weekday;
+    final sundayOffset = weekday == 7 ? 0 : weekday;
+    final weekStart = today.subtract(Duration(days: sundayOffset));
+
+    final completedDates =
+        await SharPreferences.getStringList(SharPreferences.streakCompletedDates) ??
+            <String>[];
+
+    final List<WeekDayStatus> statuses = [];
+    for (int i = 0; i < 7; i++) {
+      final dayDate = weekStart.add(Duration(days: i));
+      if (dayDate.isAfter(today)) {
+        statuses.add(WeekDayStatus.future);
+        continue;
+      }
+      if (dayDate == today) {
+        statuses.add(WeekDayStatus.ongoing);
+        continue;
+      }
+      final key = dayDate.toIso8601String().split('T')[0];
+      if (completedDates.contains(key)) {
+        statuses.add(WeekDayStatus.completed);
+      } else {
+        statuses.add(WeekDayStatus.missed);
+      }
+    }
+    return statuses;
   }
 }

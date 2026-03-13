@@ -1,8 +1,15 @@
-import 'package:biblebookapp/streak_flow/build_your_streak_dialog.dart';
+import 'package:biblebookapp/streak_flow/mood_prayer_data.dart';
+import 'package:biblebookapp/streak_flow/streak_saved_list_screen.dart';
+import 'package:biblebookapp/streak_flow/your_faith_journey_screen.dart';
 import 'package:biblebookapp/streak_flow/pour_out_worries_screen.dart';
+import 'package:biblebookapp/streak_flow/streak_flow_screens.dart';
+import 'package:biblebookapp/streak/streak_service.dart' show StreakService, WeekDayStatus;
+import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
+import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:provider/provider.dart';
 import 'package:biblebookapp/view/screens/chat/chat_screen.dart';
 
 /// Daily Journey screen: weekly streak, Today's Reward, With Jesus (4 steps), Seek His Presence (What's on Your Heart, Find Peace).
@@ -21,6 +28,8 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
 
   int _stepsCompletedToday = 0;
   bool _loaded = false;
+  int _currentStreak = 0;
+  List<WeekDayStatus> _weekStatuses = List.filled(7, WeekDayStatus.future);
 
   @override
   void initState() {
@@ -32,9 +41,13 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
     final today = DateTime.now().toIso8601String().split('T')[0];
     final lastShown = await SharPreferences.getString(SharPreferences.streakFlowLastShownDate);
     final steps = (lastShown == today) ? 4 : 0; // 4 if completed flow today
+    final streak = await StreakService.getCurrentStreak();
+    final statuses = await StreakService.getWeekDayStatuses();
     if (mounted) {
       setState(() {
         _stepsCompletedToday = steps;
+        _currentStreak = streak;
+        _weekStatuses = statuses;
         _loaded = true;
       });
     }
@@ -44,21 +57,29 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width > 450;
     final days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    final todayIndex = DateTime.now().weekday % 7; // 0=Sun .. 6=Sat
 
+    Color bgColor;
+    try {
+      final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+      bgColor = themeProvider.themeMode == ThemeMode.dark
+          ? CommanColor.darkPrimaryColor
+          : themeProvider.backgroundColor;
+    } catch (_) {
+      bgColor = const Color(0xFFF5F0E6);
+    }
+    final gradientColors = [bgColor, bgColor, bgColor];
+    final isDark = bgColor == CommanColor.darkPrimaryColor;
+    final Color textColor = isDark ? Colors.white : _brown;
+    final Color panelColor = isDark ? Colors.white.withOpacity(0.12) : _panel;
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFF5F0E6),
-              Color(0xFFEDE6D8),
-              Color(0xFFE5DCC8),
-            ],
+            colors: gradientColors,
           ),
         ),
         child: SafeArea(
@@ -70,7 +91,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back_ios, color: _brown),
+                      icon: Icon(Icons.arrow_back_ios, color: textColor),
                       onPressed: () => Get.back(),
                     ),
                     Expanded(
@@ -80,10 +101,15 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         style: TextStyle(
                           fontSize: isTablet ? 24 : 20,
                           fontWeight: FontWeight.w700,
-                          color: _brown,
+                          color: textColor,
                           fontFamily: 'Georgia',
                         ),
                       ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.library_books_rounded, color: textColor, size: 26),
+                      tooltip: 'Saved',
+                      onPressed: () => Get.to(() => const StreakSavedListScreen()),
                     ),
                     IconButton(
                       icon: Container(
@@ -91,7 +117,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         height: 28,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(color: _brown, width: 1.5),
+                          border: Border.all(color: textColor, width: 1.5),
                         ),
                         child: Center(
                           child: Text(
@@ -99,16 +125,13 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              color: _brown,
+                              color: textColor,
                               fontFamily: 'Georgia',
                             ),
                           ),
                         ),
                       ),
-                      onPressed: () => showDialog(
-                        context: context,
-                        builder: (_) => const BuildYourStreakDialog(),
-                      ),
+                      onPressed: () => Get.to(() => const YourFaithJourneyScreen()),
                     ),
                   ],
                 ),
@@ -120,11 +143,33 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const SizedBox(height: 16),
-                      // Week circles
+                      // Week circles: completed / missed / ongoing
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: List.generate(7, (i) {
-                          final isCurrent = i == todayIndex;
+                          final status = i < _weekStatuses.length ? _weekStatuses[i] : WeekDayStatus.future;
+                          final isOngoing = status == WeekDayStatus.ongoing;
+                          final isCompleted = status == WeekDayStatus.completed;
+                          final isMissed = status == WeekDayStatus.missed;
+                          Color circleColor = panelColor.withOpacity(0.8);
+                          Color borderColor = textColor.withOpacity(0.2);
+                          Color iconColor = textColor.withOpacity(isDark ? 0.9 : 0.7); // future/pending
+                          double borderWidth = 1;
+                          if (isOngoing) {
+                            circleColor = _gold.withOpacity(0.2);
+                            borderColor = _gold;
+                            borderWidth = 2.5;
+                            iconColor = const Color(0xFFE65100);
+                          } else if (isCompleted) {
+                            circleColor = _gold.withOpacity(0.25);
+                            borderColor = _gold;
+                            iconColor = const Color(0xFFE65100);
+                          } else if (isMissed) {
+                            circleColor = panelColor.withOpacity(0.6);
+                            borderColor = textColor.withOpacity(0.3);
+                            iconColor = textColor.withOpacity(0.4);
+                          }
+                          final showLock = isMissed || status == WeekDayStatus.future;
                           return Column(
                             children: [
                               Container(
@@ -132,16 +177,33 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                                 height: isTablet ? 44 : 38,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: isCurrent ? _gold.withOpacity(0.2) : _panel.withOpacity(0.8),
+                                  color: circleColor,
                                   border: Border.all(
-                                    color: isCurrent ? _gold : _brown.withOpacity(0.2),
-                                    width: isCurrent ? 2.5 : 1,
+                                    color: borderColor,
+                                    width: borderWidth,
                                   ),
                                 ),
-                                child: Icon(
-                                  Icons.local_fire_department_rounded,
-                                  size: isTablet ? 22 : 18,
-                                  color: isCurrent ? const Color(0xFFE65100) : _brown.withOpacity(0.5),
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.local_fire_department_rounded,
+                                      size: isTablet ? 22 : 18,
+                                      color: iconColor,
+                                    ),
+                                    if (showLock)
+                                      Align(
+                                        alignment: Alignment.bottomCenter,
+                                        child: Transform.translate(
+                                          offset: Offset(0, isTablet ? 4 : 3),
+                                          child: Icon(
+                                            Icons.lock,
+                                            size: isTablet ? 22 : 20,
+                                            color: textColor.withOpacity(0.7),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -149,11 +211,10 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                                 days[i],
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: _brown,
+                                  color: textColor,
                                   fontFamily: 'Georgia',
                                 ),
                               ),
-                              if (i > todayIndex) Text('${i + 1}', style: TextStyle(fontSize: 10, color: _brown.withOpacity(0.5))),
                             ],
                           );
                         }),
@@ -164,14 +225,14 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         'Your Faith Walk Today',
                         style: TextStyle(
                           fontSize: 13,
-                          color: _brown.withOpacity(0.9),
+                          color: textColor.withOpacity(0.9),
                           fontFamily: 'Georgia',
                         ),
                       ),
                       const SizedBox(height: 6),
                       LinearProgressIndicator(
                         value: _loaded ? (_stepsCompletedToday / 4).clamp(0.0, 1.0) : 0.75,
-                        backgroundColor: _panel,
+                        backgroundColor: panelColor,
                         valueColor: const AlwaysStoppedAnimation<Color>(_gold),
                         minHeight: 8,
                         borderRadius: BorderRadius.circular(4),
@@ -181,22 +242,25 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         'Step ${_stepsCompletedToday.clamp(0, 4)} of 4',
                         style: TextStyle(
                           fontSize: 12,
-                          color: _brown.withOpacity(0.8),
+                          color: textColor.withOpacity(0.8),
                           fontFamily: 'Georgia',
                         ),
                       ),
                       const SizedBox(height: 20),
-                      // Today's Reward
-                      _card(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+                      // Today's Reward — only when daily streak is completed (all 4 steps)
+                      if (_stepsCompletedToday >= 4) ...[
+                        _card(
+                          panelColor: panelColor,
+                          textColor: textColor,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                             Text(
                               'Today\'s Reward',
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: _brown,
+                                color: textColor,
                                 fontFamily: 'Georgia',
                               ),
                             ),
@@ -210,7 +274,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w700,
-                                    color: _brown,
+                                    color: textColor,
                                     fontFamily: 'Georgia',
                                   ),
                                 ),
@@ -221,22 +285,23 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                               'Use points for AI Bible Chat.',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: _brown.withOpacity(0.75),
+                                color: textColor.withOpacity(0.75),
                                 fontFamily: 'Georgia',
                               ),
                             ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
+                        const SizedBox(height: 24),
+                      ],
                       // With Jesus
-                      _sectionTitle('With Jesus'),
+                      _sectionTitle('With Jesus', textColor),
                       const SizedBox(height: 4),
                       Text(
                         'Spend a few moments with Him and start your day blessed!',
                         style: TextStyle(
                           fontSize: 13,
-                          color: _brown.withOpacity(0.85),
+                          color: textColor.withOpacity(0.85),
                           fontFamily: 'Georgia',
                         ),
                       ),
@@ -246,6 +311,10 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         title: 'Connect',
                         subtitle: '1 min · Share how you feel.',
                         completed: _stepsCompletedToday >= 1,
+                        onTap: () => Get.to(() => const StreakConnectionScreen()),
+                        textColor: textColor,
+                        panelColor: panelColor,
+                        isDark: isDark,
                       ),
                       const SizedBox(height: 8),
                       _activityCard(
@@ -253,6 +322,13 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         title: 'Verse of the Day',
                         subtitle: '1 min · Daily reading.',
                         completed: _stepsCompletedToday >= 2,
+                        onTap: () async {
+                          final item = await MoodPrayerLoader.pickItem(connectionIndex: 1);
+                          if (item != null && mounted) Get.to(() => StreakVerseScreen(item: item));
+                        },
+                        textColor: textColor,
+                        panelColor: panelColor,
+                        isDark: isDark,
                       ),
                       const SizedBox(height: 8),
                       _activityCard(
@@ -260,6 +336,13 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         title: 'Devotional',
                         subtitle: '2 min · Insight for today.',
                         completed: _stepsCompletedToday >= 3,
+                        onTap: () async {
+                          final item = await MoodPrayerLoader.pickItem(connectionIndex: 1);
+                          if (item != null && mounted) Get.to(() => StreakDevotionalScreen(item: item));
+                        },
+                        textColor: textColor,
+                        panelColor: panelColor,
+                        isDark: isDark,
                       ),
                       const SizedBox(height: 8),
                       _activityCard(
@@ -267,16 +350,23 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         title: 'Prayer',
                         subtitle: '2 min · Talk with Him.',
                         completed: _stepsCompletedToday >= 4,
+                        onTap: () async {
+                          final item = await MoodPrayerLoader.pickItem(connectionIndex: 1);
+                          if (item != null && mounted) Get.to(() => StreakPrayerScreen(item: item));
+                        },
+                        textColor: textColor,
+                        panelColor: panelColor,
+                        isDark: isDark,
                       ),
                       const SizedBox(height: 24),
                       // Seek His Presence
-                      _sectionTitle('Seek His Presence'),
+                      _sectionTitle('Seek His Presence', textColor),
                       const SizedBox(height: 4),
                       Text(
                         'Share your heart with God and find His peace.',
                         style: TextStyle(
                           fontSize: 13,
-                          color: _brown.withOpacity(0.85),
+                          color: textColor.withOpacity(0.85),
                           fontFamily: 'Georgia',
                         ),
                       ),
@@ -286,6 +376,8 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         title: 'What\'s on Your Heart?',
                         subtitle: 'Share your burdens...',
                         onTap: () => Get.to(() => ChatScreen()),
+                        textColor: textColor,
+                        panelColor: panelColor,
                       ),
                       const SizedBox(height: 8),
                       _actionCard(
@@ -293,22 +385,31 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         title: 'Find Peace',
                         subtitle: 'Release your worries.',
                         onTap: () => Get.to(() => const PourOutWorriesScreen()),
+                        textColor: textColor,
+                        panelColor: panelColor,
                       ),
                       const SizedBox(height: 24),
-                      // Next Milestone
+                      // Next Milestone (dynamic by streak)
                       _card(
+                        panelColor: panelColor,
+                        textColor: textColor,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             const Icon(Icons.star, color: _gold, size: 24),
                             const SizedBox(width: 8),
-                            Text(
-                              '3 more days to unlock ⭐ 100 Faith Credits',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: _brown,
-                                fontFamily: 'Georgia',
+                            Flexible(
+                              child: Text(
+                                _currentStreak >= 7
+                                    ? '7-day streak complete! ⭐ 100 Faith Credits earned'
+                                    : '${7 - _currentStreak} more ${7 - _currentStreak == 1 ? 'day' : 'days'} to unlock ⭐ 100 Faith Credits',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: textColor,
+                                  fontFamily: 'Georgia',
+                                ),
                               ),
                             ),
                           ],
@@ -326,10 +427,10 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
     );
   }
 
-  Widget _sectionTitle(String text) {
+  Widget _sectionTitle(String text, Color textColor) {
     return Row(
       children: [
-        Expanded(child: Divider(color: _brown.withOpacity(0.3), thickness: 1)),
+        Expanded(child: Divider(color: textColor.withOpacity(0.3), thickness: 1)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Text(
@@ -337,26 +438,26 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
-              color: _brown,
+              color: textColor,
               fontFamily: 'Georgia',
             ),
           ),
         ),
-        Expanded(child: Divider(color: _brown.withOpacity(0.3), thickness: 1)),
+        Expanded(child: Divider(color: textColor.withOpacity(0.3), thickness: 1)),
       ],
     );
   }
 
-  Widget _card({required Widget child}) {
+  Widget _card({required Widget child, required Color panelColor, required Color textColor}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _panel,
+        color: panelColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _gold.withOpacity(0.3)),
         boxShadow: [
           BoxShadow(
-            color: _brown.withOpacity(0.06),
+            color: textColor.withOpacity(0.06),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -371,8 +472,14 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
     required String title,
     required String subtitle,
     required bool completed,
+    VoidCallback? onTap,
+    required Color textColor,
+    required Color panelColor,
+    required bool isDark,
   }) {
-    return _card(
+    final content = _card(
+      panelColor: panelColor,
+      textColor: textColor,
       child: Row(
         children: [
           Container(
@@ -382,7 +489,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
               color: _gold.withOpacity(0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: _brown, size: 26),
+            child: Icon(icon, color: textColor, size: 26),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -394,7 +501,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: _brown,
+                    color: textColor,
                     fontFamily: 'Georgia',
                   ),
                 ),
@@ -402,7 +509,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                   subtitle,
                   style: TextStyle(
                     fontSize: 13,
-                    color: _brown.withOpacity(0.8),
+                    color: textColor.withOpacity(0.8),
                     fontFamily: 'Georgia',
                   ),
                 ),
@@ -410,12 +517,27 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
             ),
           ),
           if (completed)
-            const Icon(Icons.check_circle, color: Color(0xFF2E7D32), size: 28)
+            Icon(
+              Icons.check_circle,
+              color: isDark ? Colors.white : const Color(0xFF2E7D32),
+              size: 28,
+            )
           else
             const SizedBox(width: 28, height: 28),
         ],
       ),
     );
+    if (onTap != null) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: content,
+        ),
+      );
+    }
+    return content;
   }
 
   Widget _actionCard({
@@ -423,6 +545,8 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
     required String title,
     required String subtitle,
     required VoidCallback onTap,
+    required Color textColor,
+    required Color panelColor,
   }) {
     return Material(
       color: Colors.transparent,
@@ -430,6 +554,8 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: _card(
+          panelColor: panelColor,
+          textColor: textColor,
           child: Row(
             children: [
               Container(
@@ -439,7 +565,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                   color: _gold.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: _brown, size: 26),
+                child: Icon(icon, color: textColor, size: 26),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -451,7 +577,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: _brown,
+                        color: textColor,
                         fontFamily: 'Georgia',
                       ),
                     ),
@@ -459,14 +585,14 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                       subtitle,
                       style: TextStyle(
                         fontSize: 13,
-                        color: _brown.withOpacity(0.8),
+                        color: textColor.withOpacity(0.8),
                         fontFamily: 'Georgia',
                       ),
                     ),
                   ],
                 ),
               ),
-              Icon(Icons.arrow_forward_ios, size: 16, color: _brown.withOpacity(0.6)),
+              Icon(Icons.arrow_forward_ios, size: 16, color: textColor.withOpacity(0.6)),
             ],
           ),
         ),

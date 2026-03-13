@@ -113,7 +113,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
                         onPressed: _onAddWidgetTap,
                         icon: Icon(Icons.arrow_forward, color: Colors.white, size: 20),
                         label: Text(
-                          'Add Widget',
+                          'Got It',
                           style: TextStyle(
                             fontSize: isTablet ? 18 : 16,
                             fontWeight: FontWeight.w600,

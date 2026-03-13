@@ -2550,7 +2550,11 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                             () {
                                           showModalBottomSheet(
                                             context: context,
-                                            backgroundColor: Colors.transparent,
+                                            backgroundColor:
+                                                Colors.transparent,
+                                            isDismissible:
+                                                false, // Prevent initial tap-up on iPad from immediately closing
+                                            enableDrag: true,
                                             builder: (_) {
                                               final bg = isDark
                                                   ? CommanColor.darkPrimaryColor
@@ -2677,7 +2681,11 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                             () {
                                           showModalBottomSheet(
                                             context: context,
-                                            backgroundColor: Colors.transparent,
+                                            backgroundColor:
+                                                Colors.transparent,
+                                            isDismissible:
+                                                false, // Same behaviour on iPad when there is no answer yet
+                                            enableDrag: true,
                                             builder: (_) {
                                               final bg = isDark
                                                   ? CommanColor.darkPrimaryColor

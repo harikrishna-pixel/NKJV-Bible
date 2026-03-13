@@ -1,7 +1,10 @@
 import 'dart:developer';
 import 'dart:io';
+import 'package:biblebookapp/view/constants/share_preferences.dart';
+import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
@@ -21,7 +24,10 @@ class NotificationsServices {
             android: initializationSettingsAndroid,
             iOS: DarwinInitializationSettings());
 
-    await _flutterLocalNotificationsPlugin.initialize(initializationSettings);
+    await _flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: _onNotificationTap,
+    );
 
     // Request permissions on iOS and Android 13+
     if (Platform.isAndroid) {
@@ -38,6 +44,21 @@ class NotificationsServices {
             badge: true,
             sound: true,
           );
+    }
+  }
+
+  /// Call at app startup (e.g. from splash) to store notification payload when app was launched from a notification tap.
+  static Future<void> storeLaunchPayloadIfFromNotification() async {
+    final FlutterLocalNotificationsPlugin plugin =
+        FlutterLocalNotificationsPlugin();
+    final NotificationAppLaunchDetails? details =
+        await plugin.getNotificationAppLaunchDetails();
+    if (details?.didNotificationLaunchApp ?? false) {
+      final String? payload = details?.notificationResponse?.payload;
+      if (payload != null && payload.isNotEmpty) {
+        await SharPreferences.setString(
+            SharPreferences.pendingNotificationAction, payload);
+      }
     }
   }
 
@@ -63,6 +84,12 @@ class NotificationsServices {
     }
 
     if (notificationAppLaunchDetails?.didNotificationLaunchApp ?? false) {
+      final String? payload =
+          notificationAppLaunchDetails?.notificationResponse?.payload;
+      if (payload != null && payload.isNotEmpty) {
+        await SharPreferences.setString(
+            SharPreferences.pendingNotificationAction, payload);
+      }
       return true;
     }
 
@@ -75,9 +102,28 @@ class NotificationsServices {
     return status.isGranted;
   }
 
+  static void _onNotificationTap(NotificationResponse response) {
+    final String? payload = response.payload;
+    if (payload != null && payload.isNotEmpty) {
+      SharPreferences.setString(
+          SharPreferences.pendingNotificationAction, payload);
+      // Navigate to Home so pending action is handled (e.g. open verse, chat, streak).
+      Get.offAll(() => HomeScreen(
+            From: 'splash',
+            selectedVerseNumForRead: '',
+            selectedBookForRead: '',
+            selectedChapterForRead: '',
+            selectedBookNameForRead: '',
+            selectedVerseForRead: '',
+          ));
+    }
+  }
+
+  /// Schedules a daily notification at hh:mm with optional payload for tap handling.
   Future<void> showNotification(
-      int id, String title, String body, int hh, int mm) async {
-    log('Set Notification: $id, $title,$body, $hh,$mm');
+      int id, String title, String body, int hh, int mm,
+      {String? payload}) async {
+    log('Set Notification: $id, $title,$body, $hh,$mm, payload: $payload');
     var dateTime = DateTime(DateTime.now().year, DateTime.now().month,
         DateTime.now().day, hh, mm, 0);
     tz.initializeTimeZones();
@@ -109,6 +155,7 @@ class NotificationsServices {
           UILocalNotificationDateInterpretation.absoluteTime,
       androidScheduleMode: AndroidScheduleMode.alarmClock,
       matchDateTimeComponents: DateTimeComponents.time,
+      payload: payload,
     );
   }
 

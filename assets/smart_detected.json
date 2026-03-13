@@ -1,0 +1,48 @@
+{
+    "messages": [
+        { "message": "Time for your Bible moment. Open the app and stay in the Word.", "action_id": "open_reading" },
+        { "message": "Start your daily Bible streak and keep the habit.", "action_id": "open_streak" },
+        { "message": "A verse is waiting for you today. Tap to read.", "action_id": "open_verse" },
+        { "message": "Curious about the Bible? Ask a question in chat.", "action_id": "open_chat" },
+        { "message": "Your daily reading is ready. Open the app now.", "action_id": "open_reading" },
+        { "message": "Don't miss today's Word. Begin your Bible time.", "action_id": "open_streak" },
+        { "message": "Reflect on today's verse. Tap to open.", "action_id": "open_verse" }
+    ],
+    "actions": [
+        {
+            "action_id": "open_streak",
+            "description": "Open today's Bible streak reading",
+            "route": "/streak"
+        },
+        {
+            "action_id": "open_reading",
+            "description": "Open today's Bible reading chapter",
+            "route": "/daily-reading"
+        },
+        {
+            "action_id": "open_chat",
+            "description": "Open AI Bible chat screen",
+            "route": "/ai-chat"
+        },
+        {
+            "action_id": "open_verse",
+            "description": "Open daily Bible verse screen",
+            "route": "/daily-verse"
+        },
+        {
+            "action_id": "open_images",
+            "description": "Open verse images and wallpapers",
+            "route": "/verse-images"
+        },
+        {
+            "action_id": "open_quiz",
+            "description": "Open Bible quiz screen",
+            "route": "/quiz"
+        },
+        {
+            "action_id": "open_premium",
+            "description": "Open premium subscription screen",
+            "route": "/premium"
+        }
+    ]
+}

@@ -4,6 +4,7 @@ import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/view/constants/changeThemeButtun.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
+import 'package:biblebookapp/streak_flow/streak_saved_list_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/about.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
@@ -26,6 +27,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:biblebookapp/services/smart_notification_helper.dart';
+import 'package:biblebookapp/services/streak_notification_helper.dart';
 import '../../constants/colors.dart';
 import '../../constants/images.dart';
 import '../../constants/share_preferences.dart';
@@ -476,12 +479,32 @@ class _SettingScreenState extends State<SettingScreen>
   }
 
   void setNotification(NotificationTime notificationTime) async {
-    NotificationsServices().showNotification(
-        getNotificationId(notificationTime),
-        getNotificationTitle(notificationTime),
-        getNotificationBody(notificationTime),
-        int.parse(getNotificationHours(notificationTime)),
-        int.parse(getNotificationMin(notificationTime)));
+    await SmartNotificationHelper.cancelSmartNotification();
+    final int id = getNotificationId(notificationTime);
+    final int hh;
+    final int mm;
+    switch (notificationTime) {
+      case NotificationTime.morning:
+        hh = 8;
+        mm = 0;
+        break;
+      case NotificationTime.afternoon:
+        hh = 14;
+        mm = 0;
+        break;
+      case NotificationTime.evening:
+        hh = 20;
+        mm = 0;
+        break;
+    }
+    final content = notificationTime == NotificationTime.morning
+        ? await StreakNotificationHelper.getMorningContent()
+        : notificationTime == NotificationTime.afternoon
+            ? await StreakNotificationHelper.getAfternoonContent()
+            : await StreakNotificationHelper.getNightContent();
+    await NotificationsServices().showNotification(
+        id, 'Bible', content.message, hh, mm,
+        payload: content.action);
   }
 
   disableNotification(NotificationTime notificationTime) {
@@ -1000,6 +1023,7 @@ class _SettingScreenState extends State<SettingScreen>
                               // showNotificationAlertDialog(context);
                             } else {
                               disableNotification(NotificationTime.morning);
+                              SmartNotificationHelper.scheduleSmartNotificationIfNeeded();
                             }
                           } else {
                             checkNotificationPermission();
@@ -1075,6 +1099,7 @@ class _SettingScreenState extends State<SettingScreen>
                               // showNotificationAlertDialog(context);
                             } else {
                               disableNotification(NotificationTime.afternoon);
+                              SmartNotificationHelper.scheduleSmartNotificationIfNeeded();
                             }
                           } else {
                             checkNotificationPermission();
@@ -1148,6 +1173,7 @@ class _SettingScreenState extends State<SettingScreen>
                               //   showNotificationAlertDialog(context);
                             } else {
                               disableNotification(NotificationTime.evening);
+                              SmartNotificationHelper.scheduleSmartNotificationIfNeeded();
                             }
                           } else {
                             checkNotificationPermission();
@@ -1320,6 +1346,36 @@ class _SettingScreenState extends State<SettingScreen>
                       children: [
                         Text(
                           "Font Type",
+                          style: CommanStyle.bw16500(context),
+                        ),
+                        const Spacer(),
+                        Icon(
+                          Icons.navigate_next,
+                          color: CommanColor.whiteBlack(context),
+                          size: 24,
+                        )
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(
+                  height: 5,
+                ),
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                      horizontal: 20, vertical: screenWidth < 380 ? 5 : 10),
+                  child: InkWell(
+                    onTap: () {
+                      Get.to(() => const StreakSavedListScreen(),
+                          transition: Transition.cupertinoDialog,
+                          duration: const Duration(milliseconds: 300));
+                    },
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Saved from Daily Journey",
                           style: CommanStyle.bw16500(context),
                         ),
                         const Spacer(),
