@@ -49,181 +49,184 @@ class BibleAlertBox extends StatelessWidget {
             ? 44.0
             : 38.0;
 
-    // Calculate dialog dimensions - wider (increased)
+    // Calculate dialog dimensions - card-style dialog similar to mock
     final dialogWidth = screenWidth < 380
         ? screenWidth * 0.95
         : screenWidth < 600
-            ? screenWidth * 0.88
+            ? screenWidth * 0.9
             : 620.0;
     
-    // Calculate height to fit all content without scrolling - increased height (increased)
+    // Calculate height to fit content with gentle scrolling on very small screens
     final dialogHeight = screenWidth < 380
-        ? screenHeight * 0.88
+        ? screenHeight * 0.72
         : screenWidth < 600
-            ? screenHeight * 0.86
-            : 800.0;
+            ? screenHeight * 0.68
+            : 720.0;
 
     return Dialog(
-      backgroundColor: CommanColor.white,
+      backgroundColor: Colors.transparent,
       insetPadding: screenWidth > 450 
           ? EdgeInsets.symmetric(horizontal: (screenWidth - dialogWidth) / 2)
           : EdgeInsets.symmetric(horizontal: screenWidth * 0.1),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
+      child: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(
             maxWidth: dialogWidth,
-            maxHeight: dialogHeight, // Increased height to show all content
+            maxHeight: dialogHeight,
           ),
-          child: SingleChildScrollView(
-            physics: const NeverScrollableScrollPhysics(), // Disable scrolling - content should fit
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFFF8EFE4),
+                  Color(0xFFE7D3BA),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.18),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    GestureDetector(
-                      onTap: () async {
-                        Get.back();
-                      },
-                      child: Icon(
-                        Icons.close,
-                        size: screenWidth < 380 ? 20 : 25,
-                        color: CommanColor.black,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        GestureDetector(
+                          onTap: () async {
+                            Get.back();
+                          },
+                          child: Icon(
+                            Icons.close,
+                            size: screenWidth < 380 ? 20 : 26,
+                            color: const Color(0xFF5C4033),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Sign In to Save Your Spiritual Journey',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: titleFontSize,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF4B3423),
                       ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Secure Your Progress',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: subtitleFontSize + 1,
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF7A5A3A),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    BibleProgressCircle(
+                      progressSize: progressSize,
+                      fontSize: subtitleFontSize,
+                    ),
+                    SizedBox(height: screenWidth < 380 ? 14 : 18),
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: screenWidth > 450 ? 24 : 8,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildIconText(
+                              Icons.check, 'Sync reading progress', iconSize, context),
+                          const SizedBox(height: 8),
+                          _buildIconText(
+                              Icons.check, 'Access notes & highlights', iconSize, context),
+                          const SizedBox(height: 8),
+                          _buildIconText(Icons.check, 'Track your Bible completion',
+                              iconSize, context),
+                          const SizedBox(height: 8),
+                          _buildIconText(Icons.check, 'Secure cloud backup', iconSize,
+                              context),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: screenWidth < 380 ? 10 : 14),
+                    Text(
+                      'Your data stays private',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: screenWidth < 380
+                            ? 11.0
+                            : screenWidth > 450
+                                ? 15
+                                : 13.0,
+                        color: const Color(0xFF4B3423),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: screenWidth < 380 ? 12 : 16),
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: screenWidth > 450 ? 60 : 20),
+                      child: SizedBox(
+                        height: buttonHeight,
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF7B5842),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            elevation: 0,
+                          ),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Get.to(() => SignupScreen());
+                          },
+                          child: Text(
+                            'Sign In & Save Progress',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: screenWidth < 380 ? 13.0 : 12.0,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                        height: screenWidth > 450
+                            ? 10
+                            : screenWidth < 380
+                                ? 6
+                                : 8),
+                    Text(
+                      'Your spiritual growth matters. Keep it safe',
+                      style: TextStyle(
+                        fontStyle: FontStyle.italic,
+                        fontSize: screenWidth > 450
+                            ? subtitleFontSize - 1
+                            : subtitleFontSize - 2,
+                        color: const Color(0xFF6A4A33),
+                      ),
+                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Sign In to Save Your Spiritual Journey',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: titleFontSize,
-                    fontWeight: FontWeight.w600,
-                    color: CommanColor.black,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Sign in Now!',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: titleFontSize - 1,
-                    fontWeight: FontWeight.w500,
-                    fontStyle: FontStyle.italic,
-                    color: CommanColor.black,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Your bookmarks, notes & highlights. Safe & Secured',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontSize: subtitleFontSize,
-                      color: CommanColor.black,
-                      fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 6),
-
-                BibleProgressCircle(
-                  progressSize: progressSize,
-                  fontSize: subtitleFontSize,
-                ),
-
-                SizedBox(height: screenWidth < 380 ? 4 : 6),
-                Padding(
-                  padding: screenWidth > 450
-                      ? const EdgeInsets.symmetric(horizontal: 20)
-                      : EdgeInsets.symmetric(horizontal: 8),
-                  child: Column(
-                    children: [
-                      _buildIconText(Icons.check, 'Sync reading progress',
-                          iconSize, context),
-                      const SizedBox(height: 8),
-                      _buildIconText(
-                          Icons.bookmark,
-                          'Access all notes & highlights',
-                          iconSize,
-                          context),
-                      const SizedBox(height: 8),
-                      _buildIconText(
-                          Icons.circle_outlined,
-                          'Track your Bible completion',
-                          iconSize,
-                          context),
-                      const SizedBox(height: 8),
-                      _buildIconText(Icons.cloud_download,
-                          'Secure cloud backup', iconSize, context),
-                    ],
-                  ),
-                ),
-
-                SizedBox(height: screenWidth < 380 ? 4 : 8),
-                Text(
-                  'Your data stays private',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: screenWidth < 380
-                        ? 11.0
-                        : screenWidth > 450
-                            ? 15
-                            : 13.0,
-                    color: CommanColor.black,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-
-                SizedBox(height: screenWidth < 380 ? 8 : 10),
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: screenWidth > 450 ? 60 : 20),
-                  child: SizedBox(
-                    height: buttonHeight,
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.brown,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(7),
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        Get.to(() => SignupScreen());
-                      },
-                      child: Text(
-                        'Sign In & Save Progress',
-                        style: TextStyle(
-                            color: CommanColor.white,
-                            fontSize: screenWidth < 380 ? 12.0 : 11),
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(
-                    height: screenWidth > 450
-                        ? 8
-                        : screenWidth < 380
-                        ? 4
-                        : 6),
-                Text(
-                  'Your spiritual growth matters. Keep it safe',
-                  style: TextStyle(
-                    fontStyle: FontStyle.italic,
-                    fontSize: screenWidth > 450
-                        ? subtitleFontSize - 1
-                        : subtitleFontSize - 2,
-                    color: CommanColor.black,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: screenWidth < 380 ? 2 : 4),
-              ],
+              ),
             ),
           ),
         ),
@@ -284,25 +287,24 @@ class BibleProgressCircle extends StatelessWidget {
             fit: BoxFit.contain,
           ),
 
-          // Center Text
+          // Center content
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Bible\nJourney',
+                'Bible Progress',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: fontSize - 2,
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w600,
                   color: Colors.white,
                 ),
               ),
-              Text(
-                '%',
-                style: TextStyle(
-                  fontSize: fontSize + 2,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
+              const SizedBox(height: 4),
+              Icon(
+                Icons.check,
+                size: fontSize + 4,
+                color: Colors.white,
               ),
             ],
           ),

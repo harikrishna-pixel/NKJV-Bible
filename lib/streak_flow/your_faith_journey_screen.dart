@@ -424,10 +424,10 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
             const SizedBox(height: 1),
             if (isCompleted)
               Icon(Icons.local_fire_department_rounded, size: 16, color: _gold)
-            else if (isToday)
-              Icon(Icons.check_circle, size: 18, color: textColor)
             else if (isStartedNotFinished)
               _halfCircle(textColor)
+            else if (isToday)
+              Icon(Icons.check_circle, size: 18, color: textColor)
             else if (!isFuture)
               Container(
                 width: 10,

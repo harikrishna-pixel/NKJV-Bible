@@ -192,17 +192,29 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                                         "Copied");
                                                               },
                                                               child: Container(
-                                                                  padding: const EdgeInsets.all(6),
-                                                                  decoration: BoxDecoration(
-                                                                    borderRadius: BorderRadius.circular(8),
-                                                                    border: Border.all(
-                                                                      color: CommanColor.lightDarkPrimary(context),
-                                                                      width: 1.4,
+                                                                  padding:
+                                                                      const EdgeInsets
+                                                                          .all(
+                                                                          6),
+                                                                  decoration:
+                                                                      BoxDecoration(
+                                                                    borderRadius:
+                                                                        BorderRadius
+                                                                            .circular(8),
+                                                                    border:
+                                                                        Border
+                                                                            .all(
+                                                                      color: CommanColor
+                                                                          .lightDarkPrimary(
+                                                                              context),
+                                                                      width:
+                                                                          1.4,
                                                                     ),
                                                                   ),
                                                                   child: Image.asset(
                                                                       "assets/Bookmark icons/Frame 3630.png",
-                                                                      height: 28,
+                                                                      height:
+                                                                          28,
                                                                       color: CommanColor
                                                                           .lightDarkPrimary(
                                                                               context)))),
@@ -453,8 +465,8 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                             () => ChatScreen(
                                                               verseContext: {
                                                                 'verseText': data
-                                                                    .content
-                                                                    ?.toString() ??
+                                                                        .content
+                                                                        ?.toString() ??
                                                                     '',
                                                                 'book': data
                                                                     .bookName
@@ -467,21 +479,24 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                                     .toString(),
                                                               },
                                                             ),
-                                                            transition:
-                                                                Transition
-                                                                    .cupertinoDialog,
-                                                            duration: const Duration(
-                                                                milliseconds: 300),
+                                                            transition: Transition
+                                                                .cupertinoDialog,
+                                                            duration:
+                                                                const Duration(
+                                                                    milliseconds:
+                                                                        300),
                                                           );
                                                         },
                                                         child: Column(
                                                           children: [
                                                             Container(
-                                                              padding: const EdgeInsets
-                                                                  .all(8),
+                                                              padding:
+                                                                  const EdgeInsets
+                                                                      .all(8),
                                                               height: 40,
                                                               width: 40,
-                                                              decoration: BoxDecoration(
+                                                              decoration:
+                                                                  BoxDecoration(
                                                                 border: Border.all(
                                                                     color: CommanColor
                                                                         .lightDarkPrimary(
@@ -492,13 +507,11 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                                         .circular(
                                                                             8),
                                                               ),
-                                                              child: Icon(
-                                                                Icons
-                                                                    .question_answer_outlined,
-                                                                size: 22,
-                                                                color: CommanColor
-                                                                    .lightDarkPrimary(
-                                                                        context),
+                                                              child: Image.asset(
+                                                                'assets/Chat icon.png',
+                                                                height: 22,
+                                                                width: 22,
+                                                                fit: BoxFit.contain,
                                                               ),
                                                             ),
                                                             const SizedBox(
@@ -800,11 +813,20 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                               "Copied");
                                                         },
                                                         child: Container(
-                                                            padding: const EdgeInsets.all(6),
-                                                            decoration: BoxDecoration(
-                                                              borderRadius: BorderRadius.circular(8),
-                                                              border: Border.all(
-                                                                color: CommanColor.lightDarkPrimary(context),
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .all(6),
+                                                            decoration:
+                                                                BoxDecoration(
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          8),
+                                                              border:
+                                                                  Border.all(
+                                                                color: CommanColor
+                                                                    .lightDarkPrimary(
+                                                                        context),
                                                                 width: 1.4,
                                                               ),
                                                             ),
@@ -1065,16 +1087,15 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                       () => ChatScreen(
                                                         verseContext: {
                                                           'verseText': data
-                                                              .content
-                                                              ?.toString() ??
+                                                                  .content
+                                                                  ?.toString() ??
                                                               '',
                                                           'book': data.bookName
                                                               .toString(),
                                                           'chapter': data
                                                               .chapterNum
                                                               .toString(),
-                                                          'verse': data
-                                                              .verseNum
+                                                          'verse': data.verseNum
                                                               .toString(),
                                                         },
                                                       ),
@@ -1087,11 +1108,13 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                   child: Column(
                                                     children: [
                                                       Container(
-                                                        padding: const EdgeInsets
-                                                            .all(8),
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .all(8),
                                                         height: 40,
                                                         width: 40,
-                                                        decoration: BoxDecoration(
+                                                        decoration:
+                                                            BoxDecoration(
                                                           border: Border.all(
                                                               color: CommanColor
                                                                   .lightDarkPrimary(
@@ -1101,13 +1124,11 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                               BorderRadius
                                                                   .circular(8),
                                                         ),
-                                                        child: Icon(
-                                                          Icons
-                                                              .question_answer_outlined,
-                                                          size: 22,
-                                                          color: CommanColor
-                                                              .lightDarkPrimary(
-                                                                  context),
+                                                        child: Image.asset(
+                                                          'assets/Chat icon.png',
+                                                          height: 22,
+                                                          width: 22,
+                                                          fit: BoxFit.contain,
                                                         ),
                                                       ),
                                                       const SizedBox(
@@ -1356,9 +1377,15 @@ class _HighLightScreenState extends State<HighLightScreen> {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Image.asset(Images.highlightsPlaceHolder(context),
-                        height: 80, width: 80,color: Colors.transparent.withOpacity(0.3),),
-                      SizedBox(height: 20,),
+                      Image.asset(
+                        Images.highlightsPlaceHolder(context),
+                        height: 80,
+                        width: 80,
+                        color: Colors.transparent.withOpacity(0.3),
+                      ),
+                      SizedBox(
+                        height: 20,
+                      ),
                       Text(
                         "No relevant content",
                         style: CommanStyle.placeholderText(context),

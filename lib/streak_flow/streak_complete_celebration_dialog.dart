@@ -1,4 +1,3 @@
-import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/setting_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -52,16 +51,6 @@ class StreakCompleteCelebrationDialog extends StatelessWidget {
                 width: 72,
                 fit: BoxFit.contain,
               ),
-              const SizedBox(height: 8),
-              Text(
-                BibleInfo.bible_shortName,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: _brown.withOpacity(0.9),
-                  fontFamily: 'Georgia',
-                ),
-              ),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -83,7 +72,7 @@ class StreakCompleteCelebrationDialog extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
-                  "You spent time in God's Word today. Come back tomorrow to continue your journey.",
+                  "You spent time in God's Word today.\nCome back tomorrow to continue your journey.",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
@@ -96,7 +85,8 @@ class StreakCompleteCelebrationDialog extends StatelessWidget {
               const SizedBox(height: 20),
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                 decoration: BoxDecoration(
                   color: _stripBg,
                   borderRadius: BorderRadius.circular(12),
@@ -108,7 +98,7 @@ class StreakCompleteCelebrationDialog extends StatelessWidget {
                     Icon(Icons.star, color: _gold, size: 22),
                     const SizedBox(width: 10),
                     Text(
-                      'Day $streakCount Streak Started',
+                      'Day $streakCount Streak Completed',
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -157,7 +147,15 @@ class StreakCompleteCelebrationDialog extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
+              Text(
+                'Want a daily notifications ?',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _brown.withOpacity(0.7),
+                  fontFamily: 'Georgia',
+                ),
+              ),
               Material(
                 color: Colors.transparent,
                 child: InkWell(
@@ -167,19 +165,22 @@ class StreakCompleteCelebrationDialog extends StatelessWidget {
                   },
                   borderRadius: BorderRadius.circular(12),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 6, horizontal: 20),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.notifications_none, size: 20, color: _gold),
-                        const SizedBox(width: 8),
+                        Icon(Icons.notifications_none, size: 18, color: _gold),
+                        const SizedBox(width: 6),
                         Text(
                           'Enable Daily Reminder',
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: FontWeight.w500,
                             color: _gold,
                             fontFamily: 'Georgia',
+                            decoration: TextDecoration.underline,
+                            decorationColor: _gold.withOpacity(0.7),
                           ),
                         ),
                       ],

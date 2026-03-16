@@ -130,11 +130,16 @@ class _DailyVerseState extends State<DailyVerse> {
     // When opened from Verse of the Day widget, show the same verse as on the widget first
     if (widget.fromWidget && dailyVerseList.isNotEmpty) {
       final widgetData = await getVerseOfTheDayWidgetData();
-      final widgetRef = (widgetData['reference'] ?? '').trim().replaceAll(RegExp(r'\s+'), ' ');
+      final widgetRef = (widgetData['reference'] ?? '')
+          .trim()
+          .replaceAll(RegExp(r'\s+'), ' ');
       if (widgetRef.isNotEmpty) {
         final idx = dailyVerseList.indexWhere((v) {
-          final listRef = '${v.book} ${(v.chapter ?? 0) + 1}:${(v.verseNum ?? 0) + 1}'.trim();
-          return listRef == widgetRef || listRef.replaceAll(' ', '') == widgetRef.replaceAll(' ', '');
+          final listRef =
+              '${v.book} ${(v.chapter ?? 0) + 1}:${(v.verseNum ?? 0) + 1}'
+                  .trim();
+          return listRef == widgetRef ||
+              listRef.replaceAll(' ', '') == widgetRef.replaceAll(' ', '');
         });
         if (idx > 0) {
           final item = dailyVerseList.removeAt(idx);
@@ -527,7 +532,8 @@ class _DailyVerseState extends State<DailyVerse> {
                               width: 40,
                               decoration: BoxDecoration(
                                 border: Border.all(
-                                    color: CommanColor.lightDarkPrimary(context),
+                                    color:
+                                        CommanColor.lightDarkPrimary(context),
                                     width: 1.2),
                                 borderRadius: BorderRadius.circular(8),
                               ),
@@ -543,7 +549,6 @@ class _DailyVerseState extends State<DailyVerse> {
                           ],
                         ),
                       ),
-                      
                     ],
                   )
                 ],
@@ -765,8 +770,8 @@ class _DailyVerseState extends State<DailyVerse> {
                                             Expanded(
                                               child: Text(
                                                 "${data.book} ${data.chapter! + 1}:${data.verseNum! + 1}",
-                                                style:
-                                                    CommanStyle.bwWithChangeFont(
+                                                style: CommanStyle
+                                                    .bwWithChangeFont(
                                                         context,
                                                         fontSize,
                                                         selectedFontFamily),

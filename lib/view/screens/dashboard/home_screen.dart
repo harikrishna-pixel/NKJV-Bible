@@ -4740,7 +4740,7 @@ class _HomeScreenState extends State<HomeScreen>
                                                     listen: false)
                                                 .themeMode ==
                                             ThemeMode.dark
-                                        ? Colors.white
+                                        ? Colors.amberAccent
                                         : Colors.yellowAccent,
                                     size: screenWidth > 450 ? 26 : 22,
                                   ),
@@ -4959,9 +4959,10 @@ class _HomeScreenState extends State<HomeScreen>
                           },
                           visualDensity:
                               const VisualDensity(horizontal: 0, vertical: 0),
-                          leading: Icon(
-                            Icons.self_improvement,
-                            size: 24,
+                          leading: Image.asset(
+                            "assets/dove.png",
+                            height: 26,
+                            width: 26,
                             color:
                                 Provider.of<ThemeProvider>(context).themeMode ==
                                         ThemeMode.dark
@@ -4969,7 +4970,7 @@ class _HomeScreenState extends State<HomeScreen>
                                     : CommanColor.lightModePrimary,
                           ),
                           title: Text(
-                            'Get Prayer',
+                            'Prayer Guidance',
                             style: CommanStyle.bothPrimary16600(context),
                           ),
                         ),

@@ -92,7 +92,7 @@ void _showRemoveDialog(BuildContext context, VoidCallback onConfirmRemove) {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Remove?',
+                'Remove',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
@@ -298,7 +298,7 @@ class _StreakSavedListScreenState extends State<StreakSavedListScreen> {
   }
 }
 
-class _SavedItemCard extends StatelessWidget {
+class _SavedItemCard extends StatefulWidget {
   const _SavedItemCard({
     required this.item,
     required this.textColor,
@@ -312,6 +312,13 @@ class _SavedItemCard extends StatelessWidget {
   final Color panelColor;
   final Color gold;
   final void Function(String type) onDelete;
+
+  @override
+  State<_SavedItemCard> createState() => _SavedItemCardState();
+}
+
+class _SavedItemCardState extends State<_SavedItemCard> {
+  bool _expanded = false;
 
   static String _typeLabel(String type) {
     switch (type) {
@@ -342,81 +349,94 @@ class _SavedItemCard extends StatelessWidget {
   static String _formatSavedDate(String savedAt) {
     try {
       final dt = DateTime.parse(savedAt);
-      return 'Saved ${DateFormat('MMM d, yyyy').format(dt)}';
+      return DateFormat('MMM d, yyyy').format(dt);
     } catch (_) {
-      return savedAt.isNotEmpty ? 'Saved $savedAt' : '';
+      return savedAt.isNotEmpty ? savedAt : '';
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final item = widget.item;
+    final textColor = widget.textColor;
+    final panelColor = widget.panelColor;
+    final gold = widget.gold;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       color: panelColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(_typeIcon(item.type), size: 20, color: gold),
-                const SizedBox(width: 8),
+      child: InkWell(
+        onTap: () => setState(() => _expanded = !_expanded),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Icon(_typeIcon(item.type), size: 20, color: gold),
+                  const SizedBox(width: 8),
+                  Text(
+                    _typeLabel(item.type),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: gold,
+                      fontFamily: 'Georgia',
+                    ),
+                  ),
+                  if (item.savedAt.isNotEmpty) ...[
+                    const SizedBox(width: 6),
+                    Text(
+                      _formatSavedDate(item.savedAt),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: textColor.withOpacity(0.65),
+                        fontFamily: 'Georgia',
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  Icon(
+                    _expanded ? Icons.expand_less : Icons.expand_more,
+                    size: 24,
+                    color: textColor.withOpacity(0.7),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.delete_outline, size: 22, color: textColor.withOpacity(0.7)),
+                    onPressed: () {
+                      _showRemoveDialog(context, () => widget.onDelete(item.type));
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              if (item.title.isNotEmpty)
                 Text(
-                  _typeLabel(item.type),
+                  item.title,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: gold,
+                    color: textColor,
                     fontFamily: 'Georgia',
                   ),
                 ),
-                const Spacer(),
-                IconButton(
-                  icon: Icon(Icons.delete_outline, size: 22, color: textColor.withOpacity(0.7)),
-                  onPressed: () {
-                    _showRemoveDialog(context, () => onDelete(item.type));
-                  },
-                ),
-              ],
-            ),
-            if (item.title.isNotEmpty) ...[
-              const SizedBox(height: 6),
+              if (item.title.isNotEmpty) const SizedBox(height: 4),
               Text(
-                item.title,
+                item.body,
+                maxLines: _expanded ? null : 2,
+                overflow: _expanded ? null : TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                  height: 1.45,
                   color: textColor,
                   fontFamily: 'Georgia',
                 ),
               ),
             ],
-            if (item.savedAt.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(
-                _formatSavedDate(item.savedAt),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: textColor.withOpacity(0.65),
-                  fontFamily: 'Georgia',
-                ),
-              ),
-            ],
-            const SizedBox(height: 8),
-            Text(
-              item.body,
-              maxLines: 6,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 15,
-                height: 1.45,
-                color: textColor,
-                fontFamily: 'Georgia',
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

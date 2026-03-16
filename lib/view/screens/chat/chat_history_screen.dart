@@ -276,26 +276,25 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                         : () {
                             showDialog(
                               context: context,
+                              barrierDismissible: false,
                               builder: (context) {
                                 final themeProvider = Provider.of<ThemeProvider>(context);
                                 final isVintage = themeProvider.currentCustomTheme == AppCustomTheme.vintage;
                                 return AlertDialog(
-                                  backgroundColor: isDark
-                                      ? CommanColor.darkPrimaryColor
-                                      : (isVintage ? themeProvider.backgroundColor : CommanColor.white),
+                                  backgroundColor: Colors.white,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(15),
                                   ),
-                                title: Text(
+                                title: const Text(
                                   'Delete Selected',
                                   style: TextStyle(
-                                    color: CommanColor.whiteBlack(context),
+                                    color: Colors.black,
                                   ),
                                 ),
-                                content: Text(
-                                  'Are you sure you want to delete ${_selectedItems.length} conversation(s)?',
+                                content: const Text(
+                                  'Are you sure you want to delete selected conversation(s)?',
                                   style: TextStyle(
-                                    color: CommanColor.whiteBlack(context),
+                                    color: Colors.black,
                                   ),
                                 ),
                                 actions: [
@@ -304,9 +303,7 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                                     child: Text(
                                       'Cancel',
                                       style: TextStyle(
-                                        color: isDark 
-                                            ? CommanColor.white.withOpacity(0.8)
-                                            : CommanColor.lightDarkPrimary(context),
+                                    color: Colors.black,
                                       ),
                                     ),
                                   ),
@@ -363,22 +360,20 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                           final isDarkDialog = themeProvider.themeMode == ThemeMode.dark;
                           final isVintage = themeProvider.currentCustomTheme == AppCustomTheme.vintage;
                           return AlertDialog(
-                            backgroundColor: isDarkDialog
-                                ? CommanColor.darkPrimaryColor
-                                : CommanColor.white,
+                            backgroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(15),
                             ),
-                            title: Text(
+                            title: const Text(
                               'Clear All History',
                               style: TextStyle(
-                                color: CommanColor.whiteBlack(context),
+                                color: Colors.black,
                               ),
                             ),
-                            content: Text(
+                            content: const Text(
                               'Are you sure you want to delete all chat history?',
                               style: TextStyle(
-                                color: CommanColor.whiteBlack(context),
+                                color: Colors.black,
                               ),
                             ),
                             actions: [
@@ -387,9 +382,7 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                                 child: Text(
                                   'Cancel',
                                   style: TextStyle(
-                                    color: isDarkDialog 
-                                        ? CommanColor.white.withOpacity(0.8)
-                                        : CommanColor.lightDarkPrimary(context),
+                                    color: Colors.black,
                                   ),
                                 ),
                               ),

@@ -999,7 +999,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                   height: 160,
                                   width: 160,
                                 ),
-                              
+
                                 // Text(
                                 //   'Search by Words',
                                 //   style: TextStyle(
@@ -1009,7 +1009,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                 //   ),
                                 //   textAlign: TextAlign.center,
                                 // ),
-                              
+
                                 Padding(
                                   padding: EdgeInsets.symmetric(horizontal: 40),
                                   child: Text(
@@ -1263,12 +1263,12 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                         .body
                                                                         ?.text
                                                                         .toString(),
-                                                                fromSearch: true),
+                                                                fromSearch:
+                                                                    true),
                                                             transition: Transition
                                                                 .cupertinoDialog,
-                                                            duration:
-                                                                const Duration(
-                                                                    milliseconds: 300));
+                                                            duration: const Duration(
+                                                                milliseconds: 300));
                                                       },
                                                       child: Column(
                                                         children: [
@@ -1419,18 +1419,19 @@ class _SearchScreenState extends State<SearchScreen> {
                                                     ),
                                                     InkWell(
                                                       onTap: () {
-                                                        Navigator.of(context).pop();
+                                                        Navigator.of(context)
+                                                            .pop();
                                                         Get.to(
                                                           () => ChatScreen(
                                                             verseContext: {
                                                               'verseText': parse(
-                                                                      data.content)
-                                                                  .body
-                                                                  ?.text
-                                                                  .toString() ??
+                                                                          data.content)
+                                                                      .body
+                                                                      ?.text
+                                                                      .toString() ??
                                                                   '',
-                                                              'book':
-                                                                  bookName.toString(),
+                                                              'book': bookName
+                                                                  .toString(),
                                                               'chapter':
                                                                   '${int.parse(data.chapterNum.toString()) + 1}',
                                                               'verse':
@@ -1439,18 +1440,22 @@ class _SearchScreenState extends State<SearchScreen> {
                                                           ),
                                                           transition: Transition
                                                               .cupertinoDialog,
-                                                          duration: const Duration(
-                                                              milliseconds: 300),
+                                                          duration:
+                                                              const Duration(
+                                                                  milliseconds:
+                                                                      300),
                                                         );
                                                       },
                                                       child: Column(
                                                         children: [
                                                           Container(
-                                                            padding: const EdgeInsets
-                                                                .all(8),
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .all(8),
                                                             height: 40,
                                                             width: 40,
-                                                            decoration: BoxDecoration(
+                                                            decoration:
+                                                                BoxDecoration(
                                                               border: Border.all(
                                                                   color: CommanColor
                                                                       .lightDarkPrimary(
@@ -1461,19 +1466,16 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                       .circular(
                                                                           8),
                                                             ),
-                                                            child: Icon(
-                                                              Icons
-                                                                  .question_answer_outlined,
-                                                              size: 22,
-                                                              color: CommanColor
-                                                                  .lightDarkPrimary(
-                                                                      context),
+                                                            child: Image.asset(
+                                                              'assets/Chat icon.png',
+                                                              height: 22,
+                                                              width: 22,
+                                                              fit: BoxFit.contain,
                                                             ),
                                                           ),
                                                           const SizedBox(
                                                               height: 15),
-                                                          Text(
-                                                              "Ask",
+                                                          Text("Ask",
                                                               style: CommanStyle
                                                                   .bothPrimary14500(
                                                                       context)),
@@ -1771,7 +1773,8 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                               .body
                                                                               ?.text
                                                                               .toString(),
-                                                                          fromSearch: true),
+                                                                          fromSearch:
+                                                                              true),
                                                                       transition:
                                                                           Transition
                                                                               .cupertinoDialog,
@@ -1895,13 +1898,12 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                           context)
                                                                       .pop();
                                                                   Get.to(
-                                                                    () => ChatScreen(
+                                                                    () =>
+                                                                        ChatScreen(
                                                                       verseContext: {
-                                                                        'verseText': parse(data.content)
-                                                                            .body
-                                                                            ?.text
-                                                                            .toString() ??
-                                                                            '',
+                                                                        'verseText':
+                                                                            parse(data.content).body?.text.toString() ??
+                                                                                '',
                                                                         'book':
                                                                             bookName.toString(),
                                                                         'chapter':
@@ -1914,30 +1916,42 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                         Transition
                                                                             .cupertinoDialog,
                                                                     duration: const Duration(
-                                                                        milliseconds: 300),
+                                                                        milliseconds:
+                                                                            300),
                                                                   );
                                                                 },
                                                                 child: Column(
                                                                   children: [
                                                                     Container(
-                                                                      padding: const EdgeInsets.all(8),
-                                                                      height: 40,
+                                                                      padding:
+                                                                          const EdgeInsets
+                                                                              .all(
+                                                                              8),
+                                                                      height:
+                                                                          40,
                                                                       width: 40,
-                                                                      decoration: BoxDecoration(
+                                                                      decoration:
+                                                                          BoxDecoration(
                                                                         border: Border.all(
-                                                                            color: CommanColor.lightDarkPrimary(context),
+                                                                            color:
+                                                                                CommanColor.lightDarkPrimary(context),
                                                                             width: 1.2),
-                                                                        borderRadius: BorderRadius.circular(8),
+                                                                        borderRadius:
+                                                                            BorderRadius.circular(8),
                                                                       ),
-                                                                      child: Icon(
-                                                                        Icons.question_answer_outlined,
-                                                                        size: 22,
-                                                                        color: CommanColor.lightDarkPrimary(context),
+                                                                      child: Image.asset(
+                                                                        'assets/Chat icon.png',
+                                                                        height: 22,
+                                                                        width: 22,
+                                                                        fit: BoxFit.contain,
                                                                       ),
                                                                     ),
-                                                                    const SizedBox(height: 15),
+                                                                    const SizedBox(
+                                                                        height:
+                                                                            15),
                                                                     Text("Ask",
-                                                                        style: CommanStyle.bothPrimary14500(context)),
+                                                                        style: CommanStyle.bothPrimary14500(
+                                                                            context)),
                                                                   ],
                                                                 ),
                                                               ),

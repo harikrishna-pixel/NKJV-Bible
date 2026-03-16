@@ -146,7 +146,7 @@ class _PourOutWorriesScreenState extends State<PourOutWorriesScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       decoration: BoxDecoration(
                         color: _hasText
-                            ? (isDark ? Colors.white.withOpacity(0.2) : const Color(0xFF3D2914))
+                            ? CommanColor.lightDarkPrimary(context)
                             : (isDark ? Colors.white.withOpacity(0.12) : _cream.withOpacity(0.9)),
                         borderRadius: BorderRadius.circular(28),
                         border: Border.all(
@@ -168,7 +168,7 @@ class _PourOutWorriesScreenState extends State<PourOutWorriesScreen> {
                             fontSize: isTablet ? 18 : 16,
                             fontWeight: FontWeight.w600,
                             color: _hasText
-                                ? (isDark ? Colors.white : _cream)
+                                ? Colors.white
                                 : textColor.withOpacity(0.45),
                             fontFamily: 'Georgia',
                           ),

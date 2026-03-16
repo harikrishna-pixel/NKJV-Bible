@@ -349,7 +349,7 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
             ),
             const SizedBox(height: 8),
             Text(
-              _isHolding ? 'Breathing...' : 'Hold',
+              _isHolding ? 'Hold' : 'Breathe in',
               style: TextStyle(
                 fontSize: isTablet ? 16 : 14,
                 color: textColor.withOpacity(0.8),

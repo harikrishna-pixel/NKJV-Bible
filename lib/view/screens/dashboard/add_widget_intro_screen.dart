@@ -34,8 +34,10 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
     super.dispose();
   }
 
+  bool get _isLastPage => _currentPage >= _imagePaths.length - 1;
+
   void _onAddWidgetTap() {
-    if (_isIOS && _currentPage < _imagePaths.length - 1) {
+    if (!_isLastPage) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -72,37 +74,33 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
                 ),
               ),
             ),
-      body: SafeArea(
-        top: !useFullScreen,
-        child: Column(
-          children: [
-            Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                onPageChanged: (index) => setState(() => _currentPage = index),
-                itemCount: _imagePaths.length,
-                itemBuilder: (context, index) {
-                  return Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isTablet ? 32 : 20,
-                      vertical: isTablet ? 24 : 16,
-                    ),
-                    child: Image.asset(
-                      _imagePaths[index],
-                      fit: BoxFit.contain,
-                    ),
-                  );
-                },
-              ),
-            ),
-            SafeArea(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          PageView.builder(
+            controller: _pageController,
+            onPageChanged: (index) => setState(() => _currentPage = index),
+            itemCount: _imagePaths.length,
+            itemBuilder: (context, index) {
+              return Image.asset(
+                _imagePaths[index],
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+              );
+            },
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: SafeArea(
               top: false,
               child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  isTablet ? 32 : 24,
-                  16,
-                  isTablet ? 32 : 24,
-                  isTablet ? 24 : 16,
+                padding: EdgeInsets.only(
+                  left: isTablet ? 32 : 24,
+                  right: isTablet ? 32 : 24,
+                  bottom: isTablet ? 4 : 0,
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -113,7 +111,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
                         onPressed: _onAddWidgetTap,
                         icon: Icon(Icons.arrow_forward, color: Colors.white, size: 20),
                         label: Text(
-                          'Got It',
+                          _isLastPage ? 'Got it' : 'Next',
                           style: TextStyle(
                             fontSize: isTablet ? 18 : 16,
                             fontWeight: FontWeight.w600,
@@ -144,8 +142,8 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

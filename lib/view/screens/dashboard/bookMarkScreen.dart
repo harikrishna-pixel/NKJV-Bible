@@ -194,7 +194,8 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                                       color: CommanColor
                                                                           .lightDarkPrimary(
                                                                               context),
-                                                                      width: 1.4),
+                                                                      width:
+                                                                          1.4),
                                                                 ),
                                                                 child: Image.asset(
                                                                     "assets/Bookmark icons/Frame 3630.png",
@@ -455,10 +456,10 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                           () => ChatScreen(
                                                             verseContext: {
                                                               'verseText': parse(
-                                                                      data.content)
-                                                                  .body
-                                                                  ?.text
-                                                                  .toString() ??
+                                                                          data.content)
+                                                                      .body
+                                                                      ?.text
+                                                                      .toString() ??
                                                                   '',
                                                               'book': data
                                                                   .bookName
@@ -473,18 +474,22 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                           ),
                                                           transition: Transition
                                                               .cupertinoDialog,
-                                                          duration: const Duration(
-                                                              milliseconds: 300),
+                                                          duration:
+                                                              const Duration(
+                                                                  milliseconds:
+                                                                      300),
                                                         );
                                                       },
                                                       child: Column(
                                                         children: [
                                                           Container(
-                                                            padding: const EdgeInsets
-                                                                .all(8),
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .all(8),
                                                             height: 40,
                                                             width: 40,
-                                                            decoration: BoxDecoration(
+                                                            decoration:
+                                                                BoxDecoration(
                                                               border: Border.all(
                                                                   color: CommanColor
                                                                       .lightDarkPrimary(
@@ -495,13 +500,11 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                                       .circular(
                                                                           8),
                                                             ),
-                                                            child: Icon(
-                                                              Icons
-                                                                  .question_answer_outlined,
-                                                              size: 22,
-                                                              color: CommanColor
-                                                                  .lightDarkPrimary(
-                                                                      context),
+                                                            child: Image.asset(
+                                                              'assets/Chat icon.png',
+                                                              height: 22,
+                                                              width: 22,
+                                                              fit: BoxFit.contain,
                                                             ),
                                                           ),
                                                           const SizedBox(
@@ -881,26 +884,26 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                           Constants.showToast(
                                                               "Copied");
                                                         },
-                                                      child: Container(
-                                                          padding:
-                                                              const EdgeInsets
-                                                                  .all(6),
-                                                          decoration:
-                                                              BoxDecoration(
-                                                            borderRadius:
-                                                                BorderRadius
-                                                                    .circular(8),
-                                                            border: Border.all(
-                                                                color: CommanColor
-                                                                    .lightDarkPrimary(
-                                                                        context),
-                                                                width: 1.4),
-                                                          ),
-                                                          child: Image.asset(
-                                                            "assets/Bookmark icons/Frame 3630.png",
-                                                            height: 28,
-                                                          ))
-                                                    ),
+                                                        child: Container(
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .all(6),
+                                                            decoration:
+                                                                BoxDecoration(
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          8),
+                                                              border: Border.all(
+                                                                  color: CommanColor
+                                                                      .lightDarkPrimary(
+                                                                          context),
+                                                                  width: 1.4),
+                                                            ),
+                                                            child: Image.asset(
+                                                              "assets/Bookmark icons/Frame 3630.png",
+                                                              height: 28,
+                                                            ))),
                                                     const SizedBox(
                                                       height: 15,
                                                     ),
@@ -1147,19 +1150,18 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                     Get.to(
                                                       () => ChatScreen(
                                                         verseContext: {
-                                                          'verseText': parse(
-                                                                  data.content)
-                                                              .body
-                                                              ?.text
-                                                              .toString() ??
+                                                          'verseText': parse(data
+                                                                      .content)
+                                                                  .body
+                                                                  ?.text
+                                                                  .toString() ??
                                                               '',
                                                           'book': data.bookName
                                                               .toString(),
                                                           'chapter': data
                                                               .chapterNum
                                                               .toString(),
-                                                          'verse': data
-                                                              .verseNum
+                                                          'verse': data.verseNum
                                                               .toString(),
                                                         },
                                                       ),
@@ -1172,11 +1174,13 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                   child: Column(
                                                     children: [
                                                       Container(
-                                                        padding: const EdgeInsets
-                                                            .all(8),
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .all(8),
                                                         height: 40,
                                                         width: 40,
-                                                        decoration: BoxDecoration(
+                                                        decoration:
+                                                            BoxDecoration(
                                                           border: Border.all(
                                                               color: CommanColor
                                                                   .lightDarkPrimary(
@@ -1186,13 +1190,11 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                               BorderRadius
                                                                   .circular(8),
                                                         ),
-                                                        child: Icon(
-                                                          Icons
-                                                              .question_answer_outlined,
-                                                          size: 22,
-                                                          color: CommanColor
-                                                              .lightDarkPrimary(
-                                                                  context),
+                                                        child: Image.asset(
+                                                          'assets/Chat icon.png',
+                                                          height: 22,
+                                                          width: 22,
+                                                          fit: BoxFit.contain,
                                                         ),
                                                       ),
                                                       const SizedBox(
@@ -1502,9 +1504,15 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Image.asset(Images.bookmarkPlaceHolder(context),
-                          height: 80, width: 80,color: Colors.transparent.withOpacity(0.3),),
-                      SizedBox(height: 20,),
+                      Image.asset(
+                        Images.bookmarkPlaceHolder(context),
+                        height: 80,
+                        width: 80,
+                        color: Colors.transparent.withOpacity(0.3),
+                      ),
+                      SizedBox(
+                        height: 20,
+                      ),
                       Text(
                         "No relevant content",
                         style: CommanStyle.placeholderText(context),

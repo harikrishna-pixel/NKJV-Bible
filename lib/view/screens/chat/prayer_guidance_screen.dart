@@ -72,6 +72,9 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
   int _currentCredits = 0;
   Timer? _creditsTimer;
 
+  // Intro answer length selection (shared with Chat intro behaviour)
+  String _introAnswerLength = 'small';
+
   // Background music asset path (without 'assets/' prefix as AssetSource adds it automatically)
   static const String _backgroundMusicUrl =
       'music/christian-rock-for-jesus-christ-always-301257.mp3';
@@ -122,6 +125,11 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
       'titleKey': 'prayer_feelings',
       'prompt':
           'Give me a prayer to bring my feelings and emotions before God. Include 1-2 Geneva Bible verse references.',
+    },
+    {
+      'titleKey': 'prayer_praise',
+      'prompt':
+          'Write a short prayer of praise and worship to God. Include 1-2 Geneva Bible verse references.',
     },
   ];
 
@@ -1081,7 +1089,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Top row: back, credits badge
+                    // Top row: back only (wallet already shown in main header)
                     Row(
                       children: [
                         IconButton(
@@ -1094,38 +1102,6 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                             Navigator.of(dialogContext).pop();
                             _customPrayerController.clear();
                           },
-                        ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? Colors.white.withOpacity(0.12)
-                                : const Color(0xFFF8F4EB),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: isDark ? Colors.white24 : const Color(0xFFE0D5C8),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.star_border,
-                                size: 18,
-                                color: isDark ? Colors.white70 : const Color(0xFF5C4033),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                '$_currentCredits',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: isDark ? Colors.white : const Color(0xFF3D2914),
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
                       ],
                     ),
@@ -1194,7 +1170,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                             decoration: InputDecoration(
                               hintText: 'Speak from the soul...',
                               hintStyle: TextStyle(
-                                color: Colors.grey.shade600,
+                                color: isDark ? Colors.white70 : Colors.grey.shade600,
                                 fontStyle: FontStyle.italic,
                               ),
                               border: OutlineInputBorder(
@@ -1242,32 +1218,44 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                           const SizedBox(height: 16),
                           SizedBox(
                             width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: () async {
-                                final request = _customPrayerController.text.trim();
-                                Navigator.of(dialogContext).pop();
-                                _customPrayerController.clear();
-                                if (request.isNotEmpty && mounted) {
-                                  await _sendCustomPrayerRequest(request);
-                                }
+                            child: ValueListenableBuilder<TextEditingValue>(
+                              valueListenable: _customPrayerController,
+                              builder: (context, value, _) {
+                                final hasText = value.text.trim().isNotEmpty;
+                                return ElevatedButton(
+                                  onPressed: hasText
+                                      ? () async {
+                                          final request =
+                                              _customPrayerController.text.trim();
+                                          Navigator.of(dialogContext).pop();
+                                          _customPrayerController.clear();
+                                          if (request.isNotEmpty && mounted) {
+                                            await _sendCustomPrayerRequest(request);
+                                          }
+                                        }
+                                      : null,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: isDark
+                                        ? CommanColor.darkPrimaryColor
+                                        : const Color(0xFFD4A574),
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 14),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'Get Prayer',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      color: isDark
+                                          ? Colors.white
+                                          : const Color(0xFF5C4033),
+                                    ),
+                                  ),
+                                );
                               },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: isDark
-                                    ? const Color(0xFF8B6F47)
-                                    : const Color(0xFFD4A574),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: Text(
-                                'Get Prayer',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: isDark ? Colors.white : const Color(0xFF5C4033),
-                                ),
-                              ),
                             ),
                           ),
                         ],
@@ -1314,6 +1302,9 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     _creditsTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _loadCreditsFromLocal();
     });
+
+    // Show shared answer-length intro if needed (same behaviour as Chat).
+    _showPrayerIntroIfNeeded();
   }
 
   Future<void> _loadCreditsFromLocal() async {
@@ -1327,6 +1318,485 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     } catch (e) {
       debugPrint('Prayer credits load error: $e');
     }
+  }
+
+  /// Show the shared "Select Answer Length" intro once, same as Chat screen.
+  Future<void> _showPrayerIntroIfNeeded() async {
+    // Show Important Notice first when entering prayer guidance; only then show intro.
+    final agreed = await _showPleaseNoteDialog();
+    if (!agreed || !mounted) {
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final seenIntro = prefs.getBool('chat_intro_seen') ?? false;
+    if (seenIntro || !mounted) return;
+
+    final length = await WalletService.getAnswerLength();
+    if (!mounted) return;
+    setState(() {
+      _introAnswerLength = length;
+    });
+    await Future.delayed(const Duration(milliseconds: 150));
+    if (!mounted) return;
+    await _showPrayerIntroDialog();
+  }
+
+  Future<void> _showPrayerIntroDialog() async {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDark = themeProvider.themeMode == ThemeMode.dark;
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    final initialCredits = await WalletService.getCredits();
+
+    await showModalBottomSheet(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setBottomSheetState) {
+            return TweenAnimationBuilder<double>(
+              duration: const Duration(milliseconds: 800),
+              curve: Curves.easeOutCubic,
+              tween: Tween(begin: 0.0, end: 1.0),
+              builder: (context, value, child) {
+                return Transform.translate(
+                  offset: Offset(0, (1 - value) * 50),
+                  child: Opacity(
+                    opacity: value,
+                    child: child,
+                  ),
+                );
+              },
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.9,
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isDark ? CommanColor.darkPrimaryColor : Colors.white,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(24),
+                      topRight: Radius.circular(24),
+                    ),
+                  ),
+                  child: SingleChildScrollView(
+                    physics: const ClampingScrollPhysics(),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Header with gradient (styled like provided mock)
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                CommanColor.lightDarkPrimary(context),
+                                CommanColor.lightDarkPrimary(context)
+                                    .withOpacity(0.8),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(24),
+                              topRight: Radius.circular(24),
+                            ),
+                          ),
+                          padding: EdgeInsets.symmetric(
+                            vertical: screenWidth > 450 ? 28 : 24,
+                            horizontal: screenWidth > 450 ? 24 : 20,
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.volunteer_activism,
+                                size: screenWidth > 450 ? 40 : 36,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(height: 14),
+                              Text(
+                                'Welcome to Bible Guidance',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize:
+                                      screenWidth > 450 ? 22 : 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Choose your preferred answer style',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.9),
+                                  fontSize:
+                                      screenWidth > 450 ? 15 : 14,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal:
+                                      screenWidth > 450 ? 16 : 14,
+                                  vertical:
+                                      screenWidth > 450 ? 10 : 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.3),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.account_balance_wallet,
+                                      color: Colors.white,
+                                      size:
+                                          screenWidth > 450 ? 20 : 18,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'You have $initialCredits credits',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: screenWidth > 450
+                                            ? 15
+                                            : 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.all(
+                              screenWidth > 450 ? 24 : 20),
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? Colors.white.withOpacity(0.05)
+                                      : CommanColor.lightDarkPrimary(
+                                              context)
+                                          .withOpacity(0.05),
+                                  borderRadius:
+                                      BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: isDark
+                                        ? Colors.white.withOpacity(0.1)
+                                        : CommanColor
+                                                .lightDarkPrimary(
+                                                    context)
+                                            .withOpacity(0.1),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.lightbulb_outline,
+                                      color:
+                                          CommanColor.lightDarkPrimary(
+                                              context),
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        'Each response uses credits. You can change this anytime in your Wallet.',
+                                        style: TextStyle(
+                                          color: CommanColor
+                                                  .whiteBlack(context)
+                                              .withOpacity(0.8),
+                                          fontSize: screenWidth > 450
+                                              ? 14
+                                              : 13,
+                                          height: 1.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              Text(
+                                'Select Answer Length',
+                                style: TextStyle(
+                                  color: CommanColor
+                                      .whiteBlack(context),
+                                  fontSize: screenWidth > 450
+                                      ? 17
+                                      : 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              _buildPrayerIntroAnswerLengthOption(
+                                context: context,
+                                screenWidth: screenWidth,
+                                isDark: isDark,
+                                length: 'small',
+                                title: 'Short Answer',
+                                description: 'Quick & concise response',
+                                cost: '20 Credits',
+                                setBottomSheetState: setBottomSheetState,
+                              ),
+                              const SizedBox(height: 12),
+                              _buildPrayerIntroAnswerLengthOption(
+                                context: context,
+                                screenWidth: screenWidth,
+                                isDark: isDark,
+                                length: 'medium',
+                                title: 'Medium Answer',
+                                description: 'Balanced explanation',
+                                cost: '50 Credits',
+                                setBottomSheetState: setBottomSheetState,
+                              ),
+                              const SizedBox(height: 12),
+                              _buildPrayerIntroAnswerLengthOption(
+                                context: context,
+                                screenWidth: screenWidth,
+                                isDark: isDark,
+                                length: 'large',
+                                title: 'Full Study',
+                                description: 'Detailed & comprehensive',
+                                cost: '100 Credits',
+                                setBottomSheetState: setBottomSheetState,
+                              ),
+                              const SizedBox(height: 24),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor:
+                                        Colors.transparent,
+                                    shadowColor: Colors.transparent,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(16),
+                                      side: isDark
+                                          ? const BorderSide(
+                                              color: Colors.white,
+                                              width: 1.5)
+                                          : BorderSide.none,
+                                    ),
+                                    padding: EdgeInsets.zero,
+                                  ),
+                                  onPressed: () async {
+                                    final prefs =
+                                        await SharedPreferences
+                                            .getInstance();
+                                    await prefs.setBool(
+                                        'chat_intro_seen', true);
+                                    if (mounted) {
+                                      Navigator.pop(context);
+                                    }
+                                  },
+                                  child: Ink(
+                                    decoration: BoxDecoration(
+                                      borderRadius:
+                                          BorderRadius.circular(16),
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xFF763201),
+                                          Color(0xFFD5821F),
+                                          Color(0xFF763201),
+                                        ],
+                                      ),
+                                    ),
+                                    child: Container(
+                                      alignment: Alignment.center,
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: screenWidth > 450
+                                            ? 16
+                                            : 14,
+                                      ),
+                                      child: Text(
+                                        'Continue',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: screenWidth > 450
+                                              ? 17
+                                              : 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(
+                                height: MediaQuery.of(context)
+                                        .viewInsets
+                                        .bottom +
+                                    10,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPrayerIntroAnswerLengthOption({
+    required BuildContext context,
+    required double screenWidth,
+    required bool isDark,
+    required String length,
+    required String title,
+    required String description,
+    required String cost,
+    required StateSetter setBottomSheetState,
+  }) {
+    final isSelected = _introAnswerLength == length;
+
+    return InkWell(
+      onTap: () async {
+        await WalletService.setAnswerLength(length);
+        if (mounted) {
+          setState(() {
+            _introAnswerLength = length;
+          });
+          setBottomSheetState(() {
+            _introAnswerLength = length;
+          });
+          Constants.showToast('$title selected', 5000);
+        }
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: EdgeInsets.all(screenWidth > 450 ? 16 : 14),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? (isDark
+                  ? CommanColor.lightDarkPrimary(context).withOpacity(0.15)
+                  : CommanColor.lightDarkPrimary(context).withOpacity(0.08))
+              : (isDark ? Colors.white.withOpacity(0.03) : Colors.grey.shade50),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? (isDark
+                    ? Colors.white
+                    : CommanColor.lightDarkPrimary(context))
+                : (isDark
+                    ? Colors.white.withOpacity(0.1)
+                    : Colors.grey.shade200),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected
+                      ? CommanColor.lightDarkPrimary(context)
+                      : (isDark
+                          ? Colors.white.withOpacity(0.4)
+                          : Colors.grey.shade400),
+                  width: 2,
+                ),
+                color: isSelected
+                    ? CommanColor.lightDarkPrimary(context)
+                    : Colors.transparent,
+              ),
+              child: isSelected
+                  ? Center(
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                        ),
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: CommanColor.whiteBlack(context),
+                      fontSize: screenWidth > 450 ? 16 : 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      color: CommanColor.whiteBlack(context)
+                          .withOpacity(0.6),
+                      fontSize: screenWidth > 450 ? 13 : 12,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: screenWidth > 450 ? 12 : 10,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? CommanColor.lightDarkPrimary(context)
+                        .withOpacity(0.15)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: CommanColor.lightDarkPrimary(context)
+                      .withOpacity(0.6),
+                ),
+              ),
+              child: Text(
+                cost,
+                style: TextStyle(
+                  color: CommanColor.lightDarkPrimary(context),
+                  fontSize: screenWidth > 450 ? 13 : 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // Load interstitial ad
@@ -1573,13 +2043,15 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     );
 
     final matches = versePattern.allMatches(text);
+    final baseFontSize = size.width > 450 ? 18.0 : 16.0;
+
     if (matches.isEmpty) {
       // No verse references, return regular text
       return Text(
         text,
         style: TextStyle(
-          fontSize: size.width > 450 ? 18 : 16,
-          height: 1.5,
+          fontSize: baseFontSize,
+          height: 1.6,
           color: isUser ? Colors.white : CommanColor.whiteBlack(context),
           fontWeight: isUser ? FontWeight.w500 : FontWeight.w400,
         ),
@@ -1598,7 +2070,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
         ));
       }
 
-      // Add verse reference (underlined, no navigation)
+      // Add verse reference (no underline)
       final verseRef = match.group(0)!;
       spans.add(TextSpan(
         text: verseRef,
@@ -1606,9 +2078,6 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
           color: isUser
               ? Colors.white
               : (isDark ? const Color(0xFF64B5F6) : const Color(0xFF1976D2)),
-          decoration: TextDecoration.underline,
-          decorationThickness: 2,
-          decorationStyle: TextDecorationStyle.solid,
           fontWeight: FontWeight.w600,
         ),
       ));
@@ -1626,8 +2095,8 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     return RichText(
       text: TextSpan(
         style: TextStyle(
-          fontSize: size.width > 450 ? 18 : 16,
-          height: 1.5,
+          fontSize: baseFontSize,
+          height: 1.6,
           color: isUser ? Colors.white : CommanColor.whiteBlack(context),
           fontWeight: isUser ? FontWeight.w500 : FontWeight.w400,
         ),
@@ -1830,10 +2299,10 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                       ? Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // Header: illustration, title, subtitle (new design)
+                            // Header: illustration, title, subtitle (full-width)
                             Padding(
                               padding:
-                                  const EdgeInsets.symmetric(horizontal: 16),
+                                  const EdgeInsets.symmetric(horizontal: 8),
                               child: Column(
                                 children: [
                                   const SizedBox(height: 8),
@@ -1939,12 +2408,12 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                 ],
                               ),
                             ),
-                            // Grid scrolls
+                            // Grid scrolls (full-width content)
                             Expanded(
                               child: SingleChildScrollView(
                                 controller: _scrollController,
                                 padding:
-                                    const EdgeInsets.symmetric(horizontal: 16),
+                                    const EdgeInsets.symmetric(horizontal: 8),
                                 child: Column(
                                   children: [
                                     GridView.builder(
@@ -2079,7 +2548,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                         },
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: isDark
-                                              ? const Color(0xFF8B6F47)
+                                              ? CommanColor.darkPrimaryColor
                                               : const Color(0xFFD4A574),
                                           padding: const EdgeInsets.symmetric(
                                               vertical: 14),
@@ -2107,7 +2576,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                         )
                       : ListView.builder(
                           controller: _scrollController,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
                           itemCount: _messages.length + (_isLoading ? 1 : 0),
                           itemBuilder: (context, idx) {
                             if (_isLoading && idx == _messages.length) {
@@ -2139,7 +2608,9 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                     : Alignment.centerLeft,
                                 child: Container(
                                   constraints: BoxConstraints(
-                                    maxWidth: size.width * 0.78,
+                                    maxWidth: isUser
+                                        ? size.width * 0.92
+                                        : size.width,
                                   ),
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 14, vertical: 12),
@@ -2297,7 +2768,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                 if (_messages.any((m) => !m.isUser))
                   Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
+                        horizontal: 8, vertical: 12),
                     child: SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(

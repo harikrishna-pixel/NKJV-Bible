@@ -4471,11 +4471,10 @@ class HomeContentEditBottomSheetState
                               final prefs =
                                   await SharedPreferences.getInstance();
                               final current =
-                                  prefs.getInt('highlight_complete_count') ??
-                                      0;
-                              final shown = prefs
-                                      .getBool('highlight_feedback_shown') ??
-                                  false;
+                                  prefs.getInt('highlight_complete_count') ?? 0;
+                              final shown =
+                                  prefs.getBool('highlight_feedback_shown') ??
+                                      false;
                               final next = current + 1;
                               await prefs.setInt(
                                   'highlight_complete_count', next);
@@ -5968,11 +5967,11 @@ class NotesBottomSheet extends StatelessWidget {
                     onPressed: () async {
                       await SharPreferences.setString('OpenAd', '1');
                       FocusScope.of(context).unfocus();
-                      final isCancel =
-                          controller.selectedBookContent[
+                      final isCancel = controller
+                              .selectedBookContent[
                                   int.parse(verNum.toString()) - 1]
                               .isNoted ==
-                              "no";
+                          "no";
                       if (isCancel) {
                         Navigator.pop(context);
                         return;

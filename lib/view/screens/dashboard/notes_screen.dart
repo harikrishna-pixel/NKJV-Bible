@@ -484,13 +484,11 @@ class _NotesScreenState extends State<NotesScreen> {
                                                                       .circular(
                                                                           8),
                                                             ),
-                                                            child: Icon(
-                                                              Icons
-                                                                  .question_answer_outlined,
-                                                              size: 22,
-                                                              color: CommanColor
-                                                                  .lightDarkPrimary(
-                                                                      context),
+                                                            child: Image.asset(
+                                                              'assets/Chat icon.png',
+                                                              height: 22,
+                                                              width: 22,
+                                                              fit: BoxFit.contain,
                                                             ),
                                                           ),
                                                           const SizedBox(
@@ -1101,13 +1099,11 @@ class _NotesScreenState extends State<NotesScreen> {
                                                               BorderRadius
                                                                   .circular(8),
                                                         ),
-                                                        child: Icon(
-                                                          Icons
-                                                              .question_answer_outlined,
-                                                          size: 22,
-                                                          color: CommanColor
-                                                              .lightDarkPrimary(
-                                                                  context),
+                                                        child: Image.asset(
+                                                          'assets/Chat icon.png',
+                                                          height: 22,
+                                                          width: 22,
+                                                          fit: BoxFit.contain,
                                                         ),
                                                       ),
                                                       const SizedBox(

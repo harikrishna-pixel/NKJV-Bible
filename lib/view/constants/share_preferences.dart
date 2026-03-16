@@ -81,6 +81,10 @@ class SharPreferences {
   static const streakCompletedDates = 'streak_completed_dates';
   /// Streak flow: calendar day (YYYY-MM-DD) user opened "How you're feeling" (started but may not have completed).
   static const streakFlowStartedDate = 'streak_flow_started_date';
+  /// Streak flow: steps completed today (1=Verse reached, 2=Devotional reached, 3=Prayer reached). Used for UI only; full completion uses streakFlowLastShownDate.
+  static const streakFlowStepsCompletedToday = 'streak_flow_steps_completed_today';
+  /// Streak flow: calendar day (YYYY-MM-DD) user dismissed the flow without completing. Used to avoid re-showing on same day.
+  static const streakFlowDismissedDate = 'streak_flow_dismissed_date';
   /// When user taps a streak notification: action to run on next Home open (open_streak, open_reading, open_chat, open_verse).
   static const pendingNotificationAction = 'pending_notification_action';
   /// JSON: last 7 days app open times for smart notification. Format: {"open_times":[{"date":"YYYY-MM-DD","time":"HH:mm"},...]}

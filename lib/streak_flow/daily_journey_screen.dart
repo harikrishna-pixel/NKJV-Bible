@@ -40,7 +40,16 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   Future<void> _load() async {
     final today = DateTime.now().toIso8601String().split('T')[0];
     final lastShown = await SharPreferences.getString(SharPreferences.streakFlowLastShownDate);
-    final steps = (lastShown == today) ? 4 : 0; // 4 if completed flow today
+    int steps = 0;
+    if (lastShown == today) {
+      steps = 4;
+    } else {
+      final started = await SharPreferences.getString(SharPreferences.streakFlowStartedDate);
+      if (started == today) {
+        final s = await SharPreferences.getInt(SharPreferences.streakFlowStepsCompletedToday);
+        steps = s ?? 0;
+      }
+    }
     final streak = await StreakService.getCurrentStreak();
     final statuses = await StreakService.getWeekDayStatuses();
     if (mounted) {
@@ -324,7 +333,11 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         completed: _stepsCompletedToday >= 2,
                         onTap: () async {
                           final item = await MoodPrayerLoader.pickItem(connectionIndex: 1);
-                          if (item != null && mounted) Get.to(() => StreakVerseScreen(item: item));
+                          if (item != null && mounted) {
+                            await SharPreferences.setInt(
+                                SharPreferences.streakFlowStepsCompletedToday, 2);
+                            if (mounted) Get.to(() => StreakVerseScreen(item: item));
+                          }
                         },
                         textColor: textColor,
                         panelColor: panelColor,
@@ -338,7 +351,11 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         completed: _stepsCompletedToday >= 3,
                         onTap: () async {
                           final item = await MoodPrayerLoader.pickItem(connectionIndex: 1);
-                          if (item != null && mounted) Get.to(() => StreakDevotionalScreen(item: item));
+                          if (item != null && mounted) {
+                            await SharPreferences.setInt(
+                                SharPreferences.streakFlowStepsCompletedToday, 2);
+                            if (mounted) Get.to(() => StreakDevotionalScreen(item: item));
+                          }
                         },
                         textColor: textColor,
                         panelColor: panelColor,
@@ -352,7 +369,11 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         completed: _stepsCompletedToday >= 4,
                         onTap: () async {
                           final item = await MoodPrayerLoader.pickItem(connectionIndex: 1);
-                          if (item != null && mounted) Get.to(() => StreakPrayerScreen(item: item));
+                          if (item != null && mounted) {
+                            await SharPreferences.setInt(
+                                SharPreferences.streakFlowStepsCompletedToday, 3);
+                            if (mounted) Get.to(() => StreakPrayerScreen(item: item));
+                          }
                         },
                         textColor: textColor,
                         panelColor: panelColor,
@@ -523,7 +544,11 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
               size: 28,
             )
           else
-            const SizedBox(width: 28, height: 28),
+            Icon(
+              Icons.radio_button_unchecked,
+              color: textColor.withOpacity(0.35),
+              size: 24,
+            ),
         ],
       ),
     );
