@@ -33,7 +33,7 @@ import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/dashboard/preference_selection_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:biblebookapp/view/screens/tawk_chat/tawk_chat_screen.dart';
+import 'package:biblebookapp/view/widget/webview.dart';
 
 class BibleVersionsScreen extends StatefulWidget {
   final String from;
@@ -1044,7 +1044,7 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                     Navigator.pop(context);
                     // Preserve existing preference side-effect then open chat screen
                     await SharPreferences.setString('OpenAd', '1');
-                    Get.to(() => const TawkChatScreen());
+                    Get.to(() => const FeedbackWebView());
                   },
                   style:
                       ElevatedButton.styleFrom(backgroundColor: Colors.brown),

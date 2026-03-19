@@ -9,6 +9,7 @@ import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/view/screens/onboard_faith_screen.dart';
 import 'package:biblebookapp/view/screens/welcome_screen.dart';
 import 'package:biblebookapp/view/screens/notification_info_screen.dart';
+import 'package:biblebookapp/view/screens/dashboard/preference_selection_screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -28,6 +29,7 @@ import 'package:biblebookapp/Model/highLightContentModal.dart';
 import 'package:biblebookapp/Model/mainBookListModel.dart';
 import 'package:biblebookapp/Model/saveNotesModel.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
+import 'package:biblebookapp/core/extract_zip_json.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/initialization_helper.dart';
 import 'package:biblebookapp/services/paywall_preload_service.dart';
@@ -45,6 +47,7 @@ import '../../constants/images.dart';
 import '../../constants/share_preferences.dart';
 import 'package:biblebookapp/streak_flow/streak_flow_screens.dart';
 import '../dashboard/home_screen.dart';
+import 'package:biblebookapp/view/screens/bible_select_screen.dart';
 
 Future<List<MainBookListModel>> _parseAndPrepareBooks(String jsonString) async {
   final data = json.decode(jsonString);
@@ -256,7 +259,11 @@ class _SplashScreenState extends State<SplashScreen> {
           }
         });
         
-        // Essential: Update local DB
+        // Essential: Update local DB (sync verse flags with bookmarks/highlights)
+        await updateLocalDB();
+        // Preserve bookmarks, highlights, notes etc. from legacy DB if current has none
+        await DBMigrationHelper.copyUserDataFromLegacyIfNeeded(password);
+        // Sync verse flags again after copying legacy user data
         await updateLocalDB();
         await deleteFiles();
 
@@ -387,6 +394,36 @@ class _SplashScreenState extends State<SplashScreen> {
     final isOnboardingCompleted =
         await SharPreferences.getBoolean(SharPreferences.onboarding);
 
+    // Hard safety: if core bible data missing, route user to restore/select Bible.
+    try {
+      final db = await DBHelper().db;
+      if (db != null) {
+        final verseCountRows =
+            await db.rawQuery("SELECT COUNT(*) as c FROM verse");
+        final bookCountRows = await db.rawQuery("SELECT COUNT(*) as c FROM book");
+        final verseCount =
+            verseCountRows.isNotEmpty ? (verseCountRows.first["c"] as int?) ?? 0 : 0;
+        final bookCount =
+            bookCountRows.isNotEmpty ? (bookCountRows.first["c"] as int?) ?? 0 : 0;
+        if (verseCount == 0 || bookCount == 0) {
+          // If the app has no local bible text, do not proceed to Home showing "Content is Empty".
+          if (BibleInfo.folders.length <= 1) {
+            Get.offAll(() => PreferenceSelectionScreen(
+                  isSetting: false,
+                  selectedbible: BibleInfo.folders.isNotEmpty
+                      ? BibleInfo.folders.first
+                      : '',
+                ));
+          } else {
+            Get.offAll(() => const BibleVersionsScreen(from: 'onboard'));
+          }
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('testapp Core bible data check failed: $e');
+    }
+
     // First launch: show welcome -> onboarding questions
     if (isOnboardingCompleted == null || !isOnboardingCompleted) {
       Get.offAll(() => const WelcomeScreen());
@@ -412,51 +449,41 @@ class _SplashScreenState extends State<SplashScreen> {
     final count = Sqflite.firstIntValue(result) ?? 0;
 
     if (count == 0) {
-      //   try {
-      //     // Extract JSON from zip (I/O bound, can be made async-friendly)
-      //     final String response = await ExtractZipJson.extractFile(
-      //       AssetsConstants.verseJSONPath,
-      //       AssetsConstants.versePasswordKey,
-      //     );
+      try {
+        // Use same password as Bible version flow (Geneva Bible zips use HOLY_BIBLE_ZIP).
+        final String response = await ExtractZipJson.extractFile(
+          AssetsConstants.verseJSONPath,
+          AssetsConstants.holybibleKey,
+        );
 
-      //     // Parse JSON in background isolate
-      //     final tempList = await compute(_parseVerseContent, response);
+        final tempList = await compute(_parseVerseContent, response);
+        versesContent = tempList;
 
-      //     // Store in memory
-      //     versesContent = tempList;
+        await db.transaction((txn) async {
+          final batch = txn.batch();
+          for (final verse in tempList) {
+            batch.insert('verse', {
+              "book_num": verse.bookNum,
+              "chapter_num": verse.chapterNum,
+              "verse_num": verse.verseNum,
+              "content": verse.content,
+              "is_bookmarked": verse.isBookmarked,
+              "is_highlighted": verse.isHighlighted,
+              "is_noted": verse.isNoted,
+              "is_read": verse.isRead,
+              "is_underlined": verse.isUnderlined,
+            });
+          }
+          final isUpload = await batch.commit();
+          if (isUpload.isNotEmpty) {
+            debugPrint("testapp: Verse content inserted into DB.");
+          }
+        });
 
-      //     // Insert into DB using batch
-      //     await db.transaction((txn) async {
-      //       final batch = txn.batch();
-      //       for (final verse in tempList) {
-      //         batch.insert('verse', {
-      //           "book_num": verse.bookNum,
-      //           "chapter_num": verse.chapterNum,
-      //           "verse_num": verse.verseNum,
-      //           "content": verse.content,
-      //           "is_bookmarked": verse.isBookmarked,
-      //           "is_highlighted": verse.isHighlighted,
-      //           "is_noted": verse.isNoted,
-      //           "is_read": verse.isRead,
-      //           "is_underlined": verse.isUnderlined,
-      //         });
-      //       }
-      //       final isUpload = await batch.commit();
-      //       if (isUpload.isNotEmpty) {
-      //         debugPrint("testapp: Verse content inserted into DB.");
-      //       }
-      //     });
-
-      //     await SharPreferences.setBoolean(
-      //         SharPreferences.isLoadBookContent, true);
-      //   } catch (e, st) {
-      //     debugPrint("testapp: Error loading verse content → $e\n$st");
-      //   }
-      // } else {
-      //   final verseRows = await db.rawQuery("SELECT * FROM verse LIMIT 1");
-      //   if (verseRows.isEmpty) {
-      //     debugPrint("testapp: Verse table has $count rows but none returned.");
-      //   }
+        await SharPreferences.setBoolean(SharPreferences.isLoadBookContent, true);
+      } catch (e, st) {
+        debugPrint("testapp: Error loading verse content → $e\n$st");
+      }
     }
   }
 
@@ -464,6 +491,41 @@ class _SplashScreenState extends State<SplashScreen> {
     try {
       // Get the application documents directory
       final directory = await getApplicationDocumentsDirectory();
+
+      // Safety for upgrade users: only delete legacy DBs when current DB has
+      // both core data (verse/book) AND library data (bookmark/highlight), so we
+      // never delete the only copy of My Library data.
+      bool canDeleteLegacyDbs = false;
+      try {
+        final db = await DBHelper().db;
+        if (db != null) {
+          final verseCountRows =
+              await db.rawQuery("SELECT COUNT(*) as c FROM verse");
+          final bookCountRows =
+              await db.rawQuery("SELECT COUNT(*) as c FROM book");
+          final bookmarkCountRows =
+              await db.rawQuery("SELECT COUNT(*) as c FROM bookmark");
+          final highlightCountRows =
+              await db.rawQuery("SELECT COUNT(*) as c FROM highlight");
+          final verseCount =
+              (verseCountRows.isNotEmpty ? (verseCountRows.first["c"] as int?) : 0) ?? 0;
+          final bookCount =
+              (bookCountRows.isNotEmpty ? (bookCountRows.first["c"] as int?) : 0) ?? 0;
+          final bookmarkCount =
+              (bookmarkCountRows.isNotEmpty ? (bookmarkCountRows.first["c"] as int?) : 0) ?? 0;
+          final highlightCount =
+              (highlightCountRows.isNotEmpty ? (highlightCountRows.first["c"] as int?) : 0) ?? 0;
+          final hasLibraryData = bookmarkCount > 0 || highlightCount > 0;
+          canDeleteLegacyDbs = verseCount > 0 && bookCount > 0 && hasLibraryData;
+          if (verseCount > 0 && bookCount > 0 && !hasLibraryData) {
+            debugPrint(
+                'testapp Keeping legacy DBs (current DB has no library data yet).');
+          }
+        }
+      } catch (e) {
+        debugPrint('testapp Error verifying encrypted DB data: $e');
+        canDeleteLegacyDbs = false;
+      }
 
       // Define file paths
       final file1 = File('${directory.path}/book.json');
@@ -486,6 +548,12 @@ class _SplashScreenState extends State<SplashScreen> {
       }
 
       try {
+        if (!canDeleteLegacyDbs) {
+          debugPrint(
+              'testapp Skipping legacy DB deletion (target DB missing core data).');
+          return;
+        }
+
         final dir = await getApplicationDocumentsDirectory();
         final oldDbFile = File(p.join(dir.path, 'bible.db'));
         if (await oldDbFile.exists()) {
@@ -522,41 +590,37 @@ class _SplashScreenState extends State<SplashScreen> {
     final count = Sqflite.firstIntValue(result) ?? 0;
 
     if (count == 0) {
-      // try {
-      //   // Extract file (still runs on main isolate, but it’s mostly I/O bound)
-      //   final String response = await ExtractZipJson.extractFile(
-      //     AssetsConstants.booksJSONPath,
-      //     AssetsConstants.bookPasswordKey,
-      //   );
+      try {
+        // Use same password as Bible version flow (Geneva Bible zips use HOLY_BIBLE_ZIP).
+        final String response = await ExtractZipJson.extractFile(
+          AssetsConstants.booksJSONPath,
+          AssetsConstants.holybibleKey,
+        );
 
-      //   // Parse JSON in background isolate
-      //   final tempBookList = await compute(_parseAndPrepareBooks, response);
+        final tempBookList = await compute(_parseAndPrepareBooks, response);
+        bookList = tempBookList;
 
-      //   // Update UI after parsing
-      //   bookList = tempBookList;
+        await db.transaction((txn) async {
+          final batch = txn.batch();
+          for (final book in tempBookList) {
+            batch.insert('book', {
+              "book_num": book.bookNum,
+              "chapter_count": book.chapterCount,
+              "title": book.title,
+              "short_title": book.shortTitle,
+              "read_per": book.readPer,
+            });
+          }
+          final isUpload = await batch.commit();
+          if (isUpload.isNotEmpty) {
+            debugPrint("testapp: Books inserted into DB.");
+          }
+        });
 
-      //   // Insert into DB in a transaction
-      //   await db.transaction((txn) async {
-      //     final batch = txn.batch();
-      //     for (final book in tempBookList) {
-      //       batch.insert('book', {
-      //         "book_num": book.bookNum,
-      //         "chapter_count": book.chapterCount,
-      //         "title": book.title,
-      //         "short_title": book.shortTitle,
-      //         "read_per": book.readPer,
-      //       });
-      //     }
-      //     final isUpload = await batch.commit();
-      //     if (isUpload.isNotEmpty) {
-      //       debugPrint("testapp: Books inserted into DB.");
-      //     }
-      //   });
-
-      //   await SharPreferences.setBoolean(SharPreferences.isLoadBookList, true);
-      // } catch (e, st) {
-      //   debugPrint("testapp: Error loading book list: $e\n$st");
-      // }
+        await SharPreferences.setBoolean(SharPreferences.isLoadBookList, true);
+      } catch (e, st) {
+        debugPrint("testapp: Error loading book list: $e\n$st");
+      }
     } else {
       // Book table is not empty, just log one item
       final bookRows = await db.rawQuery("SELECT * FROM book LIMIT 1");

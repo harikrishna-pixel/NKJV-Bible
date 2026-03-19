@@ -96,13 +96,33 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
 
   Future<void> loadIconNames() async {
     final dbClient = await DBHelper().db;
-    final dailyVersesMainData =
+    List<Map<String, dynamic>>? raw =
         await dbClient?.rawQuery("SELECT * FROM dailyVersesMainList");
+    final dailyVersesMainData = raw ?? [];
 
-    // Build the map from Category_Name
+    if (dailyVersesMainData.isEmpty) {
+      await _seedDailyVersesMainListFromJson();
+      raw = await dbClient?.rawQuery("SELECT * FROM dailyVersesMainList");
+      final again = raw ?? [];
+      final Map<String, String> categoryIcons = {};
+      for (var item in again) {
+        final categoryName = item['Category_Name']?.toString();
+        if (categoryName != null && categoryName.isNotEmpty) {
+          categoryIcons[categoryName] = categoryName;
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _iconNames = categoryIcons;
+        });
+      }
+      await _loadPreferences();
+      return;
+    }
+
     final Map<String, String> categoryIcons = {};
-    debugPrint("daily verse -${dailyVersesMainData?.length} ");
-    for (var item in dailyVersesMainData!) {
+    debugPrint("daily verse -${dailyVersesMainData.length} ");
+    for (var item in dailyVersesMainData) {
       final categoryName = item['Category_Name']?.toString();
       if (categoryName != null && categoryName.isNotEmpty) {
         categoryIcons[categoryName] = categoryName;
@@ -111,6 +131,36 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
 
     _iconNames = categoryIcons;
     await _loadPreferences();
+  }
+
+  /// Seed dailyVersesMainList from assets when DB table is empty (e.g. after migration).
+  Future<void> _seedDailyVersesMainListFromJson() async {
+    try {
+      final db = await DBHelper().db;
+      if (db == null) return;
+      final String jsonString =
+          await rootBundle.loadString('assets/jsonFile/dailyVerse.json');
+      final List<DailyVersesMainListModel> dataList =
+          await compute(parseDailyVerseJsond, jsonString);
+      if (dataList.isEmpty) return;
+      await db.transaction((txn) async {
+        final batch = txn.batch();
+        for (final item in dataList) {
+          batch.insert('dailyVersesMainList', {
+            "Category_Name": item.mainCategory ?? item.categoryName ?? '',
+            "Category_Id": item.categoryId,
+            "Book": item.book,
+            "Book_Id": item.bookId,
+            "Chapter": item.chapter,
+            "Verse": item.verse?.toString() ?? '',
+          });
+        }
+        await batch.commit();
+      });
+      debugPrint("PreferenceSelection: seeded dailyVersesMainList from JSON");
+    } catch (e) {
+      debugPrint("PreferenceSelection: _seedDailyVersesMainListFromJson error: $e");
+    }
   }
 
   // Future<void> _savePreferences() async {

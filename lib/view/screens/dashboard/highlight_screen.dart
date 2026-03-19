@@ -53,6 +53,8 @@ class _HighLightScreenState extends State<HighLightScreen> {
   }
 
   loadData() async {
+    await DBMigrationHelper.tryRestoreLibraryDataFromLegacy();
+    if (!mounted) return;
     setState(() {
       highlightContent = DBHelper().getHighlight();
     });

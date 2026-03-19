@@ -53,6 +53,8 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
   }
 
   loadData() async {
+    await DBMigrationHelper.tryRestoreLibraryDataFromLegacy();
+    if (!mounted) return;
     setState(() {
       underListData = DBHelper().getUnderLine();
     });

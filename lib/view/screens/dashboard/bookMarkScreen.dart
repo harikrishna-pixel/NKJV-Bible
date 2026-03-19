@@ -52,6 +52,8 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
   }
 
   loadData() async {
+    await DBMigrationHelper.tryRestoreLibraryDataFromLegacy();
+    if (!mounted) return;
     setState(() {
       bookmarkDataList = DBHelper().getBookMark();
     });

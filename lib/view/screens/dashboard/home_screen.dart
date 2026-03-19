@@ -51,7 +51,7 @@ import 'package:biblebookapp/streak_flow/streak_complete_celebration_dialog.dart
 import 'package:biblebookapp/streak_flow/streak_flow_screens.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:home_widget/home_widget.dart';
-import 'package:biblebookapp/view/screens/tawk_chat/tawk_chat_screen.dart';
+import 'package:biblebookapp/view/widget/webview.dart';
 import 'package:biblebookapp/view/screens/study_plans/study_plans_screen.dart'
     as biblebookapp;
 import 'package:popover/popover.dart';
@@ -119,6 +119,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with WidgetsBindingObserver, RouteAware {
   bool isOpenChat = false;
+  bool _attemptedProviderChapterFallback = false;
 //   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
 //   final ValueNotifier<int> _rating = ValueNotifier<int>(0);
@@ -5754,8 +5755,8 @@ class _HomeScreenState extends State<HomeScreen>
                               return;
                             }
                             await SharPreferences.setString('OpenAd', '1');
-                            // Open Tawk chat screen instead of external feedback form
-                            Get.to(() => const TawkChatScreen());
+                            // Open feedback screen instead of chat
+                            Get.to(() => const FeedbackWebView());
                           }),
                           visualDensity:
                               const VisualDensity(horizontal: 0, vertical: 0),
@@ -6485,9 +6486,8 @@ class _HomeScreenState extends State<HomeScreen>
                     debugPrint(
                         "urldata - $deviceType - $packageName - $appName - $deviceModel - $deviceId");
 
-                    // Open in-app chat screen (TAWK) instead of external feedback URL
-                    // This keeps the feedback experience inside the app.
-                    Get.to(() => const TawkChatScreen());
+                    // Open in-app feedback screen instead of chat
+                    Get.to(() => const FeedbackWebView());
                   },
                   style:
                       ElevatedButton.styleFrom(backgroundColor: Colors.brown),
@@ -6718,8 +6718,8 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _launchFeedbackForm() async {
-    // Open Tawk chat screen for feedback (same as Chat Us)
-    Get.to(const TawkChatScreen());
+    // Open feedback screen
+    Get.to(const FeedbackWebView());
   }
 
   void _attachScrollListener(GetXState<DashBoardController> state) {
@@ -6926,11 +6926,75 @@ class _HomeScreenState extends State<HomeScreen>
 
   // Build empty content widget
   Widget _buildEmptyContentWithChapters(DashBoardController controller) {
-    // Show empty content message
+    // Last-resort fallback: if DB returns empty for this chapter but we already
+    // have verses cached in DownloadProvider (loaded at splash), populate from there.
+    if (!_attemptedProviderChapterFallback) {
+      _attemptedProviderChapterFallback = true;
+      Future.microtask(() {
+        try {
+          final downloadProvider =
+              Provider.of<DownloadProvider>(context, listen: false);
+          if (downloadProvider.verseList.isEmpty) return;
+
+          final bookNum = int.tryParse(controller.selectedBookNum.value) ?? 0;
+          final chapter = int.tryParse(controller.selectedChapter.value) ?? 1;
+          final safeChapter = chapter <= 0 ? 1 : chapter;
+
+          List<VerseBookContentModel> matches = downloadProvider.verseList
+              .where((v) => (v.bookNum ?? -999) == bookNum)
+              .where((v) =>
+                  (v.chapterNum ?? -999) == (safeChapter - 1) ||
+                  (v.chapterNum ?? -999) == safeChapter)
+              .toList();
+
+          // Legacy 1-based book_num fallback as well.
+          if (matches.isEmpty && bookNum > 0) {
+            final legacyBookNum = bookNum - 1;
+            matches = downloadProvider.verseList
+                .where((v) => (v.bookNum ?? -999) == legacyBookNum)
+                .where((v) =>
+                    (v.chapterNum ?? -999) == (safeChapter - 1) ||
+                    (v.chapterNum ?? -999) == safeChapter)
+                .toList();
+            if (matches.isNotEmpty) {
+              controller.selectedBookNum.value = legacyBookNum.toString();
+              SharPreferences.setString(
+                  SharPreferences.selectedBookNum, legacyBookNum.toString());
+            }
+          }
+
+          if (matches.isNotEmpty) {
+            controller.selectedBookContent.value = matches.toSet().toList();
+            controller.isFetchContent.value = false;
+            if (mounted) setState(() {});
+          }
+        } catch (e) {
+          debugPrint('testapp Provider fallback failed: $e');
+        }
+      });
+    }
+
+    // Never show a dead-end empty screen.
+    // If we still have no content after fallbacks, guide user to restore/select Bible.
     return Center(
-      child: Text(
-        "Content is Empty",
-        style: CommanStyle.bw16500(context),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Loader(),
+          const SizedBox(height: 14),
+          Text(
+            "Preparing your Bible…",
+            style: CommanStyle.bw16500(context),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 14),
+          ElevatedButton(
+            onPressed: () {
+              Get.to(() => BibleVersionsScreen(from: 'home'));
+            },
+            child: const Text("Restore / Select Bible"),
+          ),
+        ],
       ),
     );
   }

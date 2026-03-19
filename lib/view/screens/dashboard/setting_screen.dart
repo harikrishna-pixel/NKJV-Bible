@@ -10,7 +10,7 @@ import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/preference_selection_screen.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
-import 'package:biblebookapp/view/screens/tawk_chat/tawk_chat_screen.dart';
+import 'package:biblebookapp/view/widget/webview.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:day_night_time_picker/day_night_time_picker.dart';
@@ -775,7 +775,7 @@ class _SettingScreenState extends State<SettingScreen>
   }
 
   _launchURL() async {
-    // Open Tawk chat screen for feedback (same as Chat Us)
+    // Open feedback screen
     // First check connectivity and show a toast if offline
     final connectivityResult = await Connectivity().checkConnectivity();
     final hasConnection = connectivityResult.isNotEmpty &&
@@ -805,7 +805,7 @@ class _SettingScreenState extends State<SettingScreen>
     }
 
     await SharPreferences.setString('OpenAd', '1');
-    Get.to(const TawkChatScreen());
+    Get.to(const FeedbackWebView());
   }
 
   Future<void> _requestReview() async {
@@ -1358,36 +1358,33 @@ class _SettingScreenState extends State<SettingScreen>
                     ),
                   ),
                 ),
-                const SizedBox(
-                  height: 5,
-                ),
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: 20, vertical: screenWidth < 380 ? 5 : 10),
-                  child: InkWell(
-                    onTap: () {
-                      Get.to(() => const StreakSavedListScreen(),
-                          transition: Transition.cupertinoDialog,
-                          duration: const Duration(milliseconds: 300));
-                    },
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Saved from Daily Journey",
-                          style: CommanStyle.bw16500(context),
-                        ),
-                        const Spacer(),
-                        Icon(
-                          Icons.navigate_next,
-                          color: CommanColor.whiteBlack(context),
-                          size: 24,
-                        )
-                      ],
-                    ),
-                  ),
-                ),
+                // Padding(
+                //   padding: EdgeInsets.symmetric(
+                //       horizontal: 20, vertical: screenWidth < 380 ? 5 : 10),
+                //   child: InkWell(
+                //     onTap: () {
+                //       Get.to(() => const StreakSavedListScreen(),
+                //           transition: Transition.cupertinoDialog,
+                //           duration: const Duration(milliseconds: 300));
+                //     },
+                //     child: Row(
+                //       crossAxisAlignment: CrossAxisAlignment.center,
+                //       mainAxisAlignment: MainAxisAlignment.start,
+                //       children: [
+                //         Text(
+                //           "Saved from Daily Journey",
+                //           style: CommanStyle.bw16500(context),
+                //         ),
+                //         const Spacer(),
+                //         Icon(
+                //           Icons.navigate_next,
+                //           color: CommanColor.whiteBlack(context),
+                //           size: 24,
+                //         )
+                //       ],
+                //     ),
+                //   ),
+                // ),
                 const SizedBox(
                   height: 5,
                 ),

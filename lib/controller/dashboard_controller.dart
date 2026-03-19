@@ -856,23 +856,52 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
       final chapterForRead = selectedChapterForRead.value.isNotEmpty
           ? selectedChapterForRead.value
           : chapterValue;
-      final parsedChapterForRead = int.tryParse(chapterForRead) ?? 1;
+      final parsedChapterForReadRaw = int.tryParse(chapterForRead) ?? 1;
+      final parsedChapterForRead =
+          parsedChapterForReadRaw <= 0 ? 1 : parsedChapterForReadRaw;
 
       DBHelper().db.then((value) {
         value!
             .rawQuery("SELECT * From verse WHERE book_num ='$parsedBookNum'")
-            .then((selectedBookResponse) {
-          selectedVersesContent.value = selectedBookResponse
+            .then((selectedBookResponse) async {
+          var effectiveBookNum = parsedBookNum;
+          var effectiveVersesResponse = selectedBookResponse;
+
+          // Backward-compatibility for upgraded users:
+          // older builds sometimes stored book_num as 1-based.
+          if (effectiveVersesResponse.isEmpty && effectiveBookNum > 0) {
+            final legacyBookNum = effectiveBookNum - 1;
+            final retry = await value
+                .rawQuery("SELECT * From verse WHERE book_num ='$legacyBookNum'");
+            if (retry.isNotEmpty) {
+              effectiveBookNum = legacyBookNum;
+              effectiveVersesResponse = retry;
+              // Persist corrected value so future loads are consistent.
+              selectedBookNum.value = legacyBookNum.toString();
+              selectedBookNumForRead.value = legacyBookNum.toString();
+              await SharPreferences.setString(
+                  SharPreferences.selectedBookNum, legacyBookNum.toString());
+            }
+          }
+
+          selectedVersesContent.value = effectiveVersesResponse
               .map<VerseBookContentModel>(
                   (e) => VerseBookContentModel.fromJson(e))
               .toList();
           loadTextToSpeech.value = false;
-        });
-        value
-            .rawQuery(
-                "SELECT * From verse WHERE book_num ='$parsedBookNum' AND chapter_num = '${parsedChapterForRead - 1}'")
-            .then((selectedBookResponse) {
-          selectedBookContent.value = filterContent(selectedBookResponse
+
+          // Load chapter content using the same effective book number.
+          var chapterRows = await value.rawQuery(
+              "SELECT * From verse WHERE book_num ='$effectiveBookNum' AND chapter_num = '${parsedChapterForRead - 1}'");
+          // Backward-compatibility: some legacy DBs stored chapter_num as 1-based.
+          if (chapterRows.isEmpty) {
+            final retry = await value.rawQuery(
+                "SELECT * From verse WHERE book_num ='$effectiveBookNum' AND chapter_num = '$parsedChapterForRead'");
+            if (retry.isNotEmpty) {
+              chapterRows = retry;
+            }
+          }
+          selectedBookContent.value = filterContent(chapterRows
               .map<VerseBookContentModel>(
                   (e) => VerseBookContentModel.fromJson(e))
               .toList());
@@ -883,12 +912,26 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
       DBHelper().db.then((value) {
         value!
             .rawQuery("SELECT * From book WHERE book_num = $parsedBookNum")
-            .then((value) {
-          if (value.isNotEmpty) {
+            .then((valueRows) async {
+          var rows = valueRows;
+          // Same legacy fix for book table lookup.
+          if (rows.isEmpty && parsedBookNum > 0) {
+            final legacyBookNum = parsedBookNum - 1;
+            final retry = await value
+                .rawQuery("SELECT * From book WHERE book_num = $legacyBookNum");
+            if (retry.isNotEmpty) {
+              rows = retry;
+              selectedBookNum.value = legacyBookNum.toString();
+              selectedBookNumForRead.value = legacyBookNum.toString();
+              await SharPreferences.setString(
+                  SharPreferences.selectedBookNum, legacyBookNum.toString());
+            }
+          }
+          if (rows.isNotEmpty) {
             selectedBookChapterCount.value =
-                value[0]["chapter_count"].toString();
-            bookReadPer.value = value[0]["read_per"].toString();
-            selectedBookId.value = value[0]["id"].toString();
+                rows[0]["chapter_count"].toString();
+            bookReadPer.value = rows[0]["read_per"].toString();
+            selectedBookId.value = rows[0]["id"].toString();
           }
         });
       });
@@ -915,25 +958,58 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
           getChapter == null
               ? selectedChapter.value = "1"
               : selectedChapter.value = getChapter;
-          selectChapterChange.value = int.parse(selectedChapter.value);
+          final rawChapter = int.tryParse(selectedChapter.value) ?? 1;
+          final safeChapter = rawChapter <= 0 ? 1 : rawChapter;
+          if (safeChapter.toString() != selectedChapter.value) {
+            selectedChapter.value = safeChapter.toString();
+            await SharPreferences.setString(
+                SharPreferences.selectedChapter, safeChapter.toString());
+          }
+          selectChapterChange.value = safeChapter;
 
           await DBHelper().db.then((value) {
             if (value != null) {
+              final parsedBookNum = int.tryParse(selectedBookNum.value) ?? 0;
               value
                   .rawQuery(
-                      "SELECT * From verse WHERE book_num ='${int.parse(selectedBookNum.value)}'")
-                  .then((selectedBookResponse) {
-                selectedVersesContent.value = selectedBookResponse
+                      "SELECT * From verse WHERE book_num ='$parsedBookNum'")
+                  .then((selectedBookResponse) async {
+                var effectiveBookNum = parsedBookNum;
+                var effectiveVersesResponse = selectedBookResponse;
+
+                // Backward-compatibility for upgraded users:
+                // older builds sometimes stored book_num as 1-based.
+                if (effectiveVersesResponse.isEmpty && effectiveBookNum > 0) {
+                  final legacyBookNum = effectiveBookNum - 1;
+                  final retry = await value.rawQuery(
+                      "SELECT * From verse WHERE book_num ='$legacyBookNum'");
+                  if (retry.isNotEmpty) {
+                    effectiveBookNum = legacyBookNum;
+                    effectiveVersesResponse = retry;
+                    selectedBookNum.value = legacyBookNum.toString();
+                    await SharPreferences.setString(
+                        SharPreferences.selectedBookNum,
+                        legacyBookNum.toString());
+                  }
+                }
+
+                selectedVersesContent.value = effectiveVersesResponse
                     .map<VerseBookContentModel>(
                         (e) => VerseBookContentModel.fromJson(e))
                     .toList();
                 loadTextToSpeech.value = false;
-              });
-              value
-                  .rawQuery(
-                      "SELECT * From verse WHERE book_num ='${int.parse(selectedBookNum.value)}' AND chapter_num = '${int.parse(selectedChapter.value) - 1}'")
-                  .then((selectedBookResponse) {
-                selectedBookContent.value = filterContent(selectedBookResponse
+
+                var chapterRows = await value.rawQuery(
+                    "SELECT * From verse WHERE book_num ='$effectiveBookNum' AND chapter_num = '${safeChapter - 1}'");
+                // Backward-compatibility: some legacy DBs stored chapter_num as 1-based.
+                if (chapterRows.isEmpty) {
+                  final retry = await value.rawQuery(
+                      "SELECT * From verse WHERE book_num ='$effectiveBookNum' AND chapter_num = '$safeChapter'");
+                  if (retry.isNotEmpty) {
+                    chapterRows = retry;
+                  }
+                }
+                selectedBookContent.value = filterContent(chapterRows
                     .map<VerseBookContentModel>(
                         (e) => VerseBookContentModel.fromJson(e))
                     .toSet()
@@ -945,12 +1021,26 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         });
         await DBHelper().db.then((db) async {
           if (db != null) {
-            final bookNum = int.tryParse(selectedBookNum.value) ?? 0;
+            var bookNum = int.tryParse(selectedBookNum.value) ?? 0;
 
-            final result = await db.rawQuery(
+            var result = await db.rawQuery(
               "SELECT * FROM book WHERE book_num = ?",
               [bookNum],
             );
+            if (result.isEmpty && bookNum > 0) {
+              final legacyBookNum = bookNum - 1;
+              final retry = await db.rawQuery(
+                "SELECT * FROM book WHERE book_num = ?",
+                [legacyBookNum],
+              );
+              if (retry.isNotEmpty) {
+                bookNum = legacyBookNum;
+                result = retry;
+                selectedBookNum.value = legacyBookNum.toString();
+                await SharPreferences.setString(
+                    SharPreferences.selectedBookNum, legacyBookNum.toString());
+              }
+            }
 
             if (result.isNotEmpty) {
               final item = result[0];

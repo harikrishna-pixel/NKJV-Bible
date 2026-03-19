@@ -1,10 +1,14 @@
+import 'dart:io';
+
 import 'package:biblebookapp/controller/api_service.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
+import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -31,17 +35,15 @@ class _FeedbackWebViewState extends State<FeedbackWebView> {
       iframeAllowFullscreen: true);
 
   PullToRefreshController? pullToRefreshController;
-  String surveyid = '';
   String? url;
   bool isLoading = true;
-  bool checksurvey = true;
   double progress = 0;
 
   @override
   void initState() {
     super.initState();
     checknetwork();
-    getsurveyid();
+    _loadFeedbackFormUrl();
 
     pullToRefreshController = kIsWeb ||
             ![TargetPlatform.iOS, TargetPlatform.android]
@@ -77,21 +79,34 @@ class _FeedbackWebViewState extends State<FeedbackWebView> {
     }
   }
 
-  getsurveyid() async {
+  /// Load feedback form URL (bibleoffice.com) with device params.
+  Future<void> _loadFeedbackFormUrl() async {
     await SharPreferences.setString('OpenAd', '1');
-    final data = await SharPreferences.getString(SharPreferences.surveyappid);
-    final data2 =
-        await SharPreferences.getString(SharPreferences.surveyappenable);
-    debugPrint("surveyid is $surveyid  and enable $data2  and url - $url");
-    if (data2 == "1") {
+    String deviceType = 'ios';
+    String packageName = Api.packageName;
+    String appName = BibleInfo.bible_shortName;
+    String deviceId = '';
+    String deviceModel = '';
+    const String groupId = '1';
+    final DeviceInfoPlugin deviceInfoPlugin = DeviceInfoPlugin();
+    if (Platform.isAndroid) {
+      final androidInfo = await deviceInfoPlugin.androidInfo;
+      deviceType = 'Android';
+      deviceId = androidInfo.id;
+      deviceModel = androidInfo.model;
+      packageName = BibleInfo.android_Package_Name;
+    } else if (Platform.isIOS) {
+      final iosInfo = await deviceInfoPlugin.iosInfo;
+      deviceType = 'iOS';
+      packageName = BibleInfo.ios_Bundle_Id;
+      deviceId = iosInfo.identifierForVendor ?? '';
+      deviceModel = iosInfo.utsname.machine;
+    }
+    final String feedbackUrl =
+        '${Api.feedbackApi}?device_type=$deviceType&group_id=$groupId&package_name=$packageName&app_name=$appName&device_id=$deviceId&device_model=$deviceModel';
+    if (mounted) {
       setState(() {
-        surveyid = data.toString();
-        url = "${Api.surveyForm}$surveyid&package_name=${Api.packageName}";
-      });
-    } else {
-      setState(() {
-        checksurvey = false;
-        isLoading = false;
+        url = feedbackUrl;
       });
     }
   }
@@ -234,7 +249,7 @@ class _FeedbackWebViewState extends State<FeedbackWebView> {
                             Align(
                               alignment: Alignment.bottomCenter,
                               child: Text(
-                                'No Survey Found',
+                                'Unable to load feedback form',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w700,
                                   color: Colors.black,

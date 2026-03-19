@@ -2890,8 +2890,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                           const SizedBox(height: 5),
                                           Text(
                                             ChatTranslations.get(
-                                                'faith_answers',
-                                                AppApiConstant.chatLanguage),
+                                                'faith_answers', 'EN'),
                                             style: TextStyle(
                                               fontWeight: FontWeight.w700,
                                               color: CommanColor.whiteBlack(
@@ -2908,8 +2907,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                                     20), // Add bottom padding to prevent text from being hidden
                                             child: Text(
                                               ChatTranslations.get(
-                                                  'get_guidance',
-                                                  AppApiConstant.chatLanguage),
+                                                  'get_guidance', 'EN'),
                                               textAlign: TextAlign.center,
                                               style: TextStyle(
                                                 color: CommanColor.whiteBlack(
@@ -3219,8 +3217,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                ChatTranslations.get(
-                    'recent_conversations', AppApiConstant.chatLanguage),
+                ChatTranslations.get('recent_conversations', 'EN'),
                 style: TextStyle(
                   color: CommanColor.whiteBlack(context).withOpacity(0.8),
                   fontSize: screenWidth > 450 ? 14 : 12,
@@ -3239,7 +3236,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                   });
                 },
                 child: Text(
-                  ChatTranslations.get('view_all', AppApiConstant.chatLanguage),
+                  ChatTranslations.get('view_all', 'EN'),
                   style: TextStyle(
                     color: CommanColor.whiteBlack(context),
                     fontSize: screenWidth > 450 ? 13 : 12,
@@ -3372,7 +3369,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            ChatTranslations.get('Suggestions', AppApiConstant.chatLanguage),
+            ChatTranslations.get('Suggestions', 'EN'),
             style: TextStyle(
               color: isDark
                   ? Colors.white.withOpacity(0.75)

@@ -133,11 +133,10 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
     },
   ];
 
-  // Get categories with translated titles
+  // Get categories with English titles only (do not translate)
   List<_GuidanceCategory> get _categories => _categoryKeys
       .map((cat) => _GuidanceCategory(
-            title: ChatTranslations.get(
-                cat['titleKey']!, AppApiConstant.chatLanguage),
+            title: ChatTranslations.get(cat['titleKey']!, 'EN'),
             prompt: cat['prompt']!,
           ))
       .toList();
@@ -1125,7 +1124,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      ChatTranslations.get('get_guidance_need', AppApiConstant.chatLanguage),
+                      ChatTranslations.get('get_guidance_need', 'EN'),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
@@ -2187,8 +2186,8 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                             ? const SizedBox.shrink()
                             : Center(
                                 child: Text(
-                                  ChatTranslations.get('prayer_guidance_title',
-                                      AppApiConstant.chatLanguage),
+                                  ChatTranslations.get(
+                                      'prayer_guidance_title', 'EN'),
                                   style: TextStyle(
                                     fontWeight: FontWeight.w700,
                                     color: CommanColor.whiteBlack(context)
@@ -2315,8 +2314,8 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                   ),
                                   const SizedBox(height: 12),
                                   Text(
-                                    ChatTranslations.get('prayer_guidance_title',
-                                        AppApiConstant.chatLanguage),
+                                    ChatTranslations.get(
+                                        'prayer_guidance_title', 'EN'),
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       fontWeight: FontWeight.w700,
@@ -2329,8 +2328,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    ChatTranslations.get('get_guidance_need',
-                                        AppApiConstant.chatLanguage),
+                                    ChatTranslations.get('get_guidance_need', 'EN'),
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       color: isDark

@@ -16,7 +16,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:biblebookapp/view/screens/tawk_chat/tawk_chat_screen.dart';
+import 'package:biblebookapp/view/widget/webview.dart';
 import '../../constants/colors.dart';
 import '../../constants/images.dart';
 
@@ -258,9 +258,9 @@ class _AboutUsState extends State<AboutUs> {
                       debugPrint(
                           "urldata - $deviceType - $packageName - $appName - $deviceModel - $deviceId");
 
-                      // Open chat screen instead of external feedback form
+                      // Open feedback screen instead of chat
                       await SharPreferences.setString('OpenAd', '1');
-                      Get.to(() => const TawkChatScreen(),
+                      Get.to(() => const FeedbackWebView(),
                           transition: Transition.cupertinoDialog,
                           duration: const Duration(milliseconds: 300));
                       // const url =

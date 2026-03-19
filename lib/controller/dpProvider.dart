@@ -757,10 +757,26 @@ class DBMigrationHelper {
   static const _encryptedDbName = 'bible2.db';
   static const _newDbName = 'bible_enc.db';
 
-  /// Map old column names to new column names
-  static final Map<String, String> _columnNameMap = {
-    'plain_content': 'plaincontent',
-    //'book_name': 'bookName',
+  /// Per-table map: old column name -> new column name.
+  /// bookmark uses plaincontent; highlight uses plain_content.
+  static final Map<String, Map<String, String>> _columnMapForTable = {
+    'bookmark': {
+      'plain_content': 'plaincontent',
+      'book_name': 'bookName',
+    },
+    'highlight': {
+      'plaincontent': 'plain_content',
+      'bookName': 'book_name',
+      'verseid': 'verse_id',
+    },
+    'underline': {
+      'plain_content': 'plaincontent',
+      'book_name': 'bookName',
+    },
+    'save_notes': {
+      'bookName': 'book_name',
+      'plain_content': 'plaincontent',
+    },
   };
 
   /// Rename legacy `.bible.db` → `bible2.db`
@@ -822,6 +838,25 @@ class DBMigrationHelper {
     return p.join(dir.path, _newDbName);
   }
 
+  static Future<bool> _targetDbHasCoreData(
+      String targetPath, String password) async {
+    try {
+      final db = await sqlcipher.openDatabase(targetPath, password: password);
+      final verseCountRows =
+          await db.rawQuery("SELECT COUNT(*) as c FROM verse");
+      final bookCountRows = await db.rawQuery("SELECT COUNT(*) as c FROM book");
+      final verseCount =
+          verseCountRows.isNotEmpty ? (verseCountRows.first["c"] as int?) ?? 0 : 0;
+      final bookCount =
+          bookCountRows.isNotEmpty ? (bookCountRows.first["c"] as int?) ?? 0 : 0;
+      await db.close();
+      return verseCount > 0 && bookCount > 0;
+    } catch (e) {
+      debugPrint("testapp Target DB core-data check failed: $e");
+      return false;
+    }
+  }
+
   /// Get columns from target table
   static Future<List<String>> _getTableColumns(
       sqlcipher.Database db, String table) async {
@@ -829,13 +864,15 @@ class DBMigrationHelper {
     return result.map((row) => row['name'] as String).toList();
   }
 
-  /// Filter + map old row to target schema
+  /// Filter + map old row to target schema (table-specific column names)
   static Map<String, Object?> _mapAndFilterRow(
-      Map<String, Object?> oldRow, List<String> targetColumns) {
+      String tableName, Map<String, Object?> oldRow, List<String> targetColumns) {
+    final tableMap = _columnMapForTable[tableName];
     final Map<String, Object?> mapped = {};
     oldRow.forEach((oldCol, value) {
-      // Map old col name if needed
-      final newCol = _columnNameMap[oldCol] ?? oldCol;
+      final newCol = (tableMap != null && tableMap.containsKey(oldCol))
+          ? tableMap[oldCol]!
+          : oldCol;
       if (targetColumns.contains(newCol)) {
         mapped[newCol] = value;
       }
@@ -848,8 +885,21 @@ class DBMigrationHelper {
     final newDbPath = await getNewDbPath();
 
     if (await File(newDbPath).exists()) {
-      debugPrint('testapp Target encrypted DB exists. Skipping migration.');
-      return;
+      // IMPORTANT for upgrade users:
+      // Don't skip migration if the target DB exists but is empty/corrupt.
+      final ok = await _targetDbHasCoreData(newDbPath, password);
+      if (ok) {
+        debugPrint('testapp Target encrypted DB exists and has data. Skipping migration.');
+        return;
+      }
+      try {
+        await File(newDbPath).delete();
+        debugPrint('testapp Target encrypted DB existed but had no data. Re-migrating.');
+      } catch (e) {
+        debugPrint('testapp Failed to delete empty target DB: $e');
+        // If we can't delete it, we can't safely re-migrate.
+        return;
+      }
     }
     if (sourceDbPath == null || !await File(sourceDbPath).exists()) {
       debugPrint('testapp No source DB found.');
@@ -888,6 +938,28 @@ class DBMigrationHelper {
       return;
     }
 
+    /// Map legacy table names to current schema (so e.g. bookmarks -> bookmark).
+    final Map<String, String> legacyTableToTarget = {
+      'bookmarks': 'bookmark',
+      'book_mark': 'bookmark',
+      'bookMark': 'bookmark',
+      'highlights': 'highlight',
+      'high_light': 'highlight',
+      'highLight': 'highlight',
+      'underlines': 'underline',
+      'under_line': 'underline',
+      'underLine': 'underline',
+      'notes': 'save_notes',
+      'note': 'save_notes',
+      'saved_notes': 'save_notes',
+      'saveNotes': 'save_notes',
+      'calender': 'calendar',
+      'images': 'save_images',
+      'saved_images': 'save_images',
+      'saveImages': 'save_images',
+      'daily_verses_main_list': 'dailyVersesMainList',
+    };
+
     // Copy tables
     try {
       final tables = await oldDb.rawQuery(
@@ -895,59 +967,70 @@ class DBMigrationHelper {
       );
 
       for (final tableMap in tables) {
-        final tableName = tableMap['name'] as String;
-        if (tableName == 'android_metadata') continue;
+        final legacyTableName = tableMap['name'] as String;
+        if (legacyTableName == 'android_metadata') continue;
 
-        final targetColumns = await _getTableColumns(newDb, tableName);
-        final rows = await oldDb.query(tableName);
+        final targetTableName =
+            legacyTableToTarget[legacyTableName] ?? legacyTableName;
 
+        List<String> targetColumns;
+        try {
+          targetColumns = await _getTableColumns(newDb, targetTableName);
+        } catch (_) {
+          debugPrint("testapp Migration: no target table '$targetTableName', skip.");
+          continue;
+        }
+        if (targetColumns.isEmpty) continue;
+
+        final rows = await oldDb.query(legacyTableName);
         for (final row in rows) {
-          final mappedRow = _mapAndFilterRow(row, targetColumns);
+          final mappedRow =
+              _mapAndFilterRow(targetTableName, row, targetColumns);
           try {
             if (mappedRow.isNotEmpty) {
-              await newDb.insert(tableName, mappedRow,
+              await newDb.insert(targetTableName, mappedRow,
                   conflictAlgorithm: sqlcipher.ConflictAlgorithm.ignore);
             }
           } catch (e) {
-            debugPrint("testapp Insert error in '$tableName': $e");
+            debugPrint("testapp Insert error in '$targetTableName': $e");
           }
+        }
+        if (rows.isNotEmpty) {
+          debugPrint("testapp Migration: copied ${rows.length} rows $legacyTableName -> $targetTableName");
         }
       }
 
       try {
         final String dailyVerseResponse =
             await rootBundle.loadString('assets/jsonFile/dailyVerse.json');
-        final dailyVerseData = json.decode(dailyVerseResponse);
-
-        final dailyVerseDataList = List.from(dailyVerseData)
+        final dailyVerseData = json.decode(dailyVerseResponse) as List;
+        final dailyVerseDataList = dailyVerseData
             .map<DailyVersesMainListModel>(
-                (item) => DailyVersesMainListModel.fromJson(item))
+                (item) => DailyVersesMainListModel.fromJson(
+                    Map<String, dynamic>.from(item as Map)))
             .toList();
-
-        await newDb.transaction((txn) async {
-          await txn.delete('dailyVersesMainList');
-          final batch = txn.batch();
-
-          for (final item in dailyVerseDataList) {
-            final insertData = {
-              "Category_Name": item.mainCategory,
-              "Category_Id": item.categoryId,
-              "Book": item.book,
-              "Book_Id": item.bookId,
-              "Chapter": item.chapter,
-              "Verse": item.verse,
-            };
-            batch.insert('dailyVersesMainList', insertData);
-          }
-
-          final isUpload = await batch.commit();
-
-          if (isUpload.isNotEmpty) {
+        if (dailyVerseDataList.isEmpty) {
+          debugPrint("testapp dailyVerse.json empty, keeping migrated data.");
+        } else {
+          await newDb.transaction((txn) async {
+            await txn.delete('dailyVersesMainList');
+            final batch = txn.batch();
+            for (final item in dailyVerseDataList) {
+              batch.insert('dailyVersesMainList', {
+                "Category_Name": item.mainCategory ?? item.categoryName ?? '',
+                "Category_Id": item.categoryId,
+                "Book": item.book,
+                "Book_Id": item.bookId,
+                "Chapter": item.chapter,
+                "Verse": item.verse?.toString() ?? '',
+              });
+            }
+            await batch.commit();
             debugPrint("testapp dailyVersesMainList inserted successfully.");
-          }
-        });
+          });
+        }
       } catch (e) {
-        debugPrint("testapp Error loading daily verses JSON: $e");
+        debugPrint("testapp Error loading daily verses JSON: $e (keeping migrated data)");
       }
 
       debugPrint("testapp ✅ Migration finished successfully.");
@@ -955,6 +1038,130 @@ class DBMigrationHelper {
       debugPrint('testapp Migration error: $e');
     } finally {
       await oldDb?.close();
+      await newDb.close();
+    }
+  }
+
+  /// User-data and config tables to preserve on upgrade
+  static const List<String> _userDataTables = [
+    'bookmark',
+    'highlight',
+    'underline',
+    'save_notes',
+    'calendar',
+    'save_images',
+    'dailyVersesMainList',
+  ];
+
+  /// Call from Library screens when data is empty to retry copying from legacy DB.
+  static Future<void> tryRestoreLibraryDataFromLegacy() async {
+    final password = dotenv.env[AssetsConstants.dbPasswordKey];
+    if (password == null || password.isEmpty) return;
+    await copyUserDataFromLegacyIfNeeded(password);
+  }
+
+  /// If legacy DB still exists and current DB has no user data, copy it over.
+  /// Call after migration and before deleting legacy DB files.
+  static Future<void> copyUserDataFromLegacyIfNeeded(String password) async {
+    final sourceDbPath = await getSourceDbPath();
+    if (sourceDbPath == null || !await File(sourceDbPath).exists()) return;
+
+    final newDbPath = await getNewDbPath();
+    if (!await File(newDbPath).exists()) return;
+
+    final looksEncrypted = !sourceDbPath.endsWith(_unencryptedDbName)
+        ? await _isDatabaseEncrypted(sourceDbPath)
+        : false;
+
+    dynamic legacyDb;
+    try {
+      legacyDb = looksEncrypted
+          ? await sqlcipher.openDatabase(sourceDbPath, password: password)
+          : await plain.openDatabase(sourceDbPath);
+    } catch (e) {
+      debugPrint('testapp copyUserData: could not open legacy DB: $e');
+      return;
+    }
+
+    sqlcipher.Database? newDb;
+    try {
+      newDb = await sqlcipher.openDatabase(
+        newDbPath,
+        password: password,
+      );
+    } catch (e) {
+      debugPrint('testapp copyUserData: could not open new DB: $e');
+      await legacyDb?.close();
+      return;
+    }
+
+    try {
+      Future<bool> legacyHasTable(String name) async {
+        try {
+          final res = await legacyDb.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
+            [name],
+          );
+          return res.isNotEmpty;
+        } catch (_) {
+          return false;
+        }
+      }
+
+      Future<String?> pickLegacyTable(List<String> candidates) async {
+        for (final t in candidates) {
+          if (await legacyHasTable(t)) return t;
+        }
+        return null;
+      }
+
+      final Map<String, List<String>> legacyCandidatesForTarget = {
+        'bookmark': ['bookmark', 'bookmarks', 'book_mark', 'bookMark'],
+        'highlight': ['highlight', 'highlights', 'high_light', 'highLight'],
+        'underline': ['underline', 'underlines', 'under_line', 'underLine'],
+        'save_notes': ['save_notes', 'notes', 'note', 'saved_notes', 'saveNotes'],
+        'calendar': ['calendar', 'calender'],
+        'save_images': ['save_images', 'images', 'saved_images', 'saveImages'],
+        'dailyVersesMainList': ['dailyVersesMainList', 'daily_verses_main_list'],
+      };
+
+      for (final tableName in _userDataTables) {
+        try {
+          final newCountRows =
+              await newDb.rawQuery("SELECT COUNT(*) as c FROM $tableName");
+          final newCount =
+              (newCountRows.isNotEmpty ? (newCountRows.first['c'] as int?) : 0) ?? 0;
+          if (newCount > 0) continue;
+
+          final legacyTable = await pickLegacyTable(
+            legacyCandidatesForTarget[tableName] ?? [tableName],
+          );
+          if (legacyTable == null) continue;
+
+          final rows = await legacyDb.query(legacyTable);
+          if (rows.isEmpty) continue;
+
+          final targetColumns = await _getTableColumns(newDb, tableName);
+          for (final row in rows) {
+            final mappedRow =
+                _mapAndFilterRow(tableName, row, targetColumns);
+            mappedRow.remove('id');
+            if (mappedRow.isEmpty) continue;
+            try {
+              await newDb.insert(tableName, mappedRow,
+                  conflictAlgorithm: sqlcipher.ConflictAlgorithm.ignore);
+            } catch (e) {
+              debugPrint("testapp copyUserData insert '$tableName': $e");
+            }
+          }
+          debugPrint(
+              'testapp copyUserData: copied ${rows.length} rows from $legacyTable into $tableName');
+        } catch (e) {
+          debugPrint('testapp copyUserData table $tableName: $e');
+        }
+      }
+    } finally {
+      await legacyDb?.close();
       await newDb.close();
     }
   }

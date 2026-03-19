@@ -53,6 +53,8 @@ class _NotesScreenState extends State<NotesScreen> {
   }
 
   loadData() async {
+    await DBMigrationHelper.tryRestoreLibraryDataFromLegacy();
+    if (!mounted) return;
     setState(() {
       saveNotesData = DBHelper().getNotes();
     });

@@ -19,7 +19,7 @@ class AppApiConstant {
       "https://saveigm.com/bookads/admin/api/book/book_list_by_cat";
 
   // Language code for chat/Prayer (EN, HI, TN, PT). Loaded from SharedPreferences so app language reflects here.
-  static String chatLanguage = "EN";
+  static String chatLanguage = "TN";
 
   static Future<void> loadChatLanguage() async {
     try {
