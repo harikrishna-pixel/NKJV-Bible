@@ -207,7 +207,9 @@ class _SplashScreenState extends State<SplashScreen> {
         // APIs are already loading in background via BackgroundApiService
         
         // Essential: Database migration
+        print('SPLASH before migrateToEncryptedDatabase');
         await DBMigrationHelper.migrateToEncryptedDatabase(password);
+        print('SPLASH after migrateToEncryptedDatabase');
         
         // Essential: Ad consent (non-blocking, can run in background)
         AdConsentManager.initAppFlow(); // Don't await - let it run in background
@@ -265,6 +267,9 @@ class _SplashScreenState extends State<SplashScreen> {
         await DBMigrationHelper.copyUserDataFromLegacyIfNeeded(password);
         // Sync verse flags again after copying legacy user data
         await updateLocalDB();
+        print('SPLASH after copyUserDataFromLegacyIfNeeded');
+        await DBHelper.debugPrintLibraryTableCounts();
+        print('SPLASH before deleteFiles');
         await deleteFiles();
 
         // Ensure splash screen is visible for at least 1-2 seconds before navigation

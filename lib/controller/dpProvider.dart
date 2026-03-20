@@ -34,6 +34,35 @@ class DBHelper {
     return _db;
   }
 
+  /// Same as [db] — useful for diagnostics snippets.
+  Future<Database?> get database async => db;
+
+  /// Debug: log My Library row counts + encrypted DB path (filter logs: `LIBRARY_COUNTS`).
+  static Future<void> debugPrintLibraryTableCounts() async {
+    try {
+      final db = await DBHelper().db;
+      if (db == null) {
+        print('LIBRARY_COUNTS DB is null');
+        return;
+      }
+      final bookmark =
+          await db.rawQuery("SELECT COUNT(*) as c FROM bookmark");
+      final highlight =
+          await db.rawQuery("SELECT COUNT(*) as c FROM highlight");
+      final underline =
+          await db.rawQuery("SELECT COUNT(*) as c FROM underline");
+      final notes =
+          await db.rawQuery("SELECT COUNT(*) as c FROM save_notes");
+      print('LIBRARY_COUNTS BOOKMARK: ${bookmark.first['c']}');
+      print('LIBRARY_COUNTS HIGHLIGHT: ${highlight.first['c']}');
+      print('LIBRARY_COUNTS UNDERLINE: ${underline.first['c']}');
+      print('LIBRARY_COUNTS NOTES: ${notes.first['c']}');
+      print('LIBRARY_COUNTS DB PATH: ${db.path}');
+    } catch (e, st) {
+      print('LIBRARY_COUNTS error: $e\n$st');
+    }
+  }
+
   initDatabase() async {
     io.Directory documentDirectory = await getApplicationDocumentsDirectory();
     String path = p.join(
@@ -857,6 +886,40 @@ class DBMigrationHelper {
     }
   }
 
+  /// IMPORTANT: don't delete existing user data.
+  /// Some users may already have bookmarks/highlights/notes even when
+  /// verse/book tables are empty at migration time.
+  static Future<bool> _targetDbHasLibraryData(
+      String targetPath, String password) async {
+    try {
+      final db = await sqlcipher.openDatabase(targetPath, password: password);
+
+      Future<int> countFrom(String table) async {
+        try {
+          final rows = await db.rawQuery("SELECT COUNT(*) as c FROM $table");
+          return (rows.isNotEmpty ? (rows.first['c'] as int?) : null) ?? 0;
+        } catch (_) {
+          // Table may not exist in very old/corrupt DBs.
+          return 0;
+        }
+      }
+
+      final bookmarkCount = await countFrom('bookmark');
+      final highlightCount = await countFrom('highlight');
+      final underlineCount = await countFrom('underline');
+      final notesCount = await countFrom('save_notes');
+
+      await db.close();
+      return bookmarkCount > 0 ||
+          highlightCount > 0 ||
+          underlineCount > 0 ||
+          notesCount > 0;
+    } catch (e) {
+      debugPrint("testapp Target DB library-data check failed: $e");
+      return false;
+    }
+  }
+
   /// Get columns from target table
   static Future<List<String>> _getTableColumns(
       sqlcipher.Database db, String table) async {
@@ -887,12 +950,23 @@ class DBMigrationHelper {
     if (await File(newDbPath).exists()) {
       // IMPORTANT for upgrade users:
       // Don't skip migration if the target DB exists but is empty/corrupt.
-      final ok = await _targetDbHasCoreData(newDbPath, password);
-      if (ok) {
-        debugPrint('testapp Target encrypted DB exists and has data. Skipping migration.');
+      final hasCore = await _targetDbHasCoreData(newDbPath, password);
+      final hasLibrary = await _targetDbHasLibraryData(newDbPath, password);
+
+      // If core data OR any user library data exists, preserve the DB.
+      if (hasCore || hasLibrary) {
+        debugPrint(
+            'testapp Target encrypted DB exists (core:${hasCore ? 1 : 0}, library:${hasLibrary ? 1 : 0}). Skipping migration.');
         return;
       }
+
       try {
+        // Backup before delete, so field devices can recover.
+        final backupPath =
+            '$newDbPath.bak.${DateTime.now().millisecondsSinceEpoch}';
+        await File(newDbPath).copy(backupPath);
+        debugPrint('testapp Backed up empty/corrupt target DB to $backupPath');
+
         await File(newDbPath).delete();
         debugPrint('testapp Target encrypted DB existed but had no data. Re-migrating.');
       } catch (e) {

@@ -9,26 +9,32 @@ import flutter_local_notifications
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    // This is required to make any communication available in the action isolate.
+
     FlutterLocalNotificationsPlugin.setPluginRegistrantCallback { (registry) in
-        GeneratedPluginRegistrant.register(with: registry)
+      GeneratedPluginRegistrant.register(with: registry)
     }
 
     if #available(iOS 10.0, *) {
-      UNUserNotificationCenter.current().delegate = self as UNUserNotificationCenterDelegate
+      UNUserNotificationCenter.current().delegate = self
     }
 
     GeneratedPluginRegistrant.register(with: self)
 
-    if let controller = window?.rootViewController as? FlutterViewController {
+    let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
+
+    // ✅ Correct: use registrar ONLY
+    if let registrar = self.registrar(forPlugin: "com.biblebookapp.move_to_back") {
       let channel = FlutterMethodChannel(
         name: "com.biblebookapp/move_to_back",
-        binaryMessenger: controller.binaryMessenger)
+        binaryMessenger: registrar.messenger()
+      )
+
       channel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
         guard call.method == "moveTaskToBack" else {
           result(FlutterMethodNotImplemented)
           return
         }
+
         if UIApplication.shared.responds(to: NSSelectorFromString("suspend")) {
           DispatchQueue.main.async {
             UIApplication.shared.perform(NSSelectorFromString("suspend"))
@@ -40,6 +46,6 @@ import flutter_local_notifications
       }
     }
 
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    return result
   }
 }

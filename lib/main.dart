@@ -109,32 +109,41 @@ final RouteObserver<ModalRoute<void>> routeObserver =
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   configLoading();
-  await dotenv.load(fileName: ".env");
-  await GetStorage.init();
-  tz.initializeTimeZones();
 
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  // Keep startup resilient on real devices:
+  // run core app even if any optional service init fails/hangs.
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint("main: dotenv load failed: $e");
+  }
 
-  await SharPreferences.getString(SharPreferences.theme) ?? "notSave";
+  try {
+    await GetStorage.init();
+  } catch (e) {
+    debugPrint("main: GetStorage init failed: $e");
+  }
 
-  await MobileAds.instance.initialize();
-  RewardedAdService();
+  try {
+    tz.initializeTimeZones();
+  } catch (e) {
+    debugPrint("main: timezone init failed: $e");
+  }
 
-  // Initialize Statsig
-  await StatsigService.initialize();
+  try {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  } catch (e) {
+    debugPrint("main: orientation lock failed: $e");
+  }
 
-  // Start background API loading immediately (non-blocking)
-  // This will load APIs while user goes through onboarding
-  BackgroundApiService().startBackgroundLoading();
-
-  // Load chat/Prayer language so Prayer Guidance and Chat reflect app language
-  await AppApiConstant.loadChatLanguage();
-
-  // iOS Home Screen Widgets: set App Group so widget extension can read data
-  await initBibleHomeWidget();
+  try {
+    await SharPreferences.getString(SharPreferences.theme);
+  } catch (e) {
+    debugPrint("main: theme preload failed: $e");
+  }
 
   runApp(
     hooks.ProviderScope(
@@ -151,6 +160,43 @@ Future<void> main() async {
       ),
     ),
   );
+
+  // Non-critical startup tasks in background so debugger/service attach
+  // is not blocked by network/plugin initialization.
+  unawaited(_bootstrapBackgroundStartup());
+}
+
+Future<void> _bootstrapBackgroundStartup() async {
+  try {
+    await MobileAds.instance.initialize().timeout(const Duration(seconds: 8));
+    RewardedAdService();
+  } catch (e) {
+    debugPrint("main: MobileAds init failed: $e");
+  }
+
+  try {
+    await StatsigService.initialize().timeout(const Duration(seconds: 8));
+  } catch (e) {
+    debugPrint("main: Statsig init failed: $e");
+  }
+
+  try {
+    BackgroundApiService().startBackgroundLoading();
+  } catch (e) {
+    debugPrint("main: background API bootstrap failed: $e");
+  }
+
+  try {
+    await AppApiConstant.loadChatLanguage().timeout(const Duration(seconds: 8));
+  } catch (e) {
+    debugPrint("main: chat language load failed: $e");
+  }
+
+  try {
+    await initBibleHomeWidget().timeout(const Duration(seconds: 8));
+  } catch (e) {
+    debugPrint("main: home widget init failed: $e");
+  }
 }
 
 configLoading() {
