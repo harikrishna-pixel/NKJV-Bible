@@ -1015,8 +1015,12 @@ List<Map<String, dynamic>> _filterAndSortVerses(Map<String, dynamic> args) {
 }
 
 //search background
-List<VerseBookContentModel> parseVerses(List<Map<String, dynamic>> data) {
-  return data.map((e) => VerseBookContentModel.fromJson(e)).toList();
+// `compute` requires the callback to accept `dynamic` (not a typed list).
+// These helpers are used from multiple screens to parse DB rows in an isolate.
+List<VerseBookContentModel> parseVerses(dynamic data) {
+  if (data == null) return <VerseBookContentModel>[];
+  final list = (data as List).toList();
+  return list.map((e) => VerseBookContentModel.fromJson(e)).toList();
 }
 
 Map<String, List<VerseBookContentModel>> splitVerses(
@@ -1035,8 +1039,10 @@ Map<String, List<VerseBookContentModel>> splitVerses(
   return {'ot': ot, 'nt': nt};
 }
 
-List<MainBookListModel> parseBooks(List<Map<String, dynamic>> data) {
-  return data.map((e) => MainBookListModel.fromJson(e)).toList();
+List<MainBookListModel> parseBooks(dynamic data) {
+  if (data == null) return <MainBookListModel>[];
+  final list = (data as List).toList();
+  return list.map((e) => MainBookListModel.fromJson(e)).toList();
 }
 
 Map<String, List<MainBookListModel>> splitBooks(List<MainBookListModel> books) {

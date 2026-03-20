@@ -6962,6 +6962,21 @@ class _HomeScreenState extends State<HomeScreen>
                   SharPreferences.selectedBookNum, legacyBookNum.toString());
             }
           }
+          // Inverse: prefs 0-based but verse list uses 1-based book indices.
+          if (matches.isEmpty) {
+            final oneBasedBook = bookNum + 1;
+            matches = downloadProvider.verseList
+                .where((v) => (v.bookNum ?? -999) == oneBasedBook)
+                .where((v) =>
+                    (v.chapterNum ?? -999) == (safeChapter - 1) ||
+                    (v.chapterNum ?? -999) == safeChapter)
+                .toList();
+            if (matches.isNotEmpty) {
+              controller.selectedBookNum.value = oneBasedBook.toString();
+              SharPreferences.setString(
+                  SharPreferences.selectedBookNum, oneBasedBook.toString());
+            }
+          }
 
           if (matches.isNotEmpty) {
             controller.selectedBookContent.value = matches.toSet().toList();
@@ -6974,27 +6989,49 @@ class _HomeScreenState extends State<HomeScreen>
       });
     }
 
-    // Never show a dead-end empty screen.
-    // If we still have no content after fallbacks, guide user to restore/select Bible.
+    // Still empty after DB + in-memory/provider fallbacks.
+    final book = controller.selectedBook.value.toString().trim();
+    final chapter = controller.selectedChapter.value.toString().trim();
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Loader(),
-          const SizedBox(height: 14),
-          Text(
-            "Preparing your Bible…",
-            style: CommanStyle.bw16500(context),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 14),
-          ElevatedButton(
-            onPressed: () {
-              Get.to(() => BibleVersionsScreen(from: 'home'));
-            },
-            child: const Text("Restore / Select Bible"),
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.menu_book_outlined,
+              size: 56,
+              color: CommanColor.lightDarkPrimary(context).withOpacity(0.7),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No content for this chapter',
+              style: CommanStyle.bw16500(context),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Book: ${book.isEmpty ? "Selected Bible" : book} • Chapter: ${chapter.isEmpty ? "1" : chapter}',
+              style: CommanStyle.placeholderText(context),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'If verses are missing, the selected Bible file may not be synced to this device yet. Please try again.',
+              style: CommanStyle.placeholderText(context),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            TextButton(
+              onPressed: () {
+                _attemptedProviderChapterFallback = false;
+                controller.getSelectedChapterAndBook();
+                if (mounted) setState(() {});
+              },
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
       ),
     );
   }

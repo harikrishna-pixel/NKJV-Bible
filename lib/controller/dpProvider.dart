@@ -23,10 +23,36 @@ import '../Model/saveImagesModel.dart';
 import '../Model/saveNotesModel.dart';
 import '../Model/verseBookContentModel.dart';
 
-class DBHelper {
-  static Database? _db;
+/// Single source of truth: same file + directory as [DBHelper.initDatabase].
+/// Prevents "latest → latest" opening a different path than migration code.
+class BibleEncryptedDbPaths {
+  static const String fileName = 'bible_enc.db';
 
-  Future<Database?> get db async {
+  static Future<String> absolutePath() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return p.join(dir.path, fileName);
+  }
+}
+
+class DBHelper {
+  // Can be opened either as encrypted (sqlcipher) or as plain sqlite depending
+  // on what exists on disk and whether password/encryption format matches.
+  // Keep dynamic so we can still query in fallback scenarios.
+  static dynamic _db;
+
+  /// Cold start (Splash): drop any in-memory connection so we always open
+  /// the on-disk `bible_enc.db`. Fixes stale singleton after reinstall/overwrite
+  /// when prefs were restored but the DB file is new or empty.
+  static Future<void> resetStaticDatabaseConnection() async {
+    if (_db != null) {
+      try {
+        await _db!.close();
+      } catch (_) {}
+      _db = null;
+    }
+  }
+
+  Future<dynamic> get db async {
     if (_db != null) {
       return _db;
     }
@@ -35,7 +61,30 @@ class DBHelper {
   }
 
   /// Same as [db] — useful for diagnostics snippets.
-  Future<Database?> get database async => db;
+  Future<dynamic> get database async => db;
+
+  /// Debug: Check what DB files exist on disk
+  static Future<void> debugPrintDatabaseFiles() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final files = [
+        'bible.db',
+        '.bible.db',
+        'bible2.db',
+        BibleEncryptedDbPaths.fileName,
+      ];
+      
+      print('DB_FILES_CHECK: Checking database files in ${dir.path}');
+      for (final filename in files) {
+        final file = File(p.join(dir.path, filename));
+        final exists = await file.exists();
+        final size = exists ? await file.length() : 0;
+        print('DB_FILES_CHECK: $filename exists=$exists size=${size}bytes');
+      }
+    } catch (e) {
+      print('DB_FILES_CHECK error: $e');
+    }
+  }
 
   /// Debug: log My Library row counts + encrypted DB path (filter logs: `LIBRARY_COUNTS`).
   static Future<void> debugPrintLibraryTableCounts() async {
@@ -45,80 +94,100 @@ class DBHelper {
         print('LIBRARY_COUNTS DB is null');
         return;
       }
-      final bookmark =
-          await db.rawQuery("SELECT COUNT(*) as c FROM bookmark");
+      final bookmark = await db.rawQuery("SELECT COUNT(*) as c FROM bookmark");
       final highlight =
           await db.rawQuery("SELECT COUNT(*) as c FROM highlight");
       final underline =
           await db.rawQuery("SELECT COUNT(*) as c FROM underline");
-      final notes =
-          await db.rawQuery("SELECT COUNT(*) as c FROM save_notes");
+      final notes = await db.rawQuery("SELECT COUNT(*) as c FROM save_notes");
       print('LIBRARY_COUNTS BOOKMARK: ${bookmark.first['c']}');
       print('LIBRARY_COUNTS HIGHLIGHT: ${highlight.first['c']}');
       print('LIBRARY_COUNTS UNDERLINE: ${underline.first['c']}');
       print('LIBRARY_COUNTS NOTES: ${notes.first['c']}');
       print('LIBRARY_COUNTS DB PATH: ${db.path}');
+      
+      // Additional diagnostic: check if tables exist and show sample data
+      try {
+        final tables = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
+        print('LIBRARY_COUNTS TABLES: ${tables.map((t) => t['name']).join(', ')}');
+        
+        if (bookmark.first['c'] as int > 0) {
+          final sample = await db.rawQuery("SELECT id, book_num, chapter_num, verse_num FROM bookmark LIMIT 3");
+          print('LIBRARY_COUNTS BOOKMARK_SAMPLE: $sample');
+        }
+      } catch (e) {
+        print('LIBRARY_COUNTS table check error: $e');
+      }
     } catch (e, st) {
       print('LIBRARY_COUNTS error: $e\n$st');
     }
   }
 
   initDatabase() async {
-    io.Directory documentDirectory = await getApplicationDocumentsDirectory();
-    String path = p.join(
-      documentDirectory.path,
-      'bible_enc.db',
-    );
+    final String path = await BibleEncryptedDbPaths.absolutePath();
+    final password = dotenv.env[AssetsConstants.dbPasswordKey];
 
-    var db = await openDatabase(
+    Future<void> onUpgrade(dynamic db, int oldVersion, int newVersion) async {
+      if (oldVersion < 2) {
+        await db.execute(
+            'CREATE TABLE "calendar" (id INTEGER PRIMARY KEY AUTOINCREMENT,"title" TEXT,"date"	DATETIME)');
+      }
+      if (oldVersion < 3) {
+        await db.execute(
+            'CREATE TABLE IF NOT EXISTS "dailyVersesnew" (id INTEGER PRIMARY KEY AUTOINCREMENT, "Category_Name" TEXT, "Category_Id" INTEGER, "Book" TEXT, "Book_Id" INTEGER, "Chapter" INTEGER, "Verse" TEXT, "Date" TEXT, "Verse_Num" INTEGER)');
+
+        try {
+          await db.execute('ALTER TABLE bookmark ADD COLUMN plaincontent VARCHAR');
+        } catch (e) {
+          debugPrint('bookmark: plaincontent already exists or error: $e');
+        }
+        try {
+          await db.execute('ALTER TABLE save_notes ADD COLUMN plaincontent VARCHAR');
+        } catch (e) {
+          debugPrint('save_notes: plaincontent already exists or error: $e');
+        }
+        try {
+          await db.execute('ALTER TABLE highlight ADD COLUMN plain_content VARCHAR');
+        } catch (e) {
+          debugPrint('highlight: plain_content already exists or error: $e');
+        }
+        try {
+          await db.execute('ALTER TABLE highlight ADD COLUMN verse_id VARCHAR');
+        } catch (e) {
+          debugPrint('highlight: verse_id already exists or error: $e');
+        }
+      }
+    }
+
+    debugPrint(
+        'DBHelper.initDatabase opening: $path encryptedPasswordPresent=${password != null && password.isNotEmpty}');
+
+    // 1) Preferred path: open as encrypted SQLCipher.
+    if (password != null && password.isNotEmpty) {
+      try {
+        return await sqlcipher.openDatabase(
+          path,
+          version: 3,
+          password: password,
+          onCreate: _onCreate,
+          onUpgrade: onUpgrade,
+        );
+      } catch (e) {
+        debugPrint('DBHelper.initDatabase encrypted open failed: $e');
+      }
+    }
+
+    // 2) Fallback: open as plain sqlite. Fixes situations where the file
+    // on disk isn't actually encrypted (or password/encryption format mismatch).
+    return await plain.openDatabase(
       path,
       version: 3,
-      password: dotenv.env[AssetsConstants.dbPasswordKey],
       onCreate: _onCreate,
-      onUpgrade: (db, oldVersion, newVersion) async {
-        if (oldVersion < 2) {
-          await db.execute(
-              'CREATE TABLE "calendar" (id INTEGER PRIMARY KEY AUTOINCREMENT,"title" TEXT,"date"	DATETIME)');
-        }
-        if (oldVersion < 3) {
-          // Changes added in version 3
-          await db.execute(
-              'CREATE TABLE IF NOT EXISTS "dailyVersesnew" (id INTEGER PRIMARY KEY AUTOINCREMENT, "Category_Name" TEXT, "Category_Id" INTEGER, "Book" TEXT, "Book_Id" INTEGER, "Chapter" INTEGER, "Verse" TEXT, "Date" TEXT, "Verse_Num" INTEGER)');
-
-          try {
-            await db.execute(
-                'ALTER TABLE bookmark ADD COLUMN plaincontent VARCHAR');
-          } catch (e) {
-            debugPrint('bookmark: plaincontent already exists or error: $e');
-          }
-
-          try {
-            await db.execute(
-                'ALTER TABLE save_notes ADD COLUMN plaincontent VARCHAR');
-          } catch (e) {
-            debugPrint('save_notes: plaincontent already exists or error: $e');
-          }
-
-          try {
-            await db.execute(
-                'ALTER TABLE highlight ADD COLUMN plain_content VARCHAR');
-          } catch (e) {
-            debugPrint('highlight: plain_content already exists or error: $e');
-          }
-
-          try {
-            await db
-                .execute('ALTER TABLE highlight ADD COLUMN verse_id VARCHAR');
-          } catch (e) {
-            debugPrint('highlight: verse_id already exists or error: $e');
-          }
-        }
-      },
+      onUpgrade: onUpgrade,
     );
-    return db;
   }
 
-  _onCreate(Database db, int version) async {
+  _onCreate(dynamic db, int version) async {
     try {
       await db.execute(
           'CREATE TABLE "calendar" (id INTEGER PRIMARY KEY AUTOINCREMENT,"title" TEXT,"date"	DATETIME)');
@@ -784,7 +853,6 @@ class DBMigrationHelper {
   static const _unencryptedDbName = 'bible.db';
   static const _legacyEncryptedName = '.bible.db';
   static const _encryptedDbName = 'bible2.db';
-  static const _newDbName = 'bible_enc.db';
 
   /// Per-table map: old column name -> new column name.
   /// bookmark uses plaincontent; highlight uses plain_content.
@@ -818,15 +886,15 @@ class DBMigrationHelper {
       try {
         if (await File(newNamePath).exists()) {
           await File(legacyPath).delete();
-          debugPrint(
-              "testapp Removed legacy $_legacyEncryptedName (target exists).");
+          print(
+              "copyUserDataFromLegacyIfNeeded: removed legacy $_legacyEncryptedName (target exists).");
         } else {
           await File(legacyPath).rename(newNamePath);
-          debugPrint(
-              "testapp Renamed $_legacyEncryptedName → $_encryptedDbName");
+          print(
+              "copyUserDataFromLegacyIfNeeded: renamed $_legacyEncryptedName → $_encryptedDbName");
         }
       } catch (e) {
-        debugPrint("testapp Rename error for $_legacyEncryptedName: $e");
+        print("copyUserDataFromLegacyIfNeeded: rename error: $e");
       }
     }
   }
@@ -852,20 +920,17 @@ class DBMigrationHelper {
     final maybeEncryptedPath = p.join(dir.path, _encryptedDbName);
 
     if (await File(unencryptedPath).exists()) {
-      debugPrint("testapp Found plain DB at: $unencryptedPath");
+      print("copyUserDataFromLegacyIfNeeded: found plain DB at: $unencryptedPath");
       return unencryptedPath;
     }
     if (await File(maybeEncryptedPath).exists()) {
-      debugPrint("testapp Found DB at: $maybeEncryptedPath");
+      print("copyUserDataFromLegacyIfNeeded: found DB at: $maybeEncryptedPath");
       return maybeEncryptedPath;
     }
     return null;
   }
 
-  static Future<String> getNewDbPath() async {
-    final dir = await getApplicationDocumentsDirectory();
-    return p.join(dir.path, _newDbName);
-  }
+  static Future<String> getNewDbPath() => BibleEncryptedDbPaths.absolutePath();
 
   static Future<bool> _targetDbHasCoreData(
       String targetPath, String password) async {
@@ -874,10 +939,12 @@ class DBMigrationHelper {
       final verseCountRows =
           await db.rawQuery("SELECT COUNT(*) as c FROM verse");
       final bookCountRows = await db.rawQuery("SELECT COUNT(*) as c FROM book");
-      final verseCount =
-          verseCountRows.isNotEmpty ? (verseCountRows.first["c"] as int?) ?? 0 : 0;
-      final bookCount =
-          bookCountRows.isNotEmpty ? (bookCountRows.first["c"] as int?) ?? 0 : 0;
+      final verseCount = verseCountRows.isNotEmpty
+          ? (verseCountRows.first["c"] as int?) ?? 0
+          : 0;
+      final bookCount = bookCountRows.isNotEmpty
+          ? (bookCountRows.first["c"] as int?) ?? 0
+          : 0;
       await db.close();
       return verseCount > 0 && bookCount > 0;
     } catch (e) {
@@ -928,8 +995,8 @@ class DBMigrationHelper {
   }
 
   /// Filter + map old row to target schema (table-specific column names)
-  static Map<String, Object?> _mapAndFilterRow(
-      String tableName, Map<String, Object?> oldRow, List<String> targetColumns) {
+  static Map<String, Object?> _mapAndFilterRow(String tableName,
+      Map<String, Object?> oldRow, List<String> targetColumns) {
     final tableMap = _columnMapForTable[tableName];
     final Map<String, Object?> mapped = {};
     oldRow.forEach((oldCol, value) {
@@ -948,30 +1015,54 @@ class DBMigrationHelper {
     final newDbPath = await getNewDbPath();
 
     if (await File(newDbPath).exists()) {
-      // IMPORTANT for upgrade users:
-      // Don't skip migration if the target DB exists but is empty/corrupt.
+      // This file is the SAME path DBHelper opens (see BibleEncryptedDbPaths).
       final hasCore = await _targetDbHasCoreData(newDbPath, password);
       final hasLibrary = await _targetDbHasLibraryData(newDbPath, password);
 
-      // If core data OR any user library data exists, preserve the DB.
-      if (hasCore || hasLibrary) {
+      if (hasLibrary) {
         debugPrint(
-            'testapp Target encrypted DB exists (core:${hasCore ? 1 : 0}, library:${hasLibrary ? 1 : 0}). Skipping migration.');
+            'testapp Target encrypted DB already has library data (core:${hasCore ? 1 : 0}, library:${hasLibrary ? 1 : 0}). Skipping migration.');
+        return;
+      }
+
+      // ROOT CAUSE FIX: Never delete bible_enc.db while it still contains verse/book.
+      // Old code logged "migrate user data only" but STILL ran delete → if no legacy
+      // source remained, the file was gone and the next openDatabase created a NEW empty DB.
+      if (hasCore) {
+        debugPrint(
+            'testapp Target encrypted DB has core data (verse/book). NOT deleting file — same DB app reads. Library copy runs via copyUserDataFromLegacyIfNeeded.');
+        return;
+      }
+
+      // Open may have failed (wrong password) → both false; do not wipe a non-trivial file.
+      final int fileSize = await File(newDbPath).length();
+      const int minBytesToTreatAsRealDb = 4096;
+      if (fileSize >= minBytesToTreatAsRealDb) {
+        debugPrint(
+            'testapp Target DB exists (${fileSize}b) but core/library probes empty — refusing delete (likely read/key issue, not empty DB).');
+        return;
+      }
+
+      // Only rebuild from legacy when we can actually read a source file afterward.
+      final bool sourceReady =
+          sourceDbPath != null && await File(sourceDbPath).exists();
+      if (!sourceReady) {
+        debugPrint(
+            'testapp Target looks empty but no legacy DB to rebuild from — NOT deleting bible_enc.db.');
         return;
       }
 
       try {
-        // Backup before delete, so field devices can recover.
         final backupPath =
             '$newDbPath.bak.${DateTime.now().millisecondsSinceEpoch}';
         await File(newDbPath).copy(backupPath);
-        debugPrint('testapp Backed up empty/corrupt target DB to $backupPath');
+        debugPrint('testapp Backed up tiny/empty target DB to $backupPath');
 
         await File(newDbPath).delete();
-        debugPrint('testapp Target encrypted DB existed but had no data. Re-migrating.');
+        debugPrint(
+            'testapp Removed tiny empty target DB; will migrate from legacy.');
       } catch (e) {
         debugPrint('testapp Failed to delete empty target DB: $e');
-        // If we can't delete it, we can't safely re-migrate.
         return;
       }
     }
@@ -1040,6 +1131,10 @@ class DBMigrationHelper {
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
       );
 
+      // Check if target already has core data to determine migration strategy
+      final targetHasCore = await _targetDbHasCoreData(newDbPath, password);
+      final userDataTables = ['bookmark', 'highlight', 'underline', 'save_notes', 'calendar', 'save_images'];
+
       for (final tableMap in tables) {
         final legacyTableName = tableMap['name'] as String;
         if (legacyTableName == 'android_metadata') continue;
@@ -1047,11 +1142,18 @@ class DBMigrationHelper {
         final targetTableName =
             legacyTableToTarget[legacyTableName] ?? legacyTableName;
 
+        // CRITICAL FIX: If target has core data, only migrate user data tables
+        if (targetHasCore && !userDataTables.contains(targetTableName)) {
+          debugPrint("testapp Migration: skipping core table '$targetTableName' (target already has core data)");
+          continue;
+        }
+
         List<String> targetColumns;
         try {
           targetColumns = await _getTableColumns(newDb, targetTableName);
         } catch (_) {
-          debugPrint("testapp Migration: no target table '$targetTableName', skip.");
+          debugPrint(
+              "testapp Migration: no target table '$targetTableName', skip.");
           continue;
         }
         if (targetColumns.isEmpty) continue;
@@ -1070,7 +1172,8 @@ class DBMigrationHelper {
           }
         }
         if (rows.isNotEmpty) {
-          debugPrint("testapp Migration: copied ${rows.length} rows $legacyTableName -> $targetTableName");
+          debugPrint(
+              "testapp Migration: copied ${rows.length} rows $legacyTableName -> $targetTableName");
         }
       }
 
@@ -1079,8 +1182,8 @@ class DBMigrationHelper {
             await rootBundle.loadString('assets/jsonFile/dailyVerse.json');
         final dailyVerseData = json.decode(dailyVerseResponse) as List;
         final dailyVerseDataList = dailyVerseData
-            .map<DailyVersesMainListModel>(
-                (item) => DailyVersesMainListModel.fromJson(
+            .map<DailyVersesMainListModel>((item) =>
+                DailyVersesMainListModel.fromJson(
                     Map<String, dynamic>.from(item as Map)))
             .toList();
         if (dailyVerseDataList.isEmpty) {
@@ -1104,9 +1207,12 @@ class DBMigrationHelper {
           });
         }
       } catch (e) {
-        debugPrint("testapp Error loading daily verses JSON: $e (keeping migrated data)");
+        debugPrint(
+            "testapp Error loading daily verses JSON: $e (keeping migrated data)");
       }
 
+      // CRITICAL: Verify migration was successful
+      await _verifyMigrationSuccess(newDb, sourceDbPath!, password);
       debugPrint("testapp ✅ Migration finished successfully.");
     } catch (e) {
       debugPrint('testapp Migration error: $e');
@@ -1127,6 +1233,53 @@ class DBMigrationHelper {
     'dailyVersesMainList',
   ];
 
+  /// Verify that migration was successful by comparing data counts
+  static Future<void> _verifyMigrationSuccess(
+      sqlcipher.Database newDb, String sourceDbPath, String password) async {
+    try {
+      debugPrint("testapp Verifying migration success...");
+      
+      // Open source DB to compare counts
+      final looksEncrypted = !sourceDbPath.endsWith('bible.db')
+          ? await _isDatabaseEncrypted(sourceDbPath)
+          : false;
+      
+      dynamic sourceDb = looksEncrypted
+          ? await sqlcipher.openDatabase(sourceDbPath, password: password)
+          : await plain.openDatabase(sourceDbPath);
+
+      for (final tableName in _userDataTables) {
+        try {
+          // Get count from source
+          int sourceCount = 0;
+          try {
+            final sourceRows = await sourceDb.rawQuery("SELECT COUNT(*) as c FROM $tableName");
+            sourceCount = (sourceRows.isNotEmpty ? (sourceRows.first['c'] as int?) : 0) ?? 0;
+          } catch (_) {
+            // Table might not exist in source
+            continue;
+          }
+
+          // Get count from target
+          final targetRows = await newDb.rawQuery("SELECT COUNT(*) as c FROM $tableName");
+          final targetCount = (targetRows.isNotEmpty ? (targetRows.first['c'] as int?) : 0) ?? 0;
+
+          debugPrint("testapp Migration verification: $tableName source=$sourceCount target=$targetCount");
+          
+          if (sourceCount > 0 && targetCount == 0) {
+            debugPrint("testapp ⚠️ WARNING: $tableName has $sourceCount rows in source but 0 in target!");
+          }
+        } catch (e) {
+          debugPrint("testapp Migration verification error for $tableName: $e");
+        }
+      }
+      
+      await sourceDb?.close();
+    } catch (e) {
+      debugPrint("testapp Migration verification failed: $e");
+    }
+  }
+
   /// Call from Library screens when data is empty to retry copying from legacy DB.
   static Future<void> tryRestoreLibraryDataFromLegacy() async {
     final password = dotenv.env[AssetsConstants.dbPasswordKey];
@@ -1134,16 +1287,151 @@ class DBMigrationHelper {
     await copyUserDataFromLegacyIfNeeded(password);
   }
 
+  /// Emergency recovery method for users who already updated and lost data
+  /// This method is more aggressive and will attempt multiple recovery strategies
+  static Future<void> emergencyRecoverUserData() async {
+    final password = dotenv.env[AssetsConstants.dbPasswordKey];
+    if (password == null || password.isEmpty) {
+      debugPrint('emergencyRecoverUserData: No password available');
+      return;
+    }
+
+    debugPrint('emergencyRecoverUserData: Starting emergency recovery...');
+    
+    try {
+      // Strategy 1: Try standard recovery
+      await copyUserDataFromLegacyIfNeeded(password);
+      
+      // Strategy 2: Check for backup files that might exist
+      final dir = await getApplicationDocumentsDirectory();
+      final backupFiles = [
+        'bible_enc.db.bak',
+        'bible.db.bak',
+        '.bible.db.bak'
+      ];
+      
+      for (final backupFile in backupFiles) {
+        final backupPath = p.join(dir.path, backupFile);
+        if (await File(backupPath).exists()) {
+          debugPrint('emergencyRecoverUserData: Found backup file $backupFile, attempting recovery...');
+          try {
+            // Try to recover from backup
+            await _recoverFromBackupFile(backupPath, password);
+          } catch (e) {
+            debugPrint('emergencyRecoverUserData: Failed to recover from $backupFile: $e');
+          }
+        }
+      }
+      
+      // Strategy 3: Look for any .bak files with timestamps
+      final allFiles = await dir.list().toList();
+      for (final entity in allFiles) {
+        if (entity is File && entity.path.contains('.bak.')) {
+          debugPrint('emergencyRecoverUserData: Found timestamped backup ${entity.path}');
+          try {
+            await _recoverFromBackupFile(entity.path, password);
+          } catch (e) {
+            debugPrint('emergencyRecoverUserData: Failed to recover from ${entity.path}: $e');
+          }
+        }
+      }
+      
+      debugPrint('emergencyRecoverUserData: Emergency recovery completed');
+    } catch (e) {
+      debugPrint('emergencyRecoverUserData: Emergency recovery failed: $e');
+    }
+  }
+
+  /// Attempt to recover user data from a backup file
+  static Future<void> _recoverFromBackupFile(String backupPath, String password) async {
+    final newDbPath = await getNewDbPath();
+    
+    // Try to open the backup file
+    dynamic backupDb;
+    try {
+      // First try as encrypted
+      backupDb = await sqlcipher.openDatabase(backupPath, password: password);
+    } catch (_) {
+      try {
+        // Then try as unencrypted
+        backupDb = await plain.openDatabase(backupPath);
+      } catch (e) {
+        debugPrint('_recoverFromBackupFile: Cannot open backup file $backupPath: $e');
+        return;
+      }
+    }
+
+    try {
+      final newDb = await sqlcipher.openDatabase(newDbPath, password: password);
+      
+      // Check if backup has user data
+      bool hasUserData = false;
+      for (final tableName in _userDataTables) {
+        try {
+          final rows = await backupDb.rawQuery("SELECT COUNT(*) as c FROM $tableName");
+          final count = (rows.isNotEmpty ? (rows.first['c'] as int?) : 0) ?? 0;
+          if (count > 0) {
+            hasUserData = true;
+            debugPrint('_recoverFromBackupFile: Found $count rows in $tableName');
+            
+            // Copy the data
+            final data = await backupDb.query(tableName);
+            final targetColumns = await _getTableColumns(newDb, tableName);
+            
+            for (final row in data) {
+              final mappedRow = _mapAndFilterRow(tableName, row, targetColumns);
+              mappedRow.remove('id'); // Remove ID to avoid conflicts
+              if (mappedRow.isNotEmpty) {
+                try {
+                  await newDb.insert(tableName, mappedRow,
+                      conflictAlgorithm: sqlcipher.ConflictAlgorithm.ignore);
+                } catch (e) {
+                  debugPrint('_recoverFromBackupFile: Insert error: $e');
+                }
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('_recoverFromBackupFile: Error processing $tableName: $e');
+        }
+      }
+      
+      if (hasUserData) {
+        debugPrint('_recoverFromBackupFile: Successfully recovered user data from $backupPath');
+      } else {
+        debugPrint('_recoverFromBackupFile: No user data found in $backupPath');
+      }
+      
+      await newDb.close();
+    } finally {
+      await backupDb?.close();
+    }
+  }
+
   /// If legacy DB still exists and current DB has no user data, copy it over.
   /// Call after migration and before deleting legacy DB files.
   static Future<void> copyUserDataFromLegacyIfNeeded(String password) async {
     final sourceDbPath = await getSourceDbPath();
-    if (sourceDbPath == null || !await File(sourceDbPath).exists()) return;
-
     final newDbPath = await getNewDbPath();
-    if (!await File(newDbPath).exists()) return;
 
-    final looksEncrypted = !sourceDbPath.endsWith(_unencryptedDbName)
+    // Always print early so we can see *why* restore didn't happen.
+    final sourceExists =
+        sourceDbPath != null && await File(sourceDbPath).exists();
+    final newExists = await File(newDbPath).exists();
+    print(
+        'copyUserDataFromLegacyIfNeeded start sourceDbPath=$sourceDbPath sourceExists=$sourceExists newDbPath=$newDbPath newExists=$newExists');
+
+    if (!newExists) {
+      print('copyUserDataFromLegacyIfNeeded: target DB missing ($newDbPath).');
+      return;
+    }
+
+    if (!sourceExists) {
+      print('copyUserDataFromLegacyIfNeeded: no legacy source DB to copy.');
+      return;
+    }
+
+    final looksEncrypted = !sourceDbPath!.endsWith(_unencryptedDbName)
         ? await _isDatabaseEncrypted(sourceDbPath)
         : false;
 
@@ -1153,7 +1441,7 @@ class DBMigrationHelper {
           ? await sqlcipher.openDatabase(sourceDbPath, password: password)
           : await plain.openDatabase(sourceDbPath);
     } catch (e) {
-      debugPrint('testapp copyUserData: could not open legacy DB: $e');
+      print('copyUserDataFromLegacyIfNeeded: could not open legacy DB: $e');
       return;
     }
 
@@ -1164,7 +1452,7 @@ class DBMigrationHelper {
         password: password,
       );
     } catch (e) {
-      debugPrint('testapp copyUserData: could not open new DB: $e');
+      print('copyUserDataFromLegacyIfNeeded: could not open new DB: $e');
       await legacyDb?.close();
       return;
     }
@@ -1193,19 +1481,34 @@ class DBMigrationHelper {
         'bookmark': ['bookmark', 'bookmarks', 'book_mark', 'bookMark'],
         'highlight': ['highlight', 'highlights', 'high_light', 'highLight'],
         'underline': ['underline', 'underlines', 'under_line', 'underLine'],
-        'save_notes': ['save_notes', 'notes', 'note', 'saved_notes', 'saveNotes'],
+        'save_notes': [
+          'save_notes',
+          'notes',
+          'note',
+          'saved_notes',
+          'saveNotes'
+        ],
         'calendar': ['calendar', 'calender'],
         'save_images': ['save_images', 'images', 'saved_images', 'saveImages'],
-        'dailyVersesMainList': ['dailyVersesMainList', 'daily_verses_main_list'],
+        'dailyVersesMainList': [
+          'dailyVersesMainList',
+          'daily_verses_main_list'
+        ],
       };
 
       for (final tableName in _userDataTables) {
         try {
           final newCountRows =
               await newDb.rawQuery("SELECT COUNT(*) as c FROM $tableName");
-          final newCount =
-              (newCountRows.isNotEmpty ? (newCountRows.first['c'] as int?) : 0) ?? 0;
-          if (newCount > 0) continue;
+          final newCount = (newCountRows.isNotEmpty
+                  ? (newCountRows.first['c'] as int?)
+                  : 0) ??
+              0;
+          
+          // CRITICAL FIX: Always attempt to restore user data from legacy DB
+          // Even if current table has some data, legacy might have more/different data
+          // Use IGNORE conflict resolution to avoid duplicates
+          debugPrint('copyUserDataFromLegacyIfNeeded: $tableName current count=$newCount, checking legacy...');
 
           final legacyTable = await pickLegacyTable(
             legacyCandidatesForTarget[tableName] ?? [tableName],
@@ -1213,25 +1516,29 @@ class DBMigrationHelper {
           if (legacyTable == null) continue;
 
           final rows = await legacyDb.query(legacyTable);
-          if (rows.isEmpty) continue;
+          if (rows.isEmpty) {
+            debugPrint('copyUserDataFromLegacyIfNeeded: $legacyTable is empty, skipping');
+            continue;
+          }
 
           final targetColumns = await _getTableColumns(newDb, tableName);
+          int copiedCount = 0;
           for (final row in rows) {
-            final mappedRow =
-                _mapAndFilterRow(tableName, row, targetColumns);
-            mappedRow.remove('id');
+            final mappedRow = _mapAndFilterRow(tableName, row, targetColumns);
+            mappedRow.remove('id'); // Remove ID to avoid conflicts
             if (mappedRow.isEmpty) continue;
             try {
               await newDb.insert(tableName, mappedRow,
                   conflictAlgorithm: sqlcipher.ConflictAlgorithm.ignore);
+              copiedCount++;
             } catch (e) {
               debugPrint("testapp copyUserData insert '$tableName': $e");
             }
           }
-          debugPrint(
-              'testapp copyUserData: copied ${rows.length} rows from $legacyTable into $tableName');
+          print(
+              'copyUserDataFromLegacyIfNeeded: copied $copiedCount/${rows.length} rows from $legacyTable into $tableName');
         } catch (e) {
-          debugPrint('testapp copyUserData table $tableName: $e');
+          print('copyUserDataFromLegacyIfNeeded: table $tableName error: $e');
         }
       }
     } finally {

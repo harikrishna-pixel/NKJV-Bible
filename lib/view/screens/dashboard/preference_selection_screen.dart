@@ -11,7 +11,6 @@ import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/view/constants/assets_constants.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
-import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/streak_flow/streak_flow_screens.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
@@ -78,7 +77,6 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
 
   int saveDay = 9;
   Set<String> _selectedCategories = {};
-  late SharedPreferences _prefs;
 
   @override
   void initState() {
@@ -86,51 +84,68 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
     loadIconNames();
   }
 
-  Future<void> _loadPreferences() async {
-    _prefs = await SharedPreferences.getInstance();
-    final saved = _prefs.getStringList('selected_categories') ?? [];
-    setState(() {
-      _selectedCategories = saved.toSet();
-    });
-  }
-
+  /// Reads categories from DB, seeds if needed, then asset JSON. Single [setState]
+  /// with prefs so UI never stays on "loading" due to isolate/import races.
   Future<void> loadIconNames() async {
-    final dbClient = await DBHelper().db;
-    List<Map<String, dynamic>>? raw =
-        await dbClient?.rawQuery("SELECT * FROM dailyVersesMainList");
-    final dailyVersesMainData = raw ?? [];
+    Map<String, String> categoryIcons = {};
 
-    if (dailyVersesMainData.isEmpty) {
-      await _seedDailyVersesMainListFromJson();
-      raw = await dbClient?.rawQuery("SELECT * FROM dailyVersesMainList");
-      final again = raw ?? [];
-      final Map<String, String> categoryIcons = {};
-      for (var item in again) {
-        final categoryName = item['Category_Name']?.toString();
+    try {
+      final dbClient = await DBHelper().db;
+      List<Map<String, dynamic>>? raw =
+          await dbClient?.rawQuery("SELECT * FROM dailyVersesMainList");
+      var dailyVersesMainData = raw ?? [];
+
+      if (dailyVersesMainData.isEmpty) {
+        await _seedDailyVersesMainListFromJson();
+        final dbAfter = await DBHelper().db;
+        raw = await dbAfter?.rawQuery("SELECT * FROM dailyVersesMainList");
+        dailyVersesMainData = raw ?? [];
+      }
+
+      for (final item in dailyVersesMainData) {
+        final categoryName = _categoryNameFromRow(item);
         if (categoryName != null && categoryName.isNotEmpty) {
           categoryIcons[categoryName] = categoryName;
         }
       }
-      if (mounted) {
-        setState(() {
-          _iconNames = categoryIcons;
-        });
+
+      if (categoryIcons.isEmpty) {
+        final jsonString =
+            await rootBundle.loadString('assets/jsonFile/dailyVerse.json');
+        categoryIcons = await compute(
+            preferenceSelectionCategoryMapFromJsonString, jsonString);
       }
-      await _loadPreferences();
-      return;
+    } catch (e, st) {
+      debugPrint('PreferenceSelection loadIconNames: $e\n$st');
+      try {
+        final jsonString =
+            await rootBundle.loadString('assets/jsonFile/dailyVerse.json');
+        categoryIcons = await compute(
+            preferenceSelectionCategoryMapFromJsonString, jsonString);
+      } catch (e2) {
+        debugPrint('PreferenceSelection asset fallback failed: $e2');
+      }
     }
 
-    final Map<String, String> categoryIcons = {};
-    debugPrint("daily verse -${dailyVersesMainData.length} ");
-    for (var item in dailyVersesMainData) {
-      final categoryName = item['Category_Name']?.toString();
-      if (categoryName != null && categoryName.isNotEmpty) {
-        categoryIcons[categoryName] = categoryName;
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getStringList('selected_categories') ?? [];
+    if (!mounted) return;
+    setState(() {
+      _iconNames = categoryIcons;
+      _selectedCategories = saved.toSet();
+    });
+    debugPrint('PreferenceSelection: categories count ${_iconNames.length}');
+  }
+
+  /// Sqflite column keys are usually exact, but normalize for edge builds.
+  String? _categoryNameFromRow(Map<String, dynamic> row) {
+    for (final e in row.entries) {
+      if (e.key.toLowerCase() == 'category_name') {
+        final v = e.value?.toString();
+        if (v != null && v.isNotEmpty) return v;
       }
     }
-
-    _iconNames = categoryIcons;
-    await _loadPreferences();
+    return null;
   }
 
   /// Seed dailyVersesMainList from assets when DB table is empty (e.g. after migration).
@@ -140,8 +155,8 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
       if (db == null) return;
       final String jsonString =
           await rootBundle.loadString('assets/jsonFile/dailyVerse.json');
-      final List<DailyVersesMainListModel> dataList =
-          await compute(parseDailyVerseJsond, jsonString);
+      final List<DailyVersesMainListModel> dataList = await compute(
+          preferenceSelectionParseDailyVerseModels, jsonString);
       if (dataList.isEmpty) return;
       await db.transaction((txn) async {
         final batch = txn.batch();
@@ -594,88 +609,141 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
               const SizedBox(height: 16),
               Expanded(
                 child: SingleChildScrollView(
-                  child: Wrap(
-                    spacing: screenWidth > 600 ? 20 : 10,
-                    runSpacing: screenWidth > 600 ? 16 : 12,
-                    children: _iconNames.entries.map((category) {
-                      final selected = _isSelected(category.key);
-
-                      return InkWell(
-                        onTap: () => _toggleSelection(category.key),
-                        borderRadius: BorderRadius.circular(7),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            // Selected option: background color 805531 with 20% opacity
-                            color: selected
-                                ? const Color(0xFF805531).withOpacity(0.2)
-                                : Colors.transparent,
-                            // Border with increased thickness when selected
-                            border: Border.all(
-                              // Border stroke color: yellow when selected in dark mode, otherwise use default colors
-                              color: selected && isDark
-                                  ? Colors
-                                      .yellow // Yellow border for selected topics in dark mode
-                                  : (isDark
-                                      ? Colors.grey.shade400
-                                      : const Color(0xFF805531)),
-                              width: selected
-                                  ? 2.0
-                                  : 1.0, // Increase thickness when selected
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: MediaQuery.of(context).size.height * 0.38,
+                    ),
+                    child: _iconNames.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 32, horizontal: 24),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  CircularProgressIndicator.adaptive(
+                                    valueColor:
+                                        AlwaysStoppedAnimation<Color>(
+                                      isDark
+                                          ? Colors.white70
+                                          : const Color(0xFF805531),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  Text(
+                                    'Loading topics…',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: CommanColor.whiteBlack(context)
+                                          .withOpacity(0.9),
+                                      fontSize: screenWidth > 600 ? 18 : 15,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Your verse categories will appear here in a moment.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: CommanColor.whiteBlack(context)
+                                          .withOpacity(0.65),
+                                      fontSize: screenWidth > 600 ? 16 : 13,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            borderRadius: BorderRadius.circular(7),
+                          )
+                        : Wrap(
+                            spacing: screenWidth > 600 ? 20 : 10,
+                            runSpacing: screenWidth > 600 ? 16 : 12,
+                            children: _iconNames.entries.map((category) {
+                              final selected = _isSelected(category.key);
+
+                              return InkWell(
+                                onTap: () => _toggleSelection(category.key),
+                                borderRadius: BorderRadius.circular(7),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    // Selected option: background color 805531 with 20% opacity
+                                    color: selected
+                                        ? const Color(0xFF805531)
+                                            .withOpacity(0.2)
+                                        : Colors.transparent,
+                                    // Border with increased thickness when selected
+                                    border: Border.all(
+                                      // Border stroke color: yellow when selected in dark mode, otherwise use default colors
+                                      color: selected && isDark
+                                          ? Colors
+                                              .yellow // Yellow border for selected topics in dark mode
+                                          : (isDark
+                                              ? Colors.grey.shade400
+                                              : const Color(0xFF805531)),
+                                      width: selected
+                                          ? 2.0
+                                          : 1.0, // Increase thickness when selected
+                                    ),
+                                    borderRadius: BorderRadius.circular(7),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      ColorFiltered(
+                                        colorFilter: ColorFilter.mode(
+                                          // White/Black for normal (unselected) based on theme
+                                          // Theme color (805531) when selected in light mode, white when selected in dark mode
+                                          selected
+                                              ? (isDark
+                                                  ? Colors.white
+                                                  : const Color(0xFF805531))
+                                              : (isDark
+                                                  ? CommanColor.whiteBlack(
+                                                      context)
+                                                  : const Color(0xFF805531)),
+                                          BlendMode.srcIn,
+                                        ),
+                                        child: Image.asset(
+                                          _getIconPath(
+                                              category.key,
+                                              Provider.of<ThemeProvider>(
+                                                              context,
+                                                              listen: false)
+                                                          .themeMode ==
+                                                      ThemeMode.dark
+                                                  ? !selected
+                                                  : selected),
+                                          width: screenWidth > 600 ? 40 : 20,
+                                          height: screenWidth > 600 ? 40 : 20,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        category.key,
+                                        style: TextStyle(
+                                          fontSize:
+                                              screenWidth > 600 ? 19 : null,
+                                          // White/Black for normal (unselected) based on theme
+                                          // Theme color (805531) when selected in light mode, white when selected in dark mode
+                                          color: selected
+                                              ? (isDark
+                                                  ? Colors.white
+                                                  : const Color(0xFF805531))
+                                              : (isDark
+                                                  ? CommanColor.whiteBlack(
+                                                      context)
+                                                  : const Color(0xFF805531)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }).toList(),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ColorFiltered(
-                                colorFilter: ColorFilter.mode(
-                                  // White/Black for normal (unselected) based on theme
-                                  // Theme color (805531) when selected in light mode, white when selected in dark mode
-                                  selected
-                                      ? (isDark
-                                          ? Colors.white
-                                          : const Color(0xFF805531))
-                                      : (isDark
-                                          ? CommanColor.whiteBlack(context)
-                                          : const Color(0xFF805531)),
-                                  BlendMode.srcIn,
-                                ),
-                                child: Image.asset(
-                                  _getIconPath(
-                                      category.key,
-                                      Provider.of<ThemeProvider>(context,
-                                                      listen: false)
-                                                  .themeMode ==
-                                              ThemeMode.dark
-                                          ? !selected
-                                          : selected),
-                                  width: screenWidth > 600 ? 40 : 20,
-                                  height: screenWidth > 600 ? 40 : 20,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                category.key,
-                                style: TextStyle(
-                                  fontSize: screenWidth > 600 ? 19 : null,
-                                  // White/Black for normal (unselected) based on theme
-                                  // Theme color (805531) when selected in light mode, white when selected in dark mode
-                                  color: selected
-                                      ? (isDark
-                                          ? Colors.white
-                                          : const Color(0xFF805531))
-                                      : (isDark
-                                          ? CommanColor.whiteBlack(context)
-                                          : const Color(0xFF805531)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }).toList(),
                   ),
                 ),
               ),
@@ -1024,8 +1092,8 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
     // Load json and parse
     final String dailyVerseResponse =
         await rootBundle.loadString('assets/jsonFile/dailyVerse.json');
-    final List<DailyVersesMainListModel> dataList =
-        await compute(parseDailyVerseJsond, dailyVerseResponse);
+    final List<DailyVersesMainListModel> dataList = await compute(
+        preferenceSelectionParseDailyVerseModels, dailyVerseResponse);
 
     setState(() {
       dailyVerseDataList = dataList;
@@ -1841,4 +1909,34 @@ class _SpinnerPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _SpinnerPainter oldDelegate) =>
       oldDelegate.progress != progress;
+}
+
+// ---------------------------------------------------------------------------
+// Top-level for [compute] — do not use splash.dart here (circular import can
+// break isolate entrypoints and leave category map empty → endless loader UI).
+// ---------------------------------------------------------------------------
+
+Map<String, String> preferenceSelectionCategoryMapFromJsonString(
+    String jsonString) {
+  final dynamic decoded = json.decode(jsonString);
+  final out = <String, String>{};
+  if (decoded is! List) return out;
+  for (final e in decoded) {
+    if (e is! Map) continue;
+    final m = Map<String, dynamic>.from(e);
+    final name = m['Category_Name']?.toString() ??
+        m['Main_Category']?.toString() ??
+        '';
+    if (name.isNotEmpty) out[name] = name;
+  }
+  return out;
+}
+
+List<DailyVersesMainListModel> preferenceSelectionParseDailyVerseModels(
+    String jsonString) {
+  final dynamic decoded = json.decode(jsonString);
+  if (decoded is! List) return [];
+  return decoded
+      .map((item) => DailyVersesMainListModel.fromJson(item))
+      .toList();
 }

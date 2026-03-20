@@ -206,10 +206,20 @@ class _SplashScreenState extends State<SplashScreen> {
         // Only do essential initialization that's required before navigation
         // APIs are already loading in background via BackgroundApiService
         
+        // Drop any stale DB handle (hot restart / odd overwrite cases); always
+        // align with current file on disk before migration + seed.
+        await DBHelper.resetStaticDatabaseConnection();
+
         // Essential: Database migration
         print('SPLASH before migrateToEncryptedDatabase');
+        // Also log to system console (visible in Mac Console.app)
+        debugPrint('SPLASH before migrateToEncryptedDatabase');
         await DBMigrationHelper.migrateToEncryptedDatabase(password);
         print('SPLASH after migrateToEncryptedDatabase');
+        debugPrint('SPLASH after migrateToEncryptedDatabase');
+        
+        // Debug: Check what DB files exist
+        await DBHelper.debugPrintDatabaseFiles();
         
         // Essential: Ad consent (non-blocking, can run in background)
         AdConsentManager.initAppFlow(); // Don't await - let it run in background
@@ -230,6 +240,9 @@ class _SplashScreenState extends State<SplashScreen> {
         // Essential: Load local data (books, verses from DB)
         await loadBookList();
         await loadBookContent();
+        // Prefs can survive reinstall/restore while DB is empty → clear "loaded"
+        // flags and JSON caches so daily verse + home never trust stale state.
+        await reconcilePersistedBibleStateWithDatabase();
         await loadDailyVerseData();
         await loadLocal();
         
@@ -261,15 +274,18 @@ class _SplashScreenState extends State<SplashScreen> {
           }
         });
         
-        // Essential: Update local DB (sync verse flags with bookmarks/highlights)
-        await updateLocalDB();
-        // Preserve bookmarks, highlights, notes etc. from legacy DB if current has none
+        // CRITICAL: Must preserve user data BEFORE updateLocalDB() runs
+        // This ensures existing bookmarks/highlights/notes are available when verse flags are synced
         await DBMigrationHelper.copyUserDataFromLegacyIfNeeded(password);
-        // Sync verse flags again after copying legacy user data
+        
+        // Essential: Update local DB (sync verse flags with bookmarks/highlights)
         await updateLocalDB();
         print('SPLASH after copyUserDataFromLegacyIfNeeded');
         await DBHelper.debugPrintLibraryTableCounts();
         print('SPLASH before deleteFiles');
+        
+        // Force flush logs to system console (works even if VM service fails)
+        await Future.delayed(Duration(milliseconds: 100));
         await deleteFiles();
 
         // Ensure splash screen is visible for at least 1-2 seconds before navigation
@@ -280,11 +296,55 @@ class _SplashScreenState extends State<SplashScreen> {
         // They will be ready by the time user reaches home screen
         await handleNavigation();
       } catch (e) {
-        debugPrint("error intit - $e");
+        print('SPLASH init error - $e');
         // Even if there's an error, try to navigate
         await handleNavigation();
       }
     });
+  }
+
+  /// When the DB has no verse/book rows but SharedPreferences still claim
+  /// content was loaded (reinstall with iCloud prefs, `adb install -r`, etc.),
+  /// clear cached JSON + flags so [loadDailyVerseData] and Home never trust
+  /// stale "loaded" state over an empty database.
+  Future<void> reconcilePersistedBibleStateWithDatabase() async {
+    try {
+      final db = await DBHelper().db;
+      if (db == null) return;
+
+      final verseCount = Sqflite.firstIntValue(
+            await db.rawQuery('SELECT COUNT(*) AS c FROM verse'),
+          ) ??
+          0;
+      final bookCount = Sqflite.firstIntValue(
+            await db.rawQuery('SELECT COUNT(*) AS c FROM book'),
+          ) ??
+          0;
+
+      if (verseCount > 0 && bookCount > 0) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('bookList');
+      await prefs.remove('otBookList');
+      await prefs.remove('ntBookList');
+      await SharPreferences.setBoolean(SharPreferences.isLoadBookContent, false);
+      await SharPreferences.setBoolean(SharPreferences.isLoadBookList, false);
+
+      if (!mounted) return;
+      Provider.of<DownloadProvider>(context, listen: false).setData(
+        allVerses: <VerseBookContentModel>[],
+        otVerses: <VerseBookContentModel>[],
+        ntVerses: <VerseBookContentModel>[],
+        allBooks: <MainBookListModel>[],
+        otBooks: <MainBookListModel>[],
+        ntBooks: <MainBookListModel>[],
+      );
+
+      debugPrint(
+          'reconcilePersistedBibleStateWithDatabase: cleared stale prefs (verse=$verseCount book=$bookCount)');
+    } catch (e) {
+      debugPrint('reconcilePersistedBibleStateWithDatabase error: $e');
+    }
   }
 
   Future loadLocal() async {
@@ -400,33 +460,59 @@ class _SplashScreenState extends State<SplashScreen> {
         await SharPreferences.getBoolean(SharPreferences.onboarding);
 
     // Hard safety: if core bible data missing, route user to restore/select Bible.
+    // If DB cannot be opened, do NOT fall through to Home (infinite loader / empty content).
     try {
       final db = await DBHelper().db;
-      if (db != null) {
-        final verseCountRows =
-            await db.rawQuery("SELECT COUNT(*) as c FROM verse");
-        final bookCountRows = await db.rawQuery("SELECT COUNT(*) as c FROM book");
-        final verseCount =
-            verseCountRows.isNotEmpty ? (verseCountRows.first["c"] as int?) ?? 0 : 0;
-        final bookCount =
-            bookCountRows.isNotEmpty ? (bookCountRows.first["c"] as int?) ?? 0 : 0;
-        if (verseCount == 0 || bookCount == 0) {
-          // If the app has no local bible text, do not proceed to Home showing "Content is Empty".
-          if (BibleInfo.folders.length <= 1) {
-            Get.offAll(() => PreferenceSelectionScreen(
-                  isSetting: false,
-                  selectedbible: BibleInfo.folders.isNotEmpty
-                      ? BibleInfo.folders.first
-                      : '',
-                ));
-          } else {
-            Get.offAll(() => const BibleVersionsScreen(from: 'onboard'));
-          }
-          return;
+      if (db == null) {
+        debugPrint('testapp Core bible check: DB null → Bible restore flow');
+        if (BibleInfo.folders.length <= 1) {
+          Get.offAll(() => PreferenceSelectionScreen(
+                isSetting: false,
+                selectedbible: BibleInfo.folders.isNotEmpty
+                    ? BibleInfo.folders.first
+                    : '',
+              ));
+        } else {
+          Get.offAll(() => const BibleVersionsScreen(from: 'onboard'));
         }
+        return;
+      }
+      final verseCountRows =
+          await db.rawQuery("SELECT COUNT(*) as c FROM verse");
+      final bookCountRows =
+          await db.rawQuery("SELECT COUNT(*) as c FROM book");
+      final verseCount =
+          verseCountRows.isNotEmpty ? (verseCountRows.first["c"] as int?) ?? 0 : 0;
+      final bookCount =
+          bookCountRows.isNotEmpty ? (bookCountRows.first["c"] as int?) ?? 0 : 0;
+      if (verseCount == 0 || bookCount == 0) {
+        if (BibleInfo.folders.length <= 1) {
+          Get.offAll(() => PreferenceSelectionScreen(
+                isSetting: false,
+                selectedbible: BibleInfo.folders.isNotEmpty
+                    ? BibleInfo.folders.first
+                    : '',
+              ));
+        } else {
+          Get.offAll(() => const BibleVersionsScreen(from: 'onboard'));
+        }
+        return;
       }
     } catch (e) {
-      debugPrint('testapp Core bible data check failed: $e');
+      debugPrint('testapp Core bible data check failed: $e → Bible restore flow');
+      try {
+        if (BibleInfo.folders.length <= 1) {
+          Get.offAll(() => PreferenceSelectionScreen(
+                isSetting: false,
+                selectedbible: BibleInfo.folders.isNotEmpty
+                    ? BibleInfo.folders.first
+                    : '',
+              ));
+        } else {
+          Get.offAll(() => const BibleVersionsScreen(from: 'onboard'));
+        }
+      } catch (_) {}
+      return;
     }
 
     // First launch: show welcome -> onboarding questions
@@ -522,13 +608,15 @@ class _SplashScreenState extends State<SplashScreen> {
               (highlightCountRows.isNotEmpty ? (highlightCountRows.first["c"] as int?) : 0) ?? 0;
           final hasLibraryData = bookmarkCount > 0 || highlightCount > 0;
           canDeleteLegacyDbs = verseCount > 0 && bookCount > 0 && hasLibraryData;
+          print(
+              'SPLASH deleteFiles check verseCount=$verseCount bookCount=$bookCount bookmarkCount=$bookmarkCount highlightCount=$highlightCount hasLibraryData=$hasLibraryData canDeleteLegacyDbs=$canDeleteLegacyDbs');
           if (verseCount > 0 && bookCount > 0 && !hasLibraryData) {
-            debugPrint(
+            print(
                 'testapp Keeping legacy DBs (current DB has no library data yet).');
           }
         }
       } catch (e) {
-        debugPrint('testapp Error verifying encrypted DB data: $e');
+        print('SPLASH deleteFiles error verifying encrypted DB data: $e');
         canDeleteLegacyDbs = false;
       }
 
@@ -554,7 +642,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
       try {
         if (!canDeleteLegacyDbs) {
-          debugPrint(
+          print(
               'testapp Skipping legacy DB deletion (target DB missing core data).');
           return;
         }

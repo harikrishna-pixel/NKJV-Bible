@@ -30,7 +30,7 @@ class BookMarkScreen extends StatefulWidget {
 }
 
 class _BookMarkScreenState extends State<BookMarkScreen> {
-  late Future<List<BookMarkModel>> bookmarkDataList;
+  Future<List<BookMarkModel>> bookmarkDataList = Future.value(const []);
   double fontSize = Sizecf.scrnWidth! > 450 ? 25.0 : 15.0;
   var fontSizeS = "";
   var selectedFontFamily = "";
@@ -48,16 +48,31 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
   void initState() {
     super.initState();
     getFont();
-    loadData();
+    bookmarkDataList = _loadData();
   }
 
-  loadData() async {
+  Future<List<BookMarkModel>> _loadData() async {
+    // CRITICAL: Always try to restore legacy data first
     await DBMigrationHelper.tryRestoreLibraryDataFromLegacy();
+    final bookmarks = await DBHelper().getBookMark();
+    
+    // Debug logging to help diagnose issues
+    debugPrint('BookMarkScreen: loaded ${bookmarks.length} bookmarks');
+    if (bookmarks.isEmpty) {
+      debugPrint('BookMarkScreen: No bookmarks found. Legacy restore may have failed.');
+      // Print DB file status for debugging
+      await DBHelper.debugPrintDatabaseFiles();
+      await DBHelper.debugPrintLibraryTableCounts();
+    }
+    
+    return bookmarks;
+  }
+
+  void loadData() {
     if (!mounted) return;
     setState(() {
-      bookmarkDataList = DBHelper().getBookMark();
+      bookmarkDataList = _loadData();
     });
-    print(bookmarkDataList);
   }
 
   //final bookMarkKey = GlobalKey<ScaffoldState>();
@@ -72,14 +87,48 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
           builder: (context, AsyncSnapshot<List<BookMarkModel>> snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
-            } else if (snapshot.data!.isNotEmpty) {
+            }
+            if (snapshot.hasError) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: CommanColor.lightDarkPrimary(context),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Unable to load bookmarks.',
+                        textAlign: TextAlign.center,
+                        style: CommanStyle.placeholderText(context),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${snapshot.error}',
+                        textAlign: TextAlign.center,
+                        style: CommanStyle.placeholderText(context)
+                            .copyWith(fontSize: 12),
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+            final items = snapshot.data;
+            if (items != null && items.isNotEmpty) {
               return ListView.builder(
                 shrinkWrap: true,
-                itemCount: snapshot.data?.length ?? 0,
+                itemCount: items.length,
                 padding: EdgeInsets.only(left: 10, right: 10, top: 10),
                 physics: const ScrollPhysics(),
                 itemBuilder: (context, index) {
-                  var data = snapshot.data?[index];
+                  var data = items[index];
                   return Column(
                     children: [
                       Row(
