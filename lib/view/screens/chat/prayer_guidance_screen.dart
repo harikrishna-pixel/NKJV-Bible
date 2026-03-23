@@ -17,6 +17,8 @@ import 'package:biblebookapp/view/screens/category_detail_screen/view/image_deta
 import 'package:biblebookapp/view/screens/chat/chat_translations.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/post_prayer_screen.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/gestures.dart';
@@ -1062,6 +1064,92 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     }
   }
 
+  String _derivedPrayerTitleForWall(String request) {
+    final firstLine = request.split(RegExp(r'\r?\n')).first.trim();
+    if (firstLine.isEmpty) return 'My prayer';
+    if (firstLine.length <= 120) return firstLine;
+    return firstLine.substring(0, 120);
+  }
+
+  /// After custom prayer text is entered: user chooses Prayer Wall vs existing chat flow.
+  Future<void> _showPublishOrChatChoice(String request) async {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDark = themeProvider.themeMode == ThemeMode.dark;
+    final brown = const Color(0xFF5C4033);
+    final bg = isDark
+        ? CommanColor.darkPrimaryColor
+        : const Color(0xFFF5F0E6);
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: bg,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Share your prayer',
+            style: TextStyle(
+              color: isDark ? Colors.white : brown,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          content: Text(
+            'Publish to the Prayer Wall for others to pray with you, or continue here for guidance in chat.',
+            style: TextStyle(
+              color: isDark ? Colors.white70 : Colors.grey.shade800,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _sendCustomPrayerRequest(request);
+              },
+              child: Text(
+                'Chat here',
+                style: TextStyle(
+                  color: isDark ? Colors.white70 : brown,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(ctx).pop();
+                if (!mounted) return;
+                final nav = Navigator.of(context);
+                final posted = await nav.push<bool>(
+                  MaterialPageRoute(
+                    builder: (_) => PostPrayerScreen(
+                      initialTitle: _derivedPrayerTitleForWall(request),
+                      initialDescription: request,
+                      initialCategory: 'Others',
+                    ),
+                  ),
+                );
+                if (!mounted) return;
+                if (posted == true) {
+                  await nav.push(
+                    MaterialPageRoute(
+                      builder: (_) => const PrayerWallScreen(),
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: brown,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Publish'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showCustomPrayerDialog(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
@@ -1229,7 +1317,8 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                           Navigator.of(dialogContext).pop();
                                           _customPrayerController.clear();
                                           if (request.isNotEmpty && mounted) {
-                                            await _sendCustomPrayerRequest(request);
+                                            await _showPublishOrChatChoice(
+                                                request);
                                           }
                                         }
                                       : null,

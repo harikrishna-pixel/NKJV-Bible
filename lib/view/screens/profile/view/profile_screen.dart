@@ -1,7 +1,6 @@
 import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/core/export_db.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
-import 'package:biblebookapp/core/string_extensions.dart';
 import 'package:biblebookapp/utils/custom_alert.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
@@ -262,7 +261,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     ];
 
     final mheight = MediaQuery.of(context).size.height;
-    final mwidth = MediaQuery.of(context).size.width;
+
+    // UI helper: show first two letters of the user's name safely.
+    // (Edit Profile uses a similar 2-letter initials style.)
+    final _safeInitials = (() {
+      final raw = (user ?? '').trim().replaceAll(RegExp(r'\s+'), '');
+      if (raw.isEmpty) return '?';
+      if (raw.length == 1) return raw[0].toUpperCase();
+      return '${raw[0].toUpperCase()}${raw[1].toUpperCase()}';
+    })();
 
     return Scaffold(
         body: Container(
@@ -394,9 +401,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                               radius:
                                                   50, // Adjust size as needed
                                               child: Text(
-                                                user!.isNotEmpty
-                                                    ? '${user![0].toUpperCase()}${user![1].toUpperCase()}'
-                                                    : '?', // Get first letter
+                                                _safeInitials,
                                                 style: TextStyle(
                                                   fontSize: 32,
                                                   fontWeight: FontWeight.bold,
@@ -410,7 +415,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                               width: 84,
                                               child: Center(
                                                 child: Text(
-                                                  (user ?? 'N A').initials,
+                                                  (((user ?? 'N A')
+                                                              .replaceAll(
+                                                                  ' ', '')
+                                                              .isNotEmpty)
+                                                          ? '${(user ?? 'N A').replaceAll(' ', '')[0].toUpperCase()}${(user ?? 'N A').replaceAll(' ', '').length > 1 ? (user ?? 'N A').replaceAll(' ', '')[1].toUpperCase() : ''}'
+                                                          : '?'),
                                                   style: const TextStyle(
                                                       letterSpacing: BibleInfo
                                                           .letterSpacing,
