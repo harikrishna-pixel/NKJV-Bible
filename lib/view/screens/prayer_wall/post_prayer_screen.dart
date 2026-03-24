@@ -1,5 +1,7 @@
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
+import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -66,6 +68,27 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
   DateTime get _endDate =>
       _startDate.add(Duration(days: _durationDays - 1)); // inclusive display
 
+  String? _extractPrayerId(dynamic value) {
+    if (value is! Map) return null;
+    final map = Map<String, dynamic>.from(value);
+
+    final direct = (map['_id'] ?? map['id'])?.toString().trim();
+    if (direct != null && direct.isNotEmpty) return direct;
+
+    final nestedCandidates = [
+      map['data'],
+      map['prayer'],
+      map['result'],
+      map['item'],
+      map['payload'],
+    ];
+    for (final nested in nestedCandidates) {
+      final id = _extractPrayerId(nested);
+      if (id != null && id.isNotEmpty) return id;
+    }
+    return null;
+  }
+
   Future<void> _submit() async {
     final title = _titleCtrl.text.trim();
     final details = _detailsCtrl.text.trim();
@@ -91,12 +114,23 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
 
     setState(() => _submitting = true);
     try {
-      await PrayerWallService.createPrayer(
+      final created = await PrayerWallService.createPrayer(
         prayerTitle: title,
         prayerDescription: details,
         prayerCategory: _category,
         isAnonymous: _isAnonymous,
       );
+      if (!_isAnonymous) {
+        final prayerId = (_extractPrayerId(created) ?? '').trim();
+        final cachedName =
+            (await CacheNotifier().readCache(key: 'name') ?? '').toString().trim();
+        if (prayerId.isNotEmpty && cachedName.isNotEmpty) {
+          await PrayerWallLocalStore.putPrayerAuthor(
+            prayerId: prayerId,
+            authorName: cachedName,
+          );
+        }
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Prayer posted successfully.')),

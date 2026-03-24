@@ -6,6 +6,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
+import 'package:biblebookapp/services/milestone_lifetime_paywall_coordinator.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
@@ -646,6 +647,8 @@ ${category.prompt}
         // Automatically unmute and play background music when prayer is generated
         _isAudioMuted = false;
         await _playBackgroundMusic();
+        await MilestoneLifetimePaywallCoordinator
+            .onPrayerGuidanceAiResponseSuccess(context);
       }
 
       _scrollToTop();
@@ -1049,6 +1052,8 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
         // Automatically unmute and play background music when prayer is generated
         _isAudioMuted = false;
         await _playBackgroundMusic();
+        await MilestoneLifetimePaywallCoordinator
+            .onPrayerGuidanceAiResponseSuccess(context);
       }
 
       _scrollToTop();

@@ -259,12 +259,12 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
         isDark ? CommanColor.darkPrimaryColor : const Color(0xFFF5F0E6);
     final cardBg = isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white;
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.6,
-      minChildSize: 0.35,
-      maxChildSize: 0.92,
-      builder: (_, scrollCtrl) {
-        return Container(
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.82,
+        child: Container(
           decoration: BoxDecoration(
             color: cream,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
@@ -341,6 +341,8 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                           controller: _input,
                           maxLines: 3,
                           maxLength: 1000,
+                          onTapOutside: (_) =>
+                              FocusScope.of(context).unfocus(),
                           style: TextStyle(
                               color: isDark ? Colors.white : CommanColor.black),
                           decoration: InputDecoration(
@@ -382,14 +384,15 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                     style: const TextStyle(color: Colors.redAccent),
                   ),
                 ),
-              Expanded(
-                child: _loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : RefreshIndicator(
+                  Expanded(
+                    child: _loading
+                        ? const Center(child: CircularProgressIndicator())
+                        : RefreshIndicator(
                         onRefresh: _reload,
                         child: _rows.isEmpty
                             ? ListView(
-                                controller: scrollCtrl,
+                                keyboardDismissBehavior:
+                                    ScrollViewKeyboardDismissBehavior.onDrag,
                                 children: [
                                   SizedBox(
                                     height:
@@ -409,7 +412,8 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                                 ],
                               )
                             : ListView.builder(
-                                controller: scrollCtrl,
+                                keyboardDismissBehavior:
+                                    ScrollViewKeyboardDismissBehavior.onDrag,
                                 padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
                                 itemCount: _rows.length,
                                 itemBuilder: (_, i) {
@@ -476,12 +480,12 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                                   );
                                 },
                               ),
-                      ),
+                          ),
+                  ),
+                ],
               ),
-            ],
           ),
-        );
-      },
+        ),
     );
   }
 }

@@ -32,12 +32,14 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
   List<PrayerWallItem> _all = [];
   Map<String, int> _likeCounts = {};
   Map<String, int> _commentCounts = {};
+  Map<String, String> _prayerAuthorMap = {};
   String _filter = 'All';
   bool _loading = true;
   String? _error;
   bool _authLoading = true;
   bool _isLoggedIn = false;
   String? _userName;
+  String? _userId;
   final CacheNotifier _cacheNotifier = CacheNotifier();
 
   /// Maps prayer ObjectId → like document `_id` for unlike (persisted).
@@ -48,6 +50,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
   void initState() {
     super.initState();
     _hydrateLikesFromDisk();
+    _hydratePrayerAuthorsFromDisk();
     _initAuthAndProfile();
     _refresh();
   }
@@ -75,6 +78,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
 
       setState(() {
         _isLoggedIn = true;
+        _userId = userid?.toString();
         _userName = name;
         _authLoading = false;
       });
@@ -95,6 +99,12 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
     setState(() => _likeIdByPrayerId = m);
   }
 
+  Future<void> _hydratePrayerAuthorsFromDisk() async {
+    final m = await PrayerWallLocalStore.loadPrayerAuthorMap();
+    if (!mounted) return;
+    setState(() => _prayerAuthorMap = m);
+  }
+
   /// True if this device has marked the prayer as liked (see persisted map).
   bool _isLiked(String prayerId) =>
       _likeIdByPrayerId.containsKey(prayerId);
@@ -105,6 +115,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
       _error = null;
     });
     try {
+      final authorMap = await PrayerWallLocalStore.loadPrayerAuthorMap();
       final results = await Future.wait([
         PrayerWallService.fetchPrayers(),
         PrayerWallService.fetchLikeCountsByPrayer(),
@@ -115,6 +126,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
         _all = results[0] as List<PrayerWallItem>;
         _likeCounts = Map<String, int>.from(results[1] as Map<String, int>);
         _commentCounts = Map<String, int>.from(results[2] as Map<String, int>);
+        _prayerAuthorMap = authorMap;
         _loading = false;
       });
     } catch (e) {
@@ -184,14 +196,17 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
   }
 
   Future<void> _openComments(PrayerWallItem item) async {
-    await showModalBottomSheet<void>(
+    await showDialog<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => PrayerWallCommentsSheet(
-        prayerId: item.id,
-        titlePreview:
-            item.title.isNotEmpty ? item.title : item.description,
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+        backgroundColor: Colors.transparent,
+        child: PrayerWallCommentsSheet(
+          prayerId: item.id,
+          titlePreview:
+              item.title.isNotEmpty ? item.title : item.description,
+        ),
       ),
     );
     await _refreshCommentCountsOnly();
@@ -277,15 +292,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                 scrollDirection: Axis.horizontal,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                itemCount: _filterCategories.length + 1,
+                itemCount: _filterCategories.length,
                 itemBuilder: (context, i) {
-                  if (i == _filterCategories.length) {
-                    return Padding(
-                      padding: const EdgeInsets.only(left: 4),
-                      child: Icon(Icons.more_horiz,
-                          color: isDark ? Colors.white54 : brown),
-                    );
-                  }
                   final c = _filterCategories[i];
                   final sel = _filter == c;
                   return Padding(
@@ -407,7 +415,30 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                                       timeLabel: _timeLabel(item),
                                       displayName: item.isAnonymous
                                           ? 'Anonymous'
-                                          : 'Community member',
+                                          : ((item.authorName?.trim().isNotEmpty ??
+                                                  false)
+                                              ? item.authorName!.trim()
+                                              : (((item.authorUserId
+                                                                  ?.trim()
+                                                                  .isNotEmpty ??
+                                                              false) &&
+                                                          (_userId?.trim().isNotEmpty ??
+                                                              false) &&
+                                                          item.authorUserId!
+                                                                  .trim() ==
+                                                              _userId!.trim() &&
+                                                          (_userName
+                                                                  ?.trim()
+                                                                  .isNotEmpty ??
+                                                              false))
+                                                      ? _userName!.trim()
+                                              : ((_prayerAuthorMap[item.id]
+                                                              ?.trim()
+                                                              .isNotEmpty ??
+                                                          false)
+                                                      ? _prayerAuthorMap[item.id]!
+                                                          .trim()
+                                                      : 'Community member'))),
                                       likeCount: _likeCounts[item.id] ?? 0,
                                       liked: _isLiked(item.id),
                                       likeBusy:
@@ -438,7 +469,10 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                 builder: (_) => const PostPrayerScreen(),
               ),
             );
-            if (posted == true && mounted) await _refresh();
+            if (posted == true && mounted) {
+              await _hydratePrayerAuthorsFromDisk();
+              await _refresh();
+            }
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: brown,
@@ -485,6 +519,13 @@ class _PrayerCard extends StatelessWidget {
   final int commentCount;
   final VoidCallback onComments;
 
+  String _avatarInitials(String value) {
+    final raw = value.trim().replaceAll(RegExp(r'\s+'), '');
+    if (raw.isEmpty) return '?';
+    if (raw.length == 1) return raw[0].toUpperCase();
+    return '${raw[0].toUpperCase()}${raw[1].toUpperCase()}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -503,7 +544,14 @@ class _PrayerCard extends StatelessWidget {
                 CircleAvatar(
                   radius: 22,
                   backgroundColor: brown.withOpacity(0.2),
-                  child: Icon(Icons.person, color: brown),
+                  child: Text(
+                    _avatarInitials(displayName),
+                    style: TextStyle(
+                      color: brown,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(

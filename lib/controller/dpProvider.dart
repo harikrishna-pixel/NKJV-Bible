@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io' as io;
 import 'dart:io';
-
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -12,7 +11,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart' as plain;
 import 'package:sqflite_sqlcipher/sqflite.dart' as sqlcipher;
 import 'package:sqflite_sqlcipher/sqflite.dart';
-
 import 'package:biblebookapp/Model/dailyVersesMainListModel.dart';
 import 'package:biblebookapp/view/constants/assets_constants.dart';
 import 'package:biblebookapp/view/screens/calendar_screen/model/calendar_model.dart';

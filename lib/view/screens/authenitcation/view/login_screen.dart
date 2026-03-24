@@ -10,7 +10,6 @@ import 'package:biblebookapp/view/screens/authenitcation/view/widget/social_auth
 import 'package:biblebookapp/view/screens/authenitcation/widgets/text_form_field.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
-import 'package:biblebookapp/view/screens/dashboard/preference_selection_screen.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -18,14 +17,13 @@ import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:get/get.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:provider/provider.dart' as P;
-import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends HookConsumerWidget {
   LoginScreen({super.key, required this.hasSkip});
   final bool hasSkip;
-  final _formKey = GlobalKey<FormState>();
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final formKey = useMemoized(() => GlobalKey<FormState>());
     final loginState = ref.watch(loginBloc);
     double screenWidth = MediaQuery.of(context).size.width;
 
@@ -38,22 +36,19 @@ class LoginScreen extends HookConsumerWidget {
     // debugPrint("sz current width - $screenWidth ");
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      body: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => FocusScope.of(context).unfocus(),
-        child: Container(
-          height: MediaQuery.of(context).size.height,
-          width: MediaQuery.of(context).size.width,
-          decoration:
-              P.Provider.of<ThemeProvider>(context).currentCustomTheme ==
-                      AppCustomTheme.vintage
-                  ? BoxDecoration(
-                      image: DecorationImage(
-                          image: AssetImage(Images.bgImage(context)),
-                          fit: BoxFit.cover))
-                  : null,
-          child: Column(
-            children: [
+      body: Container(
+        height: MediaQuery.of(context).size.height,
+        width: MediaQuery.of(context).size.width,
+        decoration:
+            P.Provider.of<ThemeProvider>(context).currentCustomTheme ==
+                    AppCustomTheme.vintage
+                ? BoxDecoration(
+                    image: DecorationImage(
+                        image: AssetImage(Images.bgImage(context)),
+                        fit: BoxFit.cover))
+                : null,
+        child: Column(
+          children: [
               const SafeArea(
                 child: SizedBox(
                   height: 12,
@@ -115,7 +110,7 @@ class LoginScreen extends HookConsumerWidget {
                   bottom: MediaQuery.of(context).viewInsets.bottom,
                 ),
                 child: Form(
-                  key: _formKey,
+                  key: formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -164,7 +159,7 @@ class LoginScreen extends HookConsumerWidget {
                       const SizedBox(height: 32),
                       GestureDetector(
                         onTap: () async {
-                          if (_formKey.currentState?.validate() ?? false) {
+                          if (formKey.currentState?.validate() ?? false) {
                             FocusScope.of(context).unfocus();
                             try {
                               if (!loginState.isLoading) {
@@ -303,8 +298,7 @@ class LoginScreen extends HookConsumerWidget {
                   ],
                 ),
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );

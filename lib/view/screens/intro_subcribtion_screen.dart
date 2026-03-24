@@ -39,6 +39,12 @@ class SubscriptionScreen extends StatefulWidget {
   final String lifeTimePlan;
   final String checkad;
   final bool fromHomeExitOffer;
+  /// When set after products load, selects 0=six month, 1=one year, 2=lifetime.
+  /// Used by milestone Lifetime flows only; default keeps existing behavior.
+  final int? initialSelectedPlanIndex;
+  /// When true, triggers the same existing purchase flow automatically
+  /// after products are ready (used by milestone screens).
+  final bool autoStartSelectedPlanPurchase;
 
   const SubscriptionScreen({
     super.key,
@@ -47,6 +53,8 @@ class SubscriptionScreen extends StatefulWidget {
     required this.lifeTimePlan,
     required this.checkad,
     this.fromHomeExitOffer = false,
+    this.initialSelectedPlanIndex,
+    this.autoStartSelectedPlanPurchase = false,
   });
 
   /// Navigate to paywall from home (direct, no exit offer).
@@ -94,6 +102,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       false; // Track if restore dialog should be shown
   String? _pendingRestoreProductId; // Store product ID for pending restore
   Timer? _loadingTimeoutTimer; // Timer for 10-second loading timeout
+  bool _autoPurchaseTriggered = false;
+
+  void _applyInitialPlanSelectionIfAny() {
+    final idx = widget.initialSelectedPlanIndex;
+    if (idx == null || _products.isEmpty) return;
+    final safe = idx.clamp(0, _products.length - 1);
+    selectedindex = safe;
+  }
 
   void _sortProducts() {
     _products.sort((a, b) {
@@ -107,6 +123,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
       return getOrder(a.id).compareTo(getOrder(b.id));
     });
+  }
+
+  Future<void> _autoStartPurchaseIfNeeded() async {
+    if (!widget.autoStartSelectedPlanPurchase || _autoPurchaseTriggered) return;
+    if (_products.isEmpty) return;
+    final idx = selectedindex.clamp(0, _products.length - 1);
+    _autoPurchaseTriggered = true;
+    await SharPreferences.setString('OpenAd', '1');
+    await SharPreferences.setBoolean('startpurches', true);
+    _buyProduct(_products[idx]);
   }
 
   DownloadProvider? _myProvider;
@@ -1513,6 +1539,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         }
       }
     }
+
+    if (mounted) {
+      setState(() {
+        _applyInitialPlanSelectionIfAny();
+      });
+    }
+
+    await _autoStartPurchaseIfNeeded();
 
     if (widget.fromHomeExitOffer && mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {

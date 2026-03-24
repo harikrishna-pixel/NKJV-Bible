@@ -17,6 +17,7 @@ import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/chat/chat_history_screen.dart';
 import 'package:biblebookapp/view/screens/chat/chat_translations.dart';
+import 'package:biblebookapp/services/milestone_lifetime_paywall_coordinator.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
@@ -2141,6 +2142,8 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
         if (!isErrorResponse) {
           await _deductChatCredits();
           await updateBibleChatWidget(question: message, answer: responseText);
+          await MilestoneLifetimePaywallCoordinator.onChatAiResponseSuccess(
+              context);
         }
 
         // Scroll to top when answer comes to show at top of answer
