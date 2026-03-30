@@ -78,6 +78,23 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
   // Intro answer length selection (shared with Chat intro behaviour)
   String _introAnswerLength = 'small';
 
+  // Small subtitle lines for the UI (visual only, does not affect logic)
+  final List<String> _categorySubtitles = const [
+    'Give thanks & praise',
+    'Seek & give grace',
+    'Clarity & direction',
+    'Find calm & rest',
+    'Healing & strength',
+    'Protection & unity',
+    'Strength & courage',
+    'Provision & wisdom',
+    'Faith & encouragement',
+    'Peace & comfort',
+  ];
+
+  // UI mode: true => Pray for Me view (search + categories). Community navigates to PrayerWallScreen.
+  bool _isPrayForMeMode = true;
+
   // Background music asset path (without 'assets/' prefix as AssetSource adds it automatically)
   static const String _backgroundMusicUrl =
       'music/christian-rock-for-jesus-christ-always-301257.mp3';
@@ -2431,72 +2448,119 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                       fontSize: size.width > 450 ? 15 : 14,
                                     ),
                                   ),
-                                  const SizedBox(height: 20),
-                                  // Search-style input: tap opens custom prayer dialog (show Important Notice first)
-                                  InkWell(
-                                    onTap: () async {
-                                      final agreed = await _showPleaseNoteDialog();
-                                      if (!agreed || !mounted) return;
-                                      _showCustomPrayerDialog(context);
-                                    },
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 14, vertical: 12),
-                                      decoration: BoxDecoration(
-                                        image: DecorationImage(
-                                          image: AssetImage(
-                                              Images.bgImage(context)),
-                                          fit: BoxFit.cover,
-                                        ),
-                                        color: (isDark
-                                                ? Colors.black
-                                                : Colors.white)
-                                            .withOpacity(0.18),
-                                        borderRadius:
-                                            BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: isDark
-                                              ? Colors.white24
-                                              : const Color(0xFFD4C4B0),
-                                          width: 1,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.search,
-                                            size: 22,
-                                            color: isDark
-                                                ? Colors.white54
-                                                : const Color(0xFF8D8D8D),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Text(
-                                              "What's on your heart today?",
-                                              style: TextStyle(
-                                                fontSize: 15,
-                                                color: isDark
-                                                    ? Colors.white54
-                                                    : const Color(0xFF8D8D8D),
+                                  const SizedBox(height: 16),
+                                  // Mode selector: Pray for Me / Community Prayers
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: InkWell(
+                                          onTap: () async {
+                                            // When Pray for Me is tapped, directly show the custom prayer dialog (same popup as the search input used to open)
+                                            if (mounted) {
+                                              setState(() {
+                                                _isPrayForMeMode = true;
+                                              });
+                                            }
+                                            final agreed = await _showPleaseNoteDialog();
+                                            if (!agreed || !mounted) return;
+                                            _showCustomPrayerDialog(context);
+                                          },
+                                          borderRadius: BorderRadius.circular(28),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(vertical: 10),
+                                            decoration: BoxDecoration(
+                                              color: _isPrayForMeMode
+                                                  ? (isDark ? const Color(0xFF5C4033) : const Color(0xFF5C4033))
+                                                  : (isDark ? Colors.transparent : Colors.white),
+                                              borderRadius: BorderRadius.circular(28),
+                                              border: Border.all(
+                                                color: _isPrayForMeMode
+                                                    ? Colors.transparent
+                                                    : (isDark ? Colors.white24 : const Color(0xFFD4C4B0)),
+                                              ),
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                'Pray for Me',
+                                                style: TextStyle(
+                                                  color: _isPrayForMeMode ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF3D2914)),
+                                                  fontWeight: FontWeight.w700,
+                                                ),
                                               ),
                                             ),
                                           ),
-                                          Text(
-                                            '0/300',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              color: isDark
-                                                  ? Colors.white54
-                                                  : const Color(0xFF8D8D8D),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: InkWell(
+                                          onTap: () async {
+                                            // Navigate to Prayer Wall (community prayers)
+                                            if (mounted) {
+                                              setState(() {
+                                                _isPrayForMeMode = false;
+                                              });
+                                            }
+                                            await Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                builder: (_) => const PrayerWallScreen(),
+                                              ),
+                                            );
+                                            if (mounted) {
+                                              setState(() {
+                                                _isPrayForMeMode = true;
+                                              });
+                                            }
+                                          },
+                                          borderRadius: BorderRadius.circular(28),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(vertical: 10),
+                                            decoration: BoxDecoration(
+                                              color: !_isPrayForMeMode
+                                                  ? (isDark ? const Color(0xFF5C4033) : const Color(0xFF5C4033))
+                                                  : (isDark ? Colors.transparent : Colors.white),
+                                              borderRadius: BorderRadius.circular(28),
+                                              border: Border.all(
+                                                color: !_isPrayForMeMode
+                                                    ? Colors.transparent
+                                                    : (isDark ? Colors.white24 : const Color(0xFFD4C4B0)),
+                                              ),
+                                            ),
+                                            child: Stack(
+                                              alignment: Alignment.center,
+                                              children: [
+                                                Center(
+                                                  child: Text(
+                                                    'Community Prayers',
+                                                    style: TextStyle(
+                                                      color: !_isPrayForMeMode ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF3D2914)),
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ),
+                                                Positioned(
+                                                  right: 8,
+                                                  top: 6,
+                                                  child: Container(
+                                                    width: 10,
+                                                    height: 10,
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFF4CAF50),
+                                                      shape: BoxShape.circle,
+                                                      border: Border.all(color: Colors.white, width: 1.2),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
-                                        ],
+                                        ),
                                       ),
-                                    ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 24),
+                                  const SizedBox(height: 20),
+                                  // Search input removed: tapping "Pray for Me" shows the same popup as before
+                                  const SizedBox(height: 12),
                                 ],
                               ),
                             ),
@@ -2620,6 +2684,18 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                                         ? 15
                                                         : 13,
                                                     color: textClr,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 6),
+                                                Text(
+                                                  categoryIndex < _categorySubtitles.length
+                                                      ? _categorySubtitles[categoryIndex]
+                                                      : '',
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                    fontSize: size.width > 450 ? 13 : 12,
+                                                    color: textClr.withOpacity(0.85),
+                                                    fontWeight: FontWeight.w400,
                                                   ),
                                                 ),
                                               ],

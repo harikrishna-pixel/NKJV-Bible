@@ -85,6 +85,20 @@ class SharPreferences {
   static const streakFlowStepsCompletedToday = 'streak_flow_steps_completed_today';
   /// Streak flow: calendar day (YYYY-MM-DD) user dismissed the flow without completing. Used to avoid re-showing on same day.
   static const streakFlowDismissedDate = 'streak_flow_dismissed_date';
+  /// Streak flow: JSON map of dayKey (YYYY-MM-DD) -> steps completed (0-4).
+  /// Used by Faith Journey day cards to render accurate completion indicators.
+  static const streakFlowStepsByDay = 'streak_flow_steps_by_day';
+  /// Streak flow: JSON map of dayKey (YYYY-MM-DD) -> selected MoodPrayerItem snapshot.
+  /// Used so Daily Journey shows exactly the same Verse/Devotional/Prayer content seen in Streak Flow.
+  static const streakFlowItemByDay = 'streak_flow_item_by_day';
+  /// Streak flow: calendar day (YYYY-MM-DD) that was left incomplete and is eligible for restore.
+  static const streakFlowPausedDate = 'streak_flow_paused_date';
+  /// Streak flow: exact timestamp (ISO-8601) when paused was detected. Used for 24h restore window.
+  static const streakFlowPausedAt = 'streak_flow_paused_at';
+  /// Streak flow: indicates user is currently doing a restore run.
+  static const streakFlowRestoreActive = 'streak_flow_restore_active';
+  /// Streak flow: restored day (YYYY-MM-DD), usually yesterday.
+  static const streakFlowRestoreDate = 'streak_flow_restore_date';
   /// When user taps a streak notification: action to run on next Home open (open_streak, open_reading, open_chat, open_verse).
   static const pendingNotificationAction = 'pending_notification_action';
   /// JSON: last 7 days app open times for smart notification. Format: {"open_times":[{"date":"YYYY-MM-DD","time":"HH:mm"},...]}

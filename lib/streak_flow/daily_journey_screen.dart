@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:biblebookapp/streak_flow/mood_prayer_data.dart';
 import 'package:biblebookapp/streak_flow/streak_saved_list_screen.dart';
 import 'package:biblebookapp/streak_flow/your_faith_journey_screen.dart';
@@ -21,6 +22,7 @@ class DailyJourneyScreen extends StatefulWidget {
   State<DailyJourneyScreen> createState() => _DailyJourneyScreenState();
 }
 
+
 class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   static const Color _brown = Color(0xFF3D2914);
   static const Color _gold = Color(0xFFC9A227);
@@ -30,6 +32,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   bool _loaded = false;
   int _currentStreak = 0;
   List<WeekDayStatus> _weekStatuses = List.filled(7, WeekDayStatus.future);
+  Map<String, int> _stepsByDay = {};
 
   @override
   void initState() {
@@ -39,33 +42,213 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
 
   Future<void> _load() async {
     final today = DateTime.now().toIso8601String().split('T')[0];
-    final lastShown = await SharPreferences.getString(SharPreferences.streakFlowLastShownDate);
+    final lastShown = await SharPreferences.getString(
+        SharPreferences.streakFlowLastShownDate);
     int steps = 0;
     if (lastShown == today) {
       steps = 4;
     } else {
-      final started = await SharPreferences.getString(SharPreferences.streakFlowStartedDate);
+      final started = await SharPreferences.getString(
+          SharPreferences.streakFlowStartedDate);
       if (started == today) {
-        final s = await SharPreferences.getInt(SharPreferences.streakFlowStepsCompletedToday);
+        final s = await SharPreferences.getInt(
+            SharPreferences.streakFlowStepsCompletedToday);
         steps = s ?? 0;
       }
     }
     final streak = await StreakService.getCurrentStreak();
     final statuses = await StreakService.getWeekDayStatuses();
+    final rawStepsMap = await SharPreferences.getString(
+        SharPreferences.streakFlowStepsByDay);
+    Map<String, int> parsedStepsMap = {};
+    if (rawStepsMap != null && rawStepsMap.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawStepsMap);
+        if (decoded is Map) {
+          parsedStepsMap = decoded.map((k, v) {
+            final numVal = v is num ? v : int.tryParse(v.toString()) ?? 0;
+            return MapEntry(k.toString(), numVal.toInt());
+          });
+        }
+      } catch (_) {
+        parsedStepsMap = {};
+      }
+    }
     if (mounted) {
       setState(() {
         _stepsCompletedToday = steps;
         _currentStreak = streak;
         _weekStatuses = statuses;
+        _stepsByDay = parsedStepsMap;
         _loaded = true;
       });
     }
   }
 
+  /// Get the day of week for today (0=Sun, 1=Mon, ..., 6=Sat)
+  int _getTodayDayOfWeek() {
+    final w = DateTime.now().weekday; // Mon=1..Sun=7
+    return w % 7; // Sun=0..Sat=6
+  }
+
+  /// Get the start date of the current week (starts from today)
+  /// Week runs for 7 consecutive days starting from today
+  DateTime _getWeekStart() {
+    return DateTime.now();
+  }
+
+  /// Get day labels for the 7-day week starting from today
+  List<String> _getWeekDayLabels() {
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    final todayDayOfWeek = _getTodayDayOfWeek();
+
+    // Get today's name
+    final todayName = dayNames[todayDayOfWeek];
+
+    // Create labels for 7 days starting from today
+    List<String> labels = [];
+    for (int i = 0; i < 7; i++) {
+      final dayIndex = (todayDayOfWeek + i) % 7;
+      labels.add(dayNames[dayIndex]);
+    }
+    return labels;
+  }
+
+  Future<void> _storeTodaySteps(int steps) async {
+    final dayKey = DateTime.now().toIso8601String().split('T')[0];
+    final raw = await SharPreferences.getString(SharPreferences.streakFlowStepsByDay);
+    Map<String, dynamic> map = {};
+    if (raw != null && raw.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map<String, dynamic>) {
+          map = decoded;
+        } else if (decoded is Map) {
+          map = decoded.map((k, v) => MapEntry(k.toString(), v));
+        }
+      } catch (_) {
+        map = {};
+      }
+    }
+    map[dayKey] = steps.clamp(0, 4);
+    await SharPreferences.setString(
+      SharPreferences.streakFlowStepsByDay,
+      jsonEncode(map),
+    );
+  }
+
+  Future<void> _openDayJourneyCards({
+    required int dayIndex,
+    required String dayKey,
+    required String dayLabel,
+    required Color textColor,
+    required Color panelColor,
+    required bool isDark,
+    required int stepsCompletedForDay,
+  }) async {
+    final item = await _resolveDayItem(dayKey);
+    if (!mounted) return;
+    if (item == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => _DayJourneyCardsScreen(
+          dayLabel: dayLabel,
+          item: item,
+          textColor: textColor,
+          panelColor: panelColor,
+          isDark: isDark,
+          stepsCompletedForDay: stepsCompletedForDay,
+        ),
+      ),
+    );
+  }
+
+  MoodPrayerItem? _decodeStoredDayItem(dynamic raw) {
+    if (raw is! Map) return null;
+    try {
+      return MoodPrayerItem(
+        connectionLevel: (raw['connectionLevel'] as num?)?.toInt() ?? 20,
+        bookName: (raw['bookName'] ?? '').toString(),
+        bookNumber: (raw['bookNumber'] as num?)?.toInt() ?? 0,
+        chapterNumber: (raw['chapterNumber'] as num?)?.toInt() ?? 0,
+        verseNumber: (raw['verseNumber'] as num?)?.toInt() ?? 0,
+        verseText: (raw['verseText'] ?? '').toString(),
+        devotionalText: (raw['devotionalText'] ?? '').toString(),
+        prayerText: (raw['prayerText'] ?? '').toString(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<MoodPrayerItem?> _resolveDayItem(String dayKey) async {
+    final rawItems = await SharPreferences.getString(SharPreferences.streakFlowItemByDay);
+    if (rawItems != null && rawItems.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawItems);
+        if (decoded is Map) {
+          final stored = _decodeStoredDayItem(decoded[dayKey]);
+          if (stored != null) return stored;
+        }
+      } catch (_) {}
+    }
+    return MoodPrayerLoader.pickItem(connectionIndex: 1);
+  }
+
+  Future<void> _onDayTap({
+    required int dayIndex,
+    required WeekDayStatus status,
+    required bool effectiveCompleted,
+    required Color textColor,
+    required Color panelColor,
+    required String dayLabel,
+  }) async {
+    final todayKey = DateTime.now().toIso8601String().split('T')[0];
+
+    // Calculate the date for the tapped day (starting from today + dayIndex)
+    final weekStart = _getWeekStart();
+    final dayDate = weekStart.add(Duration(days: dayIndex));
+    final dayKey = dayDate.toIso8601String().split('T')[0];
+
+    if (status == WeekDayStatus.future) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Your streak days are coming soon.')),
+      );
+      return;
+    }
+
+    final stored = _stepsByDay[dayKey];
+    final stepsForDay = (dayKey == todayKey)
+        ? ((stored != null && stored > 0) ? stored : _stepsCompletedToday)
+        : (stored ??
+        (status == WeekDayStatus.completed ? 4 : 0));
+
+    if (stepsForDay <= 0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No completed faith journey for this day.')),
+      );
+      return;
+    }
+
+    await _openDayJourneyCards(
+      dayIndex: dayIndex,
+      dayKey: dayKey,
+      dayLabel: dayLabel,
+      textColor: textColor,
+      panelColor: panelColor,
+      isDark: panelColor != _panel,
+      stepsCompletedForDay: stepsForDay,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width > 450;
-    final days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    // Get day labels for 7 days starting from today
+    final days = _getWeekDayLabels();
 
     Color bgColor;
     try {
@@ -80,6 +263,23 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
     final isDark = bgColor == CommanColor.darkPrimaryColor;
     final Color textColor = isDark ? Colors.white : _brown;
     final Color panelColor = isDark ? Colors.white.withOpacity(0.12) : _panel;
+
+    // Today is always at index 0 (first day of the 7-day week)
+    final int todayIndex = 0;
+    final WeekDayStatus todayStatus = todayIndex < _weekStatuses.length
+        ? _weekStatuses[todayIndex]
+        : WeekDayStatus.ongoing;
+    final String todayLabel = days[todayIndex];
+
+    Future<void> openTodayFlameRoute() => _onDayTap(
+      dayIndex: todayIndex,
+      status: todayStatus,
+      effectiveCompleted: _stepsCompletedToday > 0 || todayStatus == WeekDayStatus.completed,
+      textColor: textColor,
+      panelColor: panelColor,
+      dayLabel: todayLabel,
+    );
+
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -105,7 +305,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                     ),
                     Expanded(
                       child: Text(
-                        'Daily Journey',
+                        'Faith Journey',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: isTablet ? 24 : 20,
@@ -116,9 +316,11 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                       ),
                     ),
                     IconButton(
-                      icon: Icon(Icons.library_books_rounded, color: textColor, size: 26),
+                      icon: Icon(Icons.library_books_rounded,
+                          color: textColor, size: 26),
                       tooltip: 'Saved',
-                      onPressed: () => Get.to(() => const StreakSavedListScreen()),
+                      onPressed: () =>
+                          Get.to(() => const StreakSavedListScreen()),
                     ),
                     IconButton(
                       icon: Container(
@@ -140,7 +342,8 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                           ),
                         ),
                       ),
-                      onPressed: () => Get.to(() => const YourFaithJourneyScreen()),
+                      onPressed: () =>
+                          Get.to(() => const YourFaithJourneyScreen()),
                     ),
                   ],
                 ),
@@ -156,18 +359,25 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: List.generate(7, (i) {
-                          final status = i < _weekStatuses.length ? _weekStatuses[i] : WeekDayStatus.future;
-                          final isOngoing = status == WeekDayStatus.ongoing;
-                          final isCompleted = status == WeekDayStatus.completed;
+                          final status = i < _weekStatuses.length
+                              ? _weekStatuses[i]
+                              : WeekDayStatus.future;
+                          final isToday = i == todayIndex;
+                          final todayFullyCompleted = isToday && _stepsCompletedToday >= 4;
+                          final isOngoing =
+                              status == WeekDayStatus.ongoing && !todayFullyCompleted;
+                          final isCompleted =
+                              status == WeekDayStatus.completed || todayFullyCompleted;
                           final isMissed = status == WeekDayStatus.missed;
                           Color circleColor = panelColor.withOpacity(0.8);
                           Color borderColor = textColor.withOpacity(0.2);
-                          Color iconColor = textColor.withOpacity(isDark ? 0.9 : 0.7); // future/pending
+                          Color iconColor = textColor.withOpacity(
+                              isDark ? 0.9 : 0.7); // future/pending
                           double borderWidth = 1;
                           if (isOngoing) {
                             circleColor = _gold.withOpacity(0.2);
-                            borderColor = _gold;
-                            borderWidth = 2.5;
+                            borderColor = _gold.withOpacity(0.35);
+                            borderWidth = 1.5;
                             iconColor = const Color(0xFFE65100);
                           } else if (isCompleted) {
                             circleColor = _gold.withOpacity(0.25);
@@ -178,41 +388,67 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                             borderColor = textColor.withOpacity(0.3);
                             iconColor = textColor.withOpacity(0.4);
                           }
-                          final showLock = isMissed || status == WeekDayStatus.future;
+                          final showLock =
+                              isMissed || status == WeekDayStatus.future;
                           return Column(
                             children: [
-                              Container(
-                                width: isTablet ? 44 : 38,
-                                height: isTablet ? 44 : 38,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: circleColor,
-                                  border: Border.all(
-                                    color: borderColor,
-                                    width: borderWidth,
-                                  ),
+                              GestureDetector(
+                                onTap: () => _onDayTap(
+                                  dayIndex: i,
+                                  status: status,
+                                  effectiveCompleted: isCompleted,
+                                  textColor: textColor,
+                                  panelColor: panelColor,
+                                  dayLabel: days[i],
                                 ),
-                                child: Stack(
-                                  alignment: Alignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.local_fire_department_rounded,
-                                      size: isTablet ? 22 : 18,
-                                      color: iconColor,
+                                child: Container(
+                                  width: isTablet ? 44 : 38,
+                                  height: isTablet ? 44 : 38,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: circleColor,
+                                    border: Border.all(
+                                      color: borderColor,
+                                      width: borderWidth,
                                     ),
-                                    if (showLock)
-                                      Align(
-                                        alignment: Alignment.bottomCenter,
-                                        child: Transform.translate(
-                                          offset: Offset(0, isTablet ? 4 : 3),
-                                          child: Icon(
-                                            Icons.lock,
-                                            size: isTablet ? 22 : 20,
-                                            color: textColor.withOpacity(0.7),
+                                  ),
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      if (isOngoing)
+                                        SizedBox(
+                                          width: isTablet ? 44 : 38,
+                                          height: isTablet ? 44 : 38,
+                                          child: CircularProgressIndicator(
+                                            value: 0.5,
+                                            strokeWidth: isTablet ? 3 : 2.5,
+                                            backgroundColor: Colors.transparent,
+                                            valueColor: const AlwaysStoppedAnimation<Color>(
+                                              _gold,
+                                            ),
                                           ),
                                         ),
+                                      Icon(
+                                        isCompleted
+                                            ? Icons.local_fire_department_rounded
+                                            : Icons.local_fire_department_outlined,
+                                        size: isTablet ? 22 : 18,
+                                        color: iconColor,
                                       ),
-                                  ],
+                                      if (showLock)
+                                        Align(
+                                          alignment: Alignment.bottomCenter,
+                                          child: Transform.translate(
+                                            offset: Offset(0, isTablet ? 4 : 3),
+                                            child: Icon(
+                                              Icons.lock,
+                                              size: isTablet ? 22 : 20,
+                                              color: textColor.withOpacity(0.7),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -240,7 +476,9 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                       ),
                       const SizedBox(height: 6),
                       LinearProgressIndicator(
-                        value: _loaded ? (_stepsCompletedToday / 4).clamp(0.0, 1.0) : 0.75,
+                        value: _loaded
+                            ? (_stepsCompletedToday / 4).clamp(0.0, 1.0)
+                            : 0.75,
                         backgroundColor: panelColor,
                         valueColor: const AlwaysStoppedAnimation<Color>(_gold),
                         minHeight: 8,
@@ -264,40 +502,41 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                            Text(
-                              'Today\'s Reward',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: textColor,
-                                fontFamily: 'Georgia',
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(Icons.star_border, color: _gold, size: 28),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '+20 Faith Credits',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
-                                    color: textColor,
-                                    fontFamily: 'Georgia',
-                                  ),
+                              Text(
+                                'Today\'s Reward',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: textColor,
+                                  fontFamily: 'Georgia',
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Use points for AI Bible Chat.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: textColor.withOpacity(0.75),
-                                fontFamily: 'Georgia',
                               ),
-                            ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Icon(Icons.star_border,
+                                      color: _gold, size: 28),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '+20 Faith Credits',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700,
+                                      color: textColor,
+                                      fontFamily: 'Georgia',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Use points for AI Bible Chat.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: textColor.withOpacity(0.75),
+                                  fontFamily: 'Georgia',
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -320,7 +559,9 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         title: 'Connect',
                         subtitle: '1 min · Share how you feel.',
                         completed: _stepsCompletedToday >= 1,
-                        onTap: () => Get.to(() => const StreakConnectionScreen()),
+                        onTap: _stepsCompletedToday >= 1
+                            ? openTodayFlameRoute
+                            : () => Get.to(() => const StreakConnectionScreen()),
                         textColor: textColor,
                         panelColor: panelColor,
                         isDark: isDark,
@@ -332,11 +573,19 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         subtitle: '1 min · Daily reading.',
                         completed: _stepsCompletedToday >= 2,
                         onTap: () async {
-                          final item = await MoodPrayerLoader.pickItem(connectionIndex: 1);
+                          if (_stepsCompletedToday >= 2) {
+                            await openTodayFlameRoute();
+                            return;
+                          }
+                          final item = await MoodPrayerLoader.pickItem(
+                              connectionIndex: 1);
                           if (item != null && mounted) {
                             await SharPreferences.setInt(
-                                SharPreferences.streakFlowStepsCompletedToday, 2);
-                            if (mounted) Get.to(() => StreakVerseScreen(item: item));
+                                SharPreferences.streakFlowStepsCompletedToday,
+                                2);
+                            await _storeTodaySteps(2);
+                            if (mounted)
+                              Get.to(() => StreakVerseScreen(item: item));
                           }
                         },
                         textColor: textColor,
@@ -350,11 +599,19 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         subtitle: '2 min · Insight for today.',
                         completed: _stepsCompletedToday >= 3,
                         onTap: () async {
-                          final item = await MoodPrayerLoader.pickItem(connectionIndex: 1);
+                          if (_stepsCompletedToday >= 3) {
+                            await openTodayFlameRoute();
+                            return;
+                          }
+                          final item = await MoodPrayerLoader.pickItem(
+                              connectionIndex: 1);
                           if (item != null && mounted) {
                             await SharPreferences.setInt(
-                                SharPreferences.streakFlowStepsCompletedToday, 2);
-                            if (mounted) Get.to(() => StreakDevotionalScreen(item: item));
+                                SharPreferences.streakFlowStepsCompletedToday,
+                                2);
+                            await _storeTodaySteps(2);
+                            if (mounted)
+                              Get.to(() => StreakDevotionalScreen(item: item));
                           }
                         },
                         textColor: textColor,
@@ -368,11 +625,19 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         subtitle: '2 min · Talk with Him.',
                         completed: _stepsCompletedToday >= 4,
                         onTap: () async {
-                          final item = await MoodPrayerLoader.pickItem(connectionIndex: 1);
+                          if (_stepsCompletedToday >= 4) {
+                            await openTodayFlameRoute();
+                            return;
+                          }
+                          final item = await MoodPrayerLoader.pickItem(
+                              connectionIndex: 1);
                           if (item != null && mounted) {
                             await SharPreferences.setInt(
-                                SharPreferences.streakFlowStepsCompletedToday, 3);
-                            if (mounted) Get.to(() => StreakPrayerScreen(item: item));
+                                SharPreferences.streakFlowStepsCompletedToday,
+                                3);
+                            await _storeTodaySteps(3);
+                            if (mounted)
+                              Get.to(() => StreakPrayerScreen(item: item));
                           }
                         },
                         textColor: textColor,
@@ -411,25 +676,34 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                       ),
                       const SizedBox(height: 24),
                       // Next Milestone (dynamic by streak)
-                      _card(
-                        panelColor: panelColor,
-                        textColor: textColor,
+                      Container(
+                        padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border(
+                            top: BorderSide(color: _gold.withOpacity(0.45)),
+                            bottom: BorderSide(color: _gold.withOpacity(0.45)),
+                          ),
+                        ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.star, color: _gold, size: 24),
+                            const Icon(Icons.star, color: _gold, size: 20),
                             const SizedBox(width: 8),
                             Flexible(
                               child: Text(
                                 _currentStreak >= 7
-                                    ? '7-day streak complete! ⭐ 100 Faith Credits earned'
-                                    : '${7 - _currentStreak} more ${7 - _currentStreak == 1 ? 'day' : 'days'} to unlock ⭐ 100 Faith Credits',
+                                    ? '7-day streak complete! 100 Faith Credits earned'
+                                    : '${7 - _currentStreak} more ${7 - _currentStreak == 1 ? 'day' : 'days'} to unlock 100 Faith Credits',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
                                   color: textColor,
                                   fontFamily: 'Georgia',
+                                  letterSpacing: 0.1,
                                 ),
                               ),
                             ),
@@ -451,7 +725,8 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   Widget _sectionTitle(String text, Color textColor) {
     return Row(
       children: [
-        Expanded(child: Divider(color: textColor.withOpacity(0.3), thickness: 1)),
+        Expanded(
+            child: Divider(color: textColor.withOpacity(0.3), thickness: 1)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Text(
@@ -464,12 +739,16 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
             ),
           ),
         ),
-        Expanded(child: Divider(color: textColor.withOpacity(0.3), thickness: 1)),
+        Expanded(
+            child: Divider(color: textColor.withOpacity(0.3), thickness: 1)),
       ],
     );
   }
 
-  Widget _card({required Widget child, required Color panelColor, required Color textColor}) {
+  Widget _card(
+      {required Widget child,
+        required Color panelColor,
+        required Color textColor}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -617,7 +896,207 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                   ],
                 ),
               ),
-              Icon(Icons.arrow_forward_ios, size: 16, color: textColor.withOpacity(0.6)),
+              Icon(Icons.arrow_forward_ios,
+                  size: 16, color: textColor.withOpacity(0.6)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DayJourneyCardsScreen extends StatelessWidget {
+  const _DayJourneyCardsScreen({
+    required this.dayLabel,
+    required this.item,
+    required this.textColor,
+    required this.panelColor,
+    required this.isDark,
+    required this.stepsCompletedForDay,
+  });
+
+  final String dayLabel;
+  final MoodPrayerItem item;
+  final Color textColor;
+  final Color panelColor;
+  final bool isDark;
+  final int stepsCompletedForDay;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: isDark ? CommanColor.darkPrimaryColor : const Color(0xFFF5EAC6),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: Icon(Icons.arrow_back_ios, color: textColor),
+                    ),
+                    Expanded(
+                      child: Text(
+                        '$dayLabel Faith Journey',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: 26,
+                          fontFamily: 'Georgia',
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 48),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                _journeyCard(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const StreakConnectionScreen(),
+                      ),
+                    );
+                  },
+                  icon: Icons.favorite,
+                  title: 'Connect',
+                  subtitle: '1 min · Share how you feel.',
+                  textColor: textColor,
+                  panelColor: panelColor,
+                  completedIndicator: stepsCompletedForDay >= 1,
+                ),
+                const SizedBox(height: 10),
+                _journeyCard(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => StreakVerseScreen(item: item),
+                      ),
+                    );
+                  },
+                  icon: Icons.menu_book,
+                  title: 'Verse of the Day',
+                  subtitle: '1 min · Daily reading.',
+                  textColor: textColor,
+                  panelColor: panelColor,
+                  completedIndicator: stepsCompletedForDay >= 2,
+                ),
+                const SizedBox(height: 10),
+                _journeyCard(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => StreakDevotionalScreen(item: item),
+                      ),
+                    );
+                  },
+                  icon: Icons.auto_stories,
+                  title: 'Devotional',
+                  subtitle: '2 min · Insight for today.',
+                  textColor: textColor,
+                  panelColor: panelColor,
+                  completedIndicator: stepsCompletedForDay >= 3,
+                ),
+                const SizedBox(height: 10),
+                _journeyCard(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => StreakPrayerScreen(item: item),
+                      ),
+                    );
+                  },
+                  icon: Icons.local_fire_department,
+                  title: 'Prayer',
+                  subtitle: '2 min · Talk with Him.',
+                  textColor: textColor,
+                  panelColor: panelColor,
+                  completedIndicator: stepsCompletedForDay >= 4,
+                ),
+                const SizedBox(height: 20),
+                // Intentionally no extra "verse quote" block here:
+                // tapping each card opens the corresponding step screen.
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _journeyCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color textColor,
+    required Color panelColor,
+    required VoidCallback onTap,
+    required bool completedIndicator,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: panelColor,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFC9A227).withOpacity(0.25)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFECE3CB),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: textColor, size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: textColor,
+                        fontFamily: 'Georgia',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: textColor.withOpacity(0.82),
+                        fontFamily: 'Georgia',
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              completedIndicator
+                  ? const Icon(Icons.check_circle,
+                  color: Color(0xFF56A05E), size: 28)
+                  : Icon(
+                Icons.radio_button_unchecked,
+                color: textColor.withOpacity(0.35),
+                size: 26,
+              ),
             ],
           ),
         ),

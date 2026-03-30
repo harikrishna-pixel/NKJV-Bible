@@ -122,19 +122,41 @@ struct BiblePrayerEntry: TimelineEntry {
   let date: Date
   let title: String
   let prayerText: String
+  let prayerReference: String
+  let prayerTime: String
+  let streakDays: Int
 }
 
 struct BiblePrayerProvider: TimelineProvider {
   func placeholder(in context: Context) -> BiblePrayerEntry {
-    BiblePrayerEntry(date: Date(), title: "Bible Prayer", prayerText: defaultPrayerText)
+    BiblePrayerEntry(
+      date: Date(),
+      title: "Morning Prayer",
+      prayerText: defaultPrayerText,
+      prayerReference: "Proverbs 27:9",
+      prayerTime: "08:30",
+      streakDays: 0
+    )
   }
 
   func getSnapshot(in context: Context, completion: @escaping (BiblePrayerEntry) -> Void) {
     let defaults = UserDefaults(suiteName: appGroupId)
-    let title = defaults?.string(forKey: "widget_bible_prayer_title") ?? "Bible Prayer"
+    let title = defaults?.string(forKey: "widget_bible_prayer_title") ?? "Morning Prayer"
     var text = defaults?.string(forKey: "widget_prayer_text") ?? ""
+    let reference = defaults?.string(forKey: "widget_prayer_reference") ?? "Proverbs 27:9"
+    let time = defaults?.string(forKey: "widget_prayer_time") ?? "08:30"
+    let days = defaults?.integer(forKey: "widget_streak_days") ?? 0
     if text.isEmpty { text = defaultPrayerText }
-    completion(BiblePrayerEntry(date: Date(), title: title, prayerText: text))
+    completion(
+      BiblePrayerEntry(
+        date: Date(),
+        title: title,
+        prayerText: text,
+        prayerReference: reference,
+        prayerTime: time,
+        streakDays: days
+      )
+    )
   }
 
   func getTimeline(in context: Context, completion: @escaping (Timeline<BiblePrayerEntry>) -> Void) {
@@ -146,28 +168,150 @@ struct BiblePrayerProvider: TimelineProvider {
 
 struct BiblePrayerView: View {
   var entry: BiblePrayerEntry
+  @Environment(\.widgetFamily) private var family
 
   var body: some View {
-    WidgetContainerBackground(background: oldPaperBackground) {
-      VStack(alignment: .leading, spacing: 6) {
-        HStack(spacing: 4) {
-          Image(systemName: "hands.sparkles")
-            .font(.caption)
-            .foregroundColor(oldPaperAccent)
-          Text(entry.title)
-            .font(.caption)
-            .fontWeight(.semibold)
-            .foregroundColor(oldPaperAccent)
+    // Full-bleed layout for Medium/Large. On iOS 17+ we use containerBackground
+    // with the same gradient to ensure edge-to-edge rendering inside widget bounds.
+    if family == .systemLarge || family == .systemMedium {
+      ZStack {
+        LinearGradient(
+          colors: [
+            Color(red: 0.99, green: 0.86, blue: 0.76),
+            Color(red: 0.98, green: 0.92, blue: 0.82)
+          ],
+          startPoint: .top,
+          endPoint: .bottom
+        )
+
+        VStack(spacing: 0) {
+            HStack {
+              Spacer()
+              HStack(spacing: 6) {
+                Image(systemName: "flame.fill")
+                  .font(.caption)
+                Text("\(entry.streakDays) days")
+                  .font(.caption)
+                  .fontWeight(.semibold)
+              }
+              .foregroundColor(.white)
+              .padding(.horizontal, 10)
+              .padding(.vertical, 4)
+              .background(Color.white.opacity(0.22))
+              .clipShape(Capsule())
+              Spacer()
+            }
+            .padding(.top, 8)
+
+            Text(entry.prayerTime)
+              .font(.system(size: family == .systemLarge ? 54 : 44, weight: .bold, design: .rounded))
+              .foregroundColor(.white)
+              .padding(.top, 8)
+
+            Spacer(minLength: 10)
+
+            VStack(spacing: 8) {
+              Text(entry.title)
+                .font(.title3)
+                .fontWeight(.semibold)
+                .foregroundColor(oldPaperText)
+                .multilineTextAlignment(.center)
+
+              Text(entry.prayerText)
+                .font(.body)
+                .foregroundColor(oldPaperText)
+                .lineLimit(family == .systemLarge ? 4 : 3)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 8)
+
+              Text(entry.prayerReference)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(oldPaperSecondary)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity)
+            .background(Color(red: 0.99, green: 0.96, blue: 0.90))
+            .overlay(
+              RoundedRectangle(cornerRadius: 18)
+                .stroke(Color(red: 0.88, green: 0.82, blue: 0.73), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .padding(.horizontal, 18)
+
+            Spacer()
+
+            Text("Pray Now")
+              .font(.headline)
+              .fontWeight(.bold)
+              .foregroundColor(.white)
+              .frame(maxWidth: .infinity)
+              .padding(.vertical, 12)
+              .background(Color.orange)
+              .clipShape(Capsule())
+              .padding(.horizontal, 48)
+              .padding(.bottom, 14)
         }
-        Text(entry.prayerText)
-          .font(.subheadline)
-          .foregroundColor(oldPaperText)
-          .lineLimit(4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      .padding(12)
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .padding(0)
+      .widgetURL(URL(string: "biblebookapp://prayer?homeWidget"))
+      .modifier(_WidgetGradientBackground())
+    } else {
+      WidgetContainerBackground(background: oldPaperBackground) {
+        VStack(alignment: .leading, spacing: 6) {
+          HStack(spacing: 4) {
+            Image(systemName: "hands.sparkles")
+              .font(.caption)
+              .foregroundColor(oldPaperAccent)
+            Text(entry.title)
+              .font(.caption)
+              .fontWeight(.semibold)
+              .foregroundColor(oldPaperAccent)
+          }
+          Text(entry.prayerText)
+            .font(.subheadline)
+            .foregroundColor(oldPaperText)
+            .lineLimit(4)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(12)
+      }
+      .widgetURL(URL(string: "biblebookapp://prayer?homeWidget"))
     }
-    .widgetURL(URL(string: "biblebookapp://prayer?homeWidget"))
+  }
+}
+
+/// Applies a containerBackground gradient on iOS 17+ so widgets render full-bleed.
+private struct _WidgetGradientBackground: ViewModifier {
+  func body(content: Content) -> some View {
+    if #available(iOS 17.0, *) {
+      content
+        .containerBackground(for: .widget) {
+          LinearGradient(
+            colors: [
+              Color(red: 0.99, green: 0.86, blue: 0.76),
+              Color(red: 0.98, green: 0.92, blue: 0.82)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+          )
+        }
+    } else {
+      content
+        .background(
+          LinearGradient(
+            colors: [
+              Color(red: 0.99, green: 0.86, blue: 0.76),
+              Color(red: 0.98, green: 0.92, blue: 0.82)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+          )
+        )
+    }
   }
 }
 
@@ -180,6 +324,8 @@ struct BiblePrayerWidget: Widget {
     }
     .configurationDisplayName("Bible Prayer")
     .description("A moment of prayer on your home screen.")
+    // Remove default widget content padding so the design is full-bleed (iOS 17+).
+    .contentMarginsDisabled()
   }
 }
 

@@ -2,6 +2,7 @@ import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_added_success_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -51,7 +52,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
     }
     if (widget.initialDescription != null &&
         widget.initialDescription!.trim().isNotEmpty) {
-      _detailsCtrl.text = _clip(widget.initialDescription!.trim(), 2000);
+      _detailsCtrl.text = _clip(widget.initialDescription!.trim(), 500);
     }
     if (widget.initialCategory != null &&
         _categories.contains(widget.initialCategory)) {
@@ -104,7 +105,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
       );
       return;
     }
-    if (title.length > 120 || details.length > 2000) {
+    if (title.length > 120 || details.length > 500) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content: Text('Title or description exceeds allowed length.')),
@@ -114,12 +115,26 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
 
     setState(() => _submitting = true);
     try {
+      // NOTE: Prayer Wall posting should not deduct wallet credits.
+      // final currentCredits = await WalletService.getCredits();
+      // if (currentCredits < _totalCredits) {
+      //   if (!mounted) return;
+      //   ScaffoldMessenger.of(context).showSnackBar(
+      //     SnackBar(
+      //       content: Text(
+      //           'Insufficient credits. Need $_totalCredits, you have $currentCredits.'),
+      //     ),
+      //   );
+      //   return;
+      // }
       final created = await PrayerWallService.createPrayer(
         prayerTitle: title,
         prayerDescription: details,
         prayerCategory: _category,
         isAnonymous: _isAnonymous,
+        prayerDuration: _durationDays,
       );
+      // await WalletService.deductCredits(_totalCredits);
       if (!_isAnonymous) {
         final prayerId = (_extractPrayerId(created) ?? '').trim();
         final cachedName =
@@ -132,10 +147,11 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         }
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Prayer posted successfully.')),
+      Navigator.of(context).pushReplacement<bool, bool>(
+        MaterialPageRoute(
+          builder: (_) => PrayerAddedSuccessScreen(durationDays: _durationDays),
+        ),
       );
-      Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -158,7 +174,11 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
     final brown = const Color(0xFF5C4033);
-    final cream = isDark ? CommanColor.darkPrimaryColor : const Color(0xFFF5F0E6);
+    final cream = isDark
+        ? CommanColor.darkPrimaryColor
+        : (themeProvider.currentCustomTheme == AppCustomTheme.vintage
+            ? const Color(0xFFF5F0E6)
+            : themeProvider.backgroundColor);
     final dateFmt = DateFormat('MMMM d, yyyy');
 
     return Scaffold(
@@ -233,7 +253,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                     TextField(
                       controller: _detailsCtrl,
                       maxLines: 5,
-                      maxLength: 2000,
+                      maxLength: 500,
                       style: TextStyle(color: isDark ? Colors.white : brown),
                       decoration: _fieldDecoration(
                         'Write your prayer request here...',
@@ -399,7 +419,6 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: Color(0xFF5C4033), width: 1.5),
       ),
-      counterText: '',
     );
   }
 

@@ -1,6 +1,7 @@
 import 'dart:io';
+import 'dart:convert';
 import 'dart:typed_data';
-
+import 'dart:math' as math;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:screenshot/screenshot.dart';
@@ -11,6 +12,8 @@ import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
+import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
@@ -25,7 +28,8 @@ const Color _kStreakCream = Color(0xFFF5F0E6);
 
 bool _isStreakDark(BuildContext context) {
   try {
-    return Provider.of<ThemeProvider>(context, listen: false).themeMode == ThemeMode.dark;
+    return Provider.of<ThemeProvider>(context, listen: false).themeMode ==
+        ThemeMode.dark;
   } catch (_) {
     return false;
   }
@@ -46,7 +50,11 @@ List<Color> _streakGradientColors(BuildContext context) {
       const Color(0xFFC9B896),
     ];
   } catch (_) {
-    return [const Color(0xFFE8DED0), const Color(0xFFD4C4B0), const Color(0xFFC9B896)];
+    return [
+      const Color(0xFFE8DED0),
+      const Color(0xFFD4C4B0),
+      const Color(0xFFC9B896)
+    ];
   }
 }
 
@@ -71,9 +79,8 @@ Future<void> _shareText(BuildContext context, String text) async {
     final RenderBox? box = renderObject is RenderBox ? renderObject : null;
     await Share.share(
       shareContent,
-      sharePositionOrigin: box != null
-          ? box.localToGlobal(Offset.zero) & box.size
-          : null,
+      sharePositionOrigin:
+          box != null ? box.localToGlobal(Offset.zero) & box.size : null,
     );
   } catch (_) {
     // ignore
@@ -108,7 +115,8 @@ void _showSavedToast(BuildContext context, {required bool saved}) {
   messenger?.showSnackBar(
     SnackBar(
       behavior: SnackBarBehavior.floating,
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      // Keep toast above bottom CTAs (Devotional/Prayer screens).
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 96),
       duration: const Duration(milliseconds: 1400),
       backgroundColor: _kStreakCream,
       shape: RoundedRectangleBorder(
@@ -121,7 +129,9 @@ void _showSavedToast(BuildContext context, {required bool saved}) {
       content: Row(
         children: [
           Icon(
-            saved ? Icons.bookmark_added_rounded : Icons.bookmark_remove_rounded,
+            saved
+                ? Icons.bookmark_added_rounded
+                : Icons.bookmark_remove_rounded,
             color: _kStreakGold,
             size: 24,
           ),
@@ -141,15 +151,174 @@ void _showSavedToast(BuildContext context, {required bool saved}) {
   );
 }
 
+void _showAppleToast(BuildContext context, String message) {
+  final overlay = Overlay.maybeOf(context);
+  if (overlay == null) return;
+  late OverlayEntry entry;
+  entry = OverlayEntry(
+    builder: (_) => Positioned(
+      left: 28,
+      right: 28,
+      bottom: 80,
+      child: IgnorePointer(
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.82),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  overlay.insert(entry);
+  Future.delayed(const Duration(milliseconds: 1400), () {
+    entry.remove();
+  });
+}
+
+Future<Map<String, int>> _readStreakFlowStepsByDay() async {
+  final raw = await SharPreferences.getString(SharPreferences.streakFlowStepsByDay);
+  if (raw == null || raw.trim().isEmpty) return <String, int>{};
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) return <String, int>{};
+    return decoded.map((key, value) {
+      final v = value is num ? value.toInt() : int.tryParse(value.toString()) ?? 0;
+      return MapEntry(key.toString(), v);
+    });
+  } catch (_) {
+    return <String, int>{};
+  }
+}
+
+Future<void> _storeStreakFlowStepsForDay(String dayKey, int steps) async {
+  final safeDayKey = dayKey.trim();
+  if (safeDayKey.isEmpty) return;
+  final map = await _readStreakFlowStepsByDay();
+  map[safeDayKey] = steps.clamp(0, 4);
+  await SharPreferences.setString(
+    SharPreferences.streakFlowStepsByDay,
+    jsonEncode(map),
+  );
+}
+
+Future<String> _currentStreakFlowProgressDayKey() async {
+  final isRestoreRun =
+      (await SharPreferences.getBoolean(SharPreferences.streakFlowRestoreActive)) ==
+          true;
+  if (isRestoreRun) {
+    final restoreDate =
+        await SharPreferences.getString(SharPreferences.streakFlowRestoreDate);
+    if (restoreDate != null && restoreDate.trim().isNotEmpty) {
+      return restoreDate;
+    }
+  }
+  final started = await SharPreferences.getString(SharPreferences.streakFlowStartedDate);
+  if (started != null && started.trim().isNotEmpty) {
+    return started;
+  }
+  return DateTime.now().toIso8601String().split('T')[0];
+}
+
+Future<void> _storeActiveStreakFlowSteps(int steps) async {
+  final dayKey = await _currentStreakFlowProgressDayKey();
+  await _storeStreakFlowStepsForDay(dayKey, steps);
+}
+
+Future<Map<String, dynamic>> _readStreakFlowItemByDay() async {
+  final raw = await SharPreferences.getString(SharPreferences.streakFlowItemByDay);
+  if (raw == null || raw.trim().isEmpty) return <String, dynamic>{};
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is Map<String, dynamic>) return decoded;
+    if (decoded is Map) {
+      return decoded.map((k, v) => MapEntry(k.toString(), v));
+    }
+  } catch (_) {}
+  return <String, dynamic>{};
+}
+
+Map<String, dynamic> _serializeMoodPrayerItem(MoodPrayerItem item) {
+  return {
+    'connectionLevel': item.connectionLevel,
+    'bookName': item.bookName,
+    'bookNumber': item.bookNumber,
+    'chapterNumber': item.chapterNumber,
+    'verseNumber': item.verseNumber,
+    'verseText': item.verseText,
+    'devotionalText': item.devotionalText,
+    'prayerText': item.prayerText,
+  };
+}
+
+Future<void> _storeActiveStreakFlowItem(MoodPrayerItem item) async {
+  final dayKey = await _currentStreakFlowProgressDayKey();
+  final map = await _readStreakFlowItemByDay();
+  map[dayKey] = _serializeMoodPrayerItem(item);
+  await SharPreferences.setString(
+    SharPreferences.streakFlowItemByDay,
+    jsonEncode(map),
+  );
+}
+
+Future<void> _recordStreakActivityForDay(String dayKey) async {
+  final normalizedDay = dayKey.trim();
+  if (normalizedDay.isEmpty) return;
+
+  final lastStr =
+      await SharPreferences.getString(SharPreferences.streakLastActivityDate);
+  final prevCount = await SharPreferences.getInt(SharPreferences.streakCount) ?? 0;
+  int newCount = 1;
+
+  if (lastStr != null && lastStr.isNotEmpty) {
+    try {
+      final last = DateTime.parse(lastStr);
+      final target = DateTime.parse(normalizedDay);
+      final lastDate = DateTime(last.year, last.month, last.day);
+      final targetDate = DateTime(target.year, target.month, target.day);
+      final diffDays = targetDate.difference(lastDate).inDays;
+      if (diffDays == 1) {
+        newCount = prevCount + 1;
+      } else if (diffDays == 0) {
+        newCount = prevCount > 0 ? prevCount : 1;
+      } else {
+        newCount = 1;
+      }
+    } catch (_) {
+      newCount = 1;
+    }
+  }
+
+  await SharPreferences.setString(
+      SharPreferences.streakLastActivityDate, normalizedDay);
+  await SharPreferences.setInt(SharPreferences.streakCount, newCount);
+}
+
 void _goToHome(BuildContext context) {
-  Get.offAll(() => HomeScreen(
-        From: "splash",
-        selectedVerseNumForRead: "",
-        selectedBookForRead: "",
-        selectedChapterForRead: "",
-        selectedBookNameForRead: "",
-        selectedVerseForRead: "",
-      ));
+  Get.offAll(
+    () => HomeScreen(
+      From: "splash",
+      selectedVerseNumForRead: "",
+      selectedBookForRead: "",
+      selectedChapterForRead: "",
+      selectedBookNameForRead: "",
+      selectedVerseForRead: "",
+    ),
+    transition: Transition.cupertino,
+    duration: const Duration(milliseconds: 350),
+  );
 }
 
 Widget _buildStepIndicator(BuildContext context, int step) {
@@ -189,18 +358,444 @@ Widget _buildStepIndicator(BuildContext context, int step) {
 class StreakFlowNavigation {
   /// Show streak flow if not yet shown today, else go to Home.
   static Future<void> navigateToStreakFlowOrHome(BuildContext context) async {
-    final today =
-        DateTime.now().toIso8601String().split('T')[0];
+    final today = DateTime.now().toIso8601String().split('T')[0];
+    final todayDate = DateTime.now();
+    final yesterdayDate = todayDate.subtract(const Duration(days: 1));
+    final dayBeforeYesterdayDate = todayDate.subtract(const Duration(days: 2));
+    final yesterday =
+        DateTime(yesterdayDate.year, yesterdayDate.month, yesterdayDate.day)
+            .toIso8601String()
+            .split('T')[0];
+    final dayBeforeYesterday = DateTime(
+      dayBeforeYesterdayDate.year,
+      dayBeforeYesterdayDate.month,
+      dayBeforeYesterdayDate.day,
+    ).toIso8601String().split('T')[0];
     final last = await SharPreferences.getString(
         SharPreferences.streakFlowLastShownDate);
     final dismissed = await SharPreferences.getString(
         SharPreferences.streakFlowDismissedDate);
+    final started = await SharPreferences.getString(
+        SharPreferences.streakFlowStartedDate);
+    final steps = await SharPreferences.getInt(
+            SharPreferences.streakFlowStepsCompletedToday) ??
+        0;
+
+    final isIncompleteYesterday = started != null &&
+        started.isNotEmpty &&
+        started == yesterday &&
+        last != yesterday &&
+        steps > 0;
+    final isMissedYesterdayWithoutOpen = (last == dayBeforeYesterday);
+
+    if (isIncompleteYesterday || isMissedYesterdayWithoutOpen) {
+      await SharPreferences.setString(
+        SharPreferences.streakFlowPausedDate,
+        isIncompleteYesterday ? started : yesterday,
+      );
+      final pausedAt = await SharPreferences.getString(
+          SharPreferences.streakFlowPausedAt);
+      if (pausedAt == null || pausedAt.isEmpty) {
+        await SharPreferences.setString(
+          SharPreferences.streakFlowPausedAt,
+          DateTime.now().toIso8601String(),
+        );
+      }
+      if (!context.mounted) return;
+      Get.offAll(() => const StreakPausedScreen());
+      return;
+    }
+
     if (last == today || dismissed == today) {
       _goToHome(context);
       return;
     }
     if (!context.mounted) return;
     Get.offAll(() => const StreakConnectionScreen());
+  }
+}
+
+class StreakPausedScreen extends StatefulWidget {
+  const StreakPausedScreen({super.key});
+
+  @override
+  State<StreakPausedScreen> createState() => _StreakPausedScreenState();
+}
+
+class _StreakPausedScreenState extends State<StreakPausedScreen> {
+  static const int _restoreCost = 50;
+  bool _busy = false;
+  String _pausedDate = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPausedDate();
+  }
+
+  Future<void> _loadPausedDate() async {
+    final paused = await SharPreferences.getString(SharPreferences.streakFlowPausedDate);
+    if (!mounted) return;
+    setState(() => _pausedDate = paused ?? '');
+  }
+
+  Future<bool> _isRestoreWindowOpen() async {
+    final raw = await SharPreferences.getString(SharPreferences.streakFlowPausedAt);
+    if (raw == null || raw.isEmpty) return true;
+    try {
+      final pausedAt = DateTime.parse(raw);
+      return DateTime.now().difference(pausedAt).inHours <= 24;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  void _showInsufficientCreditsToast() {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.hideCurrentSnackBar();
+    messenger?.showSnackBar(
+      SnackBar(
+        content: const Text('Insufficient credits - Get credits'),
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: 'Get credits',
+          onPressed: () async {
+            await Get.to(() => const WalletScreen());
+            await _tryRestore();
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _tryRestore() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final canRestore = await _isRestoreWindowOpen();
+    if (!canRestore) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Restore is available only within 24 hours.')),
+        );
+      }
+      if (mounted) setState(() => _busy = false);
+      return;
+    }
+
+    final credits = await WalletService.getCredits();
+    if (credits < _restoreCost) {
+      if (mounted) _showInsufficientCreditsToast();
+      if (mounted) setState(() => _busy = false);
+      return;
+    }
+
+    final debited = await WalletService.deductCredits(_restoreCost);
+    if (!debited) {
+      if (mounted) _showInsufficientCreditsToast();
+      if (mounted) setState(() => _busy = false);
+      return;
+    }
+
+    await SharPreferences.setBoolean(SharPreferences.streakFlowRestoreActive, true);
+    await SharPreferences.setString(
+      SharPreferences.streakFlowRestoreDate,
+      _pausedDate.isNotEmpty
+          ? _pausedDate
+          : DateTime.now().subtract(const Duration(days: 1)).toIso8601String().split('T')[0],
+    );
+    await SharPreferences.setInt(SharPreferences.streakFlowStepsCompletedToday, 0);
+    await SharPreferences.setString(
+      SharPreferences.streakFlowStartedDate,
+      DateTime.now().toIso8601String().split('T')[0],
+    );
+    if (!mounted) return;
+    _showAppleToast(context, 'Credits debited');
+    Get.offAll(() => const StreakConnectionScreen());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = _streakTextColor(context);
+    final panelColor = _streakPanelColor(context);
+    final isTablet = MediaQuery.of(context).size.width > 450;
+    const Color warmText = Color(0xFF4A2F1D);
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          image: const DecorationImage(
+            image: AssetImage('assets/back1.png'),
+            fit: BoxFit.cover,
+          ),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              _streakGradientColors(context).first.withOpacity(0.70),
+              _streakGradientColors(context)[1].withOpacity(0.72),
+              _streakGradientColors(context).last.withOpacity(0.74),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(isTablet ? 30 : 22, 8, isTablet ? 30 : 22, 20),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 430),
+                child: Column(
+                  children: [
+                Align(
+                  alignment: Alignment.topRight,
+                  child: GestureDetector(
+                    onTap: () => _goToHome(context),
+                    child: Container(
+                      width: 26,
+                      height: 26,
+                      child: Icon(Icons.close, size: 22, color: warmText.withOpacity(0.7)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  width: isTablet ? 84 : 78,
+                  height: isTablet ? 84 : 78,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: _kStreakGold.withOpacity(0.9), width: 1.6),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _kStreakGold.withOpacity(0.18),
+                        blurRadius: 16,
+                        spreadRadius: 0,
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: isTablet ? 50 : 44,
+                      height: isTablet ? 50 : 44,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: _kStreakGold.withOpacity(0.9), width: 1.3),
+                      ),
+                      child: const Icon(Icons.pause, color: _kStreakGold, size: 24),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                Text(
+                  'Your Streak Paused',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: isTablet ? 52 : 50,
+                    fontWeight: FontWeight.w700,
+                    color: warmText,
+                    fontFamily: 'Georgia',
+                    height: 0.95,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'You missed a day - and that\'s okay.\nEvery journey has pauses.\nWhat matters is starting again.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: isTablet ? 18 : 16,
+                    height: 1.45,
+                    color: warmText.withOpacity(0.9),
+                    fontFamily: 'Georgia',
+                  ),
+                ),
+                const SizedBox(height: 14),
+                FutureBuilder<int>(
+                  future: StreakService.getCurrentStreak(),
+                  builder: (context, snap) {
+                    final v = (snap.data ?? 0).clamp(0, 9999);
+                    return RichText(
+                      textAlign: TextAlign.center,
+                      text: TextSpan(
+                        style: TextStyle(
+                          fontSize: isTablet ? 25 : 22,
+                          fontWeight: FontWeight.w700,
+                          color: warmText,
+                          fontFamily: 'Georgia',
+                        ),
+                        children: [
+                          const TextSpan(text: 'You built a '),
+                          TextSpan(
+                            text: '$v Day Faith Habit.',
+                            style: const TextStyle(color: _kStreakGold),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Divider(color: warmText.withOpacity(0.24), thickness: 1),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Icon(Icons.auto_awesome, color: _kStreakGold.withOpacity(0.7), size: 14),
+                    ),
+                    Expanded(
+                      child: Divider(color: warmText.withOpacity(0.24), thickness: 1),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  decoration: BoxDecoration(
+                    color: panelColor.withOpacity(0.72),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: warmText.withOpacity(0.16), width: 1.2),
+                  ),
+                  child: Column(
+                    children: [
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _busy ? null : _tryRestore,
+                          borderRadius: BorderRadius.circular(30),
+                          child: Ink(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 18),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(30),
+                              gradient: const LinearGradient(
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                                colors: [Color(0xFFC09645), Color(0xFF9B6B2F)],
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _kStreakGold.withOpacity(0.22),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.local_fire_department,
+                                    color: Colors.white, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _busy ? 'Please wait...' : 'Restore Streak',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w700,
+                                    fontFamily: 'Georgia',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Uses 50 Faith Credits',
+                        style: TextStyle(
+                          color: const Color(0xFFA94442).withOpacity(0.95),
+                          fontSize: isTablet ? 17 : 16,
+                          fontFamily: 'Georgia',
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        height: 1,
+                        color: textColor.withOpacity(0.16),
+                      ),
+                      const SizedBox(height: 10),
+                      RichText(
+                        textAlign: TextAlign.center,
+                        text: TextSpan(
+                          style: TextStyle(
+                            color: warmText.withOpacity(0.9),
+                            fontSize: isTablet ? 21 : 19,
+                            fontFamily: 'Georgia',
+                            fontWeight: FontWeight.w500,
+                          ),
+                          children: const [
+                            TextSpan(text: 'Restore within '),
+                            TextSpan(
+                              text: '24 hours',
+                              style: TextStyle(
+                                color: _kStreakGold,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: warmText.withOpacity(0.28), thickness: 1)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        'OR',
+                        style: TextStyle(
+                          color: warmText.withOpacity(0.82),
+                          fontFamily: 'Georgia',
+                          fontSize: isTablet ? 22 : 20,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: warmText.withOpacity(0.28), thickness: 1)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _goToHome(context),
+                    borderRadius: BorderRadius.circular(30),
+                    child: Ink(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.42),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(color: _kStreakGold.withOpacity(0.55)),
+                      ),
+                      child: Text(
+                        'Start New Journey',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: warmText,
+                          fontSize: isTablet ? 22 : 20,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Georgia',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -230,6 +825,9 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
     if (existing != today) {
       await SharPreferences.setString(
           SharPreferences.streakFlowStartedDate, today);
+      // New day: reset step progress so we don't reuse a previous day's value.
+      await SharPreferences.setInt(
+          SharPreferences.streakFlowStepsCompletedToday, 0);
     }
   }
 
@@ -275,11 +873,11 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: Icon(Icons.arrow_back_ios, color: _streakTextColor(context)),
+                      icon: Icon(Icons.arrow_back_ios,
+                          color: _streakTextColor(context)),
                       onPressed: () async {
-                        final today = DateTime.now()
-                            .toIso8601String()
-                            .split('T')[0];
+                        final today =
+                            DateTime.now().toIso8601String().split('T')[0];
                         await SharPreferences.setString(
                             SharPreferences.streakFlowDismissedDate, today);
                         _goToHome(context);
@@ -294,167 +892,198 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Text(
-                  'How is your connection with God today?',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: MediaQuery.of(context).size.width > 450 ? 28 : 22,
-                    fontWeight: FontWeight.w600,
-                    color: _streakTextColor(context),
-                    fontFamily: 'Georgia',
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Pause and reflect for a moment.',
-                style: TextStyle(
-                  fontSize: MediaQuery.of(context).size.width > 450 ? 18 : 15,
-                  color: _streakTextColor(context).withOpacity(0.9),
-                  fontFamily: 'Georgia',
-                ),
-              ),
-              const SizedBox(height: 48),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Column(
-                  children: [
-                    Row(
+              Expanded(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 60),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.max,
                       children: [
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text('Far',
-                                  textAlign: TextAlign.center,
-                                  style: _labelStyle(context, active: _activeLabelIndex == 0)),
-                            ),
+                        Text(
+                          'How is your connection with God today?',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: MediaQuery.of(context).size.width > 450
+                                ? 28
+                                : 22,
+                            fontWeight: FontWeight.w600,
+                            color: _streakTextColor(context),
+                            fontFamily: 'Georgia',
                           ),
                         ),
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.center,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                'Returning',
-                                textAlign: TextAlign.center,
-                                style: _labelStyle(context, active: _activeLabelIndex == 1),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Pause and reflect for a moment.',
+                          style: TextStyle(
+                            fontSize: MediaQuery.of(context).size.width > 450
+                                ? 18
+                                : 15,
+                            color: _streakTextColor(context).withOpacity(0.9),
+                            fontFamily: 'Georgia',
+                          ),
+                        ),
+                        const SizedBox(height: 140),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text('Far',
+                                            textAlign: TextAlign.center,
+                                            style: _labelStyle(context,
+                                                active:
+                                                    _activeLabelIndex == 0)),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Align(
+                                      alignment: Alignment.center,
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          'Returning',
+                                          textAlign: TextAlign.center,
+                                          style: _labelStyle(context,
+                                              active: _activeLabelIndex == 1),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Align(
+                                      alignment: Alignment.center,
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text('Near',
+                                            textAlign: TextAlign.center,
+                                            style: _labelStyle(context,
+                                                active:
+                                                    _activeLabelIndex == 2)),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Align(
+                                      alignment: Alignment.center,
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          'Close',
+                                          textAlign: TextAlign.center,
+                                          style: _labelStyle(context,
+                                              active: _activeLabelIndex == 3),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Align(
+                                      alignment: Alignment.centerRight,
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text('Very Close',
+                                            textAlign: TextAlign.center,
+                                            style: _labelStyle(context,
+                                                active:
+                                                    _activeLabelIndex == 4)),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.center,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text('Near',
-                                  textAlign: TextAlign.center,
-                                  style: _labelStyle(context, active: _activeLabelIndex == 2)),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.center,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                'Close',
-                                textAlign: TextAlign.center,
-                                style: _labelStyle(context, active: _activeLabelIndex == 3),
+                              const SizedBox(height: 16),
+                              SliderTheme(
+                                data: SliderTheme.of(context).copyWith(
+                                  activeTrackColor: _streakTextColor(context),
+                                  inactiveTrackColor:
+                                      _streakPanelColor(context),
+                                  thumbColor: _streakTextColor(context),
+                                  overlayColor: _streakTextColor(context)
+                                      .withOpacity(0.2),
+                                  trackHeight: 6,
+                                  thumbShape: const RoundSliderThumbShape(
+                                      enabledThumbRadius: 12),
+                                  overlayShape: const RoundSliderOverlayShape(
+                                      overlayRadius: 20),
+                                  activeTickMarkColor: Colors.transparent,
+                                  inactiveTickMarkColor: Colors.transparent,
+                                ),
+                                child: LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    const double pad = 12;
+                                    final w = constraints.maxWidth - pad * 2;
+                                    const double smallR = 4.0;
+                                    return Stack(
+                                      clipBehavior: Clip.none,
+                                      children: [
+                                        Slider(
+                                          value: _value,
+                                          divisions: 4,
+                                          onChanged: (v) =>
+                                              setState(() => _value = _snap(v)),
+                                        ),
+                                        for (int i = 0; i < 5; i++) ...[
+                                          Positioned(
+                                            left: pad + (w * i / 4) - smallR,
+                                            top: 0,
+                                            bottom: 0,
+                                            child: Center(
+                                              child: Container(
+                                                width: smallR * 2,
+                                                height: smallR * 2,
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  color:
+                                                      _streakTextColor(context)
+                                                          .withOpacity(0.35),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    );
+                                  },
+                                ),
                               ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text('Deeply\nConnected',
-                                  textAlign: TextAlign.center,
-                                  style: _labelStyle(context, active: _activeLabelIndex == 4)),
-                            ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        activeTrackColor: _streakTextColor(context),
-                        inactiveTrackColor: _streakPanelColor(context),
-                        thumbColor: _streakTextColor(context),
-                        overlayColor: _streakTextColor(context).withOpacity(0.2),
-                        trackHeight: 6,
-                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 12),
-                        overlayShape: const RoundSliderOverlayShape(overlayRadius: 20),
-                        activeTickMarkColor: Colors.transparent,
-                        inactiveTickMarkColor: Colors.transparent,
-                      ),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          const double pad = 12;
-                          final w = constraints.maxWidth - pad * 2;
-                          const double smallR = 4.0;
-                          return Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Slider(
-                                value: _value,
-                                divisions: 4,
-                                onChanged: (v) => setState(() => _value = _snap(v)),
-                              ),
-                              for (int i = 0; i < 5; i++) ...[
-                                Positioned(
-                                  left: pad + (w * i / 4) - smallR,
-                                  top: 0,
-                                  bottom: 0,
-                                  child: Center(
-                                    child: Container(
-                                      width: smallR * 2,
-                                      height: smallR * 2,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: _streakTextColor(context).withOpacity(0.35),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-              const Spacer(),
-              _parchmentButton(
-                context,
-                label: 'Take the Next Step',
-                onPressed: () async {
-                  final item = await MoodPrayerLoader.pickItem(
-                      connectionIndex: _connectionIndex);
-                  if (!mounted) return;
-                  if (item == null) {
-                    _goToHome(context);
-                    return;
-                  }
-                  await SharPreferences.setInt(
-                      SharPreferences.streakFlowStepsCompletedToday, 2);
-                  if (!mounted) return;
-                  Get.to(() => StreakVerseScreen(item: item));
-                },
+              Padding(
+                padding: const EdgeInsets.only(bottom: 32),
+                child: _parchmentButton(
+                  context,
+                  label: 'Take the Next Step',
+                  onPressed: () async {
+                    final item = await MoodPrayerLoader.pickItem(
+                        connectionIndex: _connectionIndex);
+                    if (!mounted) return;
+                    if (item == null) {
+                      _goToHome(context);
+                      return;
+                    }
+                    await _storeActiveStreakFlowItem(item);
+                    await SharPreferences.setInt(
+                        SharPreferences.streakFlowStepsCompletedToday, 1);
+                    await _storeActiveStreakFlowSteps(1);
+                    if (!mounted) return;
+                    Get.to(() => StreakVerseScreen(item: item));
+                  },
+                ),
               ),
-              const SizedBox(height: 32),
             ],
           ),
         ),
@@ -496,7 +1125,8 @@ Widget _parchmentButton(
           decoration: BoxDecoration(
             color: btnBg,
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: isDark ? baseTextColor : Colors.transparent, width: 1.5),
+            border: Border.all(
+                color: isDark ? baseTextColor : Colors.transparent, width: 1.5),
             boxShadow: [
               BoxShadow(
                 color: baseTextColor.withOpacity(0.15),
@@ -516,7 +1146,7 @@ Widget _parchmentButton(
                   style: TextStyle(
                     fontSize: MediaQuery.of(context).size.width > 450 ? 18 : 16,
                     fontWeight: FontWeight.w600,
-                      color: labelColor,
+                    color: labelColor,
                     fontFamily: 'Georgia',
                   ),
                 ),
@@ -587,7 +1217,8 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: Icon(Icons.arrow_back_ios, color: _streakTextColor(context)),
+                      icon: Icon(Icons.arrow_back_ios,
+                          color: _streakTextColor(context)),
                       onPressed: () => Get.back(),
                     ),
                     Expanded(
@@ -603,7 +1234,8 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.menu_book, color: _streakTextColor(context), size: 32),
+                  Icon(Icons.menu_book,
+                      color: _streakTextColor(context), size: 32),
                   const SizedBox(width: 8),
                   Text(
                     'Verse of the Day',
@@ -624,14 +1256,30 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                     return SingleChildScrollView(
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       child: ConstrainedBox(
-                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                        constraints:
+                            BoxConstraints(minHeight: constraints.maxHeight),
                         child: Center(
                           child: Screenshot(
                             controller: _screenshotController,
                             child: Container(
                               padding: const EdgeInsets.all(24),
                               decoration: BoxDecoration(
+                                // color: _streakPanelColor(context).withOpacity(
+                                //     _isStreakDark(context) ? 0.18 : 0.88),
                                 borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: _streakTextColor(context).withOpacity(
+                                      _isStreakDark(context) ? 0.18 : 0.12),
+                                  width: 1.2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(
+                                        _isStreakDark(context) ? 0.18 : 0.10),
+                                    blurRadius: 18,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
                               ),
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
@@ -641,9 +1289,11 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                                     '"${item.verseText}"',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      fontSize: MediaQuery.of(context).size.width > 450
-                                          ? 26
-                                          : 22,
+                                      fontSize:
+                                          MediaQuery.of(context).size.width >
+                                                  450
+                                              ? 26
+                                              : 22,
                                       height: 1.5,
                                       color: _streakTextColor(context),
                                       fontFamily: 'Georgia',
@@ -687,7 +1337,8 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                           await StreakSavedStorage.remove(
                               'verse', item.verseReference, item.verseText);
                           if (mounted) setState(() => _saved = false);
-                          if (context.mounted) _showSavedToast(context, saved: false);
+                          if (context.mounted)
+                            _showSavedToast(context, saved: false);
                         } else {
                           await StreakSavedStorage.add(StreakSavedItem(
                             type: 'verse',
@@ -696,7 +1347,8 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                             savedAt: DateTime.now().toIso8601String(),
                           ));
                           if (mounted) setState(() => _saved = true);
-                          if (context.mounted) _showSavedToast(context, saved: true);
+                          if (context.mounted)
+                            _showSavedToast(context, saved: true);
                         }
                       },
                     ),
@@ -707,6 +1359,7 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                         onPressed: () async {
                           await SharPreferences.setInt(
                               SharPreferences.streakFlowStepsCompletedToday, 2);
+                          await _storeActiveStreakFlowSteps(2);
                           if (!mounted) return;
                           Get.to(() => StreakDevotionalScreen(item: item));
                         },
@@ -714,8 +1367,7 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                     ),
                     Builder(
                       builder: (shareContext) => IconButton(
-                        icon: Icon(Icons.share,
-                            color: Colors.white, size: 26),
+                        icon: Icon(Icons.share, color: Colors.white, size: 26),
                         onPressed: () async {
                           final image = await _screenshotController.capture(
                             delay: const Duration(milliseconds: 80),
@@ -852,7 +1504,8 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: Icon(Icons.arrow_back_ios, color: _streakTextColor(context)),
+                      icon: Icon(Icons.arrow_back_ios,
+                          color: _streakTextColor(context)),
                       onPressed: () => Get.back(),
                     ),
                     Expanded(
@@ -889,7 +1542,8 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                     return SingleChildScrollView(
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       child: ConstrainedBox(
-                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                        constraints:
+                            BoxConstraints(minHeight: constraints.maxHeight),
                         child: Center(
                           child: Screenshot(
                             controller: _screenshotController,
@@ -899,7 +1553,10 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                                 item.devotionalText,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: MediaQuery.of(context).size.width > 450 ? 22 : 20,
+                                  fontSize:
+                                      MediaQuery.of(context).size.width > 450
+                                          ? 22
+                                          : 20,
                                   height: 1.6,
                                   color: _streakTextColor(context),
                                   fontFamily: 'Georgia',
@@ -931,7 +1588,8 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                           await StreakSavedStorage.remove(
                               'devotional', title, item.devotionalText);
                           if (mounted) setState(() => _saved = false);
-                          if (context.mounted) _showSavedToast(context, saved: false);
+                          if (context.mounted)
+                            _showSavedToast(context, saved: false);
                         } else {
                           await StreakSavedStorage.add(StreakSavedItem(
                             type: 'devotional',
@@ -940,7 +1598,8 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                             savedAt: DateTime.now().toIso8601String(),
                           ));
                           if (mounted) setState(() => _saved = true);
-                          if (context.mounted) _showSavedToast(context, saved: true);
+                          if (context.mounted)
+                            _showSavedToast(context, saved: true);
                         }
                       },
                     ),
@@ -951,6 +1610,7 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                         onPressed: () async {
                           await SharPreferences.setInt(
                               SharPreferences.streakFlowStepsCompletedToday, 3);
+                          await _storeActiveStreakFlowSteps(3);
                           if (!mounted) return;
                           await _audioPlayer.stop();
                           Get.to(() => StreakPrayerScreen(item: item));
@@ -1061,8 +1721,8 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
   Future<void> _loadSaved() async {
     final item = widget.item;
     const title = 'A Prayer of Gratitude';
-    final contained = await StreakSavedStorage.contains(
-        'prayer', title, item.prayerText);
+    final contained =
+        await StreakSavedStorage.contains('prayer', title, item.prayerText);
     if (mounted) setState(() => _saved = contained);
   }
 
@@ -1096,7 +1756,8 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: Icon(Icons.arrow_back_ios, color: _streakTextColor(context)),
+                      icon: Icon(Icons.arrow_back_ios,
+                          color: _streakTextColor(context)),
                       onPressed: () => Get.back(),
                     ),
                     Expanded(
@@ -1133,7 +1794,8 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                     return SingleChildScrollView(
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       child: ConstrainedBox(
-                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                        constraints:
+                            BoxConstraints(minHeight: constraints.maxHeight),
                         child: Center(
                           child: Screenshot(
                             controller: _screenshotController,
@@ -1143,7 +1805,10 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                                 item.prayerText,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: MediaQuery.of(context).size.width > 450 ? 22 : 20,
+                                  fontSize:
+                                      MediaQuery.of(context).size.width > 450
+                                          ? 22
+                                          : 20,
                                   height: 1.7,
                                   color: _streakTextColor(context),
                                   fontFamily: 'Georgia',
@@ -1175,7 +1840,8 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                           await StreakSavedStorage.remove(
                               'prayer', title, item.prayerText);
                           if (mounted) setState(() => _saved = false);
-                          if (context.mounted) _showSavedToast(context, saved: false);
+                          if (context.mounted)
+                            _showSavedToast(context, saved: false);
                         } else {
                           await StreakSavedStorage.add(StreakSavedItem(
                             type: 'prayer',
@@ -1184,7 +1850,8 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                             savedAt: DateTime.now().toIso8601String(),
                           ));
                           if (mounted) setState(() => _saved = true);
-                          if (context.mounted) _showSavedToast(context, saved: true);
+                          if (context.mounted)
+                            _showSavedToast(context, saved: true);
                         }
                       },
                     ),
@@ -1204,15 +1871,104 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                                 SharPreferences.streakFlowCreditsAwardedDate,
                                 today);
                           }
+                          final isRestoreRun = await SharPreferences.getBoolean(
+                                  SharPreferences.streakFlowRestoreActive) ==
+                              true;
+                          final restoreDate = await SharPreferences.getString(
+                              SharPreferences.streakFlowRestoreDate);
+                          final completionDate = (isRestoreRun &&
+                                  restoreDate != null &&
+                                  restoreDate.isNotEmpty)
+                              ? restoreDate
+                              : DateTime.now().toIso8601String().split('T')[0];
+
+                          await _storeStreakFlowStepsForDay(
+                            completionDate,
+                            4,
+                          );
+                          // When completing a restored day (e.g. yesterday), make sure streak count/date
+                          // reflects that day so today's completion increments correctly (Day 2, Day 3, ...).
+                          if (isRestoreRun) {
+                            await _recordStreakActivityForDay(completionDate);
+                          }
                           await SharPreferences.setString(
                               SharPreferences.streakFlowLastShownDate,
-                              DateTime.now().toIso8601String().split('T')[0]);
+                              completionDate);
+                          if (isRestoreRun) {
+                            final completed = await SharPreferences.getStringList(
+                                    SharPreferences.streakCompletedDates) ??
+                                <String>[];
+                            if (!completed.contains(completionDate)) {
+                              await SharPreferences.setListString(
+                                SharPreferences.streakCompletedDates,
+                                [...completed, completionDate],
+                              );
+                            }
+                          }
                           if (!context.mounted) return;
-                          final streakCount = await StreakService.getCurrentStreak();
+                          final streakCount =
+                              await StreakService.getCurrentStreak();
                           await SharPreferences.setInt(
                               SharPreferences.pendingStreakCompleteCelebration,
                               streakCount);
                           if (!context.mounted) return;
+                          if (isRestoreRun) {
+                            await SharPreferences.setBoolean(
+                                SharPreferences.streakFlowRestoreActive, false);
+                            await SharPreferences.setString(
+                                SharPreferences.streakFlowRestoreDate, '');
+                            await showCupertinoDialog<void>(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (_) => CupertinoAlertDialog(
+                                title: const Text('Completion'),
+                                content: const Text(
+                                    'Yesterday\'s faith journey is completed.'),
+                                actions: [
+                                  CupertinoDialogAction(
+                                    onPressed: () => Navigator.of(context).pop(),
+                                    child: const Text('OK'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (!context.mounted) return;
+                            final startToday = await showCupertinoDialog<bool>(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (_) => CupertinoAlertDialog(
+                                    title: const Text('Start today\'s journey?'),
+                                    content: const Text(
+                                      'Would you like to start today\'s faith journey?',
+                                    ),
+                                    actions: [
+                                      CupertinoDialogAction(
+                                        onPressed: () => Navigator.of(context).pop(false),
+                                        child: const Text('No'),
+                                      ),
+                                      CupertinoDialogAction(
+                                        isDefaultAction: true,
+                                        onPressed: () => Navigator.of(context).pop(true),
+                                        child: const Text('Yes'),
+                                      ),
+                                    ],
+                                  ),
+                                ) ??
+                                false;
+                            if (!context.mounted) return;
+                            if (startToday) {
+                              await SharPreferences.setInt(
+                                  SharPreferences.streakFlowStepsCompletedToday, 0);
+                              await SharPreferences.setString(
+                                SharPreferences.streakFlowStartedDate,
+                                DateTime.now().toIso8601String().split('T')[0],
+                              );
+                              Get.offAll(() => const StreakConnectionScreen());
+                              return;
+                            }
+                            _goToHome(context);
+                            return;
+                          }
                           Get.offAll(() => const StreakCompletedScreen());
                         },
                       ),
@@ -1247,8 +2003,217 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
 }
 
 /// 5. Daily Streak Completed!
-class StreakCompletedScreen extends StatelessWidget {
+class StreakCompletedScreen extends StatefulWidget {
   const StreakCompletedScreen({super.key});
+
+  @override
+  State<StreakCompletedScreen> createState() => _StreakCompletedScreenState();
+}
+
+class _StreakCompletedScreenState extends State<StreakCompletedScreen>
+    with TickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final AnimationController _twinkleCtrl;
+  late final AnimationController _rayCtrl;
+  late final Animation<double> _fade;
+  late final Animation<double> _scale;
+  late final Animation<Offset> _cardSlide;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..forward();
+    _twinkleCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat(reverse: true);
+    _rayCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 9000),
+    )..repeat();
+    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic);
+    _scale = Tween<double>(begin: 0.94, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack),
+    );
+    _cardSlide = Tween<Offset>(
+      begin: const Offset(0, 0.08),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    _twinkleCtrl.dispose();
+    _rayCtrl.dispose();
+    super.dispose();
+  }
+
+  Widget _lightRaysOverlay(bool isDark) {
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: _rayCtrl,
+        builder: (context, _) {
+          final baseOpacity = isDark ? 0.20 : 0.26;
+          Widget rays(double angle, double size, double opacity) {
+            return Transform.rotate(
+              angle: angle,
+              child: SizedBox(
+                width: size,
+                height: size,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: List.generate(12, (i) {
+                    return Transform.rotate(
+                      angle: (math.pi * 2 / 12) * i,
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: Container(
+                          width: 4,
+                          height: size * 0.28,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(3),
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                const Color(0xFFFFE082).withOpacity(opacity),
+                                Colors.transparent,
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            );
+          }
+
+          return Stack(
+            alignment: Alignment.topCenter,
+            children: [
+              Positioned(
+                top: 12,
+                child: rays(_rayCtrl.value * math.pi * 2, 350, baseOpacity),
+              ),
+              Positioned(
+                top: 26,
+                child: rays(
+                    -_rayCtrl.value * math.pi * 1.4, 300, baseOpacity * 0.75),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _celebrationBurstOverlay(bool isDark) {
+    // One-shot golden burst/ripple animation that fully disappears.
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: _ctrl,
+        builder: (context, _) {
+          final t = _ctrl.value;
+          final opacity = (1.0 - (t * 1.6)).clamp(0.0, 1.0);
+          final maxRing = MediaQuery.of(context).size.width * 0.55;
+          return Opacity(
+            opacity: opacity,
+            child: Stack(
+              alignment: Alignment.topCenter,
+              children: [
+                Positioned(
+                  top: 46,
+                  child: Container(
+                    width: maxRing * (0.35 + (0.65 * t)),
+                    height: maxRing * (0.35 + (0.65 * t)),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFFFFD54F)
+                            .withOpacity(isDark ? 0.7 : 0.6),
+                        width: 2.0,
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 62,
+                  child: Container(
+                    width: maxRing * (0.22 + (0.52 * t)),
+                    height: maxRing * (0.22 + (0.52 * t)),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFFC9A227)
+                            .withOpacity(isDark ? 0.75 : 0.65),
+                        width: 1.6,
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 74,
+                  child: Container(
+                    width: maxRing * 0.34,
+                    height: maxRing * 0.34,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          const Color(0xFFFFF6D5)
+                              .withOpacity(isDark ? 0.22 : 0.30),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                ...List.generate(10, (i) {
+                  final base = i / 10.0;
+                  final theta = base * math.pi * 2;
+                  final radius = 44 + (90 * t);
+                  final cx = MediaQuery.of(context).size.width / 2;
+                  final cy = 100.0;
+                  final x = cx + math.cos(theta) * radius;
+                  final y = cy + math.sin(theta) * (radius * 0.78);
+                  final size = 7.0 + ((i % 3) * 2.0);
+                  return Positioned(
+                    left: x,
+                    top: y,
+                    child: Container(
+                      width: size,
+                      height: size,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: (i.isEven
+                                ? const Color(0xFFFFD54F)
+                                : const Color(0xFFFFF6D5))
+                            .withOpacity(0.85 * opacity),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFFFD54F)
+                                .withOpacity(0.35 * opacity),
+                            blurRadius: 10,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1258,120 +2223,225 @@ class StreakCompletedScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: bgColor,
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            const SizedBox(height: 40),
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isDark ? Colors.white24 : const Color(0xFF8B7355),
-                border: Border.all(color: _kStreakGold, width: 3),
-                boxShadow: [
-                  BoxShadow(
-                    color: _kStreakGold.withOpacity(0.4),
-                    blurRadius: 16,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.local_fire_department_rounded,
-                size: 52,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Daily Streak Completed!',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: MediaQuery.of(context).size.width > 450 ? 26 : 22,
-                fontWeight: FontWeight.w700,
-                color: textColor,
-                fontFamily: 'Georgia',
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'You\'re walking faithfully today.',
-              style: TextStyle(
-                fontSize: 16,
-                color: textColor,
-                fontFamily: 'Georgia',
-              ),
-            ),
-            Text(
-              'Keep the light alive.',
-              style: TextStyle(
-                fontSize: 16,
-                color: textColor,
-                fontFamily: 'Georgia',
-              ),
-            ),
-            const SizedBox(height: 32),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 32),
-              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
-              decoration: BoxDecoration(
-                color: _streakPanelColor(context),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _kStreakGold, width: 1.5),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    'REWARD EARNED',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.2,
-                      color: textColor,
-                      fontFamily: 'Georgia',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.monetization_on,
-                          color: _kStreakGold, size: 28),
-                      const SizedBox(width: 8),
-                      Text(
-                        '+20 Faith Credits',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: textColor,
-                          fontFamily: 'Georgia',
+            _lightRaysOverlay(isDark),
+            _celebrationBurstOverlay(isDark),
+            Column(
+              children: [
+                const SizedBox(height: 40),
+                FutureBuilder<int?>(
+                  future: SharPreferences.getInt(
+                      SharPreferences.pendingStreakCompleteCelebration),
+                  builder: (context, snap) {
+                    final streakDays = (snap.data ?? 0).clamp(0, 9999);
+                    return FadeTransition(
+                      opacity: _fade,
+                      child: ScaleTransition(
+                        scale: _scale,
+                        child: Column(
+                          children: [
+                            AnimatedBuilder(
+                              animation: _twinkleCtrl,
+                              builder: (context, child) {
+                                final pulse = 1 + (_twinkleCtrl.value * 0.06);
+                                return Transform.scale(
+                                  scale: pulse,
+                                  child: Container(
+                                    width: 108,
+                                    height: 108,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: isDark
+                                          ? Colors.white.withOpacity(0.12)
+                                          : const Color(0xFF8B7355),
+                                      border: Border.all(
+                                          color: _kStreakGold, width: 3),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: _kStreakGold.withOpacity(0.22 +
+                                              (_twinkleCtrl.value * 0.3)),
+                                          blurRadius:
+                                              14 + (_twinkleCtrl.value * 18),
+                                          spreadRadius:
+                                              1 + (_twinkleCtrl.value * 3),
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.local_fire_department,
+                                      size: 58,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              streakDays > 0
+                                  ? '$streakDays Day Streak!'
+                                  : 'Streak Completed!',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize:
+                                    MediaQuery.of(context).size.width > 450
+                                        ? 30
+                                        : 24,
+                                fontWeight: FontWeight.w800,
+                                color: textColor,
+                                fontFamily: 'Georgia',
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
+                    );
+                  },
+                ),
+                // Container(
+                //   width: 100,
+                //   height: 100,
+                //   decoration: BoxDecoration(
+                //     shape: BoxShape.circle,
+                //     // color: isDark ? Colors.white24 : const Color(0xFF8B7355),
+                //     border: Border.all(color: _kStreakGold, width: 3),
+                //     // boxShadow: [
+                //     //   BoxShadow(
+                //     //     color: _kStreakGold.withOpacity(0.4),
+                //     //     blurRadius: 16,
+                //     //     spreadRadius: 2,
+                //     //   ),
+                //     // ],
+                //   ),
+                //   child: TweenAnimationBuilder<double>(
+                //     tween: Tween(begin: 0.96, end: 1.06),
+                //     duration: const Duration(milliseconds: 900),
+                //     curve: Curves.easeInOut,
+                //     onEnd: () {},
+                //     builder: (context, scale, child) {
+                //       return Transform.scale(
+                //         scale: scale,
+                //         child: Opacity(
+                //           opacity: (scale - 0.9).clamp(0.0, 1.0),
+                //           child: child,
+                //         ),
+                //       );
+                //     },
+                //     child: Stack(
+                //       alignment: Alignment.center,
+                //       children: const [
+                //         Icon(
+                //           Icons.local_fire_department,
+                //           size: 58,
+                //           color: Colors.blue,
+                //         ),
+                //         Icon(
+                //           Icons.local_fire_department,
+                //           size: 52,
+                //           // color: Colors.white,
+                //         ),
+                //       ],
+                //     ),
+                //   ),
+                // ),
+                const SizedBox(height: 12),
+                const SizedBox(height: 8),
+                Text(
+                  'You\'re walking faithfully today.',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: textColor,
+                    fontFamily: 'Georgia',
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Added to your Wallet',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: textColor.withOpacity(0.8),
-                      fontFamily: 'Georgia',
+                ),
+                Text(
+                  'Keep the light alive.',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: textColor,
+                    fontFamily: 'Georgia',
+                  ),
+                ),
+                const SizedBox(height: 32),
+                SlideTransition(
+                  position: _cardSlide,
+                  child: FadeTransition(
+                    opacity: _fade,
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 32),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 20, horizontal: 24),
+                      decoration: BoxDecoration(
+                        color: _streakPanelColor(context),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: _kStreakGold, width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                _kStreakGold.withOpacity(isDark ? 0.20 : 0.16),
+                            blurRadius: 16,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            'REWARD EARNED',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.2,
+                              color: textColor,
+                              fontFamily: 'Georgia',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.monetization_on,
+                                  color: _kStreakGold, size: 28),
+                              const SizedBox(width: 8),
+                              Text(
+                                '+20 Faith Credits',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  color: textColor,
+                                  fontFamily: 'Georgia',
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Added to your Wallet',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: textColor.withOpacity(0.8),
+                              fontFamily: 'Georgia',
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ],
-              ),
-            ),
-            const Spacer(),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-              child: SizedBox(
-                width: double.infinity,
-                child: _parchmentButton(
-                  context,
-                  label: 'Continue My Journey',
-                  onPressed: () => _goToHome(context),
                 ),
-              ),
+                const Spacer(),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: _parchmentButton(
+                      context,
+                      label: 'Continue My Journey',
+                      onPressed: () => _goToHome(context),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

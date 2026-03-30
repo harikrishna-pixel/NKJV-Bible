@@ -212,7 +212,7 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete comment?'),
-        content: const Text('This cannot be undone.'),
+        content: const Text('This comment will be permanently deleted.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -255,31 +255,29 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
     final brown = const Color(0xFF5C4033);
-    final cream =
-        isDark ? CommanColor.darkPrimaryColor : const Color(0xFFF5F0E6);
+    final cream = isDark
+        ? CommanColor.darkPrimaryColor
+        : (themeProvider.currentCustomTheme == AppCustomTheme.vintage
+            ? const Color(0xFFF5F0E6)
+            : themeProvider.backgroundColor);
     final cardBg = isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white;
 
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTap: () => FocusScope.of(context).unfocus(),
-      child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.82,
-        child: Container(
-          decoration: BoxDecoration(
-            color: cream,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 10),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade400,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Center(
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.82,
+            child: Container(
+              decoration: BoxDecoration(
+                color: cream,
+                borderRadius: BorderRadius.circular(16),
               ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 10),
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
                 child: Container(
@@ -484,8 +482,10 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                   ),
                 ],
               ),
+            ),
           ),
         ),
+      ),
     );
   }
 }

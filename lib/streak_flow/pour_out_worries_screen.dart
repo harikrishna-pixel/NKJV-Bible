@@ -146,7 +146,7 @@ class _PourOutWorriesScreenState extends State<PourOutWorriesScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       decoration: BoxDecoration(
                         color: _hasText
-                            ? CommanColor.lightDarkPrimary(context)
+                            ? CommanColor.lightDarkPrimary(context).withOpacity(0.92)
                             : (isDark ? Colors.white.withOpacity(0.12) : _cream.withOpacity(0.9)),
                         borderRadius: BorderRadius.circular(28),
                         border: Border.all(
@@ -159,6 +159,13 @@ class _PourOutWorriesScreenState extends State<PourOutWorriesScreen> {
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
+                          if (_hasText)
+                            BoxShadow(
+                              color: _gold.withOpacity(0.2),
+                              blurRadius: 10,
+                              spreadRadius: 1,
+                              offset: const Offset(0, 1),
+                            ),
                         ],
                       ),
                       child: Center(

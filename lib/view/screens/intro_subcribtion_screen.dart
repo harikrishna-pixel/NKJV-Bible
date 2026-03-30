@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:biblebookapp/Model/product_details_model.dart' as m;
 import 'package:biblebookapp/controller/api_service.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
@@ -12,6 +11,7 @@ import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/services/statsig/statsig_service.dart';
 import 'package:biblebookapp/services/paywall_preload_service.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
+import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/streak_flow/streak_flow_screens.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
@@ -45,6 +45,8 @@ class SubscriptionScreen extends StatefulWidget {
   /// When true, triggers the same existing purchase flow automatically
   /// after products are ready (used by milestone screens).
   final bool autoStartSelectedPlanPurchase;
+  /// Transparent host: runs IAP (e.g. milestone Unlock) without showing paywall UI.
+  final bool invisiblePurchaseHost;
 
   const SubscriptionScreen({
     super.key,
@@ -55,6 +57,7 @@ class SubscriptionScreen extends StatefulWidget {
     this.fromHomeExitOffer = false,
     this.initialSelectedPlanIndex,
     this.autoStartSelectedPlanPurchase = false,
+    this.invisiblePurchaseHost = false,
   });
 
   /// Navigate to paywall from home (direct, no exit offer).
@@ -133,6 +136,36 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     await SharPreferences.setString('OpenAd', '1');
     await SharPreferences.setBoolean('startpurches', true);
     _buyProduct(_products[idx]);
+  }
+
+  Future<void> _addLifetimeWalletBonus() async {
+    final amount = widget.invisiblePurchaseHost ? 1000 : 5000;
+    await WalletService.addCredits(amount);
+  }
+
+  Future<void> _finishAfterLifetimePurchaseSuccess() async {
+    if (!mounted) return;
+    if (widget.invisiblePurchaseHost) {
+      Navigator.of(context).pop(true);
+    } else {
+      await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
+    }
+  }
+
+  Future<void> _navigateAfterNonLifetimePurchaseSuccess() async {
+    if (!mounted) return;
+    if (widget.invisiblePurchaseHost) {
+      Navigator.of(context).pop(false);
+    } else {
+      await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
+    }
+  }
+
+  void _popInvisiblePurchaseHost([bool success = false]) {
+    if (!mounted || !widget.invisiblePurchaseHost) return;
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop(success);
+    }
   }
 
   DownloadProvider? _myProvider;
@@ -1254,9 +1287,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           DebugConsole.log(" purchases error - $purchaseDetails");
           // Reset userTap on error
           if (mounted) {
+            EasyLoading.dismiss();
             setState(() {
               userTap = false;
             });
+            _popInvisiblePurchaseHost(false);
           }
         } else if (purchaseDetails.status == PurchaseStatus.purchased ||
             purchaseDetails.status == PurchaseStatus.restored) {
@@ -1307,7 +1342,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   Constants.showToast('Purchase Successful');
                   await SharPreferences.setBoolean('closead', true);
                   debugPrint("restore data 2");
-                  await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
+                  await _navigateAfterNonLifetimePurchaseSuccess();
                   return;
                 } else if (purchaseDetails.productID == widget.oneYearPlan) {
                   await controller.disableAd(const Duration(days: 366));
@@ -1320,7 +1355,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   Constants.showToast('Purchase Successful');
                   await SharPreferences.setBoolean('closead', true);
                   debugPrint("restore data 3 ");
-                  await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
+                  await _navigateAfterNonLifetimePurchaseSuccess();
                   return;
                 } else if (purchaseDetails.productID == widget.lifeTimePlan) {
                   await controller.disableAd(const Duration(days: 3650012345));
@@ -1344,10 +1379,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     await _inAppPurchase.completePurchase(purchaseDetails);
                   }
                   EasyLoading.dismiss();
+                  await _addLifetimeWalletBonus();
                   Constants.showToast('Purchase Successful');
                   await SharPreferences.setBoolean('closead', true);
                   debugPrint("restore data 4 ");
-                  await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
+                  await _finishAfterLifetimePurchaseSuccess();
                   return;
                 } else {
                   // Check if this is exit offer purchase
@@ -1380,11 +1416,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       await _inAppPurchase.completePurchase(purchaseDetails);
                     }
                     EasyLoading.dismiss();
+                    await _addLifetimeWalletBonus();
                     Constants.showToast('Purchase Successful');
                     await SharPreferences.setBoolean('closead', true);
                     debugPrint(
                         "exit offer purchase success - redirecting to home");
-                    await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
+                    await _finishAfterLifetimePurchaseSuccess();
                     return;
                   } else {
                     // Fallback: If product ID doesn't match any known plan, treat as lifetime purchase
@@ -1399,11 +1436,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       await _inAppPurchase.completePurchase(purchaseDetails);
                     }
                     EasyLoading.dismiss();
+                    await _addLifetimeWalletBonus();
                     Constants.showToast('Purchase Successful');
                     await SharPreferences.setBoolean('closead', true);
                     debugPrint(
                         "purchase success (fallback) - redirecting to home");
-                    await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
+                    await _finishAfterLifetimePurchaseSuccess();
                     return;
                   }
                 }
@@ -1449,10 +1487,19 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           EasyLoading.dismiss();
         } else if (purchaseDetails.status == PurchaseStatus.canceled) {
           EasyLoading.dismiss();
-          Constants.showToast('Something went wrong');
+          if (widget.invisiblePurchaseHost) {
+            if (mounted) {
+              setState(() {
+                userTap = false;
+              });
+              _popInvisiblePurchaseHost(false);
+            }
+          } else {
+            Constants.showToast('Something went wrong');
 
-          // Check if this is the first time showing paywall and user canceled
-          await _checkAndShowExitOffer(controller);
+            // Check if this is the first time showing paywall and user canceled
+            await _checkAndShowExitOffer(controller);
+          }
         }
       }
     });
@@ -1742,11 +1789,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   @override
   void initState() {
     super.initState();
-    // Track Paywall Screen event
-    StatsigService.trackPaywallScreen();
+    if (!widget.invisiblePurchaseHost) {
+      // Track Paywall Screen event
+      StatsigService.trackPaywallScreen();
 
-    // Mark that paywall is being shown for the first time tracking
-    _markPaywallShown();
+      // Mark that paywall is being shown for the first time tracking
+      _markPaywallShown();
+    }
 
     _initialize();
     // WidgetsBinding.instance.addObserver(this);
@@ -1825,6 +1874,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   @override
   void dispose() {
     debugPrint("iap ad - dispose");
+    if (widget.invisiblePurchaseHost) {
+      EasyLoading.dismiss();
+    }
     _subscription?.cancel();
     _loadingTimeoutTimer?.cancel(); // Cancel loading timeout timer
     // Reset exit offer flag on dispose
@@ -2039,6 +2091,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     //     });
     //   });
     // });
+
+    if (widget.invisiblePurchaseHost) {
+      return PopScope(
+        canPop: true,
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: const SizedBox.shrink(),
+        ),
+      );
+    }
 
     return PopScope(
       canPop: false,
@@ -2483,8 +2545,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   String? _getBadgeText(int index, DashBoardController controller) {
     final fakeOfferValue = _fakeOffer(_products[index], controller);
-    if (_products[index].id == widget.oneYearPlan && fakeOfferValue != null) {
-      return 'Save ${fakeOfferValue.toStringAsFixed(0)}%';
+    if (_products[index].id == widget.oneYearPlan) {
+      if (fakeOfferValue != null && fakeOfferValue > 0) {
+        return 'Save ${fakeOfferValue.toStringAsFixed(0)}%';
+      }
+      // Fallback for cases where API value is missing.
+      return 'Save 50%';
     }
     if (_products[index].id == widget.lifeTimePlan) {
       return 'Best Value';

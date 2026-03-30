@@ -10,7 +10,7 @@ class PrayerWallService {
 
   static Map<String, String> get _jsonHeaders => {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        'Authorization': 'marberx@123tech',
       };
 
   static String? _extractId(dynamic decoded) {
@@ -35,16 +35,22 @@ class PrayerWallService {
     required String prayerDescription,
     required String prayerCategory,
     bool isAnonymous = true,
+    int prayerDuration = 7,
   }) async {
+    final bodyMap = <String, dynamic>{
+      'prayer_title': prayerTitle,
+      'prayer_description': prayerDescription,
+      'prayer_category': prayerCategory,
+      'isAnonymous': isAnonymous,
+      'prayer_duration': prayerDuration,
+    };
+    final bodyJson = jsonEncode(bodyMap);
+    print('PrayerWallService.createPrayer request body: $bodyJson');
+
     final res = await http.post(
       Uri.parse(PrayerWallApiConstant.prayers),
       headers: _jsonHeaders,
-      body: jsonEncode({
-        'prayer_title': prayerTitle,
-        'prayer_description': prayerDescription,
-        'prayer_category': prayerCategory,
-        'isAnonymous': isAnonymous,
-      }),
+      body: bodyJson,
     );
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception('Create prayer failed (${res.statusCode}): ${res.body}');
@@ -53,6 +59,78 @@ class PrayerWallService {
     if (decoded is Map<String, dynamic>) return decoded;
     if (decoded is Map) return Map<String, dynamic>.from(decoded);
     return <String, dynamic>{};
+  }
+
+  static Future<void> updatePrayer({
+    required String prayerId,
+    required String prayerTitle,
+    required String prayerDescription,
+  }) async {
+    final body = jsonEncode({
+      // Support multiple backend shapes without changing UI logic.
+      'prayerId': prayerId,
+      '_id': prayerId,
+      'id': prayerId,
+      'prayer_title': prayerTitle,
+      'prayer_description': prayerDescription,
+    });
+
+    final res = await http.patch(
+      Uri.parse(PrayerWallApiConstant.prayers),
+      headers: _jsonHeaders,
+      body: body,
+    );
+    if (res.statusCode >= 200 && res.statusCode < 300) return;
+
+    if (res.statusCode == 404) {
+      final res2 = await http.patch(
+        Uri.parse('${PrayerWallApiConstant.prayers}/$prayerId'),
+        headers: _jsonHeaders,
+        body: body,
+      );
+      if (res2.statusCode >= 200 && res2.statusCode < 300) return;
+
+      final res3 = await http.put(
+        Uri.parse('${PrayerWallApiConstant.prayers}/$prayerId'),
+        headers: _jsonHeaders,
+        body: body,
+      );
+      if (res3.statusCode >= 200 && res3.statusCode < 300) return;
+
+      throw Exception(
+          'Update prayer failed (${res3.statusCode}): ${res3.body}');
+    }
+
+    throw Exception('Update prayer failed (${res.statusCode}): ${res.body}');
+  }
+
+  static Future<void> deletePrayer(String prayerId) async {
+    final body = jsonEncode({
+      // Support multiple backend shapes without changing UI logic.
+      'prayerId': prayerId,
+      '_id': prayerId,
+      'id': prayerId,
+    });
+
+    final res = await http.delete(
+      Uri.parse(PrayerWallApiConstant.prayers),
+      headers: _jsonHeaders,
+      body: body,
+    );
+    if (res.statusCode >= 200 && res.statusCode < 300) return;
+
+    if (res.statusCode == 404) {
+      final res2 = await http.delete(
+        Uri.parse('${PrayerWallApiConstant.prayers}/$prayerId'),
+        headers: _jsonHeaders,
+        body: body,
+      );
+      if (res2.statusCode >= 200 && res2.statusCode < 300) return;
+      throw Exception(
+          'Delete prayer failed (${res2.statusCode}): ${res2.body}');
+    }
+
+    throw Exception('Delete prayer failed (${res.statusCode}): ${res.body}');
   }
 
   /// Returns like count per prayerId from either full list or filtered payload.
@@ -240,25 +318,71 @@ class PrayerWallService {
     required String commentId,
     required String commentText,
   }) async {
+    final body = jsonEncode({
+      // Support multiple backend shapes without changing UI logic.
+      'commentId': commentId,
+      '_id': commentId,
+      'id': commentId,
+      'comment_text': commentText,
+      'commentText': commentText,
+      'text': commentText,
+    });
+
     final res = await http.patch(
       Uri.parse(PrayerWallApiConstant.comments),
       headers: _jsonHeaders,
-      body: jsonEncode({
-        'commentId': commentId,
-        'comment_text': commentText,
-      }),
+      body: body,
     );
     if (res.statusCode >= 200 && res.statusCode < 300) return;
+
+    if (res.statusCode == 404) {
+      final res2 = await http.patch(
+        Uri.parse('${PrayerWallApiConstant.comments}/$commentId'),
+        headers: _jsonHeaders,
+        body: body,
+      );
+      if (res2.statusCode >= 200 && res2.statusCode < 300) return;
+
+      final res3 = await http.put(
+        Uri.parse('${PrayerWallApiConstant.comments}/$commentId'),
+        headers: _jsonHeaders,
+        body: body,
+      );
+      if (res3.statusCode >= 200 && res3.statusCode < 300) return;
+
+      throw Exception(
+          'Update comment failed (${res3.statusCode}): ${res3.body}');
+    }
+
     throw Exception('Update comment failed (${res.statusCode}): ${res.body}');
   }
 
   static Future<void> deleteComment(String commentId) async {
+    final body = jsonEncode({
+      // Support multiple backend shapes without changing UI logic.
+      'commentId': commentId,
+      '_id': commentId,
+      'id': commentId,
+    });
+
     final res = await http.delete(
       Uri.parse(PrayerWallApiConstant.comments),
       headers: _jsonHeaders,
-      body: jsonEncode({'commentId': commentId}),
+      body: body,
     );
     if (res.statusCode >= 200 && res.statusCode < 300) return;
+
+    if (res.statusCode == 404) {
+      final res2 = await http.delete(
+        Uri.parse('${PrayerWallApiConstant.comments}/$commentId'),
+        headers: _jsonHeaders,
+        body: body,
+      );
+      if (res2.statusCode >= 200 && res2.statusCode < 300) return;
+      throw Exception(
+          'Delete comment failed (${res2.statusCode}): ${res2.body}');
+    }
+
     throw Exception('Delete comment failed (${res.statusCode}): ${res.body}');
   }
 }

@@ -90,4 +90,12 @@ class PrayerWallLocalStore {
     m[pid] = name;
     await savePrayerAuthorMap(m);
   }
+
+  static Future<void> removePrayerAuthor({required String prayerId}) async {
+    final pid = prayerId.trim();
+    if (pid.isEmpty) return;
+    final m = await loadPrayerAuthorMap();
+    m.remove(pid);
+    await savePrayerAuthorMap(m);
+  }
 }

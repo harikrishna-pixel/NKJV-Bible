@@ -256,15 +256,114 @@ class _StreakSavedListScreenState extends State<StreakSavedListScreen> {
                 Expanded(
                   child: Center(
                     child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Text(
-                        'No saved verses, devotionals, or prayers yet.\nSave from your Daily Journey flow.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: textColor.withOpacity(0.8),
-                          fontFamily: 'Georgia',
-                        ),
+                      padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 130,
+                            height: 130,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: panelColor.withOpacity(isDark ? 0.35 : 0.9),
+                              border: Border.all(
+                                color: _gold.withOpacity(0.65),
+                                width: 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _gold.withOpacity(0.25),
+                                  blurRadius: 22,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Icon(Icons.auto_stories,
+                                    size: 64, color: _gold.withOpacity(0.95)),
+                                // Positioned(
+                                //   right: 28,
+                                //   bottom: 28,
+                                //   child: Icon(Icons.bookmark,
+                                //       size: 24,
+                                //       color:
+                                //           textColor.withOpacity(isDark ? 0.85 : 0.75)),
+                                // ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 22),
+                          Text(
+                            'Nothing saved yet',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              color: textColor,
+                              fontFamily: 'Georgia',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'No saved verses, devotionals or prayers yet.\nStart your Daily Journey to save what inspires you.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 15,
+                              height: 1.45,
+                              color: textColor.withOpacity(0.85),
+                              fontFamily: 'Georgia',
+                            ),
+                          ),
+                          const SizedBox(height: 22),
+                          SizedBox(
+                            width: 240,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () => Get.back(),
+                                borderRadius: BorderRadius.circular(28),
+                                child: Container(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 14),
+                                  decoration: BoxDecoration(
+                                    color: CommanColor.lightDarkPrimary(context),
+                                    borderRadius: BorderRadius.circular(28),
+                                    border: Border.all(
+                                      color: _gold.withOpacity(0.65),
+                                      width: 2,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.18),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: const [
+                                      Text(
+                                        'Start Your Journey',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                          fontFamily: 'Georgia',
+                                        ),
+                                      ),
+                                      SizedBox(width: 10),
+                                      Icon(Icons.arrow_forward,
+                                          size: 18, color: Colors.white),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -381,7 +480,7 @@ class _SavedItemCardState extends State<_SavedItemCard> {
                   Text(
                     _typeLabel(item.type),
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: gold,
                       fontFamily: 'Georgia',
@@ -392,7 +491,7 @@ class _SavedItemCardState extends State<_SavedItemCard> {
                     Text(
                       _formatSavedDate(item.savedAt),
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 13,
                         color: textColor.withOpacity(0.65),
                         fontFamily: 'Georgia',
                       ),
@@ -417,7 +516,7 @@ class _SavedItemCardState extends State<_SavedItemCard> {
                 Text(
                   item.title,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 17,
                     fontWeight: FontWeight.w600,
                     color: textColor,
                     fontFamily: 'Georgia',
@@ -429,7 +528,7 @@ class _SavedItemCardState extends State<_SavedItemCard> {
                 maxLines: _expanded ? null : 2,
                 overflow: _expanded ? null : TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 15,
+                  fontSize: 17,
                   height: 1.45,
                   color: textColor,
                   fontFamily: 'Georgia',
