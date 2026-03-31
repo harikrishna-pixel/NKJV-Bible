@@ -111,6 +111,9 @@ class SharPreferences {
   static const pendingStreakCompleteCelebration = 'pending_streak_complete_celebration';
   /// Last calendar day (YYYY-MM-DD) the streak celebration dialog was shown. Used to show at most once per day.
   static const streakCelebrationShownDate = 'streak_celebration_shown_date';
+  /// Last calendar day (YYYY-MM-DD) the full-screen "Daily Streak Completed" screen was shown.
+  /// Used to prevent showing that screen multiple times in the same day.
+  static const streakCompletedScreenShownDate = 'streak_completed_screen_shown_date';
   /// JSON array of saved streak items (verses, devotionals, prayers). See StreakSavedStorage.
   static const streakSavedItems = 'streak_saved_items';
 

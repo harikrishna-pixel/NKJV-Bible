@@ -145,6 +145,7 @@ class TakeMomentIntroScreen extends StatelessWidget {
 
   Widget _parchmentButton(BuildContext context, {required String label, required VoidCallback onPressed}) {
     final isDark = Provider.of<ThemeProvider>(context, listen: false).themeMode == ThemeMode.dark;
+    final lightBtnColor = CommanColor.lightDarkPrimary(context).withOpacity(0.92);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Material(
@@ -155,7 +156,7 @@ class TakeMomentIntroScreen extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
             decoration: BoxDecoration(
-              color: isDark ? Colors.white.withOpacity(0.2) : const Color(0xFF3D2914),
+              color: isDark ? Colors.white.withOpacity(0.2) : lightBtnColor,
               borderRadius: BorderRadius.circular(28),
               border: Border.all(color: (isDark ? Colors.white : _cream).withOpacity(0.6), width: 2),
               boxShadow: [

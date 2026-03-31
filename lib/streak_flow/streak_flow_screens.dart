@@ -1155,9 +1155,9 @@ Widget _parchmentButton(
   final isDark = _isStreakDark(context);
   final baseTextColor = _streakTextColor(context);
   final btnBg = isDark
-      ? Colors.white.withOpacity(0.15)
+      ? const Color(0xFF3B2A1A)
       : CommanColor.lightDarkPrimary(context);
-  final labelColor = isDark ? baseTextColor : Colors.white;
+  final labelColor = isDark ? _kParchmentLight : Colors.white;
   return Padding(
     padding: const EdgeInsets.symmetric(horizontal: 24),
     child: Material(
@@ -1171,10 +1171,10 @@ Widget _parchmentButton(
             color: btnBg,
             borderRadius: BorderRadius.circular(28),
             border: Border.all(
-                color: isDark ? baseTextColor : Colors.transparent, width: 1.5),
+                color: isDark ? _kCandleGold : Colors.transparent, width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: baseTextColor.withOpacity(0.15),
+                color: (isDark ? _kCandleGold : baseTextColor).withOpacity(0.15),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -2019,6 +2019,20 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                             }
                             _goToHome(context);
                             return;
+                          }
+                          // Prevent showing the "Daily Streak Completed" screen more than once per day.
+                          final todayKey =
+                              DateTime.now().toIso8601String().split('T')[0];
+                          if (completionDate == todayKey) {
+                            final lastShown = await SharPreferences.getString(
+                                SharPreferences.streakCompletedScreenShownDate);
+                            if (lastShown == todayKey) {
+                              _goToHome(context);
+                              return;
+                            }
+                            await SharPreferences.setString(
+                                SharPreferences.streakCompletedScreenShownDate,
+                                todayKey);
                           }
                           Get.offAll(() => const StreakCompletedScreen());
                         },

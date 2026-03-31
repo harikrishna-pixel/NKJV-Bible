@@ -19,6 +19,7 @@ class TakeMomentReleasedScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width > 450;
     final isDark = Provider.of<ThemeProvider>(context, listen: false).themeMode == ThemeMode.dark;
+    final lightBtnColor = CommanColor.lightDarkPrimary(context).withOpacity(0.92);
     final List<Color> gradientColors = isDark
         ? [CommanColor.darkPrimaryColor, CommanColor.darkPrimaryColor, CommanColor.darkPrimaryColor]
         : [const Color(0xFFF5F0E6), const Color(0xFFE8DED0), const Color(0xFFDDD0C0)];
@@ -108,7 +109,7 @@ class TakeMomentReleasedScreen extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         decoration: BoxDecoration(
-                          color: isDark ? Colors.white.withOpacity(0.2) : const Color(0xFF8B7355),
+                          color: isDark ? Colors.white.withOpacity(0.2) : lightBtnColor,
                           borderRadius: BorderRadius.circular(28),
                           border: Border.all(color: _gold, width: 2),
                           boxShadow: [

@@ -95,15 +95,21 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   ];
 
   // Helper to get translated topic questions
+  // NOTE: Chat language should control ONLY AI responses, not the Chat UI.
+  // Keep UI text stable (English) regardless of AppApiConstant.chatLanguage.
+  static const String _uiLang = 'EN';
   List<Map<String, String>> get _topicQuestions =>
       _topicQuestionKeys.map((keys) {
         return {
           'topic': ChatTranslations.get(
-              keys['topicKey']!, AppApiConstant.chatLanguage),
+              keys['topicKey']!, _uiLang),
           'question': ChatTranslations.get(
-              keys['questionKey']!, AppApiConstant.chatLanguage),
+              keys['questionKey']!, _uiLang),
         };
       }).toList();
+
+  // UI labels that should not follow chat response language.
+  String _tUi(String key) => ChatTranslations.get(key, _uiLang);
 
   @override
   void initState() {
@@ -1173,8 +1179,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         ),
                       ),
                       child: Text(
-                        ChatTranslations.get(
-                            'cancel', AppApiConstant.chatLanguage),
+                        _tUi('cancel'),
                         style: TextStyle(
                           fontSize: isTablet ? 16 : 14,
                           fontWeight: FontWeight.w600,
@@ -1666,7 +1671,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 const SizedBox(height: 20),
                 // Title
                 Text(
-                  ChatTranslations.get('new_chat', AppApiConstant.chatLanguage),
+                  _tUi('new_chat'),
                   style: TextStyle(
                     color: CommanColor.whiteBlack(context),
                     fontSize: screenWidth > 450 ? 24 : 22,
@@ -1677,8 +1682,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 const SizedBox(height: 12),
                 // Description
                 Text(
-                  ChatTranslations.get(
-                      'new_chat_confirmation', AppApiConstant.chatLanguage),
+                  _tUi('new_chat_confirmation'),
                   style: TextStyle(
                     color: CommanColor.whiteBlack(context).withOpacity(0.7),
                     fontSize: screenWidth > 450 ? 16 : 14,
@@ -1720,8 +1724,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              ChatTranslations.get(
-                                  'cancel', AppApiConstant.chatLanguage),
+                              _tUi('cancel'),
                               style: TextStyle(
                                 color: isDark
                                     ? CommanColor.white.withOpacity(0.8)
@@ -1768,8 +1771,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              ChatTranslations.get(
-                                  'new_chat_long', AppApiConstant.chatLanguage),
+                              _tUi('new_chat_long'),
                               style: TextStyle(
                                 color: CommanColor.white,
                                 fontSize: screenWidth > 450 ? 16 : 14,
@@ -2451,8 +2453,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                           Expanded(
                             child: Center(
                               child: Text(
-                                ChatTranslations.get(
-                                    'faith_chat', AppApiConstant.chatLanguage),
+                                _tUi('faith_chat'),
                                 style: TextStyle(
                                   color: isDark
                                       ? Colors.white
@@ -3111,11 +3112,11 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
               child: Row(
                 children: [
                   ChatTranslations.get(
-                      'what_god_say_fear', AppApiConstant.chatLanguage),
+                      'what_god_say_fear', _uiLang),
                   ChatTranslations.get(
-                      'example_forgive', AppApiConstant.chatLanguage),
+                      'example_forgive', _uiLang),
                   ChatTranslations.get(
-                      'example_purpose', AppApiConstant.chatLanguage),
+                      'example_purpose', _uiLang),
                 ].asMap().entries.map((entry) {
                   final index = entry.key;
                   final question = entry.value;
@@ -3483,18 +3484,18 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
       return hasVerseContext
           ? [
               ChatTranslations.get(
-                  'tell_more_verse', AppApiConstant.chatLanguage),
+                  'tell_more_verse', _uiLang),
               ChatTranslations.get(
-                  'how_apply_verse_life', AppApiConstant.chatLanguage),
+                  'how_apply_verse_life', _uiLang),
               ChatTranslations.get(
-                  'what_else_verse_teach', AppApiConstant.chatLanguage),
+                  'what_else_verse_teach', _uiLang),
             ]
           : [
-              ChatTranslations.get('explain_more', AppApiConstant.chatLanguage),
+              ChatTranslations.get('explain_more', _uiLang),
               ChatTranslations.get(
-                  'how_apply_this', AppApiConstant.chatLanguage),
+                  'how_apply_this', _uiLang),
               ChatTranslations.get(
-                  'what_else_know', AppApiConstant.chatLanguage),
+                  'what_else_know', _uiLang),
             ];
     }
 
@@ -3514,14 +3515,14 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
       for (var phrase in keyPhrases.take(2)) {
         if (hasVerseContext) {
           dynamicQuestions.add(
-              '${ChatTranslations.get('explain_more_about', AppApiConstant.chatLanguage)} ${phrase}?');
+              '${ChatTranslations.get('explain_more_about', _uiLang)} ${phrase}?');
           dynamicQuestions.add(
-              '${ChatTranslations.get('how_verse_relate_to', AppApiConstant.chatLanguage)} ${phrase}?');
+              '${ChatTranslations.get('how_verse_relate_to', _uiLang)} ${phrase}?');
         } else {
           dynamicQuestions.add(
-              '${ChatTranslations.get('explain_more_about', AppApiConstant.chatLanguage)} ${phrase}?');
+              '${ChatTranslations.get('explain_more_about', _uiLang)} ${phrase}?');
           dynamicQuestions.add(
-              '${ChatTranslations.get('how_relate_to', AppApiConstant.chatLanguage)} ${phrase}?');
+              '${ChatTranslations.get('how_relate_to', _uiLang)} ${phrase}?');
         }
         if (dynamicQuestions.length >= 3) break;
       }
@@ -3533,12 +3534,12 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
         if (hasVerseContext) {
           if (!dynamicQuestions.any((q) => q.toLowerCase().contains(concept))) {
             dynamicQuestions.add(
-                '${ChatTranslations.get('verse_teach_about', AppApiConstant.chatLanguage)} ${concept}?');
+                '${ChatTranslations.get('verse_teach_about', _uiLang)} ${concept}?');
           }
         } else {
           if (!dynamicQuestions.any((q) => q.toLowerCase().contains(concept))) {
             dynamicQuestions.add(
-                '${ChatTranslations.get('god_say_about', AppApiConstant.chatLanguage)} ${concept}?');
+                '${ChatTranslations.get('god_say_about', _uiLang)} ${concept}?');
           }
         }
         if (dynamicQuestions.length >= 3) break;
@@ -3618,9 +3619,9 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
           firstSentence.contains('in order to')) {
         dynamicQuestions.add(hasVerseContext
             ? ChatTranslations.get(
-                'why_verse_important', AppApiConstant.chatLanguage)
+                'why_verse_important', _uiLang)
             : ChatTranslations.get(
-                'why_important', AppApiConstant.chatLanguage));
+                'why_important', _uiLang));
       }
 
       // Look for "how to", "way to" patterns
@@ -3629,18 +3630,18 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
           firstSentence.contains('steps')) {
         dynamicQuestions.add(hasVerseContext
             ? ChatTranslations.get(
-                'what_steps_take', AppApiConstant.chatLanguage)
+                'what_steps_take', _uiLang)
             : ChatTranslations.get(
-                'what_practical_steps', AppApiConstant.chatLanguage));
+                'what_practical_steps', _uiLang));
       }
 
       // Look for questions in the response
       if (firstSentence.contains('?') || answer.contains('?')) {
         dynamicQuestions.add(hasVerseContext
             ? ChatTranslations.get(
-                'explain_verse_further', AppApiConstant.chatLanguage)
+                'explain_verse_further', _uiLang)
             : ChatTranslations.get(
-                'explain_further', AppApiConstant.chatLanguage));
+                'explain_further', _uiLang));
       }
     }
 
@@ -3655,39 +3656,39 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
         if (!dynamicQuestions.any((q) =>
             q.contains('apply') ||
             q.contains(ChatTranslations.get(
-                    'how_apply_verse_life', AppApiConstant.chatLanguage)
+                    'how_apply_verse_life', _uiLang)
                 .substring(0, 5)))) {
           dynamicQuestions.add(ChatTranslations.get(
-              'how_apply_verse_life', AppApiConstant.chatLanguage));
+              'how_apply_verse_life', _uiLang));
         } else if (!dynamicQuestions.any((q) =>
             q.contains('more') ||
             q.contains(ChatTranslations.get(
-                    'tell_more_verse', AppApiConstant.chatLanguage)
+                    'tell_more_verse', _uiLang)
                 .substring(0, 5)))) {
           dynamicQuestions.add(ChatTranslations.get(
-              'tell_more_verse', AppApiConstant.chatLanguage));
+              'tell_more_verse', _uiLang));
         } else {
           dynamicQuestions.add(ChatTranslations.get(
-              'what_else_verse_teach', AppApiConstant.chatLanguage));
+              'what_else_verse_teach', _uiLang));
         }
       } else {
         if (!dynamicQuestions.any((q) =>
             q.contains('apply') ||
             q.contains(ChatTranslations.get(
-                    'how_apply_this', AppApiConstant.chatLanguage)
+                    'how_apply_this', _uiLang)
                 .substring(0, 5)))) {
           dynamicQuestions.add(ChatTranslations.get(
-              'how_apply_this', AppApiConstant.chatLanguage));
+              'how_apply_this', _uiLang));
         } else if (!dynamicQuestions.any((q) =>
             q.contains('more') ||
             q.contains(ChatTranslations.get(
-                    'explain_more', AppApiConstant.chatLanguage)
+                    'explain_more', _uiLang)
                 .substring(0, 5)))) {
           dynamicQuestions.add(ChatTranslations.get(
-              'explain_more', AppApiConstant.chatLanguage));
+              'explain_more', _uiLang));
         } else {
           dynamicQuestions.add(ChatTranslations.get(
-              'what_else_know', AppApiConstant.chatLanguage));
+              'what_else_know', _uiLang));
         }
       }
     }
@@ -3936,9 +3937,9 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
 
     // Generate suggested questions based on the verse
     final suggestedQuestions = [
-      ChatTranslations.get('explain_verse', AppApiConstant.chatLanguage),
-      ChatTranslations.get('verse_daily_life', AppApiConstant.chatLanguage),
-      ChatTranslations.get('how_apply_teaching', AppApiConstant.chatLanguage),
+      ChatTranslations.get('explain_verse', _uiLang),
+      ChatTranslations.get('verse_daily_life', _uiLang),
+      ChatTranslations.get('how_apply_teaching', _uiLang),
     ];
 
     return Container(
@@ -3953,8 +3954,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            ChatTranslations.get(
-                'suggestions_colon', AppApiConstant.chatLanguage),
+                _tUi('suggestions_colon'),
             style: TextStyle(
               color: CommanColor.whiteBlack(context).withOpacity(0.7),
               fontSize: screenWidth > 450 ? 16 : 14,
@@ -4138,15 +4138,8 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
     final baseColor = isUser
         ? const Color(0xFFF6F1E9)
         : (isDark ? Colors.white.withOpacity(0.9) : const Color(0xFF8D6E63));
-    // Use a brighter, more visible color for verse highlighting
-    // For AI responses (isUser = false): use yellow in light mode, white in dark mode
-    // For user messages: use the same colors
-    final highlightColor = isDark
-        ? Colors
-            .white // White color for dark mode - highly visible against dark background
-        : (isUser
-            ? const Color(0xFFF6F1E9) // Match user text in light mode
-            : const Color(0xFF8D6E63)); // Match AI text in light mode
+    // Keep verse references clickable (for AI messages) but don't visually underline/highlight them.
+    final highlightColor = baseColor;
 
     // Pattern to match verse references like "John 3:16", "Genesis 1:1-3", "1 Corinthians 13:4-7", "John 3:16, 17", etc.
     // Matches: Book name (with optional number prefix) + chapter:verse (with optional verse range or comma-separated verses)
@@ -4275,12 +4268,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
           color: highlightColor,
           fontSize: screenWidth > 450 ? 18 : 16,
           height: 1.4,
-          fontWeight: isDark
-              ? FontWeight.w700
-              : FontWeight.w600, // Bolder in dark mode for better visibility
-          decoration: TextDecoration.underline,
-          decorationThickness: 2,
-          decorationStyle: TextDecorationStyle.solid,
+          fontWeight: FontWeight.w600,
         ),
         recognizer: recognizer,
       ));
@@ -4558,7 +4546,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
               ),
               const SizedBox(width: 12),
               Text(
-                ChatTranslations.get('copy', AppApiConstant.chatLanguage),
+                ChatTranslations.get('copy', _uiLang),
                 style: TextStyle(
                   color: textColor,
                   fontSize: screenWidth > 450 ? 16 : 14,
@@ -4569,7 +4557,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
           onTap: () async {
             await Clipboard.setData(ClipboardData(text: message.text));
             Constants.showToast(
-                ChatTranslations.get('copied', AppApiConstant.chatLanguage));
+                ChatTranslations.get('copied', _uiLang));
           },
         ),
         if (!message.isUser) // Only show Share for reply messages
@@ -4583,7 +4571,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  ChatTranslations.get('share', AppApiConstant.chatLanguage),
+                  ChatTranslations.get('share', _uiLang),
                   style: TextStyle(
                     color: textColor,
                     fontSize: screenWidth > 450 ? 16 : 14,
@@ -4679,12 +4667,12 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                       decoration: InputDecoration(
                         hintText: _isListening
                             ? ChatTranslations.get(
-                                'listening', AppApiConstant.chatLanguage)
+                                'listening', _uiLang)
                             : (_isLoading
                                 ? ChatTranslations.get('seeking_guidance',
-                                    AppApiConstant.chatLanguage)
+                                    _uiLang)
                                 : ChatTranslations.get('ask_anything',
-                                    AppApiConstant.chatLanguage)),
+                                    _uiLang)),
                         hintStyle: TextStyle(
                           color:
                               CommanColor.whiteBlack(context).withOpacity(0.5),

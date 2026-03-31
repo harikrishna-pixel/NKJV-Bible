@@ -53,6 +53,21 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
   Map<String, String> _likeIdByPrayerId = {};
   final Set<String> _likeToggleBusy = {};
 
+  bool _looksOffline(Object e) {
+    final s = e.toString();
+    return s.contains('SocketException') ||
+        s.contains('Failed host lookup') ||
+        s.contains('ClientException') ||
+        s.contains('Network is unreachable');
+  }
+
+  String _friendlyError(Object e) {
+    if (_looksOffline(e)) {
+      return 'You’re offline. Please check your internet connection and try again.';
+    }
+    return e.toString();
+  }
+
   void _showAppleToast(String message) {
     final overlay = Overlay.maybeOf(context);
     if (overlay == null) return;
@@ -174,7 +189,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = _friendlyError(e);
         _loading = false;
       });
     }
@@ -255,9 +270,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Like update failed: $e')),
-      );
+      _showAppleToast(_looksOffline(e)
+          ? 'No internet connection. Please try again.'
+          : 'Like update failed. Please try again.');
     } finally {
       if (mounted) {
         setState(() => _likeToggleBusy.remove(pid));
@@ -464,16 +479,20 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
+          backgroundColor: isDark ? CommanColor.darkPrimaryColor : null,
+          surfaceTintColor: Colors.transparent,
           title: const Text('Delete post?'),
           content: const Text('This post will be permanently deleted.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
+              child: Text('Cancel',
+                  style: TextStyle(color: isDark ? Colors.white70 : null)),
             ),
             TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Delete'),
+              child: Text('Delete',
+                  style: TextStyle(color: isDark ? Colors.white : null)),
             ),
           ],
         ),
@@ -491,9 +510,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
         );
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not delete: $e')),
-        );
+        _showAppleToast(_looksOffline(e)
+            ? 'No internet connection. Please try again.'
+            : 'Could not delete. Please try again.');
       }
       return;
     }
@@ -515,9 +534,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
         );
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not update: $e')),
-        );
+        _showAppleToast(_looksOffline(e)
+            ? 'No internet connection. Please try again.'
+            : 'Could not update. Please try again.');
       }
     }
   }
@@ -706,11 +725,13 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                   children: [
                     CircleAvatar(
                       radius: 18,
-                      backgroundColor: brown.withOpacity(0.2),
+                      backgroundColor: isDark
+                          ? Colors.white.withOpacity(0.12)
+                          : brown.withOpacity(0.2),
                       child: Text(
                         userInitials,
                         style: TextStyle(
-                          color: brown,
+                          color: isDark ? Colors.white : brown,
                           fontWeight: FontWeight.w700,
                           fontSize: 13,
                         ),
@@ -745,6 +766,10 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                                 const SizedBox(height: 16),
                                 ElevatedButton(
                                   onPressed: _refresh,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: brown,
+                                    foregroundColor: Colors.white,
+                                  ),
                                   child: const Text('Retry'),
                                 ),
                               ],
@@ -977,11 +1002,13 @@ class _PrayerCard extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 22,
-                    backgroundColor: brown.withOpacity(0.2),
+                    backgroundColor: isDark
+                        ? Colors.white.withOpacity(0.12)
+                        : brown.withOpacity(0.2),
                     child: Text(
                       _avatarInitials(displayName),
                       style: TextStyle(
-                        color: brown,
+                        color: isDark ? Colors.white : brown,
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
                       ),
@@ -1047,7 +1074,7 @@ class _PrayerCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: brown,
+                          color: isDark ? Colors.white70 : brown,
                         ),
                       ),
                     ],
@@ -1109,6 +1136,9 @@ class _PrayerCard extends StatelessWidget {
                               showDialog<void>(
                                 context: context,
                                 builder: (dctx) => AlertDialog(
+                                  backgroundColor:
+                                      isDark ? CommanColor.darkPrimaryColor : null,
+                                  surfaceTintColor: Colors.transparent,
                                   title: Text(
                                     'Prayer',
                                     style: TextStyle(
@@ -1117,12 +1147,19 @@ class _PrayerCard extends StatelessWidget {
                                     ),
                                   ),
                                   content: SingleChildScrollView(
-                                    child: Text(titleText),
+                                    child: Text(
+                                      titleText,
+                                      style: TextStyle(
+                                          color:
+                                              isDark ? Colors.white70 : Colors.black87),
+                                    ),
                                   ),
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.pop(dctx),
-                                      child: const Text('Close'),
+                                      child: Text('Close',
+                                          style: TextStyle(
+                                              color: isDark ? Colors.white : null)),
                                     ),
                                   ],
                                 ),
@@ -1180,6 +1217,9 @@ class _PrayerCard extends StatelessWidget {
                                 showDialog<void>(
                                   context: context,
                                   builder: (dctx) => AlertDialog(
+                                    backgroundColor:
+                                        isDark ? CommanColor.darkPrimaryColor : null,
+                                    surfaceTintColor: Colors.transparent,
                                     title: Text(
                                       item.title.isNotEmpty
                                           ? item.title
@@ -1190,12 +1230,21 @@ class _PrayerCard extends StatelessWidget {
                                       ),
                                     ),
                                     content: SingleChildScrollView(
-                                      child: Text(item.description),
+                                      child: Text(
+                                        item.description,
+                                        style: TextStyle(
+                                            color: isDark
+                                                ? Colors.white70
+                                                : Colors.black87),
+                                      ),
                                     ),
                                     actions: [
                                       TextButton(
                                         onPressed: () => Navigator.pop(dctx),
-                                        child: const Text('Close'),
+                                        child: Text('Close',
+                                            style: TextStyle(
+                                                color:
+                                                    isDark ? Colors.white : null)),
                                       ),
                                     ],
                                   ),

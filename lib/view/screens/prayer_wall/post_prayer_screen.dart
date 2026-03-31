@@ -1,4 +1,3 @@
-import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
@@ -157,8 +156,16 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
       Navigator.of(context).pop(result);
     } catch (e) {
       if (!mounted) return;
+      final s = e.toString();
+      final isOffline = s.contains('SocketException') ||
+          s.contains('Failed host lookup') ||
+          s.contains('ClientException') ||
+          s.contains('Network is unreachable');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not post: $e')),
+        SnackBar(
+            content: Text(isOffline
+                ? 'No internet connection. Please try again.'
+                : 'Could not post. Please try again.')),
       );
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -177,26 +184,24 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
     final brown = const Color(0xFF5C4033);
-    final cream = isDark
-        ? CommanColor.darkPrimaryColor
-        : (themeProvider.currentCustomTheme == AppCustomTheme.vintage
-            ? const Color(0xFFF5F0E6)
-            : themeProvider.backgroundColor);
     final dateFmt = DateFormat('MMMM d, yyyy');
 
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage(Images.bgImage(context)),
-            fit: BoxFit.cover,
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      behavior: HitTestBehavior.opaque,
+      child: Scaffold(
+        body: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage(Images.bgImage(context)),
+              fit: BoxFit.cover,
+            ),
           ),
-        ),
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-      body: SafeArea(
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            body: SafeArea(
         child: Column(
           children: [
             Container(
@@ -363,8 +368,10 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                                 ? null
                                 : () => Navigator.of(context).pop(false),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: brown,
-                              side: BorderSide(color: brown),
+                              foregroundColor:
+                                  isDark ? Colors.white70 : brown,
+                              side: BorderSide(
+                                  color: isDark ? Colors.white24 : brown),
                               padding: const EdgeInsets.symmetric(vertical: 14),
                             ),
                             child: const Text('Cancel'),
@@ -400,9 +407,10 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
           ],
         ),
       ),
-        )
-      )
-    );
+    ),
+  ),
+),
+);
   }
 
   Widget _label(String t, Color brown, bool isDark) {

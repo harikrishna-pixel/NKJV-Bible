@@ -186,6 +186,29 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
     return MoodPrayerLoader.pickItem(connectionIndex: 1);
   }
 
+  /// Same destinations as [_DayJourneyCardsScreen] per step, without pushing the summary screen first.
+  Future<void> _openTodayFaithStep(int step) async {
+    final todayKey = DateTime.now().toIso8601String().split('T')[0];
+    if (step == 1) {
+      if (!mounted) return;
+      Get.to(() => const StreakConnectionScreen());
+      return;
+    }
+    final item = await _resolveDayItem(todayKey);
+    if (!mounted || item == null) return;
+    switch (step) {
+      case 2:
+        Get.to(() => StreakVerseScreen(item: item));
+        break;
+      case 3:
+        Get.to(() => StreakDevotionalScreen(item: item));
+        break;
+      case 4:
+        Get.to(() => StreakPrayerScreen(item: item));
+        break;
+    }
+  }
+
   Future<void> _onDayTap({
     required int dayIndex,
     required WeekDayStatus status,
@@ -263,22 +286,6 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
     final int todayWeekdayIndexInSun = DateTime.now().weekday % 7; // Sun=0..Sat=6
     final int todayViewIndex =
         (todayWeekdayIndexInSun - _installWeekStartIndexInSun + 7) % 7;
-
-    final int baseTodayIndex =
-        (todayViewIndex + _installWeekStartIndexInSun) % 7; // Sun-based index
-    final WeekDayStatus todayStatus = baseTodayIndex < _weekStatuses.length
-        ? _weekStatuses[baseTodayIndex]
-        : WeekDayStatus.ongoing;
-    final String todayLabel = days[baseTodayIndex];
-
-    Future<void> openTodayFlameRoute() => _onDayTap(
-      dayIndex: todayViewIndex,
-      status: todayStatus,
-      effectiveCompleted: _stepsCompletedToday > 0 || todayStatus == WeekDayStatus.completed,
-      textColor: textColor,
-      panelColor: panelColor,
-      dayLabel: todayLabel,
-    );
 
     return Scaffold(
       body: Container(
@@ -582,7 +589,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         subtitle: '1 min · Share how you feel.',
                         completed: _stepsCompletedToday >= 1,
                         onTap: _stepsCompletedToday >= 1
-                            ? openTodayFlameRoute
+                            ? () async => _openTodayFaithStep(1)
                             : () => Get.to(() => const StreakConnectionScreen()),
                         textColor: textColor,
                         panelColor: panelColor,
@@ -596,7 +603,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         completed: _stepsCompletedToday >= 2,
                         onTap: () async {
                           if (_stepsCompletedToday >= 2) {
-                            await openTodayFlameRoute();
+                            await _openTodayFaithStep(2);
                             return;
                           }
                           final item = await MoodPrayerLoader.pickItem(
@@ -622,7 +629,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         completed: _stepsCompletedToday >= 3,
                         onTap: () async {
                           if (_stepsCompletedToday >= 3) {
-                            await openTodayFlameRoute();
+                            await _openTodayFaithStep(3);
                             return;
                           }
                           final item = await MoodPrayerLoader.pickItem(
@@ -648,7 +655,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         completed: _stepsCompletedToday >= 4,
                         onTap: () async {
                           if (_stepsCompletedToday >= 4) {
-                            await openTodayFlameRoute();
+                            await _openTodayFaithStep(4);
                             return;
                           }
                           final item = await MoodPrayerLoader.pickItem(
