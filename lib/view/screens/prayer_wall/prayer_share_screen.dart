@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
+import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -93,7 +94,17 @@ class PrayerShareScreen extends StatelessWidget {
     final cardBg = isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white;
 
     return Scaffold(
-      backgroundColor: cream,
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage(Images.bgImage(context)),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: brown,
         foregroundColor: Colors.white,
@@ -185,6 +196,8 @@ class PrayerShareScreen extends StatelessWidget {
           ),
         ),
       ),
+        )
+      )
     );
   }
 
@@ -248,7 +261,7 @@ class PrayerShareScreen extends StatelessWidget {
           ),
         ),
       ),
-    );
+        );
   }
 }
 

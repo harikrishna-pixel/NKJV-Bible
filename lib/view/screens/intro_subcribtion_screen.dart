@@ -8,12 +8,12 @@ import 'package:biblebookapp/utils/debugprint.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/images.dart';
-import 'package:biblebookapp/services/statsig/statsig_service.dart';
+import 'package:biblebookapp/services/analytics/analytics_service.dart';
 import 'package:biblebookapp/services/paywall_preload_service.dart';
-import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
-import 'package:biblebookapp/streak_flow/streak_flow_screens.dart';
+import 'package:biblebookapp/view/constants/share_preferences.dart';
+import 'package:biblebookapp/streak_flow/streak_flow_screens.dart' hide SharPreferences;
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/remove_add-screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -1791,7 +1791,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     super.initState();
     if (!widget.invisiblePurchaseHost) {
       // Track Paywall Screen event
-      StatsigService.trackPaywallScreen();
+      AnalyticsService.trackPaywallScreen();
 
       // Mark that paywall is being shown for the first time tracking
       _markPaywallShown();

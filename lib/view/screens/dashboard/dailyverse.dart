@@ -24,7 +24,7 @@ import '../../../Model/dailyVerseList.dart';
 import '../../constants/constant.dart';
 import '../../constants/images.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:biblebookapp/services/statsig/statsig_service.dart';
+import 'package:biblebookapp/services/analytics/analytics_service.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 
 class DailyVerse extends StatefulWidget {
@@ -102,7 +102,7 @@ class _DailyVerseState extends State<DailyVerse> {
     loaddata();
     getFont();
     // Track Daily Verses event
-    StatsigService.trackDailyVerses();
+    AnalyticsService.trackDailyVerses();
   }
 
   void loaddata() async {

@@ -1324,50 +1324,50 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                               );
                             },
                           ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ValueListenableBuilder<TextEditingValue>(
-                              valueListenable: _customPrayerController,
-                              builder: (context, value, _) {
-                                final hasText = value.text.trim().isNotEmpty;
-                                return ElevatedButton(
-                                  onPressed: hasText
-                                      ? () async {
-                                          final request =
-                                              _customPrayerController.text.trim();
-                                          Navigator.of(dialogContext).pop();
-                                          _customPrayerController.clear();
-                                          if (request.isNotEmpty && mounted) {
-                                            await _showPublishOrChatChoice(
-                                                request);
-                                          }
-                                        }
-                                      : null,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: isDark
-                                        ? CommanColor.darkPrimaryColor
-                                        : const Color(0xFFD4A574),
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    'Get Prayer',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                      color: isDark
-                                          ? Colors.white
-                                          : const Color(0xFF5C4033),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
+                          // const SizedBox(height: 16),
+                          // SizedBox(
+                          //   width: double.infinity,
+                          //   child: ValueListenableBuilder<TextEditingValue>(
+                          //     valueListenable: _customPrayerController,
+                          //     builder: (context, value, _) {
+                          //       final hasText = value.text.trim().isNotEmpty;
+                          //       return ElevatedButton(
+                          //         onPressed: hasText
+                          //             ? () async {
+                          //                 final request =
+                          //                     _customPrayerController.text.trim();
+                          //                 Navigator.of(dialogContext).pop();
+                          //                 _customPrayerController.clear();
+                          //                 if (request.isNotEmpty && mounted) {
+                          //                   await _showPublishOrChatChoice(
+                          //                       request);
+                          //                 }
+                          //               }
+                          //             : null,
+                          //         style: ElevatedButton.styleFrom(
+                          //           backgroundColor: isDark
+                          //               ? CommanColor.darkPrimaryColor
+                          //               : const Color(0xFFD4A574),
+                          //           padding:
+                          //               const EdgeInsets.symmetric(vertical: 14),
+                          //           shape: RoundedRectangleBorder(
+                          //             borderRadius: BorderRadius.circular(12),
+                          //           ),
+                          //         ),
+                          //         child: Text(
+                          //           'Get Prayer',
+                          //           style: TextStyle(
+                          //             fontSize: 16,
+                          //             fontWeight: FontWeight.w700,
+                          //             color: isDark
+                          //                 ? Colors.white
+                          //                 : const Color(0xFF5C4033),
+                          //           ),
+                          //         ),
+                          //       );
+                          //     },
+                          //   ),
+                          // ),
                         ],
                       ),
                     ),

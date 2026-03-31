@@ -8,7 +8,7 @@ import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/core/notifiers/bottom.notifier.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
-import 'package:biblebookapp/services/statsig/statsig_service.dart';
+import 'package:biblebookapp/services/analytics/analytics_service.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
 import 'package:biblebookapp/utils/rating_dialog_helper.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
@@ -5647,7 +5647,7 @@ class HomeContentEditBottomSheetState
                 ),
               );
               // Track Share event
-              StatsigService.trackShare();
+              AnalyticsService.trackShare();
             }
           },
           child: Image(
@@ -6518,7 +6518,7 @@ class ImageBottomSheet extends StatelessWidget {
 
                 saveAndShare(image, "bible", message, context: context);
                 // Track Share event
-                StatsigService.trackShare();
+                AnalyticsService.trackShare();
               } else if (label == "Save") {
                 await saveImageIntoLocal(image, context);
               } else {

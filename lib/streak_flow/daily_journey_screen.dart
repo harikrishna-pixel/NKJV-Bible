@@ -3,11 +3,12 @@ import 'package:biblebookapp/streak_flow/mood_prayer_data.dart';
 import 'package:biblebookapp/streak_flow/streak_saved_list_screen.dart';
 import 'package:biblebookapp/streak_flow/your_faith_journey_screen.dart';
 import 'package:biblebookapp/streak_flow/pour_out_worries_screen.dart';
-import 'package:biblebookapp/streak_flow/streak_flow_screens.dart';
+import 'package:biblebookapp/streak_flow/streak_flow_screens.dart' hide SharPreferences;
+import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/streak/streak_service.dart' show StreakService, WeekDayStatus;
 import 'package:biblebookapp/view/constants/colors.dart';
-import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
+import 'package:biblebookapp/view/constants/images.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
@@ -33,6 +34,9 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   int _currentStreak = 0;
   List<WeekDayStatus> _weekStatuses = List.filled(7, WeekDayStatus.future);
   Map<String, int> _stepsByDay = {};
+  // Rotates the weekly calendar to start from the app install day.
+  // 0=Sun, 1=Mon, ..., 6=Sat (matches StreakService.getWeekDayStatuses order).
+  int _installWeekStartIndexInSun = 0;
 
   @override
   void initState() {
@@ -58,6 +62,21 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
     }
     final streak = await StreakService.getCurrentStreak();
     final statuses = await StreakService.getWeekDayStatuses();
+
+    // Save the "install/open" date once so the calendar UI starts from that weekday.
+    final todayKey = DateTime.now().toIso8601String().split('T')[0];
+    final installRaw =
+        await SharPreferences.getString(SharPreferences.appInstalledDate);
+    final installDate = (installRaw == null || installRaw.trim().isEmpty)
+        ? DateTime.now()
+        : DateTime.tryParse(installRaw) ?? DateTime.now();
+    if (installRaw == null || installRaw.trim().isEmpty) {
+      await SharPreferences.setString(
+        SharPreferences.appInstalledDate,
+        todayKey,
+      );
+    }
+    final installIndexInSun = installDate.weekday % 7;
     final rawStepsMap = await SharPreferences.getString(
         SharPreferences.streakFlowStepsByDay);
     Map<String, int> parsedStepsMap = {};
@@ -80,38 +99,10 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
         _currentStreak = streak;
         _weekStatuses = statuses;
         _stepsByDay = parsedStepsMap;
+        _installWeekStartIndexInSun = installIndexInSun;
         _loaded = true;
       });
     }
-  }
-
-  /// Get the day of week for today (0=Sun, 1=Mon, ..., 6=Sat)
-  int _getTodayDayOfWeek() {
-    final w = DateTime.now().weekday; // Mon=1..Sun=7
-    return w % 7; // Sun=0..Sat=6
-  }
-
-  /// Get the start date of the current week (starts from today)
-  /// Week runs for 7 consecutive days starting from today
-  DateTime _getWeekStart() {
-    return DateTime.now();
-  }
-
-  /// Get day labels for the 7-day week starting from today
-  List<String> _getWeekDayLabels() {
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    final todayDayOfWeek = _getTodayDayOfWeek();
-
-    // Get today's name
-    final todayName = dayNames[todayDayOfWeek];
-
-    // Create labels for 7 days starting from today
-    List<String> labels = [];
-    for (int i = 0; i < 7; i++) {
-      final dayIndex = (todayDayOfWeek + i) % 7;
-      labels.add(dayNames[dayIndex]);
-    }
-    return labels;
   }
 
   Future<void> _storeTodaySteps(int steps) async {
@@ -205,9 +196,14 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   }) async {
     final todayKey = DateTime.now().toIso8601String().split('T')[0];
 
-    // Calculate the date for the tapped day (starting from today + dayIndex)
-    final weekStart = _getWeekStart();
-    final dayDate = weekStart.add(Duration(days: dayIndex));
+    // Calculate the date for the tapped day based on the rotated calendar.
+    // _weekStatuses from StreakService is ordered Sun..Sat, so we map view index → Sun-index.
+    final now = DateTime.now();
+    final todayDate = DateTime(now.year, now.month, now.day);
+    final todayWeekdayIndexInSun = now.weekday % 7; // Sun=0..Sat=6
+    final weekStartSunday = todayDate.subtract(Duration(days: todayWeekdayIndexInSun));
+    final baseIndexInSun = (dayIndex + _installWeekStartIndexInSun) % 7;
+    final dayDate = weekStartSunday.add(Duration(days: baseIndexInSun));
     final dayKey = dayDate.toIso8601String().split('T')[0];
 
     if (status == WeekDayStatus.future) {
@@ -247,8 +243,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width > 450;
 
-    // Get day labels for 7 days starting from today
-    final days = _getWeekDayLabels();
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
     Color bgColor;
     try {
@@ -264,15 +259,20 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
     final Color textColor = isDark ? Colors.white : _brown;
     final Color panelColor = isDark ? Colors.white.withOpacity(0.12) : _panel;
 
-    // Today is always at index 0 (first day of the 7-day week)
-    final int todayIndex = 0;
-    final WeekDayStatus todayStatus = todayIndex < _weekStatuses.length
-        ? _weekStatuses[todayIndex]
+    // Rotated calendar: view index 0 corresponds to install weekday.
+    final int todayWeekdayIndexInSun = DateTime.now().weekday % 7; // Sun=0..Sat=6
+    final int todayViewIndex =
+        (todayWeekdayIndexInSun - _installWeekStartIndexInSun + 7) % 7;
+
+    final int baseTodayIndex =
+        (todayViewIndex + _installWeekStartIndexInSun) % 7; // Sun-based index
+    final WeekDayStatus todayStatus = baseTodayIndex < _weekStatuses.length
+        ? _weekStatuses[baseTodayIndex]
         : WeekDayStatus.ongoing;
-    final String todayLabel = days[todayIndex];
+    final String todayLabel = days[baseTodayIndex];
 
     Future<void> openTodayFlameRoute() => _onDayTap(
-      dayIndex: todayIndex,
+      dayIndex: todayViewIndex,
       status: todayStatus,
       effectiveCompleted: _stepsCompletedToday > 0 || todayStatus == WeekDayStatus.completed,
       textColor: textColor,
@@ -285,10 +285,9 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
         width: double.infinity,
         height: double.infinity,
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: gradientColors,
+          image: DecorationImage(
+            image: AssetImage(Images.bgImage(context)),
+            fit: BoxFit.cover,
           ),
         ),
         child: SafeArea(
@@ -359,22 +358,45 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: List.generate(7, (i) {
-                          final status = i < _weekStatuses.length
-                              ? _weekStatuses[i]
+                          final baseIndex = (i + _installWeekStartIndexInSun) % 7;
+                          final status = baseIndex < _weekStatuses.length
+                              ? _weekStatuses[baseIndex]
                               : WeekDayStatus.future;
-                          final isToday = i == todayIndex;
+                          final isToday = i == todayViewIndex;
                           final todayFullyCompleted = isToday && _stepsCompletedToday >= 4;
-                          final isOngoing =
-                              status == WeekDayStatus.ongoing && !todayFullyCompleted;
-                          final isCompleted =
-                              status == WeekDayStatus.completed || todayFullyCompleted;
-                          final isMissed = status == WeekDayStatus.missed;
+                          final DateTime now = DateTime.now();
+                          final DateTime todayDate = DateTime(now.year, now.month, now.day);
+                          final int todayWeekdayIndexInSun = now.weekday % 7;
+                          final DateTime weekStartSunday =
+                              todayDate.subtract(Duration(days: todayWeekdayIndexInSun));
+                          final dayKey = weekStartSunday
+                              .add(Duration(days: baseIndex))
+                              .toIso8601String()
+                              .split('T')[0];
+                          final storedSteps = _stepsByDay[dayKey];
+                          final int effectiveStepsForDay = (dayKey ==
+                                  DateTime.now().toIso8601String().split('T')[0])
+                              ? ((_stepsByDay[dayKey] ?? 0) > 0
+                                  ? (_stepsByDay[dayKey] ?? 0)
+                                  : _stepsCompletedToday)
+                              : (storedSteps ?? 0);
+                          final bool storedCompleted = effectiveStepsForDay >= 4;
+
+                          final bool isOngoing = status == WeekDayStatus.ongoing && !storedCompleted;
+                          final bool isCompleted =
+                              storedCompleted || status == WeekDayStatus.completed || todayFullyCompleted;
+                          final bool isMissed = status == WeekDayStatus.missed;
+                          final bool isFutureDay = status == WeekDayStatus.future;
                           Color circleColor = panelColor.withOpacity(0.8);
                           Color borderColor = textColor.withOpacity(0.2);
                           Color iconColor = textColor.withOpacity(
                               isDark ? 0.9 : 0.7); // future/pending
                           double borderWidth = 1;
-                          if (isOngoing) {
+                          if (isFutureDay) {
+                            circleColor = panelColor.withOpacity(0.75);
+                            borderColor = textColor.withOpacity(0.25);
+                            borderWidth = 1;
+                          } else if (isOngoing) {
                             circleColor = _gold.withOpacity(0.2);
                             borderColor = _gold.withOpacity(0.35);
                             borderWidth = 1.5;
@@ -389,18 +411,18 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                             iconColor = textColor.withOpacity(0.4);
                           }
                           final showLock =
-                              isMissed || status == WeekDayStatus.future;
+                              isFutureDay || isMissed && !storedCompleted;
                           return Column(
                             children: [
                               GestureDetector(
                                 onTap: () => _onDayTap(
-                                  dayIndex: i,
-                                  status: status,
-                                  effectiveCompleted: isCompleted,
-                                  textColor: textColor,
-                                  panelColor: panelColor,
-                                  dayLabel: days[i],
-                                ),
+                                      dayIndex: i,
+                                      status: status,
+                                      effectiveCompleted: isCompleted,
+                                      textColor: textColor,
+                                      panelColor: panelColor,
+                                      dayLabel: days[baseIndex],
+                                    ),
                                 child: Container(
                                   width: isTablet ? 44 : 38,
                                   height: isTablet ? 44 : 38,
@@ -453,7 +475,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                days[i],
+                                days[baseIndex],
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: textColor,
@@ -929,7 +951,12 @@ class _DayJourneyCardsScreen extends StatelessWidget {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        color: isDark ? CommanColor.darkPrimaryColor : const Color(0xFFF5EAC6),
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage(Images.bgImage(context)),
+            fit: BoxFit.cover,
+          ),
+        ),
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),

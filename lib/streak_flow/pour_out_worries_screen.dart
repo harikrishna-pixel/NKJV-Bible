@@ -1,6 +1,7 @@
 import 'package:biblebookapp/streak_flow/take_moment_intro_screen.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
+import 'package:biblebookapp/view/constants/images.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
@@ -52,10 +53,9 @@ class _PourOutWorriesScreenState extends State<PourOutWorriesScreen> {
         width: double.infinity,
         height: double.infinity,
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: gradientColors,
+          image: DecorationImage(
+            image: AssetImage(Images.bgImage(context)),
+            fit: BoxFit.cover,
           ),
         ),
         child: SafeArea(

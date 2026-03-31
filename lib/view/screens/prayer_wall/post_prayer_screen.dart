@@ -1,5 +1,6 @@
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
+import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_added_success_screen.dart';
@@ -147,11 +148,13 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         }
       }
       if (!mounted) return;
-      Navigator.of(context).pushReplacement<bool, bool>(
+      final result = await Navigator.of(context).push<bool>(
         MaterialPageRoute(
           builder: (_) => PrayerAddedSuccessScreen(durationDays: _durationDays),
         ),
       );
+      if (!mounted) return;
+      Navigator.of(context).pop(result);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -182,7 +185,17 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
     final dateFmt = DateFormat('MMMM d, yyyy');
 
     return Scaffold(
-      backgroundColor: cream,
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage(Images.bgImage(context)),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Column(
           children: [
@@ -387,6 +400,8 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
           ],
         ),
       ),
+        )
+      )
     );
   }
 
@@ -450,6 +465,6 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
           ),
         ),
       ),
-    );
+        );
   }
 }

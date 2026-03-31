@@ -22,7 +22,7 @@ import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
-import 'package:biblebookapp/services/statsig/statsig_service.dart';
+import 'package:biblebookapp/services/analytics/analytics_service.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -120,7 +120,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (mounted) setState(() {});
     });
     // Track Geneva Bible Chat event
-    StatsigService.trackGenevaBibleChat();
+    AnalyticsService.trackGenevaBibleChat();
     _showChatIntroIfNeeded();
     _loadRecentConversations();
 
@@ -2556,7 +2556,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                             backgroundColor:
                                                 Colors.transparent,
                                             isDismissible:
-                                                false, // Prevent initial tap-up on iPad from immediately closing
+                                                true, // Allow dismissing when tapping outside
                                             enableDrag: true,
                                             builder: (_) {
                                               final bg = isDark
@@ -2687,7 +2687,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                             backgroundColor:
                                                 Colors.transparent,
                                             isDismissible:
-                                                false, // Same behaviour on iPad when there is no answer yet
+                                                true, // Allow dismissing when tapping outside
                                             enableDrag: true,
                                             builder: (_) {
                                               final bg = isDark

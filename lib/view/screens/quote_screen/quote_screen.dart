@@ -1,4 +1,4 @@
-import 'package:biblebookapp/services/statsig/statsig_service.dart';
+import 'package:biblebookapp/services/analytics/analytics_service.dart';
 import 'package:biblebookapp/utils/internet_speed_checker.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
@@ -30,7 +30,7 @@ class QuoteScreen extends HookConsumerWidget {
       WidgetsBinding.instance.addPostFrameCallback((callback) {
         ref.read(quotesCategoryBloc).getQuotesCategory();
         // Track Quotes event
-        StatsigService.trackQuotes();
+        AnalyticsService.trackQuotes();
         // Reset toast flag when starting to load
         hasShownToast.value = false;
         hasCheckedNetwork.value = false;

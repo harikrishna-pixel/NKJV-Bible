@@ -1938,14 +1938,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.0"
-  statsig:
-    dependency: "direct main"
-    description:
-      name: statsig
-      sha256: "5f795aa88925e5e229529b2e9d52134fd2922c40c092bb2627c87755d5bbb434"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.2.6"
   stream_channel:
     dependency: transitive
     description:

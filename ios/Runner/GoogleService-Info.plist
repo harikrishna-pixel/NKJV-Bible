@@ -2,28 +2,22 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CLIENT_ID</key>
-	<string>727999460969-4kqkiaukebp8ilvnhf08ljhs1t6211hc.apps.googleusercontent.com</string>
-	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.727999460969-4kqkiaukebp8ilvnhf08ljhs1t6211hc</string>
-	<key>ANDROID_CLIENT_ID</key>
-	<string>727999460969-vukqsgbm0l0rauv3lqq1jouv455n7hip.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
-	<string>AIzaSyAWizjCMtQt8Wj4X_9zFkLzxRcpdByoBrM</string>
+	<string>AIzaSyCy6M7BPWbMfG2kO4TwBOPMOdOZ7kcN4Hw</string>
 	<key>GCM_SENDER_ID</key>
-	<string>727999460969</string>
+	<string>517469006523</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.balaklrapps.amplifiedbible</string>
+	<string>com.balaklrapps.genevabible</string>
 	<key>PROJECT_ID</key>
-	<string>amplified-bible-ea0b7</string>
+	<string>old-paper-analytics</string>
 	<key>STORAGE_BUCKET</key>
-	<string>amplified-bible-ea0b7.appspot.com</string>
+	<string>old-paper-analytics.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
-	<false></false>
+	<true></true>
 	<key>IS_APPINVITE_ENABLED</key>
 	<true></true>
 	<key>IS_GCM_ENABLED</key>
@@ -31,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:727999460969:ios:992015c7b587c574e594f8</string>
+	<string>1:517469006523:ios:de6b5c688b042f9afc979e</string>
 </dict>
 </plist>

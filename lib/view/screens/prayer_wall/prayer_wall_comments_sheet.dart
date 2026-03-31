@@ -1,5 +1,6 @@
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
+import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
 import 'package:flutter/material.dart';
@@ -47,6 +48,7 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
     try {
       final list =
           await PrayerWallService.fetchCommentsForPrayer(widget.prayerId);
+      // Comments fetched successfully
       if (!mounted) return;
       setState(() {
         _rows = list;
@@ -192,6 +194,9 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
         commentText: newText,
       );
       if (!mounted) return;
+      // Small delay to allow server-side processing
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (!mounted) return;
       await _reload();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -271,104 +276,185 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
           child: SizedBox(
             height: MediaQuery.of(context).size.height * 0.82,
             child: Container(
+              margin: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: cream,
-                borderRadius: BorderRadius.circular(16),
+                image: DecorationImage(
+                  image: AssetImage(Images.bgImage(context)),
+                  fit: BoxFit.cover,
+                ),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.15),
+                    blurRadius: 20,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+                border: Border.all(
+                  color: isDark 
+                    ? Colors.white.withValues(alpha: 0.1)
+                    : const Color(0xFFD4C4B0),
+                  width: 1.5,
+                ),
               ),
               child: Column(
                 children: [
-                  const SizedBox(height: 10),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                  decoration: BoxDecoration(
-                    color: cardBg,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.08)
-                          : const Color(0xFFE7DCCB),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Comments',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? Colors.white : brown,
-                        ),
-                      ),
-                      if (widget.titlePreview.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            widget.titlePreview,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: isDark ? Colors.white70 : Colors.grey.shade700,
-                            ),
+                  // Enhanced Header with close button and drag handle
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 16, 0),
+                    child: Column(
+                      children: [
+                        // Drag handle
+                        Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: isDark 
+                              ? Colors.white.withValues(alpha: 0.3)
+                              : brown.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
-                    ],
+                        const SizedBox(height: 16),
+                        // Header row with title and close button
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: brown.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                Icons.comment_outlined,
+                                color: brown,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Comments',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w700,
+                                      color: isDark ? Colors.white : brown,
+                                      fontFamily: 'Georgia',
+                                    ),
+                                  ),
+                                  if (widget.titlePreview.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 2),
+                                      child: Text(
+                                        widget.titlePreview,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: isDark ? Colors.white60 : Colors.grey.shade600,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              icon: Icon(
+                                Icons.close,
+                                color: isDark ? Colors.white70 : brown.withValues(alpha: 0.7),
+                                size: 22,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(height: 16),
+              // Enhanced input section
+              Container(
+                margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  image: DecorationImage(
+                    image: AssetImage(Images.bgImage(context)),
+                    fit: BoxFit.cover,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.1)
+                        : const Color(0xFFD4C4B0),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: cardBg,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.08)
-                                : const Color(0xFFE7DCCB),
-                          ),
+                      child: TextField(
+                        controller: _input,
+                        maxLines: 3,
+                        minLines: 1,
+                        maxLength: 1000,
+                        onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                        style: TextStyle(
+                          color: isDark ? Colors.white : CommanColor.black,
+                          fontSize: 15,
+                          height: 1.4,
                         ),
-                        child: TextField(
-                          controller: _input,
-                          maxLines: 3,
-                          maxLength: 1000,
-                          onTapOutside: (_) =>
-                              FocusScope.of(context).unfocus(),
-                          style: TextStyle(
-                              color: isDark ? Colors.white : CommanColor.black),
-                          decoration: InputDecoration(
-                            hintText: 'Write a comment...',
-                            border: InputBorder.none,
-                            contentPadding:
-                                const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                            counterText: '',
+                        decoration: InputDecoration(
+                          hintText: 'Share your thoughts...',
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                          counterText: '',
+                          hintStyle: TextStyle(
+                            color: isDark ? Colors.white54 : Colors.grey.shade500,
+                            fontSize: 15,
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 12),
                     _posting
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                        ? Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
                             ),
                           )
                         : Material(
                             color: brown,
                             borderRadius: BorderRadius.circular(12),
-                            child: IconButton(
-                              onPressed: _send,
-                              icon: const Icon(Icons.send, color: Colors.white),
+                            elevation: 2,
+                            child: InkWell(
+                              onTap: _send,
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.all(10),
+                                child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                              ),
                             ),
                           ),
                   ],
@@ -420,60 +506,145 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                                   final mine =
                                       id != null && _myIds.contains(id);
                                   return Container(
-                                    margin: const EdgeInsets.only(bottom: 10),
+                                    margin: const EdgeInsets.only(bottom: 12),
                                     decoration: BoxDecoration(
-                                      color: cardBg,
-                                      borderRadius: BorderRadius.circular(14),
+                                      image: DecorationImage(
+                                        image: AssetImage(Images.bgImage(context)),
+                                        fit: BoxFit.cover,
+                                      ),
+                                      borderRadius: BorderRadius.circular(16),
                                       border: Border.all(
-                                        color: isDark
-                                            ? Colors.white.withValues(alpha: 0.08)
-                                            : const Color(0xFFE7DCCB),
+                                        color: mine
+                                            ? brown.withValues(alpha: 0.3)
+                                            : (isDark
+                                                ? Colors.white.withValues(alpha: 0.1)
+                                                : const Color(0xFFD4C4B0)),
+                                        width: mine ? 1.5 : 1,
                                       ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.03),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
                                     ),
-                                    child: ListTile(
-                                      contentPadding: const EdgeInsets.fromLTRB(
-                                          12, 6, 8, 6),
-                                      leading: CircleAvatar(
-                                        radius: 16,
-                                        backgroundColor: mine
-                                            ? brown.withValues(alpha: 0.18)
-                                            : Colors.grey.withValues(alpha: 0.18),
-                                        child: Icon(
-                                          Icons.person_outline,
-                                          size: 16,
-                                          color: mine
-                                              ? brown
-                                              : (isDark ? Colors.white70 : Colors.black54),
-                                        ),
-                                      ),
-                                      title: Text(
-                                        _commentText(row),
-                                        style: TextStyle(
-                                          color: isDark
-                                              ? Colors.white
-                                              : CommanColor.black,
-                                          height: 1.3,
-                                        ),
-                                      ),
-                                      trailing: mine
-                                          ? Row(
-                                              mainAxisSize: MainAxisSize.min,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(16),
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Container(
+                                            width: 36,
+                                            height: 36,
+                                            decoration: BoxDecoration(
+                                              color: mine
+                                                  ? brown.withValues(alpha: 0.15)
+                                                  : (isDark 
+                                                      ? Colors.white.withValues(alpha: 0.1)
+                                                      : Colors.grey.withValues(alpha: 0.15)),
+                                              borderRadius: BorderRadius.circular(18),
+                                              border: Border.all(
+                                                color: mine
+                                                    ? brown.withValues(alpha: 0.3)
+                                                    : (isDark 
+                                                        ? Colors.white.withValues(alpha: 0.2)
+                                                        : Colors.grey.withValues(alpha: 0.3)),
+                                              ),
+                                            ),
+                                            child: Icon(
+                                              mine ? Icons.account_circle : Icons.person_outline,
+                                              size: 20,
+                                              color: mine
+                                                  ? brown
+                                                  : (isDark ? Colors.white60 : Colors.grey.shade600),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                IconButton(
-                                                  icon: Icon(Icons.edit_outlined,
-                                                      color: brown, size: 20),
-                                                  onPressed: () => _edit(row),
-                                                ),
-                                                IconButton(
-                                                  icon: const Icon(
-                                                      Icons.delete_outline,
-                                                      color: Colors.redAccent,
-                                                      size: 20),
-                                                  onPressed: () => _delete(row),
+                                                if (mine)
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(
+                                                        horizontal: 8, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: brown.withValues(alpha: 0.1),
+                                                      borderRadius: BorderRadius.circular(8),
+                                                    ),
+                                                    child: Text(
+                                                      'You',
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight: FontWeight.w600,
+                                                        color: brown,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                if (mine) const SizedBox(height: 6),
+                                                Text(
+                                                  _commentText(row),
+                                                  style: TextStyle(
+                                                    color: isDark ? Colors.white : CommanColor.black,
+                                                    height: 1.4,
+                                                    fontSize: 15,
+                                                  ),
                                                 ),
                                               ],
-                                            )
-                                          : null,
+                                            ),
+                                          ),
+                                          if (mine) ...[
+                                            const SizedBox(width: 8),
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Container(
+                                                  decoration: BoxDecoration(
+                                                    color: isDark 
+                                                        ? Colors.white.withValues(alpha: 0.1)
+                                                        : brown.withValues(alpha: 0.1),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                  child: IconButton(
+                                                    icon: Icon(
+                                                      Icons.edit_outlined,
+                                                      color: isDark ? Colors.white70 : brown,
+                                                      size: 18,
+                                                    ),
+                                                    onPressed: () => _edit(row),
+                                                    padding: const EdgeInsets.all(8),
+                                                    constraints: const BoxConstraints(
+                                                      minWidth: 32,
+                                                      minHeight: 32,
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Container(
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.red.withValues(alpha: 0.1),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                  child: IconButton(
+                                                    icon: const Icon(
+                                                      Icons.delete_outline,
+                                                      color: Colors.redAccent,
+                                                      size: 18,
+                                                    ),
+                                                    onPressed: () => _delete(row),
+                                                    padding: const EdgeInsets.all(8),
+                                                    constraints: const BoxConstraints(
+                                                      minWidth: 32,
+                                                      minHeight: 32,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ],
+                                      ),
                                     ),
                                   );
                                 },

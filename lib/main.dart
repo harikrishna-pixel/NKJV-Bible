@@ -4,7 +4,7 @@ import 'package:biblebookapp/core/notifiers/bottom.notifier.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/background_api_service.dart';
-import 'package:biblebookapp/services/statsig/statsig_service.dart';
+import 'package:biblebookapp/services/analytics/analytics_service.dart';
 
 import 'package:biblebookapp/view/widget/adhelper.dart';
 import 'package:biblebookapp/constant/app_api_constant.dart';
@@ -171,9 +171,9 @@ Future<void> _bootstrapBackgroundStartup() async {
   }
 
   try {
-    await StatsigService.initialize().timeout(const Duration(seconds: 8));
+    await AnalyticsService.initialize().timeout(const Duration(seconds: 8));
   } catch (e) {
-    debugPrint("main: Statsig init failed: $e");
+    debugPrint("main: Analytics init failed: $e");
   }
 
   try {

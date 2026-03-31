@@ -45,7 +45,7 @@ import '../../../Model/verseBookContentModel.dart';
 import '../../../controller/dpProvider.dart';
 import '../../constants/images.dart';
 import '../../constants/share_preferences.dart';
-import 'package:biblebookapp/streak_flow/streak_flow_screens.dart';
+import 'package:biblebookapp/streak_flow/streak_flow_screens.dart' hide SharPreferences;
 import '../dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/bible_select_screen.dart';
 

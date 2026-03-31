@@ -1,4 +1,4 @@
-import 'package:biblebookapp/services/statsig/statsig_service.dart';
+import 'package:biblebookapp/services/analytics/analytics_service.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/images.dart';
@@ -27,7 +27,7 @@ class BooksScreen extends HookConsumerWidget {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(bookBloc).getBooks(bookAdId);
         // Track Books event
-        StatsigService.trackBooks();
+        AnalyticsService.trackBooks();
         // Reset toast flag when starting to load
         hasShownToast.value = false;
       });

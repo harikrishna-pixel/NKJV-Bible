@@ -91,6 +91,10 @@ class SharPreferences {
   /// Streak flow: JSON map of dayKey (YYYY-MM-DD) -> selected MoodPrayerItem snapshot.
   /// Used so Daily Journey shows exactly the same Verse/Devotional/Prayer content seen in Streak Flow.
   static const streakFlowItemByDay = 'streak_flow_item_by_day';
+
+  /// First day the app was opened/installed. Used to rotate the weekly streak calendar UI.
+  /// Stored as YYYY-MM-DD (date only).
+  static const appInstalledDate = 'app_installed_date';
   /// Streak flow: calendar day (YYYY-MM-DD) that was left incomplete and is eligible for restore.
   static const streakFlowPausedDate = 'streak_flow_paused_date';
   /// Streak flow: exact timestamp (ISO-8601) when paused was detected. Used for 24h restore window.

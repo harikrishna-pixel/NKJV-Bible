@@ -1,5 +1,6 @@
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
+import 'package:biblebookapp/view/constants/images.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -28,7 +29,17 @@ class PrayerAddedSuccessScreen extends StatelessWidget {
     final fmt = DateFormat('MMM d, yyyy');
 
     return Scaffold(
-      backgroundColor: cream,
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage(Images.bgImage(context)),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
@@ -159,6 +170,8 @@ class PrayerAddedSuccessScreen extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
         ),
       ),
     );

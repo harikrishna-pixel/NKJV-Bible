@@ -1,5 +1,6 @@
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
+import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/login_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/post_prayer_screen.dart';
@@ -314,7 +315,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                 color: brown.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(Icons.edit_outlined, color: brown, size: 18),
+              child: Icon(Icons.edit_outlined, color: isDark ? Colors.white70 : brown, size: 18),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -562,10 +563,21 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
     }
 
     return Scaffold(
-      backgroundColor: cream,
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage(Images.bgImage(context)),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
       floatingActionButton: FloatingActionButton(
-        backgroundColor: brown,
+        backgroundColor: isDark ? brown.withValues(alpha: 0.9) : brown,
         foregroundColor: Colors.white,
+        elevation: isDark ? 8 : 6,
         onPressed: () async {
           final posted = await Navigator.of(context).push<bool>(
             MaterialPageRoute(
@@ -706,15 +718,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text(
-                        'Hi, ${_userName!.trim()}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? Colors.white : brown,
-                        ),
-                      ),
+                      child: SizedBox.shrink(), // Remove "Hi, bala" text
                     ),
                   ],
                 ),
@@ -781,7 +785,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                                       isDark: isDark,
                                       timeLabel: _timeLabel(item),
                                       displayName: _isMyPrayer(item)
-                                          ? 'You'
+                                          ? (_userName?.trim().isNotEmpty ?? false)
+                                              ? _userName!.trim()
+                                              : 'You'
                                           : (item.isAnonymous
                                               ? 'Anonymous'
                                               : ((item.authorName?.trim().isNotEmpty ??
@@ -872,6 +878,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
           ),
         ),
       ),
+        )
+      )
     );
   }
 }
@@ -937,11 +945,28 @@ class _PrayerCard extends StatelessWidget {
     return InkWell(
       onTap: isMine ? onOpen : null,
       borderRadius: BorderRadius.circular(14),
-      child: Card(
+      child: Container(
         margin: const EdgeInsets.only(bottom: 14),
-        color: isDark ? Colors.white.withOpacity(0.06) : Colors.white,
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage(Images.bgImage(context)),
+            fit: BoxFit.cover,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+          border: Border.all(
+            color: isDark 
+              ? Colors.white.withOpacity(0.1)
+              : const Color(0xFFD4C4B0),
+            width: 1,
+          ),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Column(
@@ -1015,7 +1040,7 @@ class _PrayerCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.favorite_border, size: 14, color: brown),
+                      Icon(Icons.favorite_border, size: 14, color: isDark ? Colors.white70 : brown),
                       const SizedBox(width: 4),
                       Text(
                         item.category,
@@ -1039,7 +1064,7 @@ class _PrayerCard extends StatelessWidget {
                         color: brown.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Icon(Icons.share, size: 16, color: brown),
+                      child: Icon(Icons.share, size: 16, color: isDark ? Colors.white70 : brown),
                     ),
                   ),
                 ],
@@ -1258,7 +1283,7 @@ class _PrayerCard extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(Icons.chat_bubble_outline,
-                                  color: brown, size: 18),
+                                  color: isDark ? Colors.white70 : brown, size: 18),
                               const SizedBox(width: 6),
                               Flexible(
                                 child: Text(
@@ -1282,6 +1307,6 @@ class _PrayerCard extends StatelessWidget {
           ),
         ),
       ),
-    );
+        );
   }
 }

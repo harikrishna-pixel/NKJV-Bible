@@ -48,7 +48,8 @@ import 'package:biblebookapp/streak_flow/daily_journey_screen.dart';
 import 'package:biblebookapp/services/smart_notification_helper.dart';
 import 'package:biblebookapp/services/streak_notification_helper.dart';
 import 'package:biblebookapp/streak_flow/streak_complete_celebration_dialog.dart';
-import 'package:biblebookapp/streak_flow/streak_flow_screens.dart';
+import 'package:biblebookapp/streak_flow/streak_flow_screens.dart' hide SharPreferences;
+import '../../constants/share_preferences.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:biblebookapp/view/widget/webview.dart';
@@ -80,14 +81,13 @@ import '../../constants/changeThemeButtun.dart';
 import 'package:html/parser.dart' show parse;
 import '../../constants/constant.dart';
 import '../../constants/images.dart';
-import '../../constants/share_preferences.dart';
 import '../../widget/home_content_edit_bottom_sheet.dart';
 import '../authenitcation/view/login_screen.dart';
 import 'book_list_screen.dart';
 import 'chapterListScreen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart' as p;
-import 'package:biblebookapp/services/statsig/statsig_service.dart';
+import 'package:biblebookapp/services/analytics/analytics_service.dart';
 import 'package:biblebookapp/utils/custom_share.dart';
 import 'package:html/parser.dart' as html;
 
@@ -1095,8 +1095,7 @@ class _HomeScreenState extends State<HomeScreen>
   bool _hasInitialized = false;
   bool _showUI = true; // Track UI visibility for scroll-based hide/show
   BuildContext? _bottomSheetContext; // Track bottom sheet context to dismiss it
-  bool _exitOfferCooldownActive =
-      false; // Red dot indicator (show after 3 days)
+  bool _exitOfferCooldownActive = false; // Red dot indicator (show after 3 days)
   Timer?
       _exitOfferCooldownRefreshTimer; // Refresh so red dot dismisses after 10 mins
   // dailyverse
@@ -1113,7 +1112,7 @@ class _HomeScreenState extends State<HomeScreen>
     WidgetsBinding.instance.addObserver(this);
     _initializeApp();
     // Track Home Screen event
-    StatsigService.trackHomeScreen();
+    AnalyticsService.trackHomeScreen();
   }
 
   Future<void> _initializeApp() async {
@@ -1185,9 +1184,6 @@ class _HomeScreenState extends State<HomeScreen>
       barrierDismissible: false,
       builder: (_) => StreakCompleteCelebrationDialog(
         streakCount: count,
-        onContinueTomorrow: (dialogContext) {
-          Navigator.of(dialogContext).pop();
-        },
       ),
     );
   }

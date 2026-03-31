@@ -3,16 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 /// Celebration dialog when user completes the full 4-step streak (Day X Complete).
-/// Shows app logo, "Day X Complete", streak started strip, Continue Tomorrow, Enable Daily Reminder.
+/// Shows app logo, "Day X Complete", streak started strip, and Enable Daily Reminder.
 class StreakCompleteCelebrationDialog extends StatelessWidget {
   const StreakCompleteCelebrationDialog({
     super.key,
     required this.streakCount,
-    required this.onContinueTomorrow,
   });
 
   final int streakCount;
-  final void Function(BuildContext dialogContext) onContinueTomorrow;
 
   static const Color _brown = Color(0xFF3D2914);
   static const Color _gold = Color(0xFFC9A227);
@@ -98,7 +96,7 @@ class StreakCompleteCelebrationDialog extends StatelessWidget {
                     Icon(Icons.star, color: _gold, size: 22),
                     const SizedBox(width: 10),
                     Text(
-                      'Day $streakCount Streak Completed',
+                      'Streak Started',
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -109,83 +107,57 @@ class StreakCompleteCelebrationDialog extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Material(
-                    color: const Color(0xFF5C4A3A),
-                    borderRadius: BorderRadius.circular(14),
-                    child: InkWell(
-                      onTap: () => onContinueTomorrow(context),
-                      borderRadius: BorderRadius.circular(14),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        decoration: BoxDecoration(
+                child: Column(
+                  children: [
+                    Text(
+                      'Want a daily notifications ?',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: _brown.withOpacity(0.8),
+                        fontFamily: 'Georgia',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            Get.to(() => SettingScreen(notificationValue: false));
+                          },
                           borderRadius: BorderRadius.circular(14),
-                          boxShadow: [
-                            BoxShadow(
-                              color: _brown.withOpacity(0.3),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: _gold, width: 1.5),
+                              borderRadius: BorderRadius.circular(14),
                             ),
-                          ],
-                        ),
-                        child: const Text(
-                          'Continue Tomorrow',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                            fontFamily: 'Georgia',
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.notifications_none, size: 20, color: _gold),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Enable Daily Reminder',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: _gold,
+                                    fontFamily: 'Georgia',
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Want a daily notifications ?',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: _brown.withOpacity(0.7),
-                  fontFamily: 'Georgia',
-                ),
-              ),
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Get.to(() => SettingScreen(notificationValue: false));
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 6, horizontal: 20),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.notifications_none, size: 18, color: _gold),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Enable Daily Reminder',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: _gold,
-                            fontFamily: 'Georgia',
-                            decoration: TextDecoration.underline,
-                            decorationColor: _gold.withOpacity(0.7),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  ],
                 ),
               ),
               const SizedBox(height: 16),

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/paywall_preload_service.dart';
-import 'package:biblebookapp/services/statsig/statsig_service.dart';
+import 'package:biblebookapp/services/analytics/analytics_service.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/images.dart';
@@ -41,7 +41,7 @@ class _SubscriptionPlanPageState extends State<SubscriptionPlanPage> {
     super.initState();
     _loadProductIDs();
     // Track Paywall Screen event
-    StatsigService.trackPaywallScreen();
+    AnalyticsService.trackPaywallScreen();
   }
 
   Future<void> _loadProductIDs() async {

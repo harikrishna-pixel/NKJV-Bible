@@ -21,6 +21,15 @@ import 'package:share_plus/share_plus.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 
+// Color constants for streak completion screen
+const Color _kParchmentLight = Color(0xFFF5EAC6);
+const Color _kParchmentMid = Color(0xFFECE3CB);
+const Color _kParchmentShadow = Color(0xFFD4C4A0);
+const Color _kInkBrown = Color(0xFF4A2F1D);
+const Color _kInkSepia = Color(0xFF6B4E37);
+const Color _kCandleGold = Color(0xFFC9A227);
+const Color _kCandleGlow = Color(0xFFFFF6D5);
+
 // Streak flow colors (warm parchment / spiritual theme)
 const Color _kStreakBrown = Color(0xFF3D2914);
 const Color _kStreakGold = Color(0xFFC9A227);
@@ -189,13 +198,15 @@ void _showAppleToast(BuildContext context, String message) {
 }
 
 Future<Map<String, int>> _readStreakFlowStepsByDay() async {
-  final raw = await SharPreferences.getString(SharPreferences.streakFlowStepsByDay);
+  final raw =
+      await SharPreferences.getString(SharPreferences.streakFlowStepsByDay);
   if (raw == null || raw.trim().isEmpty) return <String, int>{};
   try {
     final decoded = jsonDecode(raw);
     if (decoded is! Map) return <String, int>{};
     return decoded.map((key, value) {
-      final v = value is num ? value.toInt() : int.tryParse(value.toString()) ?? 0;
+      final v =
+          value is num ? value.toInt() : int.tryParse(value.toString()) ?? 0;
       return MapEntry(key.toString(), v);
     });
   } catch (_) {
@@ -215,9 +226,9 @@ Future<void> _storeStreakFlowStepsForDay(String dayKey, int steps) async {
 }
 
 Future<String> _currentStreakFlowProgressDayKey() async {
-  final isRestoreRun =
-      (await SharPreferences.getBoolean(SharPreferences.streakFlowRestoreActive)) ==
-          true;
+  final isRestoreRun = (await SharPreferences.getBoolean(
+          SharPreferences.streakFlowRestoreActive)) ==
+      true;
   if (isRestoreRun) {
     final restoreDate =
         await SharPreferences.getString(SharPreferences.streakFlowRestoreDate);
@@ -225,7 +236,8 @@ Future<String> _currentStreakFlowProgressDayKey() async {
       return restoreDate;
     }
   }
-  final started = await SharPreferences.getString(SharPreferences.streakFlowStartedDate);
+  final started =
+      await SharPreferences.getString(SharPreferences.streakFlowStartedDate);
   if (started != null && started.trim().isNotEmpty) {
     return started;
   }
@@ -238,7 +250,8 @@ Future<void> _storeActiveStreakFlowSteps(int steps) async {
 }
 
 Future<Map<String, dynamic>> _readStreakFlowItemByDay() async {
-  final raw = await SharPreferences.getString(SharPreferences.streakFlowItemByDay);
+  final raw =
+      await SharPreferences.getString(SharPreferences.streakFlowItemByDay);
   if (raw == null || raw.trim().isEmpty) return <String, dynamic>{};
   try {
     final decoded = jsonDecode(raw);
@@ -279,7 +292,8 @@ Future<void> _recordStreakActivityForDay(String dayKey) async {
 
   final lastStr =
       await SharPreferences.getString(SharPreferences.streakLastActivityDate);
-  final prevCount = await SharPreferences.getInt(SharPreferences.streakCount) ?? 0;
+  final prevCount =
+      await SharPreferences.getInt(SharPreferences.streakCount) ?? 0;
   int newCount = 1;
 
   if (lastStr != null && lastStr.isNotEmpty) {
@@ -375,8 +389,8 @@ class StreakFlowNavigation {
         SharPreferences.streakFlowLastShownDate);
     final dismissed = await SharPreferences.getString(
         SharPreferences.streakFlowDismissedDate);
-    final started = await SharPreferences.getString(
-        SharPreferences.streakFlowStartedDate);
+    final started =
+        await SharPreferences.getString(SharPreferences.streakFlowStartedDate);
     final steps = await SharPreferences.getInt(
             SharPreferences.streakFlowStepsCompletedToday) ??
         0;
@@ -393,8 +407,8 @@ class StreakFlowNavigation {
         SharPreferences.streakFlowPausedDate,
         isIncompleteYesterday ? started : yesterday,
       );
-      final pausedAt = await SharPreferences.getString(
-          SharPreferences.streakFlowPausedAt);
+      final pausedAt =
+          await SharPreferences.getString(SharPreferences.streakFlowPausedAt);
       if (pausedAt == null || pausedAt.isEmpty) {
         await SharPreferences.setString(
           SharPreferences.streakFlowPausedAt,
@@ -434,13 +448,15 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
   }
 
   Future<void> _loadPausedDate() async {
-    final paused = await SharPreferences.getString(SharPreferences.streakFlowPausedDate);
+    final paused =
+        await SharPreferences.getString(SharPreferences.streakFlowPausedDate);
     if (!mounted) return;
     setState(() => _pausedDate = paused ?? '');
   }
 
   Future<bool> _isRestoreWindowOpen() async {
-    final raw = await SharPreferences.getString(SharPreferences.streakFlowPausedAt);
+    final raw =
+        await SharPreferences.getString(SharPreferences.streakFlowPausedAt);
     if (raw == null || raw.isEmpty) return true;
     try {
       final pausedAt = DateTime.parse(raw);
@@ -475,7 +491,8 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
     if (!canRestore) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Restore is available only within 24 hours.')),
+          const SnackBar(
+              content: Text('Restore is available only within 24 hours.')),
         );
       }
       if (mounted) setState(() => _busy = false);
@@ -496,14 +513,19 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
       return;
     }
 
-    await SharPreferences.setBoolean(SharPreferences.streakFlowRestoreActive, true);
+    await SharPreferences.setBoolean(
+        SharPreferences.streakFlowRestoreActive, true);
     await SharPreferences.setString(
       SharPreferences.streakFlowRestoreDate,
       _pausedDate.isNotEmpty
           ? _pausedDate
-          : DateTime.now().subtract(const Duration(days: 1)).toIso8601String().split('T')[0],
+          : DateTime.now()
+              .subtract(const Duration(days: 1))
+              .toIso8601String()
+              .split('T')[0],
     );
-    await SharPreferences.setInt(SharPreferences.streakFlowStepsCompletedToday, 0);
+    await SharPreferences.setInt(
+        SharPreferences.streakFlowStepsCompletedToday, 0);
     await SharPreferences.setString(
       SharPreferences.streakFlowStartedDate,
       DateTime.now().toIso8601String().split('T')[0],
@@ -540,254 +562,277 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
         ),
         child: SafeArea(
           child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(isTablet ? 30 : 22, 8, isTablet ? 30 : 22, 20),
+            padding: EdgeInsets.fromLTRB(
+                isTablet ? 30 : 22, 8, isTablet ? 30 : 22, 20),
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 430),
                 child: Column(
                   children: [
-                Align(
-                  alignment: Alignment.topRight,
-                  child: GestureDetector(
-                    onTap: () => _goToHome(context),
-                    child: Container(
-                      width: 26,
-                      height: 26,
-                      child: Icon(Icons.close, size: 22, color: warmText.withOpacity(0.7)),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Container(
-                  width: isTablet ? 84 : 78,
-                  height: isTablet ? 84 : 78,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: _kStreakGold.withOpacity(0.9), width: 1.6),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _kStreakGold.withOpacity(0.18),
-                        blurRadius: 16,
-                        spreadRadius: 0,
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: GestureDetector(
+                        onTap: () => _goToHome(context),
+                        child: Container(
+                          width: 26,
+                          height: 26,
+                          child: Icon(Icons.close,
+                              size: 22, color: warmText.withOpacity(0.7)),
+                        ),
                       ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Container(
-                      width: isTablet ? 50 : 44,
-                      height: isTablet ? 50 : 44,
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      width: isTablet ? 84 : 78,
+                      height: isTablet ? 84 : 78,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(color: _kStreakGold.withOpacity(0.9), width: 1.3),
-                      ),
-                      child: const Icon(Icons.pause, color: _kStreakGold, size: 24),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 22),
-                Text(
-                  'Your Streak Paused',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: isTablet ? 52 : 50,
-                    fontWeight: FontWeight.w700,
-                    color: warmText,
-                    fontFamily: 'Georgia',
-                    height: 0.95,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'You missed a day - and that\'s okay.\nEvery journey has pauses.\nWhat matters is starting again.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: isTablet ? 18 : 16,
-                    height: 1.45,
-                    color: warmText.withOpacity(0.9),
-                    fontFamily: 'Georgia',
-                  ),
-                ),
-                const SizedBox(height: 14),
-                FutureBuilder<int>(
-                  future: StreakService.getCurrentStreak(),
-                  builder: (context, snap) {
-                    final v = (snap.data ?? 0).clamp(0, 9999);
-                    return RichText(
-                      textAlign: TextAlign.center,
-                      text: TextSpan(
-                        style: TextStyle(
-                          fontSize: isTablet ? 25 : 22,
-                          fontWeight: FontWeight.w700,
-                          color: warmText,
-                          fontFamily: 'Georgia',
-                        ),
-                        children: [
-                          const TextSpan(text: 'You built a '),
-                          TextSpan(
-                            text: '$v Day Faith Habit.',
-                            style: const TextStyle(color: _kStreakGold),
+                        border: Border.all(
+                            color: _kStreakGold.withOpacity(0.9), width: 1.6),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _kStreakGold.withOpacity(0.18),
+                            blurRadius: 16,
+                            spreadRadius: 0,
                           ),
                         ],
                       ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Divider(color: warmText.withOpacity(0.24), thickness: 1),
+                      child: Center(
+                        child: Container(
+                          width: isTablet ? 50 : 44,
+                          height: isTablet ? 50 : 44,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: _kStreakGold.withOpacity(0.9),
+                                width: 1.3),
+                          ),
+                          child: const Icon(Icons.pause,
+                              color: _kStreakGold, size: 24),
+                        ),
+                      ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      child: Icon(Icons.auto_awesome, color: _kStreakGold.withOpacity(0.7), size: 14),
+                    const SizedBox(height: 22),
+                    Text(
+                      'Your Streak Paused',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: isTablet ? 52 : 50,
+                        fontWeight: FontWeight.w700,
+                        color: warmText,
+                        fontFamily: 'Georgia',
+                        height: 0.95,
+                      ),
                     ),
-                    Expanded(
-                      child: Divider(color: warmText.withOpacity(0.24), thickness: 1),
+                    const SizedBox(height: 14),
+                    Text(
+                      'You missed a day - and that\'s okay.\nEvery journey has pauses.\nWhat matters is starting again.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: isTablet ? 18 : 16,
+                        height: 1.45,
+                        color: warmText.withOpacity(0.9),
+                        fontFamily: 'Georgia',
+                      ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                  decoration: BoxDecoration(
-                    color: panelColor.withOpacity(0.72),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: warmText.withOpacity(0.16), width: 1.2),
-                  ),
-                  child: Column(
-                    children: [
-                      Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: _busy ? null : _tryRestore,
-                          borderRadius: BorderRadius.circular(30),
-                          child: Ink(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 18),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(30),
-                              gradient: const LinearGradient(
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
-                                colors: [Color(0xFFC09645), Color(0xFF9B6B2F)],
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: _kStreakGold.withOpacity(0.22),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
+                    const SizedBox(height: 14),
+                    FutureBuilder<int>(
+                      future: StreakService.getCurrentStreak(),
+                      builder: (context, snap) {
+                        final v = (snap.data ?? 0).clamp(0, 9999);
+                        return RichText(
+                          textAlign: TextAlign.center,
+                          text: TextSpan(
+                            style: TextStyle(
+                              fontSize: isTablet ? 25 : 22,
+                              fontWeight: FontWeight.w700,
+                              color: warmText,
+                              fontFamily: 'Georgia',
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.local_fire_department,
-                                    color: Colors.white, size: 20),
-                                const SizedBox(width: 8),
-                                Text(
-                                  _busy ? 'Please wait...' : 'Restore Streak',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 22,
+                            children: [
+                              const TextSpan(text: 'You built a '),
+                              TextSpan(
+                                text: '$v Day Faith Habit.',
+                                style: const TextStyle(color: _kStreakGold),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Divider(
+                              color: warmText.withOpacity(0.24), thickness: 1),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          child: Icon(Icons.auto_awesome,
+                              color: _kStreakGold.withOpacity(0.7), size: 14),
+                        ),
+                        Expanded(
+                          child: Divider(
+                              color: warmText.withOpacity(0.24), thickness: 1),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                      decoration: BoxDecoration(
+                        color: panelColor.withOpacity(0.72),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                            color: warmText.withOpacity(0.16), width: 1.2),
+                      ),
+                      child: Column(
+                        children: [
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: _busy ? null : _tryRestore,
+                              borderRadius: BorderRadius.circular(30),
+                              child: Ink(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 12, horizontal: 18),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(30),
+                                  gradient: const LinearGradient(
+                                    begin: Alignment.centerLeft,
+                                    end: Alignment.centerRight,
+                                    colors: [
+                                      Color(0xFFC09645),
+                                      Color(0xFF9B6B2F)
+                                    ],
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: _kStreakGold.withOpacity(0.22),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.local_fire_department,
+                                        color: Colors.white, size: 20),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      _busy
+                                          ? 'Please wait...'
+                                          : 'Restore Streak',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w700,
+                                        fontFamily: 'Georgia',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Uses 50 Faith Credits',
+                            style: TextStyle(
+                              color: const Color(0xFFA94442).withOpacity(0.95),
+                              fontSize: isTablet ? 17 : 16,
+                              fontFamily: 'Georgia',
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            height: 1,
+                            color: textColor.withOpacity(0.16),
+                          ),
+                          const SizedBox(height: 10),
+                          RichText(
+                            textAlign: TextAlign.center,
+                            text: TextSpan(
+                              style: TextStyle(
+                                color: warmText.withOpacity(0.9),
+                                fontSize: isTablet ? 21 : 19,
+                                fontFamily: 'Georgia',
+                                fontWeight: FontWeight.w500,
+                              ),
+                              children: const [
+                                TextSpan(text: 'Restore within '),
+                                TextSpan(
+                                  text: '24 hours',
+                                  style: TextStyle(
+                                    color: _kStreakGold,
                                     fontWeight: FontWeight.w700,
-                                    fontFamily: 'Georgia',
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'Uses 50 Faith Credits',
-                        style: TextStyle(
-                          color: const Color(0xFFA94442).withOpacity(0.95),
-                          fontSize: isTablet ? 17 : 16,
-                          fontFamily: 'Georgia',
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        width: double.infinity,
-                        height: 1,
-                        color: textColor.withOpacity(0.16),
-                      ),
-                      const SizedBox(height: 10),
-                      RichText(
-                        textAlign: TextAlign.center,
-                        text: TextSpan(
-                          style: TextStyle(
-                            color: warmText.withOpacity(0.9),
-                            fontSize: isTablet ? 21 : 19,
-                            fontFamily: 'Georgia',
-                            fontWeight: FontWeight.w500,
-                          ),
-                          children: const [
-                            TextSpan(text: 'Restore within '),
-                            TextSpan(
-                              text: '24 hours',
-                              style: TextStyle(
-                                color: _kStreakGold,
-                                fontWeight: FontWeight.w700,
-                              ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                            child: Divider(
+                                color: warmText.withOpacity(0.28),
+                                thickness: 1)),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            'OR',
+                            style: TextStyle(
+                              color: warmText.withOpacity(0.82),
+                              fontFamily: 'Georgia',
+                              fontSize: isTablet ? 22 : 20,
+                              fontWeight: FontWeight.w500,
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(child: Divider(color: warmText.withOpacity(0.28), thickness: 1)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Text(
-                        'OR',
-                        style: TextStyle(
-                          color: warmText.withOpacity(0.82),
-                          fontFamily: 'Georgia',
-                          fontSize: isTablet ? 22 : 20,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                        Expanded(
+                            child: Divider(
+                                color: warmText.withOpacity(0.28),
+                                thickness: 1)),
+                      ],
                     ),
-                    Expanded(child: Divider(color: warmText.withOpacity(0.28), thickness: 1)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () => _goToHome(context),
-                    borderRadius: BorderRadius.circular(30),
-                    child: Ink(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 13),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.42),
+                    const SizedBox(height: 12),
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => _goToHome(context),
                         borderRadius: BorderRadius.circular(30),
-                        border: Border.all(color: _kStreakGold.withOpacity(0.55)),
-                      ),
-                      child: Text(
-                        'Start New Journey',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: warmText,
-                          fontSize: isTablet ? 22 : 20,
-                          fontWeight: FontWeight.w700,
-                          fontFamily: 'Georgia',
+                        child: Ink(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.42),
+                            borderRadius: BorderRadius.circular(30),
+                            border: Border.all(
+                                color: _kStreakGold.withOpacity(0.55)),
+                          ),
+                          child: Text(
+                            'Start New Journey',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: warmText,
+                              fontSize: isTablet ? 22 : 20,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Georgia',
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ),
                   ],
                 ),
               ),
@@ -1895,9 +1940,10 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                               SharPreferences.streakFlowLastShownDate,
                               completionDate);
                           if (isRestoreRun) {
-                            final completed = await SharPreferences.getStringList(
-                                    SharPreferences.streakCompletedDates) ??
-                                <String>[];
+                            final completed =
+                                await SharPreferences.getStringList(
+                                        SharPreferences.streakCompletedDates) ??
+                                    <String>[];
                             if (!completed.contains(completionDate)) {
                               await SharPreferences.setListString(
                                 SharPreferences.streakCompletedDates,
@@ -1926,7 +1972,8 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                                     'Yesterday\'s faith journey is completed.'),
                                 actions: [
                                   CupertinoDialogAction(
-                                    onPressed: () => Navigator.of(context).pop(),
+                                    onPressed: () =>
+                                        Navigator.of(context).pop(),
                                     child: const Text('OK'),
                                   ),
                                 ],
@@ -1937,18 +1984,21 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                                   context: context,
                                   barrierDismissible: false,
                                   builder: (_) => CupertinoAlertDialog(
-                                    title: const Text('Start today\'s journey?'),
+                                    title:
+                                        const Text('Start today\'s journey?'),
                                     content: const Text(
                                       'Would you like to start today\'s faith journey?',
                                     ),
                                     actions: [
                                       CupertinoDialogAction(
-                                        onPressed: () => Navigator.of(context).pop(false),
+                                        onPressed: () =>
+                                            Navigator.of(context).pop(false),
                                         child: const Text('No'),
                                       ),
                                       CupertinoDialogAction(
                                         isDefaultAction: true,
-                                        onPressed: () => Navigator.of(context).pop(true),
+                                        onPressed: () =>
+                                            Navigator.of(context).pop(true),
                                         child: const Text('Yes'),
                                       ),
                                     ],
@@ -1958,7 +2008,8 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                             if (!context.mounted) return;
                             if (startToday) {
                               await SharPreferences.setInt(
-                                  SharPreferences.streakFlowStepsCompletedToday, 0);
+                                  SharPreferences.streakFlowStepsCompletedToday,
+                                  0);
                               await SharPreferences.setString(
                                 SharPreferences.streakFlowStartedDate,
                                 DateTime.now().toIso8601String().split('T')[0],
@@ -2003,6 +2054,10 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
 }
 
 /// 5. Daily Streak Completed!
+
+// ─── Stub preferences ────────────────────────────────────────────────────────
+
+// ═════════════════════════════════════════════════════════════════════════════
 class StreakCompletedScreen extends StatefulWidget {
   const StreakCompletedScreen({super.key});
 
@@ -2012,6 +2067,69 @@ class StreakCompletedScreen extends StatefulWidget {
 
 class _StreakCompletedScreenState extends State<StreakCompletedScreen>
     with TickerProviderStateMixin {
+  bool _isStreakDark(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark;
+
+  Color _streakTextColor(BuildContext context) =>
+      _isStreakDark(context) ? _kParchmentLight : _kInkBrown;
+
+  Color _streakPanelColor(BuildContext context) =>
+      _isStreakDark(context) ? const Color(0xFF2A1F12) : _kParchmentMid;
+
+  Widget _parchmentButton(
+    BuildContext context, {
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    final isDark = _isStreakDark(context);
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF3B2A1A) : _kInkBrown,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: _kCandleGold, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: _kCandleGold.withOpacity(0.25),
+              blurRadius: 12,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFFF5EAC6),
+              fontFamily: 'Georgia',
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _goToHome(BuildContext context) {
+    Get.offAll(
+      () => HomeScreen(
+        From: "splash",
+        selectedVerseNumForRead: "",
+        selectedBookForRead: "",
+        selectedChapterForRead: "",
+        selectedBookNameForRead: "",
+        selectedVerseForRead: "",
+      ),
+      transition: Transition.cupertino,
+      duration: const Duration(milliseconds: 350),
+    );
+  }
+
+  // ── Unchanged controllers (kept identical) ─────────────────────────────────
   late final AnimationController _ctrl;
   late final AnimationController _twinkleCtrl;
   late final AnimationController _rayCtrl;
@@ -2024,7 +2142,7 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 1600),
     )..forward();
     _twinkleCtrl = AnimationController(
       vsync: this,
@@ -2032,16 +2150,16 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
     )..repeat(reverse: true);
     _rayCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 9000),
+      duration: const Duration(milliseconds: 12000),
     )..repeat();
     _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic);
-    _scale = Tween<double>(begin: 0.94, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack),
+    _scale = Tween<double>(begin: 0.88, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut),
     );
     _cardSlide = Tween<Offset>(
-      begin: const Offset(0, 0.08),
+      begin: const Offset(0, 0.12),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack));
   }
 
   @override
@@ -2052,13 +2170,17 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
     super.dispose();
   }
 
+  // ── PARCHMENT LIGHT RAYS (replaces golden rays) ───────────────────────────
+  // Slow, sepia ink-bleed rays that radiate like candlelight through vellum.
   Widget _lightRaysOverlay(bool isDark) {
     return IgnorePointer(
       child: AnimatedBuilder(
         animation: _rayCtrl,
         builder: (context, _) {
-          final baseOpacity = isDark ? 0.20 : 0.26;
-          Widget rays(double angle, double size, double opacity) {
+          final baseOpacity = isDark ? 0.10 : 0.14;
+
+          Widget rays(double angle, double size, double opacity,
+              {int rayCount = 16}) {
             return Transform.rotate(
               angle: angle,
               child: SizedBox(
@@ -2066,24 +2188,71 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
                 height: size,
                 child: Stack(
                   alignment: Alignment.center,
-                  children: List.generate(12, (i) {
+                  children: List.generate(rayCount, (i) {
+                    final rayAngle = (math.pi * 2 / rayCount) * i;
+                    final rayLength = size * (0.22 + (i % 3) * 0.04);
+                    final rayWidth = 2.0 + (i % 2) * 1.0;
+                    // Alternate between candle-amber and sepia ink rays
+                    final rayColor = i.isEven ? _kCandleGold : _kInkSepia;
                     return Transform.rotate(
-                      angle: (math.pi * 2 / 12) * i,
+                      angle: rayAngle,
                       child: Align(
                         alignment: Alignment.topCenter,
                         child: Container(
-                          width: 4,
-                          height: size * 0.28,
+                          width: rayWidth,
+                          height: rayLength,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(3),
+                            borderRadius: BorderRadius.circular(rayWidth / 2),
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                const Color(0xFFFFE082).withOpacity(opacity),
+                                rayColor.withOpacity(opacity),
+                                rayColor.withOpacity(opacity * 0.5),
                                 Colors.transparent,
                               ],
+                              stops: const [0.0, 0.5, 1.0],
                             ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            );
+          }
+
+          // Decorative cross-hatch shimmer ring (like manuscript illumination)
+          Widget illuminationRing(
+              double rotation, double radius, double opacity) {
+            return Transform.rotate(
+              angle: rotation,
+              child: SizedBox(
+                width: radius * 2,
+                height: radius * 2,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: List.generate(12, (i) {
+                    final sparkleAngle = (math.pi * 2 / 12) * i;
+                    final isLong = i % 3 == 0;
+                    return Transform.rotate(
+                      angle: sparkleAngle,
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: Container(
+                          width: isLong ? 1.5 : 1.0,
+                          height: isLong ? 16 : 8,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(0.75),
+                            color: _kCandleGlow.withOpacity(opacity),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _kCandleGold.withOpacity(opacity * 0.4),
+                                blurRadius: 3,
+                                spreadRadius: 0,
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -2098,13 +2267,31 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
             alignment: Alignment.topCenter,
             children: [
               Positioned(
-                top: 12,
-                child: rays(_rayCtrl.value * math.pi * 2, 350, baseOpacity),
+                top: 8,
+                child: rays(_rayCtrl.value * math.pi * 2, 400, baseOpacity,
+                    rayCount: 20),
               ),
               Positioned(
-                top: 26,
+                top: 18,
                 child: rays(
-                    -_rayCtrl.value * math.pi * 1.4, 300, baseOpacity * 0.75),
+                    -_rayCtrl.value * math.pi * 1.6, 340, baseOpacity * 0.75,
+                    rayCount: 16),
+              ),
+              Positioned(
+                top: 28,
+                child: rays(
+                    _rayCtrl.value * math.pi * 0.8, 280, baseOpacity * 0.55,
+                    rayCount: 12),
+              ),
+              Positioned(
+                top: 100,
+                child: illuminationRing(
+                    _rayCtrl.value * math.pi * 3, 80, baseOpacity * 0.9),
+              ),
+              Positioned(
+                top: 100,
+                child: illuminationRing(
+                    -_rayCtrl.value * math.pi * 2.2, 60, baseOpacity * 0.7),
               ),
             ],
           );
@@ -2113,8 +2300,9 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
     );
   }
 
+  // ── PARCHMENT BURST (replaces golden confetti burst) ──────────────────────
+  // Ink-drop ripples + floating Scripture-dot particles — quill-dip aesthetic.
   Widget _celebrationBurstOverlay(bool isDark) {
-    // One-shot golden burst/ripple animation that fully disappears.
     return IgnorePointer(
       child: AnimatedBuilder(
         animation: _ctrl,
@@ -2122,11 +2310,13 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
           final t = _ctrl.value;
           final opacity = (1.0 - (t * 1.6)).clamp(0.0, 1.0);
           final maxRing = MediaQuery.of(context).size.width * 0.55;
+
           return Opacity(
             opacity: opacity,
             child: Stack(
               alignment: Alignment.topCenter,
               children: [
+                // Ink-bleed outer ring
                 Positioned(
                   top: 46,
                   child: Container(
@@ -2135,13 +2325,13 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: const Color(0xFFFFD54F)
-                            .withOpacity(isDark ? 0.7 : 0.6),
-                        width: 2.0,
+                        color: _kInkSepia.withOpacity(isDark ? 0.55 : 0.45),
+                        width: 1.5,
                       ),
                     ),
                   ),
                 ),
+                // Candle-wax inner ring
                 Positioned(
                   top: 62,
                   child: Container(
@@ -2150,13 +2340,13 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: const Color(0xFFC9A227)
-                            .withOpacity(isDark ? 0.75 : 0.65),
-                        width: 1.6,
+                        color: _kCandleGold.withOpacity(isDark ? 0.60 : 0.50),
+                        width: 1.2,
                       ),
                     ),
                   ),
                 ),
+                // Warm vellum glow center
                 Positioned(
                   top: 74,
                   child: Container(
@@ -2166,23 +2356,29 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
                         colors: [
-                          const Color(0xFFFFF6D5)
-                              .withOpacity(isDark ? 0.22 : 0.30),
+                          _kCandleGlow.withOpacity(isDark ? 0.18 : 0.26),
                           Colors.transparent,
                         ],
                       ),
                     ),
                   ),
                 ),
-                ...List.generate(10, (i) {
-                  final base = i / 10.0;
+                // Ink-dot particles (replaces confetti dots)
+                ...List.generate(16, (i) {
+                  final base = i / 16.0;
                   final theta = base * math.pi * 2;
-                  final radius = 44 + (90 * t);
+                  final radius = 50 + (110 * t);
                   final cx = MediaQuery.of(context).size.width / 2;
-                  final cy = 100.0;
+                  const cy = 100.0;
                   final x = cx + math.cos(theta) * radius;
-                  final y = cy + math.sin(theta) * (radius * 0.78);
-                  final size = 7.0 + ((i % 3) * 2.0);
+                  final y = cy + math.sin(theta) * (radius * 0.85);
+                  // Vary: ink dots vs tiny cross/dagger ornaments
+                  final size = i % 4 == 0 ? 5.0 : 3.5;
+                  final color = i % 3 == 0
+                      ? _kCandleGold
+                      : i % 3 == 1
+                          ? _kInkSepia
+                          : _kParchmentShadow;
                   return Positioned(
                     left: x,
                     top: y,
@@ -2191,16 +2387,12 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
                       height: size,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: (i.isEven
-                                ? const Color(0xFFFFD54F)
-                                : const Color(0xFFFFF6D5))
-                            .withOpacity(0.85 * opacity),
+                        color: color.withOpacity(0.80 * opacity),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFFFFD54F)
-                                .withOpacity(0.35 * opacity),
-                            blurRadius: 10,
-                            spreadRadius: 1,
+                            color: _kCandleGold.withOpacity(0.20 * opacity),
+                            blurRadius: 6,
+                            spreadRadius: 0,
                           ),
                         ],
                       ),
@@ -2215,21 +2407,43 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
     );
   }
 
+  // ── PARCHMENT TEXTURE OVERLAY ─────────────────────────────────────────────
+  // Subtle aged-paper grain via semi-transparent lines (no external assets).
+  Widget _parchmentTextureOverlay(bool isDark) {
+    return IgnorePointer(
+      child: CustomPaint(
+        painter: _ParchmentGrainPainter(isDark: isDark),
+        size: Size.infinite,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = _isStreakDark(context);
     final textColor = _streakTextColor(context);
-    final bgColor = isDark ? CommanColor.darkPrimaryColor : _kStreakCream;
+    // Parchment background replaces flat dark/cream
+    final bgColor = isDark
+        ? const Color(0xFF1C1208) // very dark aged vellum
+        : _kParchmentLight;
+
     return Scaffold(
       backgroundColor: bgColor,
       body: SafeArea(
         child: Stack(
           children: [
+            // 1. Aged-paper grain texture
+            _parchmentTextureOverlay(isDark),
+            // 2. Candlelight rays (same logic, parchment palette)
             _lightRaysOverlay(isDark),
+            // 3. Ink-bleed celebration burst (same logic, parchment palette)
             _celebrationBurstOverlay(isDark),
+
             Column(
               children: [
                 const SizedBox(height: 40),
+
+                // ── Illuminated Flame Badge ──────────────────────────────────
                 FutureBuilder<int?>(
                   future: SharPreferences.getInt(
                       SharPreferences.pendingStreakCompleteCelebration),
@@ -2244,7 +2458,7 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
                             AnimatedBuilder(
                               animation: _twinkleCtrl,
                               builder: (context, child) {
-                                final pulse = 1 + (_twinkleCtrl.value * 0.06);
+                                final pulse = 1 + (_twinkleCtrl.value * 0.08);
                                 return Transform.scale(
                                   scale: pulse,
                                   child: Container(
@@ -2252,32 +2466,48 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
                                     height: 108,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
+                                      // Parchment circle bg
                                       color: isDark
-                                          ? Colors.white.withOpacity(0.12)
-                                          : const Color(0xFF8B7355),
+                                          ? const Color(0xFF2E1E0A)
+                                          : _kParchmentMid,
+                                      // Ink-drawn border
                                       border: Border.all(
-                                          color: _kStreakGold, width: 3),
+                                          color: _kInkSepia, width: 2.5),
                                       boxShadow: [
+                                        // Candle glow pulse
                                         BoxShadow(
-                                          color: _kStreakGold.withOpacity(0.22 +
-                                              (_twinkleCtrl.value * 0.3)),
+                                          color: _kCandleGold.withOpacity(0.20 +
+                                              (_twinkleCtrl.value * 0.30)),
                                           blurRadius:
-                                              14 + (_twinkleCtrl.value * 18),
+                                              18 + (_twinkleCtrl.value * 20),
                                           spreadRadius:
-                                              1 + (_twinkleCtrl.value * 3),
+                                              1 + (_twinkleCtrl.value * 4),
+                                        ),
+                                        // Warm vellum inner halo
+                                        BoxShadow(
+                                          color: _kCandleGlow.withOpacity(0.10 +
+                                              (_twinkleCtrl.value * 0.20)),
+                                          blurRadius:
+                                              8 + (_twinkleCtrl.value * 10),
+                                          spreadRadius: _twinkleCtrl.value * 2,
                                         ),
                                       ],
                                     ),
                                     child: const Icon(
-                                      Icons.local_fire_department,
+                                      Icons.local_fire_department_rounded,
                                       size: 58,
-                                      color: Colors.white,
+                                      color: const Color(0xFFC9A227),
                                     ),
                                   ),
                                 );
                               },
                             ),
                             const SizedBox(height: 14),
+
+                            // Decorative manuscript rule above title
+                            _ManuscriptRule(color: _kInkSepia.withOpacity(0.5)),
+                            const SizedBox(height: 8),
+
                             Text(
                               streakDays > 0
                                   ? '$streakDays Day Streak!'
@@ -2291,79 +2521,47 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
                                 fontWeight: FontWeight.w800,
                                 color: textColor,
                                 fontFamily: 'Georgia',
+                                // Slight letter-spacing for inscription feel
+                                letterSpacing: 1.0,
                               ),
                             ),
+
+                            const SizedBox(height: 8),
+                            _ManuscriptRule(color: _kInkSepia.withOpacity(0.5)),
                           ],
                         ),
                       ),
                     );
                   },
                 ),
-                // Container(
-                //   width: 100,
-                //   height: 100,
-                //   decoration: BoxDecoration(
-                //     shape: BoxShape.circle,
-                //     // color: isDark ? Colors.white24 : const Color(0xFF8B7355),
-                //     border: Border.all(color: _kStreakGold, width: 3),
-                //     // boxShadow: [
-                //     //   BoxShadow(
-                //     //     color: _kStreakGold.withOpacity(0.4),
-                //     //     blurRadius: 16,
-                //     //     spreadRadius: 2,
-                //     //   ),
-                //     // ],
-                //   ),
-                //   child: TweenAnimationBuilder<double>(
-                //     tween: Tween(begin: 0.96, end: 1.06),
-                //     duration: const Duration(milliseconds: 900),
-                //     curve: Curves.easeInOut,
-                //     onEnd: () {},
-                //     builder: (context, scale, child) {
-                //       return Transform.scale(
-                //         scale: scale,
-                //         child: Opacity(
-                //           opacity: (scale - 0.9).clamp(0.0, 1.0),
-                //           child: child,
-                //         ),
-                //       );
-                //     },
-                //     child: Stack(
-                //       alignment: Alignment.center,
-                //       children: const [
-                //         Icon(
-                //           Icons.local_fire_department,
-                //           size: 58,
-                //           color: Colors.blue,
-                //         ),
-                //         Icon(
-                //           Icons.local_fire_department,
-                //           size: 52,
-                //           // color: Colors.white,
-                //         ),
-                //       ],
-                //     ),
-                //   ),
-                // ),
+
                 const SizedBox(height: 12),
                 const SizedBox(height: 8),
+
+                // Scripture-style subtitle
                 Text(
                   'You\'re walking faithfully today.',
                   style: TextStyle(
-                    fontSize: 16,
-                    color: textColor,
+                    fontSize: 15,
+                    color: textColor.withOpacity(0.85),
                     fontFamily: 'Georgia',
+                    fontStyle: FontStyle.italic,
                   ),
                 ),
+                const SizedBox(height: 4),
                 Text(
                   'Keep the light alive.',
                   style: TextStyle(
-                    fontSize: 16,
-                    color: textColor,
+                    fontSize: 15,
+                    color: textColor.withOpacity(0.85),
                     fontFamily: 'Georgia',
+                    fontStyle: FontStyle.italic,
                   ),
                 ),
+
                 const SizedBox(height: 32),
+
+                // ── Reward Scroll Card ────────────────────────────────────────
                 SlideTransition(
                   position: _cardSlide,
                   child: FadeTransition(
@@ -2374,26 +2572,37 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
                           vertical: 20, horizontal: 24),
                       decoration: BoxDecoration(
                         color: _streakPanelColor(context),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: _kStreakGold, width: 1.5),
+                        borderRadius: BorderRadius.circular(6),
+                        // Double ink border — like a manuscript frame
+                        border: Border.all(color: _kInkSepia, width: 1.5),
                         boxShadow: [
                           BoxShadow(
+                            color: _kInkBrown.withOpacity(isDark ? 0.40 : 0.18),
+                            blurRadius: 18,
+                            offset: const Offset(0, 4),
+                          ),
+                          // Inner candle-glow
+                          BoxShadow(
                             color:
-                                _kStreakGold.withOpacity(isDark ? 0.20 : 0.16),
-                            blurRadius: 16,
-                            spreadRadius: 1,
+                                _kCandleGold.withOpacity(isDark ? 0.12 : 0.10),
+                            blurRadius: 10,
+                            spreadRadius: -2,
                           ),
                         ],
                       ),
                       child: Column(
                         children: [
+                          // Scroll top ornament line
+                          _ScrollOrnament(color: _kInkSepia),
+                          const SizedBox(height: 10),
+
                           Text(
-                            'REWARD EARNED',
+                            'REWARD  EARNED',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 11,
                               fontWeight: FontWeight.w700,
-                              letterSpacing: 1.2,
-                              color: textColor,
+                              letterSpacing: 2.4,
+                              color: textColor.withOpacity(0.7),
                               fontFamily: 'Georgia',
                             ),
                           ),
@@ -2402,7 +2611,7 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(Icons.monetization_on,
-                                  color: _kStreakGold, size: 28),
+                                  color: _kCandleGold, size: 26),
                               const SizedBox(width: 8),
                               Text(
                                 '+20 Faith Credits',
@@ -2419,17 +2628,23 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
                           Text(
                             'Added to your Wallet',
                             style: TextStyle(
-                              fontSize: 14,
-                              color: textColor.withOpacity(0.8),
+                              fontSize: 13,
+                              color: textColor.withOpacity(0.75),
                               fontFamily: 'Georgia',
+                              fontStyle: FontStyle.italic,
                             ),
                           ),
+                          const SizedBox(height: 10),
+                          // Scroll bottom ornament line
+                          _ScrollOrnament(color: _kInkSepia),
                         ],
                       ),
                     ),
                   ),
                 ),
+
                 const Spacer(),
+
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
                   child: SizedBox(
@@ -2448,4 +2663,81 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
       ),
     );
   }
+}
+
+// ─── Manuscript horizontal rule ───────────────────────────────────────────────
+class _ManuscriptRule extends StatelessWidget {
+  final Color color;
+  const _ManuscriptRule({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 48),
+      child: Row(
+        children: [
+          Expanded(child: Container(height: 1, color: color)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Icon(Icons.diamond_outlined, size: 10, color: color),
+          ),
+          Expanded(child: Container(height: 1, color: color)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Scroll ornament (❧ style ends) ─────────────────────────────────────────
+class _ScrollOrnament extends StatelessWidget {
+  final Color color;
+  const _ScrollOrnament({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(width: 40, height: 1, color: color.withOpacity(0.5)),
+        const SizedBox(width: 6),
+        Icon(Icons.auto_awesome, size: 12, color: color),
+        const SizedBox(width: 6),
+        Container(width: 40, height: 1, color: color.withOpacity(0.5)),
+      ],
+    );
+  }
+}
+
+// ─── Parchment Grain Painter ──────────────────────────────────────────────────
+// Draws fine horizontal rules like aged vellum paper grain.
+class _ParchmentGrainPainter extends CustomPainter {
+  final bool isDark;
+  const _ParchmentGrainPainter({required this.isDark});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = (isDark ? Colors.white : _kInkBrown)
+          .withOpacity(isDark ? 0.025 : 0.04)
+      ..strokeWidth = 0.4
+      ..style = PaintingStyle.stroke;
+
+    // Faint horizontal grain lines
+    for (double y = 0; y < size.height; y += 6) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+
+    // Faint vertical fibre lines (sparse)
+    final fibrePaint = Paint()
+      ..color = (isDark ? Colors.white : _kInkBrown)
+          .withOpacity(isDark ? 0.012 : 0.025)
+      ..strokeWidth = 0.3
+      ..style = PaintingStyle.stroke;
+    for (double x = 0; x < size.width; x += 18) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), fibrePaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ParchmentGrainPainter old) => old.isDark != isDark;
 }
