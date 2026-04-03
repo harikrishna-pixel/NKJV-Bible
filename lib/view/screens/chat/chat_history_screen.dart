@@ -279,49 +279,56 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                               barrierDismissible: false,
                               builder: (context) {
                                 final themeProvider = Provider.of<ThemeProvider>(context);
+                                final isDark = themeProvider.themeMode == ThemeMode.dark;
                                 final isVintage = themeProvider.currentCustomTheme == AppCustomTheme.vintage;
+                                final bgColor = isDark ? const Color(0xFF2A1F12) : Colors.white;
+                                final textColor = isDark ? Colors.white : Colors.black;
+                                final cancelColor = isDark ? Colors.white70 : Colors.black87;
+                                final deleteColor = isDark ? Colors.red[300] : Colors.red;
+                                
                                 return AlertDialog(
-                                  backgroundColor: Colors.white,
+                                  backgroundColor: bgColor,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(15),
                                   ),
-                                title: const Text(
-                                  'Delete Selected',
-                                  style: TextStyle(
-                                    color: Colors.black,
-                                  ),
-                                ),
-                                content: const Text(
-                                  'Are you sure you want to delete selected conversation(s)?',
-                                  style: TextStyle(
-                                    color: Colors.black,
-                                  ),
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Get.back(),
-                                    child: Text(
-                                      'Cancel',
-                                      style: TextStyle(
-                                    color: Colors.black,
-                                      ),
+                                  title: Text(
+                                    'Delete Selected',
+                                    style: TextStyle(
+                                      color: textColor,
                                     ),
                                   ),
-                                  TextButton(
-                                    onPressed: () {
-                                      Get.back();
-                                      _deleteSelectedItems();
-                                    },
-                                    child: Text(
-                                      'Delete',
-                                      style: TextStyle(
-                                        color: isDark ? Colors.red[300] : Colors.red,
-                                      ),
+                                  content: Text(
+                                    'Are you sure you want to delete selected conversation(s)?',
+                                    style: TextStyle(
+                                      color: textColor,
                                     ),
                                   ),
-                                ],
-                              );
-                            });
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Get.back(),
+                                      child: Text(
+                                        'Cancel',
+                                        style: TextStyle(
+                                          color: cancelColor,
+                                        ),
+                                      ),
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        Get.back();
+                                        _deleteSelectedItems();
+                                      },
+                                      child: Text(
+                                        'Delete',
+                                        style: TextStyle(
+                                          color: deleteColor,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            );
                           },
                   ),
                   IconButton(
@@ -359,21 +366,25 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                           final themeProvider = Provider.of<ThemeProvider>(context);
                           final isDarkDialog = themeProvider.themeMode == ThemeMode.dark;
                           final isVintage = themeProvider.currentCustomTheme == AppCustomTheme.vintage;
+                          final bgColor = isDarkDialog ? const Color(0xFF2A1F12) : Colors.white;
+                          final textColor = isDarkDialog ? Colors.white : Colors.black;
+                          final cancelColor = isDarkDialog ? Colors.white70 : Colors.black87;
+                          
                           return AlertDialog(
-                            backgroundColor: Colors.white,
+                            backgroundColor: bgColor,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(15),
                             ),
-                            title: const Text(
+                            title: Text(
                               'Clear All History',
                               style: TextStyle(
-                                color: Colors.black,
+                                color: textColor,
                               ),
                             ),
-                            content: const Text(
+                            content: Text(
                               'Are you sure you want to delete all chat history?',
                               style: TextStyle(
-                                color: Colors.black,
+                                color: textColor,
                               ),
                             ),
                             actions: [
@@ -382,7 +393,7 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                                 child: Text(
                                   'Cancel',
                                   style: TextStyle(
-                                    color: Colors.black,
+                                    color: cancelColor,
                                   ),
                                 ),
                               ),

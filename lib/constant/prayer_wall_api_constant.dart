@@ -3,7 +3,7 @@
 class PrayerWallApiConstant {
   PrayerWallApiConstant._();
 
-  static const String baseUrl = 'http://marberx-tech.duckdns.org';
+  static const String baseUrl = 'https://api.biblehi.com';
 
   static String _path(String p) => '$baseUrl$p';
 

@@ -27,6 +27,42 @@ import 'package:flutter/cupertino.dart';
 import 'package:biblebookapp/services/analytics/analytics_service.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 
+String _normalizeDailyVerseRef(String s) =>
+    s.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
+
+/// Finds the list index for the verse shown on the home widget (handles spacing / parsing).
+int _indexOfVerseMatchingWidgetRef(
+    List<DailyVerseList> list, String widgetRef) {
+  final wNorm = _normalizeDailyVerseRef(widgetRef);
+  if (wNorm.isEmpty) return -1;
+  for (var i = 0; i < list.length; i++) {
+    final v = list[i];
+    final listRef = _normalizeDailyVerseRef(
+        '${v.book} ${(v.chapter ?? 0) + 1}:${(v.verseNum ?? 0) + 1}');
+    if (listRef == wNorm ||
+        listRef.replaceAll(' ', '') == wNorm.replaceAll(' ', '')) {
+      return i;
+    }
+  }
+  final rm = RegExp(r'^(.*)\s(\d+):(\d+)$').firstMatch(widgetRef.trim());
+  if (rm != null) {
+    final bookW = rm.group(1)!.trim().toLowerCase();
+    final ch = int.tryParse(rm.group(2)!);
+    final vs = int.tryParse(rm.group(3)!);
+    if (ch != null && vs != null) {
+      for (var i = 0; i < list.length; i++) {
+        final v = list[i];
+        if ((v.book ?? '').toLowerCase().trim() == bookW &&
+            (v.chapter ?? 0) + 1 == ch &&
+            (v.verseNum ?? 0) + 1 == vs) {
+          return i;
+        }
+      }
+    }
+  }
+  return -1;
+}
+
 class DailyVerse extends StatefulWidget {
   const DailyVerse({super.key, this.fromWidget = false});
 
@@ -134,13 +170,21 @@ class _DailyVerseState extends State<DailyVerse> {
           .trim()
           .replaceAll(RegExp(r'\s+'), ' ');
       if (widgetRef.isNotEmpty) {
-        final idx = dailyVerseList.indexWhere((v) {
-          final listRef =
-              '${v.book} ${(v.chapter ?? 0) + 1}:${(v.verseNum ?? 0) + 1}'
-                  .trim();
-          return listRef == widgetRef ||
-              listRef.replaceAll(' ', '') == widgetRef.replaceAll(' ', '');
-        });
+        var idx = _indexOfVerseMatchingWidgetRef(dailyVerseList, widgetRef);
+        if (idx < 0) {
+          final widgetPlain =
+              stripHtmlTagsForWidgetVerse(widgetData['text'] ?? '');
+          if (widgetPlain.length >= 15) {
+            final prefix = widgetPlain.substring(0, 15).toLowerCase();
+            idx = dailyVerseList.indexWhere((v) {
+              final t = stripHtmlTagsForWidgetVerse(v.verse ?? '').toLowerCase();
+              if (t.startsWith(prefix)) return true;
+              if (t.isEmpty) return false;
+              final headLen = t.length < 15 ? t.length : 15;
+              return prefix.startsWith(t.substring(0, headLen));
+            });
+          }
+        }
         if (idx > 0) {
           final item = dailyVerseList.removeAt(idx);
           dailyVerseList.insert(0, item);

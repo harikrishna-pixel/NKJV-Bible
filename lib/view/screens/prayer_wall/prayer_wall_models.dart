@@ -32,6 +32,7 @@ class PrayerWallItem {
   static String? _extractAuthorName(Map<String, dynamic> map) {
     final direct = _cleanName(
       map['name'] ??
+          map['user_name'] ??
           map['userName'] ??
           map['username'] ??
           map['fullName'] ??
@@ -45,6 +46,7 @@ class PrayerWallItem {
       final userMap = Map<String, dynamic>.from(nestedUser);
       final fromUser = _cleanName(
         userMap['name'] ??
+            userMap['user_name'] ??
             userMap['userName'] ??
             userMap['username'] ??
             userMap['fullName'],
@@ -57,6 +59,7 @@ class PrayerWallItem {
       final posterMap = Map<String, dynamic>.from(nestedPoster);
       return _cleanName(
         posterMap['name'] ??
+            posterMap['user_name'] ??
             posterMap['userName'] ??
             posterMap['username'] ??
             posterMap['fullName'],

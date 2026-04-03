@@ -77,6 +77,14 @@ const String _kDefaultVerseText =
     'For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.';
 const String _kDefaultVerseRef = 'John 3:16';
 
+/// Plain text for widget display (no visible HTML). Does not change verse source data elsewhere.
+String stripHtmlTagsForWidgetVerse(String raw) {
+  if (raw.isEmpty) return raw;
+  var s = raw.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), ' ');
+  s = s.replaceAll(RegExp(r'<[^>]*>'), '');
+  return s.replaceAll(RegExp(r'\s+'), ' ').trim();
+}
+
 /// Updates the "Verse of the day" widget with the given verse text and reference.
 /// Uses defaults if empty. Call after loading daily verses (e.g. from DownloadProvider.loadDailyVerses).
 /// No-op on non-iOS.
@@ -86,7 +94,9 @@ Future<void> updateVerseOfTheDayWidget({
 }) async {
   if (!Platform.isIOS) return;
   try {
-    final text = verseText.trim().isEmpty ? _kDefaultVerseText : verseText;
+    final text = verseText.trim().isEmpty
+        ? _kDefaultVerseText
+        : stripHtmlTagsForWidgetVerse(verseText);
     final ref = reference.trim().isEmpty ? _kDefaultVerseRef : reference;
     await HomeWidget.saveWidgetData<String>(_kVerseTextKey, text);
     await HomeWidget.saveWidgetData<String>(_kVerseReferenceKey, ref);

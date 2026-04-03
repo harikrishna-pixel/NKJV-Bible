@@ -87,9 +87,9 @@ class _SettingScreenState extends State<SettingScreen>
         if (status.isGranted) {
           debugPrint("✅ Notification permission is granted");
           setState(() {
-            notificationButtonValue = nt ?? true;
-            notificationButtonValue1 = nt1 ?? true;
-            notificationButtonValue2 = nt2 ?? true;
+            notificationButtonValue = nt ?? false;
+            notificationButtonValue1 = nt1 ?? false;
+            notificationButtonValue2 = nt2 ?? false;
           });
           // Proceed with your logic
         }
@@ -276,9 +276,9 @@ class _SettingScreenState extends State<SettingScreen>
       if (status.isGranted) {
         debugPrint("✅ Notification permission is granted");
         setState(() {
-          notificationButtonValue = nt ?? true;
-          notificationButtonValue1 = nt1 ?? true;
-          notificationButtonValue2 = nt2 ?? true;
+          notificationButtonValue = nt ?? false;
+          notificationButtonValue1 = nt1 ?? false;
+          notificationButtonValue2 = nt2 ?? false;
         });
         // Proceed with your logic
       } else {

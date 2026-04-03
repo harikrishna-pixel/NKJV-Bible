@@ -12,6 +12,7 @@ class MoodPrayerItem {
     required this.verseText,
     required this.devotionalText,
     required this.prayerText,
+    this.connectionSliderValue,
   });
 
   final int connectionLevel;
@@ -23,7 +24,37 @@ class MoodPrayerItem {
   final String devotionalText;
   final String prayerText;
 
+  /// Slider position (0–1) when the user completed the Connect step; persisted for review.
+  final double? connectionSliderValue;
+
   String get verseReference => '$bookName $chapterNumber:$verseNumber';
+
+  MoodPrayerItem copyWith({
+    int? connectionLevel,
+    String? bookName,
+    int? bookNumber,
+    int? chapterNumber,
+    int? verseNumber,
+    String? verseText,
+    String? devotionalText,
+    String? prayerText,
+    double? connectionSliderValue,
+    bool clearConnectionSliderValue = false,
+  }) {
+    return MoodPrayerItem(
+      connectionLevel: connectionLevel ?? this.connectionLevel,
+      bookName: bookName ?? this.bookName,
+      bookNumber: bookNumber ?? this.bookNumber,
+      chapterNumber: chapterNumber ?? this.chapterNumber,
+      verseNumber: verseNumber ?? this.verseNumber,
+      verseText: verseText ?? this.verseText,
+      devotionalText: devotionalText ?? this.devotionalText,
+      prayerText: prayerText ?? this.prayerText,
+      connectionSliderValue: clearConnectionSliderValue
+          ? null
+          : (connectionSliderValue ?? this.connectionSliderValue),
+    );
+  }
 
   static MoodPrayerItem fromJson(Map<String, dynamic> json) {
     return MoodPrayerItem(
@@ -34,7 +65,8 @@ class MoodPrayerItem {
       verseNumber: (json['Verse_Number'] as num?)?.toInt() ?? 0,
       verseText: json['Verse_Text'] as String? ?? '',
       devotionalText: json['Devotional_Text'] as String? ?? '',
-      prayerText: (json['Prayer_Text'] as String? ?? '').replaceAll('\\n', '\n'),
+      prayerText:
+          (json['Prayer_Text'] as String? ?? '').replaceAll('\\n', '\n'),
     );
   }
 }
@@ -47,7 +79,9 @@ class MoodPrayerLoader {
     if (_cache != null) return _cache!;
     final str = await rootBundle.loadString('assets/mood_prayer.json');
     final list = jsonDecode(str) as List<dynamic>;
-    _cache = list.map((e) => MoodPrayerItem.fromJson(e as Map<String, dynamic>)).toList();
+    _cache = list
+        .map((e) => MoodPrayerItem.fromJson(e as Map<String, dynamic>))
+        .toList();
     return _cache!;
   }
 

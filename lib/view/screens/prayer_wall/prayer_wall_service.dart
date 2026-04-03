@@ -35,6 +35,7 @@ class PrayerWallService {
     required String prayerDescription,
     required String prayerCategory,
     bool isAnonymous = true,
+    String? userName,
     int prayerDuration = 7,
   }) async {
     final bodyMap = <String, dynamic>{
@@ -44,6 +45,13 @@ class PrayerWallService {
       'isAnonymous': isAnonymous,
       'prayer_duration': prayerDuration,
     };
+
+    // Always send logged-in user's display name (when available),
+    // alongside the user's selected `isAnonymous` flag.
+    final normalizedUserName = userName?.trim();
+    if (normalizedUserName != null && normalizedUserName.isNotEmpty) {
+      bodyMap['user_name'] = normalizedUserName;
+    }
     final bodyJson = jsonEncode(bodyMap);
     print('PrayerWallService.createPrayer request body: $bodyJson');
 

@@ -4720,25 +4720,19 @@ class _HomeScreenState extends State<HomeScreen>
                                         ? 50
                                         : 35,
                                 decoration: BoxDecoration(
-                                  // Keep Light mode exactly as before; only adjust Dark mode.
-                                  color: Provider.of<ThemeProvider>(context,
-                                                  listen: false)
-                                              .themeMode ==
-                                          ThemeMode.dark
-                                      ? CommanColor.lightDarkPrimary(context)
-                                      : CommanColor.whiteLightModePrimary(
-                                          context),
+                                  // Match Bible Chat FAB: white circle in dark mode, primary in light.
+                                  color: CommanColor.whiteLightModePrimary(context),
                                   shape: BoxShape.circle,
                                 ),
                                 child: Center(
                                   child: Icon(
                                     Icons.local_fire_department_rounded,
                                     color: Provider.of<ThemeProvider>(context,
-                                                    listen: false)
-                                                .themeMode ==
-                                            ThemeMode.dark
-                                        ? Colors.amberAccent
-                                        : Colors.yellowAccent,
+                                                listen: false)
+                                            .themeMode ==
+                                        ThemeMode.dark
+                                    ? CommanColor.lightModePrimary
+                                    : Colors.yellowAccent,
                                     size: screenWidth > 450 ? 26 : 22,
                                   ),
                                 ),

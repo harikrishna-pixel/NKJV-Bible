@@ -42,6 +42,9 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
             <String>[];
     final started =
         await SharPreferences.getString(SharPreferences.streakFlowStartedDate);
+    final stepsCompletedToday =
+        await SharPreferences.getInt(SharPreferences.streakFlowStepsCompletedToday) ??
+            0;
     final today = DateTime.now().toIso8601String().split('T')[0];
     final best = _computeBestStreak(dates);
     if (mounted) {
@@ -50,7 +53,8 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
         _completedDates = List.from(dates);
         _totalDays = dates.length;
         _bestStreak = best;
-        _startedNotFinishedDate = (started == today && !dates.contains(today))
+        _startedNotFinishedDate =
+            (started == today && !dates.contains(today) && stepsCompletedToday > 0)
             ? today
             : null;
       });

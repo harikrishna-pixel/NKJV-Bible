@@ -52,6 +52,9 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
     final useFullScreen = _isIOS;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    // Reserve space so carousel imagery does not sit under the action strip (esp. iPad).
+    final footerReserve = isTablet ? 220.0 : 180.0;
 
     return Scaffold(
       backgroundColor: CommanColor.backgrondcolor,
@@ -77,18 +80,23 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          PageView.builder(
-            controller: _pageController,
-            onPageChanged: (index) => setState(() => _currentPage = index),
-            itemCount: _imagePaths.length,
-            itemBuilder: (context, index) {
-              return Image.asset(
-                _imagePaths[index],
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-              );
-            },
+          Positioned.fill(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: footerReserve),
+              child: PageView.builder(
+                controller: _pageController,
+                onPageChanged: (index) => setState(() => _currentPage = index),
+                itemCount: _imagePaths.length,
+                itemBuilder: (context, index) {
+                  return Image.asset(
+                    _imagePaths[index],
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                  );
+                },
+              ),
+            ),
           ),
           Positioned(
             left: 0,
@@ -96,11 +104,23 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
             bottom: 0,
             child: SafeArea(
               top: false,
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: isTablet ? 32 : 24,
-                  right: isTablet ? 32 : 24,
-                  bottom: isTablet ? 4 : 0,
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: CommanColor.backgrondcolor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.14),
+                      blurRadius: 14,
+                      offset: const Offset(0, -4),
+                    ),
+                  ],
+                ),
+                padding: EdgeInsets.fromLTRB(
+                  isTablet ? 32 : 24,
+                  isTablet ? 18 : 14,
+                  isTablet ? 32 : 24,
+                  (isTablet ? 12 : 8) + bottomInset,
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -127,9 +147,13 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
                         ),
                       ),
                     ),
-                    SizedBox(height: isTablet ? 16 : 12),
+                    SizedBox(height: isTablet ? 12 : 10),
                     TextButton(
                       onPressed: () => Get.back(),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      ),
                       child: Text(
                         'Not Now',
                         style: TextStyle(

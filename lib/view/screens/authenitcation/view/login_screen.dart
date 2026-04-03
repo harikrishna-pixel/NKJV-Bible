@@ -19,8 +19,9 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:provider/provider.dart' as P;
 
 class LoginScreen extends HookConsumerWidget {
-  LoginScreen({super.key, required this.hasSkip});
+  LoginScreen({super.key, required this.hasSkip, this.popOnSuccess = false});
   final bool hasSkip;
+  final bool popOnSuccess;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final formKey = useMemoized(() => GlobalKey<FormState>());
@@ -58,13 +59,17 @@ class LoginScreen extends HookConsumerWidget {
                 children: [
                   InkWell(
                     onTap: () {
-                      Get.offAll(() => HomeScreen(
-                          From: "splash",
-                          selectedVerseNumForRead: "",
-                          selectedBookForRead: "",
-                          selectedChapterForRead: "",
-                          selectedBookNameForRead: "",
-                          selectedVerseForRead: ""));
+                      if (popOnSuccess) {
+                        Get.back();
+                      } else {
+                        Get.offAll(() => HomeScreen(
+                            From: "splash",
+                            selectedVerseNumForRead: "",
+                            selectedBookForRead: "",
+                            selectedChapterForRead: "",
+                            selectedBookNameForRead: "",
+                            selectedVerseForRead: ""));
+                      }
                     },
                     child: Padding(
                       padding: const EdgeInsets.only(left: 15.0),
@@ -171,6 +176,9 @@ class LoginScreen extends HookConsumerWidget {
                                 if (user != null) {
                                   Constants.showToast(
                                       "Hi ${user.displayName}, Welcome to ${BibleInfo.bible_shortName}");
+                                  if (popOnSuccess) {
+                                    return Navigator.of(context).pop(true);
+                                  }
                                   return Get.offAll(() => HomeScreen(
                                       From: "splash",
                                       selectedVerseNumForRead: "",

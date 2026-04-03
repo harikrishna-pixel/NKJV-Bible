@@ -127,18 +127,22 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
       //   );
       //   return;
       // }
+      final cachedName =
+          (await CacheNotifier().readCache(key: 'name') ?? '')
+              .toString()
+              .trim();
+
       final created = await PrayerWallService.createPrayer(
         prayerTitle: title,
         prayerDescription: details,
         prayerCategory: _category,
         isAnonymous: _isAnonymous,
         prayerDuration: _durationDays,
+        userName: cachedName,
       );
       // await WalletService.deductCredits(_totalCredits);
       if (!_isAnonymous) {
         final prayerId = (_extractPrayerId(created) ?? '').trim();
-        final cachedName =
-            (await CacheNotifier().readCache(key: 'name') ?? '').toString().trim();
         if (prayerId.isNotEmpty && cachedName.isNotEmpty) {
           await PrayerWallLocalStore.putPrayerAuthor(
             prayerId: prayerId,
@@ -334,17 +338,17 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                         color: isDark ? Colors.white70 : const Color(0xFF6D6D6D),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    _label('Credit Cost', brown, isDark),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Total Cost: $_totalCredits Credits',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white : brown,
-                      ),
-                    ),
+                    // const SizedBox(height: 16),
+                    // _label('Credit Cost', brown, isDark),
+                    // const SizedBox(height: 6),
+                    // Text(
+                    //   'Total Cost: $_totalCredits Credits',
+                    //   style: TextStyle(
+                    //     fontSize: 16,
+                    //     fontWeight: FontWeight.w600,
+                    //     color: isDark ? Colors.white : brown,
+                    //   ),
+                    // ),
                     const SizedBox(height: 12),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,

@@ -124,12 +124,19 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
       if (!mounted) return;
 
       if (!loggedIn) {
-        // If user isn't logged in, show the existing login screen.
-        Navigator.of(context).pushReplacement(
+        // If user isn't logged in, show login and return to Prayer Wall on success.
+        final ok = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
-            builder: (_) => LoginScreen(hasSkip: false),
+            builder: (_) => LoginScreen(hasSkip: false, popOnSuccess: true),
           ),
         );
+        if (!mounted) return;
+        if (ok == true) {
+          // Re-run auth hydration now that login has completed.
+          return _initAuthAndProfile();
+        }
+        // If user backed out of login, leave Prayer Wall (same behavior as not authorized).
+        Navigator.of(context).maybePop();
         return;
       }
 
@@ -142,11 +149,16 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
     } catch (_) {
       // If cache read fails for any reason, treat as not logged in.
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
+      final ok = await Navigator.of(context).push<bool>(
         MaterialPageRoute(
-          builder: (_) => LoginScreen(hasSkip: false),
+          builder: (_) => LoginScreen(hasSkip: false, popOnSuccess: true),
         ),
       );
+      if (!mounted) return;
+      if (ok == true) {
+        return _initAuthAndProfile();
+      }
+      Navigator.of(context).maybePop();
     }
   }
 

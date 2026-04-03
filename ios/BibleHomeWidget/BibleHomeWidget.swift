@@ -49,6 +49,19 @@ private let defaultPrayerText = "Lord, guide my heart today. Give me strength to
 private let defaultChatQuestion = "What is faith?"
 private let defaultChatAnswer = "Faith is confidence in what we hope for and assurance about what we do not see. — Hebrews 11:1"
 
+/// Removes `<br>` and other simple HTML tags for widget text (matches app-side sanitization).
+private func plainVerseTextForWidget(_ raw: String) -> String {
+  var s = raw
+  s = s.replacingOccurrences(of: "<br/>", with: " ", options: .caseInsensitive)
+  s = s.replacingOccurrences(of: "<br>", with: " ", options: .caseInsensitive)
+  if let regex = try? NSRegularExpression(pattern: "<[^>]+>", options: []) {
+    let range = NSRange(s.startIndex..., in: s)
+    s = regex.stringByReplacingMatches(in: s, range: range, withTemplate: " ")
+  }
+  return s.replacingOccurrences(of: "  ", with: " ", options: [])
+    .trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
 // MARK: - Verse of the Day Widget
 
 struct VerseOfTheDayEntry: TimelineEntry {
@@ -88,7 +101,7 @@ struct VerseOfTheDayView: View {
           .font(.caption)
           .fontWeight(.semibold)
           .foregroundColor(oldPaperAccent)
-        Text(entry.verseText)
+        Text(plainVerseTextForWidget(entry.verseText))
           .font(.subheadline)
           .foregroundColor(oldPaperText)
           .lineLimit(4)

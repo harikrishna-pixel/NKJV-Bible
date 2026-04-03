@@ -67,6 +67,16 @@ void _showRemovedToast(BuildContext context, String type) {
 }
 
 void _showRemoveDialog(BuildContext context, VoidCallback onConfirmRemove) {
+  final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+  final isDark = themeProvider.themeMode == ThemeMode.dark;
+  
+  // Theme-aware colors
+  final bgColor = isDark ? const Color(0xFF2A1F12) : _dialogCream;
+  final textColor = isDark ? Colors.white : _dialogBrown;
+  final cancelColor = isDark ? Colors.white70 : _dialogBrown;
+  final buttonBgColor = isDark ? Colors.white.withOpacity(0.15) : _dialogStripBg;
+  final borderColor = isDark ? Colors.white.withOpacity(0.3) : _dialogBrown.withOpacity(0.2);
+  
   showDialog(
     context: context,
     builder: (ctx) => Dialog(
@@ -75,9 +85,9 @@ void _showRemoveDialog(BuildContext context, VoidCallback onConfirmRemove) {
       child: Container(
         constraints: const BoxConstraints(maxWidth: 360),
         decoration: BoxDecoration(
-          color: _dialogCream,
+          color: bgColor,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _dialogBrown.withOpacity(0.2), width: 1.5),
+          border: Border.all(color: borderColor, width: 1.5),
           boxShadow: [
             BoxShadow(
               color: Colors.black26,
@@ -97,7 +107,7 @@ void _showRemoveDialog(BuildContext context, VoidCallback onConfirmRemove) {
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
-                  color: _dialogBrown,
+                  color: textColor,
                   fontFamily: 'Georgia',
                 ),
               ),
@@ -107,7 +117,7 @@ void _showRemoveDialog(BuildContext context, VoidCallback onConfirmRemove) {
                 style: TextStyle(
                   fontSize: 16,
                   height: 1.4,
-                  color: _dialogBrown.withOpacity(0.9),
+                  color: textColor.withOpacity(0.9),
                   fontFamily: 'Georgia',
                 ),
               ),
@@ -122,14 +132,14 @@ void _showRemoveDialog(BuildContext context, VoidCallback onConfirmRemove) {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: _dialogBrown,
+                        color: cancelColor,
                         fontFamily: 'Georgia',
                       ),
                     ),
                   ),
                   const SizedBox(width: 16),
                   Material(
-                    color: _dialogStripBg,
+                    color: buttonBgColor,
                     borderRadius: BorderRadius.circular(12),
                     child: InkWell(
                       onTap: () {
@@ -145,7 +155,7 @@ void _showRemoveDialog(BuildContext context, VoidCallback onConfirmRemove) {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: _dialogBrown,
+                            color: textColor,
                             fontFamily: 'Georgia',
                           ),
                         ),
@@ -512,7 +522,7 @@ class _SavedItemCardState extends State<_SavedItemCard> {
                 ],
               ),
               const SizedBox(height: 6),
-              if (item.title.isNotEmpty)
+              if (item.title.isNotEmpty && item.type != 'devotional' && item.type != 'prayer')
                 Text(
                   item.title,
                   style: TextStyle(
@@ -522,7 +532,7 @@ class _SavedItemCardState extends State<_SavedItemCard> {
                     fontFamily: 'Georgia',
                   ),
                 ),
-              if (item.title.isNotEmpty) const SizedBox(height: 4),
+              if (item.title.isNotEmpty && item.type != 'devotional' && item.type != 'prayer') const SizedBox(height: 4),
               Text(
                 item.body,
                 maxLines: _expanded ? null : 2,

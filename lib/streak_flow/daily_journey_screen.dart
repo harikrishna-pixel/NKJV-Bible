@@ -3,9 +3,10 @@ import 'package:biblebookapp/streak_flow/mood_prayer_data.dart';
 import 'package:biblebookapp/streak_flow/streak_saved_list_screen.dart';
 import 'package:biblebookapp/streak_flow/your_faith_journey_screen.dart';
 import 'package:biblebookapp/streak_flow/pour_out_worries_screen.dart';
-import 'package:biblebookapp/streak_flow/streak_flow_screens.dart' hide SharPreferences;
+import 'package:biblebookapp/streak_flow/streak_flow_screens.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
-import 'package:biblebookapp/streak/streak_service.dart' show StreakService, WeekDayStatus;
+import 'package:biblebookapp/streak/streak_service.dart'
+    show StreakService, WeekDayStatus;
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/images.dart';
@@ -22,7 +23,6 @@ class DailyJourneyScreen extends StatefulWidget {
   @override
   State<DailyJourneyScreen> createState() => _DailyJourneyScreenState();
 }
-
 
 class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   static const Color _brown = Color(0xFF3D2914);
@@ -77,8 +77,8 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
       );
     }
     final installIndexInSun = installDate.weekday % 7;
-    final rawStepsMap = await SharPreferences.getString(
-        SharPreferences.streakFlowStepsByDay);
+    final rawStepsMap =
+        await SharPreferences.getString(SharPreferences.streakFlowStepsByDay);
     Map<String, int> parsedStepsMap = {};
     if (rawStepsMap != null && rawStepsMap.trim().isNotEmpty) {
       try {
@@ -107,7 +107,8 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
 
   Future<void> _storeTodaySteps(int steps) async {
     final dayKey = DateTime.now().toIso8601String().split('T')[0];
-    final raw = await SharPreferences.getString(SharPreferences.streakFlowStepsByDay);
+    final raw =
+        await SharPreferences.getString(SharPreferences.streakFlowStepsByDay);
     Map<String, dynamic> map = {};
     if (raw != null && raw.trim().isNotEmpty) {
       try {
@@ -166,6 +167,8 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
         verseText: (raw['verseText'] ?? '').toString(),
         devotionalText: (raw['devotionalText'] ?? '').toString(),
         prayerText: (raw['prayerText'] ?? '').toString(),
+        connectionSliderValue:
+            (raw['connectionSliderValue'] as num?)?.toDouble(),
       );
     } catch (_) {
       return null;
@@ -173,7 +176,8 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   }
 
   Future<MoodPrayerItem?> _resolveDayItem(String dayKey) async {
-    final rawItems = await SharPreferences.getString(SharPreferences.streakFlowItemByDay);
+    final rawItems =
+        await SharPreferences.getString(SharPreferences.streakFlowItemByDay);
     if (rawItems != null && rawItems.trim().isNotEmpty) {
       try {
         final decoded = jsonDecode(rawItems);
@@ -191,20 +195,25 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
     final todayKey = DateTime.now().toIso8601String().split('T')[0];
     if (step == 1) {
       if (!mounted) return;
-      Get.to(() => const StreakConnectionScreen());
+      final item = await _resolveDayItem(todayKey);
+      if (!mounted) return;
+      Get.to(() => StreakConnectionScreen(
+            viewOnly: true,
+            initialSliderValue: item?.connectionSliderValue,
+          ));
       return;
     }
     final item = await _resolveDayItem(todayKey);
     if (!mounted || item == null) return;
     switch (step) {
       case 2:
-        Get.to(() => StreakVerseScreen(item: item));
+        Get.to(() => StreakVerseScreen(item: item, viewOnly: true));
         break;
       case 3:
-        Get.to(() => StreakDevotionalScreen(item: item));
+        Get.to(() => StreakDevotionalScreen(item: item, viewOnly: true));
         break;
       case 4:
-        Get.to(() => StreakPrayerScreen(item: item));
+        Get.to(() => StreakPrayerScreen(item: item, viewOnly: true));
         break;
     }
   }
@@ -224,7 +233,8 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
     final now = DateTime.now();
     final todayDate = DateTime(now.year, now.month, now.day);
     final todayWeekdayIndexInSun = now.weekday % 7; // Sun=0..Sat=6
-    final weekStartSunday = todayDate.subtract(Duration(days: todayWeekdayIndexInSun));
+    final weekStartSunday =
+        todayDate.subtract(Duration(days: todayWeekdayIndexInSun));
     final baseIndexInSun = (dayIndex + _installWeekStartIndexInSun) % 7;
     final dayDate = weekStartSunday.add(Duration(days: baseIndexInSun));
     final dayKey = dayDate.toIso8601String().split('T')[0];
@@ -240,13 +250,13 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
     final stored = _stepsByDay[dayKey];
     final stepsForDay = (dayKey == todayKey)
         ? ((stored != null && stored > 0) ? stored : _stepsCompletedToday)
-        : (stored ??
-        (status == WeekDayStatus.completed ? 4 : 0));
+        : (stored ?? (status == WeekDayStatus.completed ? 4 : 0));
 
     if (stepsForDay <= 0) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No completed faith journey for this day.')),
+        const SnackBar(
+            content: Text('No completed faith journey for this day.')),
       );
       return;
     }
@@ -277,13 +287,13 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
     } catch (_) {
       bgColor = const Color(0xFFF5F0E6);
     }
-    final gradientColors = [bgColor, bgColor, bgColor];
     final isDark = bgColor == CommanColor.darkPrimaryColor;
     final Color textColor = isDark ? Colors.white : _brown;
     final Color panelColor = isDark ? Colors.white.withOpacity(0.12) : _panel;
 
     // Rotated calendar: view index 0 corresponds to install weekday.
-    final int todayWeekdayIndexInSun = DateTime.now().weekday % 7; // Sun=0..Sat=6
+    final int todayWeekdayIndexInSun =
+        DateTime.now().weekday % 7; // Sun=0..Sat=6
     final int todayViewIndex =
         (todayWeekdayIndexInSun - _installWeekStartIndexInSun + 7) % 7;
 
@@ -365,35 +375,45 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: List.generate(7, (i) {
-                          final baseIndex = (i + _installWeekStartIndexInSun) % 7;
+                          final baseIndex =
+                              (i + _installWeekStartIndexInSun) % 7;
                           final status = baseIndex < _weekStatuses.length
                               ? _weekStatuses[baseIndex]
                               : WeekDayStatus.future;
                           final isToday = i == todayViewIndex;
-                          final todayFullyCompleted = isToday && _stepsCompletedToday >= 4;
+                          final todayFullyCompleted =
+                              isToday && _stepsCompletedToday >= 4;
                           final DateTime now = DateTime.now();
-                          final DateTime todayDate = DateTime(now.year, now.month, now.day);
+                          final DateTime todayDate =
+                              DateTime(now.year, now.month, now.day);
                           final int todayWeekdayIndexInSun = now.weekday % 7;
-                          final DateTime weekStartSunday =
-                              todayDate.subtract(Duration(days: todayWeekdayIndexInSun));
+                          final DateTime weekStartSunday = todayDate
+                              .subtract(Duration(days: todayWeekdayIndexInSun));
                           final dayKey = weekStartSunday
                               .add(Duration(days: baseIndex))
                               .toIso8601String()
                               .split('T')[0];
                           final storedSteps = _stepsByDay[dayKey];
                           final int effectiveStepsForDay = (dayKey ==
-                                  DateTime.now().toIso8601String().split('T')[0])
+                                  DateTime.now()
+                                      .toIso8601String()
+                                      .split('T')[0])
                               ? ((_stepsByDay[dayKey] ?? 0) > 0
                                   ? (_stepsByDay[dayKey] ?? 0)
                                   : _stepsCompletedToday)
                               : (storedSteps ?? 0);
-                          final bool storedCompleted = effectiveStepsForDay >= 4;
+                          final bool storedCompleted =
+                              effectiveStepsForDay >= 4;
 
-                          final bool isOngoing = status == WeekDayStatus.ongoing && !storedCompleted;
-                          final bool isCompleted =
-                              storedCompleted || status == WeekDayStatus.completed || todayFullyCompleted;
+                          final bool isOngoing =
+                              status == WeekDayStatus.ongoing &&
+                                  !storedCompleted;
+                          final bool isCompleted = storedCompleted ||
+                              status == WeekDayStatus.completed ||
+                              todayFullyCompleted;
                           final bool isMissed = status == WeekDayStatus.missed;
-                          final bool isFutureDay = status == WeekDayStatus.future;
+                          final bool isFutureDay =
+                              status == WeekDayStatus.future;
                           Color circleColor = panelColor.withOpacity(0.8);
                           Color borderColor = textColor.withOpacity(0.2);
                           Color iconColor = textColor.withOpacity(
@@ -423,13 +443,13 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                             children: [
                               GestureDetector(
                                 onTap: () => _onDayTap(
-                                      dayIndex: i,
-                                      status: status,
-                                      effectiveCompleted: isCompleted,
-                                      textColor: textColor,
-                                      panelColor: panelColor,
-                                      dayLabel: days[baseIndex],
-                                    ),
+                                  dayIndex: i,
+                                  status: status,
+                                  effectiveCompleted: isCompleted,
+                                  textColor: textColor,
+                                  panelColor: panelColor,
+                                  dayLabel: days[baseIndex],
+                                ),
                                 child: Container(
                                   width: isTablet ? 44 : 38,
                                   height: isTablet ? 44 : 38,
@@ -444,7 +464,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                                   child: Stack(
                                     alignment: Alignment.center,
                                     children: [
-                                      if (isOngoing)
+                                      if (isOngoing && effectiveStepsForDay > 0)
                                         SizedBox(
                                           width: isTablet ? 44 : 38,
                                           height: isTablet ? 44 : 38,
@@ -452,15 +472,19 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                                             value: 0.5,
                                             strokeWidth: isTablet ? 3 : 2.5,
                                             backgroundColor: Colors.transparent,
-                                            valueColor: const AlwaysStoppedAnimation<Color>(
+                                            valueColor:
+                                                const AlwaysStoppedAnimation<
+                                                    Color>(
                                               _gold,
                                             ),
                                           ),
                                         ),
                                       Icon(
                                         isCompleted
-                                            ? Icons.local_fire_department_rounded
-                                            : Icons.local_fire_department_outlined,
+                                            ? Icons
+                                                .local_fire_department_rounded
+                                            : Icons
+                                                .local_fire_department_outlined,
                                         size: isTablet ? 22 : 18,
                                         color: iconColor,
                                       ),
@@ -590,7 +614,8 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         completed: _stepsCompletedToday >= 1,
                         onTap: _stepsCompletedToday >= 1
                             ? () async => _openTodayFaithStep(1)
-                            : () => Get.to(() => const StreakConnectionScreen()),
+                            : () =>
+                                Get.to(() => const StreakConnectionScreen()),
                         textColor: textColor,
                         panelColor: panelColor,
                         isDark: isDark,
@@ -706,8 +731,8 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                       const SizedBox(height: 24),
                       // Next Milestone (dynamic by streak)
                       Container(
-                        padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
                         decoration: BoxDecoration(
                           color: Colors.transparent,
                           borderRadius: BorderRadius.circular(12),
@@ -776,8 +801,8 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
 
   Widget _card(
       {required Widget child,
-        required Color panelColor,
-        required Color textColor}) {
+      required Color panelColor,
+      required Color textColor}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -996,7 +1021,10 @@ class _DayJourneyCardsScreen extends StatelessWidget {
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => const StreakConnectionScreen(),
+                        builder: (_) => StreakConnectionScreen(
+                          viewOnly: stepsCompletedForDay >= 1,
+                          initialSliderValue: item.connectionSliderValue,
+                        ),
                       ),
                     );
                   },
@@ -1012,7 +1040,10 @@ class _DayJourneyCardsScreen extends StatelessWidget {
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => StreakVerseScreen(item: item),
+                        builder: (_) => StreakVerseScreen(
+                          item: item,
+                          viewOnly: stepsCompletedForDay >= 2,
+                        ),
                       ),
                     );
                   },
@@ -1028,7 +1059,10 @@ class _DayJourneyCardsScreen extends StatelessWidget {
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => StreakDevotionalScreen(item: item),
+                        builder: (_) => StreakDevotionalScreen(
+                          item: item,
+                          viewOnly: stepsCompletedForDay >= 3,
+                        ),
                       ),
                     );
                   },
@@ -1044,7 +1078,10 @@ class _DayJourneyCardsScreen extends StatelessWidget {
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => StreakPrayerScreen(item: item),
+                        builder: (_) => StreakPrayerScreen(
+                          item: item,
+                          viewOnly: stepsCompletedForDay >= 4,
+                        ),
                       ),
                     );
                   },
@@ -1085,7 +1122,8 @@ class _DayJourneyCardsScreen extends StatelessWidget {
           decoration: BoxDecoration(
             color: panelColor,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFC9A227).withOpacity(0.25)),
+            border:
+                Border.all(color: const Color(0xFFC9A227).withOpacity(0.25)),
           ),
           child: Row(
             children: [
@@ -1125,12 +1163,12 @@ class _DayJourneyCardsScreen extends StatelessWidget {
               ),
               completedIndicator
                   ? const Icon(Icons.check_circle,
-                  color: Color(0xFF56A05E), size: 28)
+                      color: Color(0xFF56A05E), size: 28)
                   : Icon(
-                Icons.radio_button_unchecked,
-                color: textColor.withOpacity(0.35),
-                size: 26,
-              ),
+                      Icons.radio_button_unchecked,
+                      color: textColor.withOpacity(0.35),
+                      size: 26,
+                    ),
             ],
           ),
         ),

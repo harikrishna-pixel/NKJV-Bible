@@ -753,7 +753,7 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                       },
                                       child: Container(
                                         color: Color(
-                                            int.parse(data!.color.toString())),
+                                            int.parse(data.color.toString())),
                                         child: HtmlWidget(
                                           '''${data.content}''',
                                           textStyle:

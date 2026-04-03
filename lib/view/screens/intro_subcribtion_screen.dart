@@ -26,7 +26,7 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher_string.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../Model/get_audio_model.dart';
 import '../../core/notifiers/download.notifier.dart';
@@ -141,6 +141,26 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   Future<void> _addLifetimeWalletBonus() async {
     final amount = widget.invisiblePurchaseHost ? 1000 : 5000;
     await WalletService.addCredits(amount);
+  }
+
+  Future<bool> _tryMarkLifetimeWalletBonusGrantedOnce() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'lifetime_wallet_bonus_granted_v1_${widget.checkad}';
+      final already = prefs.getBool(key) ?? false;
+      if (already) return false;
+      await prefs.setBool(key, true);
+      return true;
+    } catch (_) {
+      // If we can't persist, prefer granting rather than missing user credits.
+      return true;
+    }
+  }
+
+  Future<void> _addLifetimeWalletBonusOnce() async {
+    final shouldGrant = await _tryMarkLifetimeWalletBonusGrantedOnce();
+    if (!shouldGrant) return;
+    await _addLifetimeWalletBonus();
   }
 
   Future<void> _finishAfterLifetimePurchaseSuccess() async {
@@ -775,6 +795,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   /// Navigate away from paywall screen
   Future<void> _navigateAwayFromPaywall() async {
+    if (!mounted) return;
     if (_myProvider != null) {
       _myProvider?.enableAd();
     }
@@ -783,9 +804,24 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     // If came from Settings (theme), route back to Settings
     if (widget.checkad == 'theme') {
       Get.back();
-    } else {
-      await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
+      return;
     }
+    // When this screen sits on top of another route (e.g. Navigator.push), pop it
+    // so close / continue / links are not stuck behind a stale stack.
+    if (!mounted) return;
+    final nav = Navigator.of(context);
+    if (nav.canPop()) {
+      nav.pop();
+      return;
+    }
+    if (!mounted) return;
+    await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
+  }
+
+  Future<void> _openLegalUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (!await canLaunchUrl(uri)) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   /// Get exit offer from API response with fallback to constant data
@@ -1214,10 +1250,21 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         }
         await Future.delayed(Duration(seconds: 1));
         EasyLoading.dismiss();
+        // StoreKit may report "restored" for already-owned products even in a buy flow.
+        // Ensure the milestone wallet bonus is applied once when a buy was initiated.
+        if (startFlag == true) {
+          await _addLifetimeWalletBonusOnce();
+        }
         Constants.showToast(successToastMessage);
         await SharPreferences.setBoolean('closead', true);
-        final ctx = context ?? Get.context;
-        if (ctx != null) await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
+        if (widget.invisiblePurchaseHost) {
+          _popInvisiblePurchaseHost(true);
+        } else {
+          final ctx = context ?? Get.context;
+          if (ctx != null) {
+            await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
+          }
+        }
         return;
       } else if (productId == widget.oneYearPlan) {
         final dur = DateTime(dateTime.year + 1, dateTime.month, dateTime.day);
@@ -1231,8 +1278,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         EasyLoading.dismiss();
         Constants.showToast(successToastMessage);
         await SharPreferences.setBoolean('closead', true);
-        final ctx2 = context ?? Get.context;
-        if (ctx2 != null) await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx2);
+        if (widget.invisiblePurchaseHost) {
+          _popInvisiblePurchaseHost(false);
+        } else {
+          final ctx2 = context ?? Get.context;
+          if (ctx2 != null) {
+            await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx2);
+          }
+        }
         return;
       } else if (productId == widget.sixMonthPlan) {
         final dur = addSixMonths(customDate: dateTime);
@@ -1246,8 +1299,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         EasyLoading.dismiss();
         Constants.showToast(successToastMessage);
         await SharPreferences.setBoolean('closead', true);
-        final ctx3 = context ?? Get.context;
-        if (ctx3 != null) await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx3);
+        if (widget.invisiblePurchaseHost) {
+          _popInvisiblePurchaseHost(false);
+        } else {
+          final ctx3 = context ?? Get.context;
+          if (ctx3 != null) {
+            await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx3);
+          }
+        }
         return;
       }
     }
@@ -1379,7 +1438,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     await _inAppPurchase.completePurchase(purchaseDetails);
                   }
                   EasyLoading.dismiss();
-                  await _addLifetimeWalletBonus();
+                  await _addLifetimeWalletBonusOnce();
                   Constants.showToast('Purchase Successful');
                   await SharPreferences.setBoolean('closead', true);
                   debugPrint("restore data 4 ");
@@ -1416,7 +1475,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       await _inAppPurchase.completePurchase(purchaseDetails);
                     }
                     EasyLoading.dismiss();
-                    await _addLifetimeWalletBonus();
+                    await _addLifetimeWalletBonusOnce();
                     Constants.showToast('Purchase Successful');
                     await SharPreferences.setBoolean('closead', true);
                     debugPrint(
@@ -1436,7 +1495,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       await _inAppPurchase.completePurchase(purchaseDetails);
                     }
                     EasyLoading.dismiss();
-                    await _addLifetimeWalletBonus();
+                    await _addLifetimeWalletBonusOnce();
                     Constants.showToast('Purchase Successful');
                     await SharPreferences.setBoolean('closead', true);
                     debugPrint(
@@ -2393,11 +2452,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          GestureDetector(
-                            onTap: () async {
-                              launchUrlString(
-                                  'https://bibleoffice.com/terms_conditions.html');
-                            },
+                          TextButton(
+                            onPressed: () => _openLegalUrl(
+                                'https://bibleoffice.com/terms_conditions.html'),
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(48, 48),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
                             child: Text(
                               "Terms of Use",
                               style: TextStyle(
@@ -2412,6 +2475,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                   'restorepurches', true);
                               await _restorePurchases(controller);
                             },
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(48, 48),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
                             child: Text(
                               "Restore",
                               style: TextStyle(
@@ -2421,11 +2490,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               ),
                             ),
                           ),
-                          GestureDetector(
-                            onTap: () async {
-                              launchUrlString(
-                                  'https://bibleoffice.com/privacy_policy.html');
-                            },
+                          TextButton(
+                            onPressed: () => _openLegalUrl(
+                                'https://bibleoffice.com/privacy_policy.html'),
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(48, 48),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
                             child: Text(
                               "Privacy Policy",
                               style: TextStyle(
@@ -2450,10 +2523,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     padding: const EdgeInsets.all(8.0),
                     child: IconButton(
                       icon: Icon(Icons.close,
-                          color: CommanColor.whiteBlack(context), size: 20),
-                      iconSize: 20,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
+                          color: CommanColor.whiteBlack(context), size: 22),
+                      iconSize: 22,
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        padding: const EdgeInsets.all(10),
+                      ),
                       onPressed: () async {
                         // Exit offer commented out
                         // await _checkAndShowExitOfferBeforeClose(controller);
