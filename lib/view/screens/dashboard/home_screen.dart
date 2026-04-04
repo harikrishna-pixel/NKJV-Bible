@@ -1140,7 +1140,9 @@ class _HomeScreenState extends State<HomeScreen>
       // iOS Home Widgets: update launcher widgets and handle widget tap
       await updateAllLauncherWidgets();
       final initialUri = await HomeWidget.initiallyLaunchedFromHomeWidget();
+      if (!mounted) return;
       _navigateForWidgetRoute(getBibleWidgetRouteFromUri(initialUri));
+      if (!mounted) return;
       _widgetClickSubscription ??=
           HomeWidget.widgetClicked.listen((uri) {
         if (!mounted) return;
@@ -2533,7 +2535,9 @@ class _HomeScreenState extends State<HomeScreen>
     disposead();
     WidgetsBinding.instance.removeObserver(this);
     _checkerTimer?.cancel();
-    _widgetClickSubscription?.cancel();
+    final widgetSub = _widgetClickSubscription;
+    _widgetClickSubscription = null;
+    widgetSub?.cancel();
     // _exitOfferCooldownRefreshTimer?.cancel();
     routeObserver.unsubscribe(this);
     super.dispose();

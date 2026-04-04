@@ -464,14 +464,19 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                                   child: Stack(
                                     alignment: Alignment.center,
                                     children: [
-                                      if (isOngoing && effectiveStepsForDay > 0)
+                                      // Show correct partial/full ring based on the real
+                                      // number of steps completed for this day (0-4).
+                                      if ((isOngoing || isCompleted) &&
+                                          effectiveStepsForDay > 0)
                                         SizedBox(
                                           width: isTablet ? 44 : 38,
                                           height: isTablet ? 44 : 38,
                                           child: CircularProgressIndicator(
-                                            value: 0.5,
+                                            value: (effectiveStepsForDay / 4)
+                                                .clamp(0.0, 1.0),
                                             strokeWidth: isTablet ? 3 : 2.5,
-                                            backgroundColor: Colors.transparent,
+                                            backgroundColor:
+                                                Colors.transparent,
                                             valueColor:
                                                 const AlwaysStoppedAnimation<
                                                     Color>(

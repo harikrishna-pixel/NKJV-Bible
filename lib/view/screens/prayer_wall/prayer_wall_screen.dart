@@ -2,7 +2,6 @@ import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
-import 'package:biblebookapp/view/screens/authenitcation/view/login_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/post_prayer_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_comments_sheet.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
@@ -47,7 +46,16 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
   bool _isLoggedIn = false;
   String? _userName;
   String? _userId;
+  /// Name last saved when posting (no login required).
+  String? _localDisplayName;
   final CacheNotifier _cacheNotifier = CacheNotifier();
+
+  /// Logged-in name if any, otherwise last locally saved post name.
+  String get _viewerDisplayName {
+    final u = (_userName ?? '').trim();
+    if (u.isNotEmpty) return u;
+    return (_localDisplayName ?? '').trim();
+  }
 
   /// Maps prayer ObjectId → like document `_id` for unlike (persisted).
   Map<String, String> _likeIdByPrayerId = {};
@@ -108,58 +116,46 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
     super.initState();
     _hydrateLikesFromDisk();
     _hydratePrayerAuthorsFromDisk();
-    _initAuthAndProfile();
+    _loadAuthAndLocalName();
     _refresh();
   }
 
-  Future<void> _initAuthAndProfile() async {
+  Future<void> _loadAuthAndLocalName() async {
     try {
       final authtoken = await _cacheNotifier.readCache(key: 'authtoken');
       final userid = await _cacheNotifier.readCache(key: 'userid');
       final name = await _cacheNotifier.readCache(key: 'name');
+      final localName = await PrayerWallLocalStore.loadLastDisplayName();
 
       final loggedIn = (authtoken != null && authtoken.toString().isNotEmpty) ||
           (userid != null && userid.toString().isNotEmpty);
 
       if (!mounted) return;
-
-      if (!loggedIn) {
-        // If user isn't logged in, show login and return to Prayer Wall on success.
-        final ok = await Navigator.of(context).push<bool>(
-          MaterialPageRoute(
-            builder: (_) => LoginScreen(hasSkip: false, popOnSuccess: true),
-          ),
-        );
-        if (!mounted) return;
-        if (ok == true) {
-          // Re-run auth hydration now that login has completed.
-          return _initAuthAndProfile();
-        }
-        // If user backed out of login, leave Prayer Wall (same behavior as not authorized).
-        Navigator.of(context).maybePop();
-        return;
-      }
-
       setState(() {
-        _isLoggedIn = true;
+        _isLoggedIn = loggedIn;
         _userId = userid?.toString();
-        _userName = name;
+        _userName = name?.toString();
+        _localDisplayName = localName;
         _authLoading = false;
       });
     } catch (_) {
-      // If cache read fails for any reason, treat as not logged in.
       if (!mounted) return;
-      final ok = await Navigator.of(context).push<bool>(
-        MaterialPageRoute(
-          builder: (_) => LoginScreen(hasSkip: false, popOnSuccess: true),
-        ),
-      );
+      final localName = await PrayerWallLocalStore.loadLastDisplayName();
       if (!mounted) return;
-      if (ok == true) {
-        return _initAuthAndProfile();
-      }
-      Navigator.of(context).maybePop();
+      setState(() {
+        _isLoggedIn = false;
+        _userId = null;
+        _userName = null;
+        _localDisplayName = localName;
+        _authLoading = false;
+      });
     }
+  }
+
+  Future<void> _reloadLocalDisplayName() async {
+    final n = await PrayerWallLocalStore.loadLastDisplayName();
+    if (!mounted) return;
+    setState(() => _localDisplayName = n);
   }
 
   Future<void> _hydrateLikesFromDisk() async {
@@ -230,7 +226,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
 
   bool _isMyPrayer(PrayerWallItem item) {
     final uid = (_userId ?? '').trim();
-    final uname = (_userName ?? '').trim();
+    final uname = _viewerDisplayName;
     final authorId = (item.authorUserId ?? '').trim();
     if (uid.isNotEmpty && authorId.isNotEmpty && uid == authorId) return true;
     final local = (_prayerAuthorMap[item.id] ?? '').trim();
@@ -574,7 +570,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
             ? const Color(0xFFF5F0E6)
             : themeProvider.backgroundColor);
     final userInitials = (() {
-      final raw = (_userName ?? '').trim().replaceAll(RegExp(r'\s+'), '');
+      final raw =
+          _viewerDisplayName.replaceAll(RegExp(r'\s+'), '');
       if (raw.isEmpty) return '?';
       if (raw.length == 1) return raw[0].toUpperCase();
       return '${raw[0].toUpperCase()}${raw[1].toUpperCase()}';
@@ -616,6 +613,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
             ),
           );
           if (posted == true && mounted) {
+            await _reloadLocalDisplayName();
             await _hydratePrayerAuthorsFromDisk();
             await _refresh();
           }
@@ -730,7 +728,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                 ],
               ),
             ),
-            if (_isLoggedIn && (_userName?.trim().isNotEmpty ?? false))
+            if (_viewerDisplayName.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Row(
@@ -822,9 +820,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                                       isDark: isDark,
                                       timeLabel: _timeLabel(item),
                                       displayName: _isMyPrayer(item)
-                                          ? (_userName?.trim().isNotEmpty ?? false)
-                                              ? _userName!.trim()
-                                              : 'You'
+                                          ? (_viewerDisplayName.isNotEmpty
+                                              ? _viewerDisplayName
+                                              : 'You')
                                           : (item.isAnonymous
                                               ? 'Anonymous'
                                               : ((item.authorName?.trim().isNotEmpty ??
@@ -839,11 +837,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                                                               item.authorUserId!
                                                                       .trim() ==
                                                                   _userId!.trim() &&
-                                                              (_userName
-                                                                      ?.trim()
-                                                                      .isNotEmpty ??
-                                                                  false))
-                                                          ? _userName!.trim()
+                                                              _viewerDisplayName
+                                                                  .isNotEmpty)
+                                                          ? _viewerDisplayName
                                                           : ((_prayerAuthorMap[item.id]
                                                                           ?.trim()
                                                                           .isNotEmpty ??
@@ -895,6 +891,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
               ),
             );
             if (posted == true && mounted) {
+              await _reloadLocalDisplayName();
               await _hydratePrayerAuthorsFromDisk();
               await _refresh();
               if (!mounted) return;

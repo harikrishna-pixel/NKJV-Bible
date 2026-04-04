@@ -11,6 +11,7 @@ import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -102,8 +103,36 @@ bool _isAppInActive = false;
 final RouteObserver<ModalRoute<void>> routeObserver =
     RouteObserver<ModalRoute<void>>();
 
+/// home_widget uses [EventChannel] `home_widget/updates`. Cancelling the
+/// subscription sometimes races the native side and produces a benign
+/// `PlatformException` that Flutter reports via [FlutterError.onError].
+bool _isBenignHomeWidgetUpdatesStreamCancel(FlutterErrorDetails details) {
+  if (details.library != 'services library') return false;
+  final ex = details.exception;
+  if (ex is! PlatformException) return false;
+  final msg = ex.message ?? '';
+  if (!msg.contains('No active stream to cancel')) return false;
+  final ctx = details.context;
+  if (ctx == null) return false;
+  return ctx.toStringDeep(minLevel: DiagnosticLevel.hidden)
+      .contains('home_widget/updates');
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  final FlutterExceptionHandler? previousFlutterOnError = FlutterError.onError;
+  FlutterError.onError = (FlutterErrorDetails details) {
+    if (_isBenignHomeWidgetUpdatesStreamCancel(details)) {
+      return;
+    }
+    if (previousFlutterOnError != null) {
+      previousFlutterOnError(details);
+    } else {
+      FlutterError.presentError(details);
+    }
+  };
+
   configLoading();
 
   // Keep startup resilient on real devices:

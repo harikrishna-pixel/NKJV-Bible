@@ -10,6 +10,7 @@ class PrayerWallLocalStore {
   static const _kLikeMap = 'prayer_wall_like_map_v1';
   static const _kMyCommentIds = 'prayer_wall_my_comment_ids_v1';
   static const _kPrayerAuthorMap = 'prayer_wall_prayer_author_map_v1';
+  static const _kLastDisplayName = 'prayer_wall_last_display_name_v1';
 
   static Future<Map<String, String>> loadLikeMap() async {
     final p = await SharedPreferences.getInstance();
@@ -97,5 +98,21 @@ class PrayerWallLocalStore {
     final m = await loadPrayerAuthorMap();
     m.remove(pid);
     await savePrayerAuthorMap(m);
+  }
+
+  /// Last name used when posting (or prefilled from login). For display / prefill only.
+  static Future<String?> loadLastDisplayName() async {
+    final p = await SharedPreferences.getInstance();
+    final s = p.getString(_kLastDisplayName);
+    if (s == null) return null;
+    final t = s.trim();
+    return t.isEmpty ? null : t;
+  }
+
+  static Future<void> saveLastDisplayName(String name) async {
+    final t = name.trim();
+    if (t.isEmpty) return;
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kLastDisplayName, t);
   }
 }

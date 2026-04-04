@@ -39,6 +39,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
 
   final _titleCtrl = TextEditingController();
   final _detailsCtrl = TextEditingController();
+  final _nameCtrl = TextEditingController();
   String _category = 'Others';
   int _durationDays = 7;
   bool _isAnonymous = true;
@@ -57,6 +58,19 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
     if (widget.initialCategory != null &&
         _categories.contains(widget.initialCategory)) {
       _category = widget.initialCategory!;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _prefillDisplayName());
+  }
+
+  Future<void> _prefillDisplayName() async {
+    final login =
+        (await CacheNotifier().readCache(key: 'name') ?? '').toString().trim();
+    final saved = (await PrayerWallLocalStore.loadLastDisplayName() ?? '')
+        .trim();
+    final prefill = login.isNotEmpty ? login : saved;
+    if (!mounted || prefill.isEmpty) return;
+    if (_nameCtrl.text.trim().isEmpty) {
+      setState(() => _nameCtrl.text = _clip(prefill, 80));
     }
   }
 
@@ -127,10 +141,13 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
       //   );
       //   return;
       // }
-      final cachedName =
+      final enteredName = _nameCtrl.text.trim();
+      final loginName =
           (await CacheNotifier().readCache(key: 'name') ?? '')
               .toString()
               .trim();
+      final effectiveName =
+          enteredName.isNotEmpty ? enteredName : loginName;
 
       final created = await PrayerWallService.createPrayer(
         prayerTitle: title,
@@ -138,15 +155,18 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         prayerCategory: _category,
         isAnonymous: _isAnonymous,
         prayerDuration: _durationDays,
-        userName: cachedName,
+        userName: effectiveName.isNotEmpty ? effectiveName : null,
       );
       // await WalletService.deductCredits(_totalCredits);
+      if (effectiveName.isNotEmpty) {
+        await PrayerWallLocalStore.saveLastDisplayName(effectiveName);
+      }
       if (!_isAnonymous) {
         final prayerId = (_extractPrayerId(created) ?? '').trim();
-        if (prayerId.isNotEmpty && cachedName.isNotEmpty) {
+        if (prayerId.isNotEmpty && effectiveName.isNotEmpty) {
           await PrayerWallLocalStore.putPrayerAuthor(
             prayerId: prayerId,
-            authorName: cachedName,
+            authorName: effectiveName,
           );
         }
       }
@@ -180,6 +200,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
   void dispose() {
     _titleCtrl.dispose();
     _detailsCtrl.dispose();
+    _nameCtrl.dispose();
     super.dispose();
   }
 
@@ -258,6 +279,19 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
+                    _label('Enter Name', brown, isDark),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _nameCtrl,
+                      maxLength: 80,
+                      textCapitalization: TextCapitalization.words,
+                      style: TextStyle(color: isDark ? Colors.white : brown),
+                      decoration: _fieldDecoration(
+                        'How you want your name to appear',
+                        isDark,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     _label('Prayer Title', brown, isDark),
                     const SizedBox(height: 8),
                     TextField(
