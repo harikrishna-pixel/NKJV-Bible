@@ -2453,7 +2453,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                           Expanded(
                             child: Center(
                               child: Text(
-                                _tUi('faith_chat'),
+                                ChatTranslations.get('faith_chat', 'EN'),
                                 style: TextStyle(
                                   color: isDark
                                       ? Colors.white

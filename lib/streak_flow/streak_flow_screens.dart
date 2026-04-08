@@ -24,7 +24,6 @@ import 'package:biblebookapp/view/constants/colors.dart';
 // Color constants for streak completion screen
 const Color _kParchmentLight = Color(0xFFF5EAC6);
 const Color _kParchmentMid = Color(0xFFECE3CB);
-const Color _kParchmentShadow = Color(0xFFD4C4A0);
 const Color _kInkBrown = Color(0xFF4A2F1D);
 const Color _kInkSepia = Color(0xFF6B4E37);
 const Color _kCandleGold = Color(0xFFC9A227);
@@ -34,6 +33,101 @@ const Color _kCandleGlow = Color(0xFFFFF6D5);
 const Color _kStreakBrown = Color(0xFF3D2914);
 const Color _kStreakGold = Color(0xFFC9A227);
 const Color _kStreakCream = Color(0xFFF5F0E6);
+
+/// Shared background music for Streak Flow (Devotional + Prayer).
+/// Keeps playback continuous and preserves mute state across screens.
+class _StreakFlowBgMusic {
+  static const String _asset =
+      'music/christian-rock-for-jesus-christ-always-301257.mp3';
+  static final AudioPlayer _player = AudioPlayer();
+  static bool _initialized = false;
+
+  static Future<void> _init() async {
+    if (_initialized) return;
+    _initialized = true;
+    try {
+      await _player.setReleaseMode(ReleaseMode.loop);
+      // Keep audio stable across route transitions (prevents perceived stop/restart).
+      await _player.setAudioContext(
+        AudioContext(
+          android: const AudioContextAndroid(
+            isSpeakerphoneOn: false,
+            stayAwake: true,
+            contentType: AndroidContentType.music,
+            usageType: AndroidUsageType.media,
+            audioFocus: AndroidAudioFocus.gain,
+          ),
+          iOS: AudioContextIOS(
+            category: AVAudioSessionCategory.playback,
+          ),
+        ),
+      );
+      await _player.setSource(AssetSource(_asset));
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  static Future<bool> getMuted() async {
+    return (await SharPreferences.getBoolean(
+            SharPreferences.streakFlowMusicMuted)) ??
+        false;
+  }
+
+  static Future<void> setMuted(bool muted) async {
+    await SharPreferences.setBoolean(
+        SharPreferences.streakFlowMusicMuted, muted);
+    try {
+      if (muted) {
+        await _player.pause();
+      } else {
+        await play();
+      }
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  static Future<void> play() async {
+    await _init();
+    final muted = await getMuted();
+    if (muted) return;
+    try {
+      if (_player.state == PlayerState.playing) return;
+      await _player.resume();
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  static Future<void> stop() async {
+    try {
+      await _player.stop();
+    } catch (_) {
+      // ignore
+    }
+  }
+}
+
+/// Track shape that uses full available width (no side insets).
+class _FullWidthSliderTrackShape extends RoundedRectSliderTrackShape {
+  const _FullWidthSliderTrackShape();
+
+  @override
+  Rect getPreferredRect({
+    required RenderBox parentBox,
+    Offset offset = Offset.zero,
+    required SliderThemeData sliderTheme,
+    bool isEnabled = false,
+    bool isDiscrete = false,
+  }) {
+    final trackHeight = sliderTheme.trackHeight ?? 2.0;
+    final trackLeft = offset.dx;
+    final trackTop = offset.dy + (parentBox.size.height - trackHeight) / 2;
+    final trackWidth = parentBox.size.width;
+    return Rect.fromLTWH(trackLeft, trackTop, trackWidth, trackHeight);
+  }
+}
 
 bool _isStreakDark(BuildContext context) {
   try {
@@ -572,7 +666,6 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final textColor = _streakTextColor(context);
     final panelColor = _streakPanelColor(context);
     final isTablet = MediaQuery.of(context).size.width > 450;
     final isDark = _isStreakDark(context);
@@ -668,23 +761,38 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
                           SharPreferences.getInt(SharPreferences.streakCount),
                       builder: (context, snap) {
                         final v = (snap.data ?? 0).clamp(0, 9999);
-                        return RichText(
-                          textAlign: TextAlign.center,
-                          text: TextSpan(
-                            style: TextStyle(
-                              fontSize: isTablet ? 25 : 22,
-                              fontWeight: FontWeight.w700,
-                              color: warmText,
-                              fontFamily: 'Georgia',
-                            ),
-                            children: [
-                              const TextSpan(text: 'You built a '),
-                              TextSpan(
-                                text: '$v Day Faith Habit.',
-                                style: const TextStyle(color: _kStreakGold),
+                        return Column(
+                          children: [
+                            RichText(
+                              textAlign: TextAlign.center,
+                              text: TextSpan(
+                                style: TextStyle(
+                                  fontSize: isTablet ? 25 : 22,
+                                  fontWeight: FontWeight.w700,
+                                  color: warmText,
+                                  fontFamily: 'Georgia',
+                                ),
+                                children: [
+                                  const TextSpan(text: 'You built a '),
+                                  TextSpan(
+                                    text: '$v Day Faith Habit.',
+                                    style: const TextStyle(color: _kStreakGold),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Continue your streak from yesterday',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: isTablet ? 16 : 14,
+                                color: warmText.withOpacity(0.85),
+                                fontFamily: 'Georgia',
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
                         );
                       },
                     ),
@@ -720,7 +828,8 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
                         children: [
                           _buildParchmentButton(
                             context: context,
-                            label: _busy ? 'Please wait...' : 'Restore Streak',
+                            label:
+                                _busy ? 'Please wait...' : 'Restore Yesterday',
                             onTap: _busy ? () {} : _tryRestore,
                             isSecondary: false,
                           ),
@@ -735,34 +844,18 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          Container(
-                            width: double.infinity,
-                            height: 1,
-                            color: textColor.withOpacity(0.16),
-                          ),
-                          const SizedBox(height: 10),
-                          RichText(
-                            textAlign: TextAlign.center,
-                            text: TextSpan(
-                              style: TextStyle(
-                                color: warmText.withOpacity(0.9),
-                                fontSize: isTablet ? 21 : 19,
-                                fontFamily: 'Georgia',
-                                fontWeight: FontWeight.w500,
-                              ),
-                              children: const [
-                                TextSpan(text: 'Restore within '),
-                                TextSpan(
-                                  text: '24 hours',
-                                  style: TextStyle(
-                                    color: _kStreakGold,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                         ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Note: Yesterday Streaks can Restored within 24 hours',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: warmText.withOpacity(0.8),
+                        fontSize: isTablet ? 14 : 13,
+                        fontFamily: 'Georgia',
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -1004,13 +1097,17 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                                   Expanded(
                                     child: Align(
                                       alignment: Alignment.center,
-                                      child: FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        child: Text(
-                                          'Returning',
-                                          textAlign: TextAlign.center,
-                                          style: _labelStyle(context,
-                                              active: _activeLabelIndex == 1),
+                                      child: AnimatedOpacity(
+                                        opacity: _activeLabelIndex == 1 ? 1.0 : 0.0,
+                                        duration: const Duration(milliseconds: 160),
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Text(
+                                            'Returning',
+                                            textAlign: TextAlign.center,
+                                            style: _labelStyle(context,
+                                                active: _activeLabelIndex == 1),
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -1031,13 +1128,17 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                                   Expanded(
                                     child: Align(
                                       alignment: Alignment.center,
-                                      child: FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        child: Text(
-                                          'Close',
-                                          textAlign: TextAlign.center,
-                                          style: _labelStyle(context,
-                                              active: _activeLabelIndex == 3),
+                                      child: AnimatedOpacity(
+                                        opacity: _activeLabelIndex == 3 ? 1.0 : 0.0,
+                                        duration: const Duration(milliseconds: 160),
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Text(
+                                            'Close',
+                                            textAlign: TextAlign.center,
+                                            style: _labelStyle(context,
+                                                active: _activeLabelIndex == 3),
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -1063,6 +1164,7 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                                   activeTrackColor: _streakTextColor(context),
                                   inactiveTrackColor:
                                       _streakPanelColor(context),
+                                  trackShape: const _FullWidthSliderTrackShape(),
                                   thumbColor: _streakTextColor(context),
                                   overlayColor: _streakTextColor(context)
                                       .withOpacity(0.2),
@@ -1076,9 +1178,9 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                                 ),
                                 child: LayoutBuilder(
                                   builder: (context, constraints) {
-                                    const double pad = 12;
-                                    final w = constraints.maxWidth - pad * 2;
                                     const double smallR = 4.0;
+                                    final trackW = constraints.maxWidth;
+                                    final usable = trackW - (smallR * 2);
                                     return Stack(
                                       clipBehavior: Clip.none,
                                       children: [
@@ -1092,7 +1194,7 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                                         ),
                                         for (int i = 0; i < 5; i++) ...[
                                           Positioned(
-                                            left: pad + (w * i / 4) - smallR,
+                                            left: usable * (i / 4),
                                             top: 0,
                                             bottom: 0,
                                             child: Center(
@@ -1554,70 +1656,38 @@ class StreakDevotionalScreen extends StatefulWidget {
 
 class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
   bool _saved = false;
-  late AudioPlayer _audioPlayer;
   final ScreenshotController _screenshotController = ScreenshotController();
-  bool _isAudioPlaying = false;
   bool _isAudioMuted = false;
-  static const String _backgroundMusicUrl =
-      'music/christian-rock-for-jesus-christ-always-301257.mp3';
 
   @override
   void initState() {
     super.initState();
-    _audioPlayer = AudioPlayer();
-    _audioPlayer.setReleaseMode(ReleaseMode.loop);
-    _audioPlayer.onPlayerStateChanged.listen((state) {
-      if (mounted) {
-        setState(() => _isAudioPlaying = state == PlayerState.playing);
-      }
-    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadSaved();
-      _playBackgroundMusic();
+      _loadMusicMuted();
+      _StreakFlowBgMusic.play();
     });
   }
 
   @override
   void dispose() {
-    _audioPlayer.stop();
-    _audioPlayer.dispose();
     super.dispose();
   }
 
-  Future<void> _playBackgroundMusic() async {
-    if (_isAudioMuted) return;
-    try {
-      if (_audioPlayer.state == PlayerState.playing) return;
-      if (_audioPlayer.state != PlayerState.stopped) {
-        await _audioPlayer.stop();
-      }
-      await _audioPlayer.setSource(AssetSource(_backgroundMusicUrl));
-      await Future.delayed(const Duration(milliseconds: 200));
-      await _audioPlayer.seek(Duration.zero);
-      await _audioPlayer.resume();
-    } catch (e) {
-      if (mounted) setState(() => _isAudioPlaying = false);
-    }
+  Future<void> _loadMusicMuted() async {
+    final muted = await _StreakFlowBgMusic.getMuted();
+    if (mounted) setState(() => _isAudioMuted = muted);
   }
 
   Future<void> _toggleAudio() async {
-    if (_isAudioMuted) {
-      _isAudioMuted = false;
-      if (_isAudioPlaying) {
-        await _audioPlayer.resume();
-      } else {
-        await _playBackgroundMusic();
-      }
-    } else {
-      _isAudioMuted = true;
-      await _audioPlayer.pause();
-    }
-    if (mounted) setState(() {});
+    final next = !_isAudioMuted;
+    await _StreakFlowBgMusic.setMuted(next);
+    if (mounted) setState(() => _isAudioMuted = next);
   }
 
   Future<void> _loadSaved() async {
     final item = widget.item;
-    const title = "Today's Devotional";
+    const title = "Devotional Moment";
     final contained = await StreakSavedStorage.contains(
         'devotional', title, item.devotionalText);
     if (mounted) setState(() => _saved = contained);
@@ -1674,7 +1744,7 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                     IconButton(
                       icon: Icon(Icons.close, color: _streakTextColor(context)),
                       onPressed: () async {
-                        await _audioPlayer.stop();
+                        await _StreakFlowBgMusic.stop();
                         if (context.mounted) _goToHome(context);
                       },
                       tooltip: 'Close',
@@ -1684,7 +1754,7 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Today\'s Devotional',
+                'Devotional Moment',
                 style: TextStyle(
                   fontSize: 18,
                   color: _streakTextColor(context).withOpacity(0.9),
@@ -1741,7 +1811,7 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                         ),
                         onPressed: () async {
                           final item = widget.item;
-                          const title = "Today's Devotional";
+                          const title = "Devotional Moment";
                           if (_saved) {
                             await StreakSavedStorage.remove(
                                 'devotional', title, item.devotionalText);
@@ -1771,7 +1841,7 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                                 3);
                             await _storeActiveStreakFlowSteps(3);
                             if (!mounted) return;
-                            await _audioPlayer.stop();
+                            // Keep music continuous into Prayer; do not stop/restart.
                             Get.to(() => StreakPrayerScreen(
                                   item: item,
                                   viewOnly: widget.viewOnly,
@@ -1826,70 +1896,38 @@ class StreakPrayerScreen extends StatefulWidget {
 
 class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
   bool _saved = false;
-  late AudioPlayer _audioPlayer;
   final ScreenshotController _screenshotController = ScreenshotController();
-  bool _isAudioPlaying = false;
   bool _isAudioMuted = false;
-  static const String _backgroundMusicUrl =
-      'music/christian-rock-for-jesus-christ-always-301257.mp3';
 
   @override
   void initState() {
     super.initState();
-    _audioPlayer = AudioPlayer();
-    _audioPlayer.setReleaseMode(ReleaseMode.loop);
-    _audioPlayer.onPlayerStateChanged.listen((state) {
-      if (mounted) {
-        setState(() => _isAudioPlaying = state == PlayerState.playing);
-      }
-    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadSaved();
-      _playBackgroundMusic();
+      _loadMusicMuted();
+      _StreakFlowBgMusic.play();
     });
   }
 
   @override
   void dispose() {
-    _audioPlayer.stop();
-    _audioPlayer.dispose();
     super.dispose();
   }
 
-  Future<void> _playBackgroundMusic() async {
-    if (_isAudioMuted) return;
-    try {
-      if (_audioPlayer.state == PlayerState.playing) return;
-      if (_audioPlayer.state != PlayerState.stopped) {
-        await _audioPlayer.stop();
-      }
-      await _audioPlayer.setSource(AssetSource(_backgroundMusicUrl));
-      await Future.delayed(const Duration(milliseconds: 200));
-      await _audioPlayer.seek(Duration.zero);
-      await _audioPlayer.resume();
-    } catch (e) {
-      if (mounted) setState(() => _isAudioPlaying = false);
-    }
+  Future<void> _loadMusicMuted() async {
+    final muted = await _StreakFlowBgMusic.getMuted();
+    if (mounted) setState(() => _isAudioMuted = muted);
   }
 
   Future<void> _toggleAudio() async {
-    if (_isAudioMuted) {
-      _isAudioMuted = false;
-      if (_isAudioPlaying) {
-        await _audioPlayer.resume();
-      } else {
-        await _playBackgroundMusic();
-      }
-    } else {
-      _isAudioMuted = true;
-      await _audioPlayer.pause();
-    }
-    if (mounted) setState(() {});
+    final next = !_isAudioMuted;
+    await _StreakFlowBgMusic.setMuted(next);
+    if (mounted) setState(() => _isAudioMuted = next);
   }
 
   Future<void> _loadSaved() async {
     final item = widget.item;
-    const title = 'Today\'s Prayer';
+    const title = 'Prayer Moment';
     final contained =
         await StreakSavedStorage.contains('prayer', title, item.prayerText);
     if (mounted) setState(() => _saved = contained);
@@ -1946,7 +1984,7 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                     IconButton(
                       icon: Icon(Icons.close, color: _streakTextColor(context)),
                       onPressed: () async {
-                        await _audioPlayer.stop();
+                        await _StreakFlowBgMusic.stop();
                         if (context.mounted) _goToHome(context);
                       },
                       tooltip: 'Close',
@@ -1956,7 +1994,7 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Today\'s Prayer',
+                'Prayer Moment',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
@@ -2095,6 +2133,10 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                                 SharPreferences
                                     .pendingStreakCompleteCelebration,
                                 streakCount);
+                            // Stop background music once Prayer moment is completed.
+                            try {
+                              await _StreakFlowBgMusic.stop();
+                            } catch (_) {}
                             if (!context.mounted) return;
                             if (isRestoreRun) {
                               await SharPreferences.setBoolean(
@@ -2102,47 +2144,97 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                                   false);
                               await SharPreferences.setString(
                                   SharPreferences.streakFlowRestoreDate, '');
-                              await showCupertinoDialog<void>(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (_) => CupertinoAlertDialog(
-                                  title: const Text('Completion'),
-                                  content: const Text(
-                                      'Yesterday\'s faith journey is completed.'),
-                                  actions: [
-                                    CupertinoDialogAction(
-                                      onPressed: () =>
-                                          Navigator.of(context).pop(),
-                                      child: const Text('OK'),
-                                    ),
-                                  ],
-                                ),
-                              );
-                              if (!context.mounted) return;
-                              final startToday = await showCupertinoDialog<
-                                      bool>(
+                              final startToday = await showDialog<bool>(
                                     context: context,
                                     barrierDismissible: false,
-                                    builder: (_) => CupertinoAlertDialog(
-                                      title:
-                                          const Text('Start today\'s journey?'),
-                                      content: const Text(
-                                        'Would you like to start today\'s faith journey?',
-                                      ),
-                                      actions: [
-                                        CupertinoDialogAction(
-                                          onPressed: () =>
-                                              Navigator.of(context).pop(false),
-                                          child: const Text('No'),
+                                    builder: (_) {
+                                      final isDark = _isStreakDark(context);
+                                      final textColor = _streakTextColor(context);
+                                      final panelColor = _streakPanelColor(context);
+                                      return Dialog(
+                                        backgroundColor: Colors.transparent,
+                                        insetPadding:
+                                            const EdgeInsets.symmetric(horizontal: 24),
+                                        child: Container(
+                                          constraints: const BoxConstraints(maxWidth: 360),
+                                          decoration: BoxDecoration(
+                                            color: panelColor,
+                                            borderRadius: BorderRadius.circular(18),
+                                            border: Border.all(
+                                              color: textColor.withOpacity(0.18),
+                                              width: 1.5,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withOpacity(0.25),
+                                                blurRadius: 18,
+                                                offset: const Offset(0, 10),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Padding(
+                                            padding:
+                                                const EdgeInsets.fromLTRB(18, 16, 18, 18),
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.local_fire_department_rounded,
+                                                  size: 34,
+                                                  color: _kStreakGold,
+                                                ),
+                                                const SizedBox(height: 10),
+                                                Text(
+                                                  'Streak Completed! ✨',
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                    fontSize: 22,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: textColor,
+                                                    fontFamily: 'Georgia',
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 10),
+                                                Text(
+                                                  'You completed yesterday\'s faith journey.\nStart today\'s journey and keep growing in faith.',
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    height: 1.4,
+                                                    color: textColor.withOpacity(0.88),
+                                                    fontFamily: 'Georgia',
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 16),
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: _buildParchmentButton(
+                                                        context: context,
+                                                        label: 'Later',
+                                                        isSecondary: true,
+                                                        onTap: () =>
+                                                            Navigator.of(context).pop(false),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    Expanded(
+                                                      child: _buildParchmentButton(
+                                                        context: context,
+                                                        label: 'Start Today',
+                                                        onTap: () =>
+                                                            Navigator.of(context).pop(true),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                if (!isDark) const SizedBox(height: 2),
+                                              ],
+                                            ),
+                                          ),
                                         ),
-                                        CupertinoDialogAction(
-                                          isDefaultAction: true,
-                                          onPressed: () =>
-                                              Navigator.of(context).pop(true),
-                                          child: const Text('Yes'),
-                                        ),
-                                      ],
-                                    ),
+                                      );
+                                    },
                                   ) ??
                                   false;
                               if (!context.mounted) return;
@@ -2516,15 +2608,6 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
 
   // ── PARCHMENT TEXTURE OVERLAY ─────────────────────────────────────────────
   // Subtle aged-paper grain via semi-transparent lines (no external assets).
-  Widget _parchmentTextureOverlay(bool isDark) {
-    return IgnorePointer(
-      child: CustomPaint(
-        painter: _ParchmentGrainPainter(isDark: isDark),
-        size: Size.infinite,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = _isStreakDark(context);
@@ -2851,36 +2934,4 @@ class _ScrollOrnament extends StatelessWidget {
   }
 }
 
-// ─── Parchment Grain Painter ──────────────────────────────────────────────────
-// Draws fine horizontal rules like aged vellum paper grain.
-class _ParchmentGrainPainter extends CustomPainter {
-  final bool isDark;
-  const _ParchmentGrainPainter({required this.isDark});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = (isDark ? Colors.white : _kInkBrown)
-          .withOpacity(isDark ? 0.025 : 0.04)
-      ..strokeWidth = 0.4
-      ..style = PaintingStyle.stroke;
-
-    // Faint horizontal grain lines
-    for (double y = 0; y < size.height; y += 6) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-
-    // Faint vertical fibre lines (sparse)
-    final fibrePaint = Paint()
-      ..color = (isDark ? Colors.white : _kInkBrown)
-          .withOpacity(isDark ? 0.012 : 0.025)
-      ..strokeWidth = 0.3
-      ..style = PaintingStyle.stroke;
-    for (double x = 0; x < size.width; x += 18) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), fibrePaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_ParchmentGrainPainter old) => old.isDark != isDark;
-}
+// (removed unused parchment grain painter)

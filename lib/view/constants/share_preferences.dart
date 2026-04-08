@@ -103,6 +103,8 @@ class SharPreferences {
   static const streakFlowRestoreActive = 'streak_flow_restore_active';
   /// Streak flow: restored day (YYYY-MM-DD), usually yesterday.
   static const streakFlowRestoreDate = 'streak_flow_restore_date';
+  /// Streak flow: background music mute state (shared across Devotional & Prayer).
+  static const streakFlowMusicMuted = 'streak_flow_music_muted';
   /// When user taps a streak notification: action to run on next Home open (open_streak, open_reading, open_chat, open_verse).
   static const pendingNotificationAction = 'pending_notification_action';
   /// JSON: last 7 days app open times for smart notification. Format: {"open_times":[{"date":"YYYY-MM-DD","time":"HH:mm"},...]}

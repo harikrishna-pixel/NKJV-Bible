@@ -4,7 +4,6 @@ import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:biblebookapp/constant/app_api_constant.dart';
-import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/milestone_lifetime_paywall_coordinator.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
@@ -17,7 +16,6 @@ import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
 import 'package:biblebookapp/view/screens/chat/chat_translations.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
-import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/post_prayer_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
@@ -94,9 +92,6 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
 
   // UI mode: true => Pray for Me view (search + categories). Community navigates to PrayerWallScreen.
   bool _isPrayForMeMode = true;
-
-  /// Shown in the top bar when in an active prayer session (category or custom).
-  String? _sessionHeaderTitle;
 
   // Background music asset path (without 'assets/' prefix as AssetSource adds it automatically)
   static const String _backgroundMusicUrl =
@@ -401,7 +396,6 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
     final category = _categories[categoryIndex];
 
     setState(() {
-      _sessionHeaderTitle = category.title;
       _messages.add(_GuidanceMessage(text: category.title, isUser: true));
       _isLoading = true;
     });
@@ -806,7 +800,6 @@ ${category.prompt}
     }
 
     setState(() {
-      _sessionHeaderTitle = 'My Prayer';
       _messages.add(_GuidanceMessage(text: customRequest, isUser: true));
       _isLoading = true;
     });
@@ -2113,49 +2106,9 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     );
   }
 
-  // Parse verse reference to extract book, chapter, and verse
-  Map<String, dynamic>? _parseVerseReference(String verseRef) {
-    try {
-      // Pattern to match verse references like "John 3:16", "Genesis 1:1", "1 Corinthians 13:4"
-      final pattern = RegExp(
-        r'\b([1-3]?\s?[A-Za-z]{2,})\s+(\d{1,3}):(\d{1,3})',
-        caseSensitive: false,
-      );
-      final match = pattern.firstMatch(verseRef);
-      if (match != null) {
-        String bookName = match.group(1)?.trim() ?? '';
-        final chapter = int.tryParse(match.group(2) ?? '');
-        final verse = int.tryParse(match.group(3) ?? '');
-        if (chapter != null && verse != null && bookName.isNotEmpty) {
-          // Capitalize first letter of each word in book name
-          bookName = bookName
-              .split(' ')
-              .map((word) => word.isNotEmpty
-                  ? word[0].toUpperCase() + word.substring(1).toLowerCase()
-                  : '')
-              .join(' ');
-
-          return {
-            'bookName': bookName,
-            'chapter': chapter,
-            'verse': verse,
-          };
-        }
-      }
-    } catch (e) {
-      debugPrint('Error parsing verse reference: $e');
-    }
-    return null;
-  }
-
   // Build rich text with clickable verse references
   Widget _buildMessageWithVerseLinks(
-    String text,
-    bool isUser,
-    Size size,
-    bool isDark, {
-    TextAlign textAlign = TextAlign.start,
-  }) {
+      String text, bool isUser, Size size, bool isDark) {
     // Regex to match verse references like "Genesis 1:1", "John 3:16", "1 Corinthians 13:4-8"
     final versePattern = RegExp(
       r'(\d?\s?[A-Za-z]+\s+\d+:\d+(?:-\d+)?)',
@@ -2169,7 +2122,6 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
       // No verse references, return regular text
       return Text(
         text,
-        textAlign: textAlign,
         style: TextStyle(
           fontSize: baseFontSize,
           height: 1.6,
@@ -2196,8 +2148,10 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
       spans.add(TextSpan(
         text: verseRef,
         style: TextStyle(
-          color: isUser ? Colors.white : CommanColor.whiteBlack(context),
-          fontWeight: FontWeight.w400,
+          color: isUser
+              ? Colors.white
+              : (isDark ? const Color(0xFF64B5F6) : const Color(0xFF1976D2)),
+          fontWeight: FontWeight.w600,
         ),
       ));
 
@@ -2212,7 +2166,6 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     }
 
     return RichText(
-      textAlign: textAlign,
       text: TextSpan(
         style: TextStyle(
           fontSize: baseFontSize,
@@ -2238,7 +2191,6 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
           debugPrint(
               '🔙 BACK BUTTON: System back pressed, clearing messages...');
           setState(() {
-            _sessionHeaderTitle = null;
             _messages.clear();
             _isLoading = false;
             _customPrayerController.clear();
@@ -2282,7 +2234,6 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                             debugPrint(
                                 '🔙 BACK BUTTON: Back arrow pressed, clearing messages...');
                             setState(() {
-                              _sessionHeaderTitle = null;
                               _messages.clear();
                               _isLoading = false;
                               _customPrayerController.clear();
@@ -2309,18 +2260,13 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                             ? const SizedBox.shrink()
                             : Center(
                                 child: Text(
-                                  (_sessionHeaderTitle ?? '').trim().isEmpty
-                                      ? ChatTranslations.get(
-                                          'prayer_guidance_title', 'EN')
-                                      : _sessionHeaderTitle!,
-                                  textAlign: TextAlign.center,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
+                                  ChatTranslations.get(
+                                      'prayer_guidance_title', 'EN'),
                                   style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: CommanColor.whiteBlack(context),
-                                    fontSize: size.width > 450 ? 22 : 20,
-                                    fontFamily: 'Georgia',
+                                    fontWeight: FontWeight.w700,
+                                    color: CommanColor.whiteBlack(context)
+                                        .withOpacity(0.7),
+                                    fontSize: size.width > 450 ? 22 : 18,
                                   ),
                                 ),
                               ),
@@ -2721,37 +2667,37 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                         );
                                       },
                                     ),
-                                    // const SizedBox(height: 24),
-                                    // // Get Prayer button (opens custom prayer dialog; show Important Notice first)
-                                    // SizedBox(
-                                    //   width: double.infinity,
-                                    //   child: ElevatedButton(
-                                    //     onPressed: () async {
-                                    //       final agreed = await _showPleaseNoteDialog();
-                                    //       if (!agreed || !mounted) return;
-                                    //       _showCustomPrayerDialog(context);
-                                    //     },
-                                    //     style: ElevatedButton.styleFrom(
-                                    //       backgroundColor: isDark
-                                    //           ? CommanColor.darkPrimaryColor
-                                    //           : const Color(0xFFD4A574),
-                                    //       padding: const EdgeInsets.symmetric(
-                                    //           vertical: 14),
-                                    //       shape: RoundedRectangleBorder(
-                                    //         borderRadius:
-                                    //             BorderRadius.circular(12),
-                                    //       ),
-                                    //     ),
-                                    //     child: Text(
-                                    //       'Get Prayer',
-                                    //       style: TextStyle(
-                                    //         fontSize: size.width > 450 ? 17 : 16,
-                                    //         fontWeight: FontWeight.w700,
-                                    //         color: isDark ? Colors.white : const Color(0xFF5C4033),
-                                    //       ),
-                                    //     ),
-                                    //   ),
-                                    // ),
+                                    const SizedBox(height: 24),
+                                    // Get Prayer button (opens custom prayer dialog; show Important Notice first)
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton(
+                                        onPressed: () async {
+                                          final agreed = await _showPleaseNoteDialog();
+                                          if (!agreed || !mounted) return;
+                                          _showCustomPrayerDialog(context);
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: isDark
+                                              ? CommanColor.darkPrimaryColor
+                                              : const Color(0xFFD4A574),
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 14),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                        child: Text(
+                                          'Get Prayer',
+                                          style: TextStyle(
+                                            fontSize: size.width > 450 ? 17 : 16,
+                                            fontWeight: FontWeight.w700,
+                                            color: isDark ? Colors.white : const Color(0xFF5C4033),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                     const SizedBox(height: 24),
                                   ],
                                 ),
@@ -2790,12 +2736,12 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                               child: Align(
                                 alignment: isUser
                                     ? Alignment.centerRight
-                                    : Alignment.center,
+                                    : Alignment.centerLeft,
                                 child: Container(
                                   constraints: BoxConstraints(
                                     maxWidth: isUser
                                         ? size.width * 0.92
-                                        : size.width * 0.94,
+                                        : size.width,
                                   ),
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 14, vertical: 12),
@@ -2824,9 +2770,6 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                         isUser,
                                         size,
                                         isDark,
-                                        textAlign: isUser
-                                            ? TextAlign.start
-                                            : TextAlign.center,
                                       ),
                                       const SizedBox(height: 6),
                                       // Action icons (Copy / Share) for responses only
@@ -3010,7 +2953,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                         ),
                         child: Text(
                           ChatTranslations.get(
-                              'amen_button', AppApiConstant.chatLanguage),
+                              'amen_button', 'EN'),
                           style: TextStyle(
                             fontSize: size.width > 450 ? 18 : 16,
                             fontWeight: FontWeight.w700,

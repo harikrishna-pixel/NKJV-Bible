@@ -132,8 +132,13 @@ class _SplashScreenState extends State<SplashScreen> {
                 _appOpenAd = null;
               },
             );
-
-            _appOpenAd!.show();
+            // Show open ad after 2 seconds (Splash requirement).
+            Future.delayed(const Duration(seconds: 2), () {
+              if (!mounted) return;
+              final adToShow = _appOpenAd;
+              if (adToShow == null) return;
+              adToShow.show();
+            });
           },
           onAdFailedToLoad: (error) {
             debugPrint('AppOpenAd failed to load: $error');
@@ -1616,7 +1621,13 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
               },
             );
 
-            _appOpenAd!.show();
+            // Show open ad after 2 seconds (Splash requirement).
+            Future.delayed(const Duration(seconds: 2), () {
+              if (!mounted) return;
+              final adToShow = _appOpenAd;
+              if (adToShow == null) return;
+              adToShow.show();
+            });
           },
           onAdFailedToLoad: (error) {
             debugPrint('AppOpenAd failed to load: $error');
