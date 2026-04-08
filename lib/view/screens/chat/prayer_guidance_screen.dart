@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:biblebookapp/constant/app_api_constant.dart';
+import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/milestone_lifetime_paywall_coordinator.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
@@ -16,6 +17,7 @@ import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
 import 'package:biblebookapp/view/screens/chat/chat_translations.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
+import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/post_prayer_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
@@ -2106,6 +2108,41 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     );
   }
 
+  // Parse verse reference to extract book, chapter, and verse
+  Map<String, dynamic>? _parseVerseReference(String verseRef) {
+    try {
+      // Pattern to match verse references like "John 3:16", "Genesis 1:1", "1 Corinthians 13:4"
+      final pattern = RegExp(
+        r'\b([1-3]?\s?[A-Za-z]{2,})\s+(\d{1,3}):(\d{1,3})',
+        caseSensitive: false,
+      );
+      final match = pattern.firstMatch(verseRef);
+      if (match != null) {
+        String bookName = match.group(1)?.trim() ?? '';
+        final chapter = int.tryParse(match.group(2) ?? '');
+        final verse = int.tryParse(match.group(3) ?? '');
+        if (chapter != null && verse != null && bookName.isNotEmpty) {
+          // Capitalize first letter of each word in book name
+          bookName = bookName
+              .split(' ')
+              .map((word) => word.isNotEmpty
+                  ? word[0].toUpperCase() + word.substring(1).toLowerCase()
+                  : '')
+              .join(' ');
+
+          return {
+            'bookName': bookName,
+            'chapter': chapter,
+            'verse': verse,
+          };
+        }
+      }
+    } catch (e) {
+      debugPrint('Error parsing verse reference: $e');
+    }
+    return null;
+  }
+
   // Build rich text with clickable verse references
   Widget _buildMessageWithVerseLinks(
       String text, bool isUser, Size size, bool isDark) {
@@ -2953,7 +2990,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                         ),
                         child: Text(
                           ChatTranslations.get(
-                              'amen_button', 'EN'),
+                              'amen_button', AppApiConstant.chatLanguage),
                           style: TextStyle(
                             fontSize: size.width > 450 ? 18 : 16,
                             fontWeight: FontWeight.w700,

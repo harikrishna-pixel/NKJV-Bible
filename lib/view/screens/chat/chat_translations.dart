@@ -1466,7 +1466,7 @@ class ChatTranslations {
     'copied': {
       'EN': 'Copied to clipboard',
       'HI': 'क्लिपबोर्ड पर कॉपी किया गया',
-      'TN': 'கிளிப்போர்டுக்கு நகலெடுக்கப்பட்டது',
+      'TN': 'கிளிப்போர்டில் நகலெடுக்கப்பட்டது',
       'PT': 'Copiado para a área de transferência',
       'SQ': 'U kopjua në clipboard',
       'AM': 'ወደ ክሊፕቦርድ ተቀድቷል',
