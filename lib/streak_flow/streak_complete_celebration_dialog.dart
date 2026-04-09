@@ -107,11 +107,10 @@ class _StreakCompleteCelebrationDialogState
                   const SizedBox(height: 8),
                   _buildTopDecorationRow(),
                   const SizedBox(height: 12),
-                  Image.asset(
-                    'assets/Icon-1024.png',
-                    height: 72,
-                    width: 72,
-                    fit: BoxFit.contain,
+                  Icon(
+                    Icons.local_fire_department_rounded,
+                    size: 72,
+                    color: _gold,
                   ),
                   const SizedBox(height: 16),
                   Row(

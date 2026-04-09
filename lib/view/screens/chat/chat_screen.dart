@@ -63,6 +63,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _selectedExampleQuestionIndex; // Track which example question button is tapped
   String _introAnswerLength = 'small';
 
+  /// Normalized text of follow-up chips the user already sent (so the next
+  /// reply can surface different suggestions).
+  final Set<String> _usedFollowUpSuggestionKeys = {};
+
+  /// API-generated follow-ups for the footer row (same language as assistant).
+  List<String>? _geminiFollowUpSuggestions;
+  int? _geminiFollowUpsMessageHash;
+
   // Speech to text
   stt.SpeechToText? _speech;
   bool _isListening = false;
@@ -1328,10 +1336,29 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final List<dynamic> history = jsonDecode(historyJson);
       setState(() {
         _messages.clear();
+        _usedFollowUpSuggestionKeys.clear();
+        _geminiFollowUpSuggestions = null;
+        _geminiFollowUpsMessageHash = null;
         _messages.addAll(
           history.map((item) => ChatMessage.fromJson(item)).toList(),
         );
       });
+      // When opening a recent conversation, fetch Gemini follow-ups for the
+      // latest assistant reply so the footer suggestions also appear in history view.
+      final lastAi = _messages.lastWhere(
+        (m) => !m.isUser,
+        orElse: () => ChatMessage(
+          text: '',
+          isUser: false,
+          timestamp: DateTime.now(),
+        ),
+      );
+      if (lastAi.text.trim().isNotEmpty) {
+        unawaited(_fetchGeminiFollowUpSuggestions(
+          lastAi.text,
+          avoidNormalizedQuestions: _usedFollowUpSuggestionKeys,
+        ));
+      }
       // Removed _scrollToBottom() to keep view at top when loading history
     }
   }
@@ -1597,6 +1624,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     // Clear only the current conversation, keep history intact
     setState(() {
       _messages.clear();
+      _usedFollowUpSuggestionKeys.clear();
+      _geminiFollowUpSuggestions = null;
+      _geminiFollowUpsMessageHash = null;
     });
   }
 
@@ -1804,7 +1834,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     // Check internet connection
     final bool isConnected = await InternetConnection().hasInternetAccess;
     if (!isConnected) {
-      Constants.showToast("Check Your Internet Connection", 5000);
+      Constants.showToast("No internet connection", 5000);
       return;
     }
 
@@ -1888,6 +1918,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 8. Provide well-structured responses that are easy to understand
 9. If asked about specific verses, provide context and meaning
 10. Always respond in plain text format without using asterisks (*), markdown formatting, or special characters
+11. Do not repeat yourself: avoid restating the same sentences, bullet points, or stock phrases you already used in this conversation unless the user explicitly asks you to repeat or summarize.
+12. Each new reply should add fresh detail, a different angle, or a deeper step—do not copy, closely paraphrase, or recycle your previous answer when the user asks a follow-up question.
 
 ${answerLengthInstruction}
 ${AppApiConstant.chatLanguage != null ? '\nIMPORTANT: Always respond in ${AppApiConstant.chatLanguage == 'TN' ? 'Tamil' : AppApiConstant.chatLanguage} language. All your responses must be in ${AppApiConstant.chatLanguage == 'TN' ? 'Tamil' : AppApiConstant.chatLanguage}.' : ''}
@@ -2128,6 +2160,8 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
             timestamp: DateTime.now(),
           ));
           _isLoading = false;
+          _geminiFollowUpSuggestions = null;
+          _geminiFollowUpsMessageHash = null;
         });
 
         // Ensure keyboard stays dismissed immediately after setState
@@ -2146,6 +2180,10 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
           await updateBibleChatWidget(question: message, answer: responseText);
           await MilestoneLifetimePaywallCoordinator.onChatAiResponseSuccess(
               context);
+          unawaited(_fetchGeminiFollowUpSuggestions(
+            responseText,
+            avoidNormalizedQuestions: _usedFollowUpSuggestionKeys,
+          ));
         }
 
         // Scroll to top when answer comes to show at top of answer
@@ -2185,6 +2223,8 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
             timestamp: DateTime.now(),
           ));
           _isLoading = false;
+          _geminiFollowUpSuggestions = null;
+          _geminiFollowUpsMessageHash = null;
         });
 
         // Ensure keyboard stays dismissed immediately after setState
@@ -2213,6 +2253,8 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
           timestamp: DateTime.now(),
         ));
         _isLoading = false;
+        _geminiFollowUpSuggestions = null;
+        _geminiFollowUpsMessageHash = null;
       });
 
       // Ensure keyboard stays dismissed immediately after setState
@@ -3360,6 +3402,141 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
     );
   }
 
+  /// Second API call: 3 follow-up questions in the same language as [assistantReply].
+  /// This powers ONLY the footer suggestions row (no local fallbacks).
+  Future<void> _fetchGeminiFollowUpSuggestions(
+    String assistantReply, {
+    Set<String>? avoidNormalizedQuestions,
+  }) async {
+    if (assistantReply.isEmpty || !mounted) return;
+    final snippet = assistantReply.length > 8000
+        ? assistantReply.substring(0, 8000)
+        : assistantReply;
+    final avoid = (avoidNormalizedQuestions ?? const <String>{})
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .take(12)
+        .join('\n');
+    final prompt =
+        '''You write short follow-up questions for a Bible faith chat app.
+Read the assistant message below. Write EXACTLY 3 different questions the user might ask next about that reply.
+
+Rules:
+- Write all 3 questions in the SAME language and script as the assistant message (for example if the message is in Tamil, write only in Tamil; if in English, only English).
+- Each question on its own line. No numbering, bullets, or markdown.
+- Each line under 160 characters. Plain text only.
+- Do not repeat the assistant text verbatim as a question.
+- Do not repeat or paraphrase any of the "Avoid" questions below.
+
+Avoid (do not output these):
+${avoid.isEmpty ? '(none)' : avoid}
+
+Assistant message:
+---
+$snippet
+---
+
+Your 3 questions (exactly 3 lines):''';
+
+    try {
+      final url = Uri.parse(_baseUrl);
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'prompt': prompt}),
+      );
+      if (response.statusCode != 200 || !mounted) return;
+      var raw = _extractTextFromChatApiBody(response.body);
+      raw = raw?.replaceAll('*', '').trim() ?? '';
+      if (raw.isEmpty) return;
+      raw = raw.replaceAll('\\n', '\n');
+      raw = raw.replaceAll('\\"', '"');
+      final three = _parseThreeFollowUpQuestionLines(raw);
+      if (three == null || !mounted) return;
+      final hash = assistantReply.hashCode;
+      setState(() {
+        _geminiFollowUpSuggestions = three;
+        _geminiFollowUpsMessageHash = hash;
+      });
+    } catch (e) {
+      debugPrint('Gemini follow-up suggestions failed: $e');
+    }
+  }
+
+  String? _extractTextFromChatApiBody(String body) {
+    if (body.isEmpty) return null;
+    try {
+      final responseData = jsonDecode(body);
+      String? walk(dynamic data) {
+        if (data is String) return data;
+        if (data is Map) {
+          if (data['output'] != null) return walk(data['output']);
+          if (data['response'] != null) return walk(data['response']);
+          if (data['text'] != null) return walk(data['text']);
+          if (data['message'] != null) return walk(data['message']);
+          if (data['candidates'] != null && data['candidates'] is List) {
+            final list = data['candidates'] as List;
+            if (list.isNotEmpty) return walk(list.first);
+          }
+          if (data['content'] is Map) {
+            final parts = (data['content'] as Map)['parts'];
+            if (parts is List && parts.isNotEmpty) {
+              final p0 = parts.first;
+              if (p0 is Map && p0['text'] != null) {
+                return p0['text'].toString();
+              }
+            }
+          }
+        }
+        if (data is List && data.isNotEmpty) {
+          return walk(data.first);
+        }
+        return null;
+      }
+
+      return walk(responseData);
+    } catch (_) {
+      if (body.contains('"text"')) {
+        final m = RegExp(r'"text"\s*:\s*"((?:[^"\\]|\\.)*)"').firstMatch(body);
+        if (m != null) {
+          return m.group(1)?.replaceAll(r'\n', '\n');
+        }
+      }
+      return null;
+    }
+  }
+
+  List<String>? _parseThreeFollowUpQuestionLines(String raw) {
+    final t = raw.trim();
+    if (t.isEmpty) return null;
+    try {
+      if (t.startsWith('[')) {
+        final decoded = jsonDecode(t);
+        if (decoded is List) {
+          final list = decoded
+              .map((e) => e.toString().trim())
+              .where((s) => s.isNotEmpty && s.length < 500)
+              .take(3)
+              .toList();
+          if (list.length == 3) return list;
+        }
+      }
+    } catch (_) {}
+    final lines = t.split(RegExp(r'\r?\n'));
+    final out = <String>[];
+    for (var line in lines) {
+      line = line.trim();
+      if (line.isEmpty) continue;
+      line = line.replaceFirst(RegExp(r'^\d+[\.\)\:\-]\s*'), '');
+      line = line.replaceFirst(RegExp(r'^[-•*]\s*'), '');
+      line = line.trim();
+      if (line.length < 3) continue;
+      out.add(line);
+      if (out.length == 3) break;
+    }
+    return out.length == 3 ? out : null;
+  }
+
   Widget _buildFollowUpSuggestions(double screenWidth, bool isDark) {
     // Follow-ups must match the latest assistant reply. If the last message is
     // the user's question (e.g. while loading), using lastWhere(!isUser) would
@@ -3370,15 +3547,20 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
     final lastAi = _messages.last;
     if (lastAi.text.isEmpty) return const SizedBox.shrink();
 
-    String? precedingQuestion;
-    if (_messages.length >= 2 && _messages[_messages.length - 2].isUser) {
-      precedingQuestion = _messages[_messages.length - 2].text;
+    final hash = lastAi.text.hashCode;
+    if (!(_geminiFollowUpsMessageHash == hash &&
+        _geminiFollowUpSuggestions != null &&
+        _geminiFollowUpSuggestions!.length >= 3)) {
+      // Only show Gemini-backed suggestions. If not ready yet, show nothing.
+      return const SizedBox.shrink();
     }
 
-    final suggestions = _getFollowUpList(
-      lastAi.text,
-      precedingQuestion: precedingQuestion,
-    );
+    final suggestions = _geminiFollowUpSuggestions!
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .where((s) => !_matchesAnyUsedSuggestion(s, _usedFollowUpSuggestionKeys))
+        .take(3)
+        .toList();
     if (suggestions.isEmpty) return const SizedBox.shrink();
 
     return Container(
@@ -3419,6 +3601,8 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                     child: InkWell(
                       onTap: () {
                         setState(() {
+                          _usedFollowUpSuggestionKeys
+                              .add(_normalizeSuggestionKey(question));
                           _selectedTopicIndex = null;
                           _selectedExampleQuestionIndex = index;
                         });
@@ -3492,10 +3676,34 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
     );
   }
 
+  static String _normalizeSuggestionKey(String s) =>
+      s.trim().replaceAll(RegExp(r'\s+'), ' ');
+
+  static List<String> _rotateStrings(List<String> items, int offset) {
+    if (items.isEmpty) return items;
+    final n = items.length;
+    final o = offset % n;
+    return [...items.sublist(o), ...items.sublist(0, o)];
+  }
+
+  /// True if this chip matches something the user already sent (exact or fuzzy).
+  bool _matchesAnyUsedSuggestion(String candidate, Set<String> used) {
+    if (used.isEmpty) return false;
+    final t = _normalizeSuggestionKey(candidate);
+    for (final u in used) {
+      if (t == u) return true;
+      if (_chatSuggestionTooSimilar(t, u)) return true;
+    }
+    return false;
+  }
+
   List<String> _getFollowUpList(
     String answer, {
     String? precedingQuestion,
+    Set<String>? usedSuggestionKeys,
+    int suggestionRotation = 0,
   }) {
+    final used = usedSuggestionKeys ?? <String>{};
     final bool hasVerseContext = widget.verseContext != null;
 
     final pq = precedingQuestion?.trim();
@@ -3510,23 +3718,29 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
         .where((s) => s.trim().isNotEmpty)
         .toList();
     if (sentences.isEmpty) {
-      return hasVerseContext
-          ? [
-              ChatTranslations.get(
-                  'tell_more_verse', AppApiConstant.chatLanguage),
-              ChatTranslations.get(
-                  'how_apply_verse_life', AppApiConstant.chatLanguage),
-              ChatTranslations.get(
-                  'what_else_verse_teach', AppApiConstant.chatLanguage),
-            ]
-          : [
-              ChatTranslations.get(
-                  'explain_more', AppApiConstant.chatLanguage),
-              ChatTranslations.get(
-                  'how_apply_this', AppApiConstant.chatLanguage),
-              ChatTranslations.get(
-                  'what_else_know', AppApiConstant.chatLanguage),
-            ];
+      return _finalizeChatSuggestions(
+        hasVerseContext
+            ? [
+                ChatTranslations.get(
+                    'tell_more_verse', AppApiConstant.chatLanguage),
+                ChatTranslations.get(
+                    'how_apply_verse_life', AppApiConstant.chatLanguage),
+                ChatTranslations.get(
+                    'what_else_verse_teach', AppApiConstant.chatLanguage),
+              ]
+            : [
+                ChatTranslations.get(
+                    'explain_more', AppApiConstant.chatLanguage),
+                ChatTranslations.get(
+                    'how_apply_this', AppApiConstant.chatLanguage),
+                ChatTranslations.get(
+                    'what_else_know', AppApiConstant.chatLanguage),
+              ],
+        precedingQuestion,
+        hasVerseContext,
+        used,
+        suggestionRotation,
+      );
     }
 
     // Analyze question + reply so concepts/keywords align with this turn (e.g.
@@ -3536,7 +3750,14 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
 
     // Extract key phrases and nouns from the response
     var keyPhrases = List<String>.from(_extractKeyPhrases(answer, sentences));
-    if (pq != null && pq.isNotEmpty) {
+    // Do not mine the user's message for phrases when it is only a generic
+    // follow-up like "explain more" (TN matches the explain_more string)—that
+    // produced chips repeating the same question as the AI reply.
+    final explainMoreTemplate =
+        ChatTranslations.get('explain_more', AppApiConstant.chatLanguage);
+    if (pq != null &&
+        pq.isNotEmpty &&
+        !_chatSuggestionTooSimilar(pq, explainMoreTemplate)) {
       final qSentences = pq
           .split(RegExp(r'[.!?]\s+'))
           .where((s) => s.trim().isNotEmpty)
@@ -3554,21 +3775,23 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
     // Generate truly dynamic questions based on actual content
     final List<String> dynamicQuestions = [];
 
-    // Priority 1: Generate questions from extracted key phrases
+    // Priority 1: Alternate "relate to" vs "God says about" — avoid explain_more_about,
+    // which shares Tamil "மேலும் விளக்க" with other chips and reads as repeated.
     if (keyPhrases.isNotEmpty) {
-      for (var phrase in keyPhrases.take(2)) {
+      for (var i = 0;
+          i < keyPhrases.length && dynamicQuestions.length < 3;
+          i++) {
+        final phrase = keyPhrases[i];
+        final useRelate = i.isEven;
         if (hasVerseContext) {
-          dynamicQuestions.add(
-              '${ChatTranslations.get('explain_more_about', AppApiConstant.chatLanguage)} ${phrase}?');
-          dynamicQuestions.add(
-              '${ChatTranslations.get('how_verse_relate_to', AppApiConstant.chatLanguage)} ${phrase}?');
+          dynamicQuestions.add(useRelate
+              ? '${ChatTranslations.get('how_verse_relate_to', AppApiConstant.chatLanguage)} ${phrase}?'
+              : '${ChatTranslations.get('verse_teach_about', AppApiConstant.chatLanguage)} ${phrase}?');
         } else {
-          dynamicQuestions.add(
-              '${ChatTranslations.get('explain_more_about', AppApiConstant.chatLanguage)} ${phrase}?');
-          dynamicQuestions.add(
-              '${ChatTranslations.get('how_relate_to', AppApiConstant.chatLanguage)} ${phrase}?');
+          dynamicQuestions.add(useRelate
+              ? '${ChatTranslations.get('how_relate_to', AppApiConstant.chatLanguage)} ${phrase}?'
+              : '${ChatTranslations.get('god_say_about', AppApiConstant.chatLanguage)} ${phrase}?');
         }
-        if (dynamicQuestions.length >= 3) break;
       }
     }
 
@@ -3679,19 +3902,26 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                 'what_practical_steps', AppApiConstant.chatLanguage));
       }
 
-      // Look for questions in the response
+      // Look for questions in the response (skip explain_further — same "explain more"
+      // family as other chips in many languages; other priorities already add variety.)
       if (firstSentence.contains('?') || answer.contains('?')) {
         dynamicQuestions.add(hasVerseContext
             ? ChatTranslations.get(
-                'explain_verse_further', AppApiConstant.chatLanguage)
+                'why_verse_important', AppApiConstant.chatLanguage)
             : ChatTranslations.get(
-                'explain_further', AppApiConstant.chatLanguage));
+                'why_important', AppApiConstant.chatLanguage));
       }
     }
 
     // Return dynamic questions if we have enough, otherwise fill with contextual fallbacks
     if (dynamicQuestions.length >= 3) {
-      return dynamicQuestions.take(3).toList();
+      return _finalizeChatSuggestions(
+        dynamicQuestions,
+        precedingQuestion,
+        hasVerseContext,
+        used,
+        suggestionRotation,
+      );
     }
 
     // Fill remaining slots with contextual questions
@@ -3737,7 +3967,226 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
       }
     }
 
-    return dynamicQuestions.take(3).toList();
+    return _finalizeChatSuggestions(
+      dynamicQuestions,
+      precedingQuestion,
+      hasVerseContext,
+      used,
+      suggestionRotation,
+    );
+  }
+
+  /// Long ordered list of static templates for refilling when the user has
+  /// already used some chips (prefer unused keys first).
+  List<String> _staticFollowUpCandidatesOrdered(
+      bool hasVerseContext, String lang) {
+    if (hasVerseContext) {
+      return [
+        ChatTranslations.get('what_else_verse_teach', lang),
+        ChatTranslations.get('tell_more_verse', lang),
+        ChatTranslations.get('why_verse_important', lang),
+        ChatTranslations.get('verse_daily_life', lang),
+        ChatTranslations.get('how_apply_verse_life', lang),
+        ChatTranslations.get('explain_verse_further', lang),
+        ChatTranslations.get('ask_questions_verse', lang),
+        ChatTranslations.get('what_steps_take', lang),
+      ];
+    }
+    return [
+      ChatTranslations.get('what_else_know', lang),
+      ChatTranslations.get('why_important', lang),
+      ChatTranslations.get('what_practical_steps', lang),
+      ChatTranslations.get('how_apply_teaching', lang),
+      ChatTranslations.get('how_apply_this', lang),
+      ChatTranslations.get('what_steps_take', lang),
+      ChatTranslations.get('explain_more', lang),
+      ChatTranslations.get('explain_further', lang),
+    ];
+  }
+
+  /// Shared wording across "explain more" templates (TA/EN/HI) — allow at most one such chip.
+  List<String> _explainMoreSharedMarkers(String lang) {
+    switch (lang) {
+      case 'TN':
+        return ['மேலும் விளக்க'];
+      case 'HI':
+        return ['और समझा', 'और बताए'];
+      case 'EN':
+        return ['explain more', 'explain this further', 'explain further'];
+      default:
+        final em = ChatTranslations.get('explain_more', lang);
+        if (em.length < 10) return [em];
+        return [em.substring(0, em.length < 18 ? em.length : 18)];
+    }
+  }
+
+  List<String> _capExplainMoreFamilyChips(List<String> items, String lang) {
+    if (items.length <= 1) return items;
+    final markers = _explainMoreSharedMarkers(lang);
+    final out = <String>[];
+    var keptExplain = false;
+    for (final s in items) {
+      final t = s.trim();
+      if (t.isEmpty) continue;
+      final isExplain =
+          markers.any((m) => m.isNotEmpty && t.contains(m));
+      if (isExplain) {
+        if (keptExplain) continue;
+        keptExplain = true;
+      }
+      out.add(t);
+    }
+    return out;
+  }
+
+  /// Remove chips that restate the user's last question (e.g. Tamil "explain more"
+  /// is identical to the [explain_more] translation) and refill with distinct options.
+  List<String> _finalizeChatSuggestions(
+    List<String> raw,
+    String? precedingQuestion,
+    bool hasVerseContext,
+    Set<String> usedKeys,
+    int suggestionRotation,
+  ) {
+    final lang = AppApiConstant.chatLanguage;
+    final pq = precedingQuestion?.trim();
+
+    var list = _dedupeChatSuggestions(raw, max: 20);
+    list = list
+        .where((s) => !_matchesAnyUsedSuggestion(s, usedKeys))
+        .toList();
+    if (pq != null && pq.isNotEmpty) {
+      list = list
+          .where((s) => !_suggestionEchoesUserMessage(s, pq))
+          .toList();
+    }
+    list = _dedupeChatSuggestions(list, max: 10);
+    list = _capExplainMoreFamilyChips(list, lang);
+
+    bool canAdd(String candidate) {
+      final t = candidate.trim();
+      if (t.isEmpty) return false;
+      if (_matchesAnyUsedSuggestion(t, usedKeys)) return false;
+      if (pq != null &&
+          pq.isNotEmpty &&
+          _suggestionEchoesUserMessage(t, pq)) {
+        return false;
+      }
+      return !list.any((x) => _chatSuggestionTooSimilar(x, t));
+    }
+
+    final primaryFillers = hasVerseContext
+        ? <String>[
+            ChatTranslations.get('what_else_verse_teach', lang),
+            ChatTranslations.get('tell_more_verse', lang),
+            ChatTranslations.get('why_verse_important', lang),
+            ChatTranslations.get('verse_daily_life', lang),
+          ]
+        : <String>[
+            ChatTranslations.get('what_else_know', lang),
+            ChatTranslations.get('why_important', lang),
+            ChatTranslations.get('what_practical_steps', lang),
+            ChatTranslations.get('how_apply_teaching', lang),
+          ];
+
+    final combinedPool = <String>[];
+    final poolKeys = <String>{};
+    void addUniqueToPool(String s) {
+      final k = _normalizeSuggestionKey(s);
+      if (k.isEmpty || poolKeys.contains(k)) return;
+      poolKeys.add(k);
+      combinedPool.add(s.trim());
+    }
+
+    for (final f in primaryFillers) {
+      addUniqueToPool(f);
+    }
+    for (final f in _staticFollowUpCandidatesOrdered(hasVerseContext, lang)) {
+      addUniqueToPool(f);
+    }
+
+    final rotatedPool =
+        _rotateStrings(combinedPool, suggestionRotation);
+
+    for (final f in rotatedPool) {
+      if (list.length >= 3) break;
+      if (canAdd(f)) list.add(f);
+    }
+
+    return list.take(3).toList();
+  }
+
+  bool _suggestionEchoesUserMessage(String suggestion, String userQuestion) {
+    final s = suggestion.trim();
+    final u = userQuestion.trim();
+    if (s.isEmpty || u.isEmpty) return false;
+    if (s == u) return true;
+    if (_chatSuggestionTooSimilar(s, u)) return true;
+    if (s.length >= 12 && u.length >= 12 && (s.contains(u) || u.contains(s))) {
+      return true;
+    }
+    // User typed a generic "explain more" prompt (often identical to the
+    // explain_more string in TN). Drop any chip that is the same template or
+    // the near-duplicate explain_further variant.
+    final lang = AppApiConstant.chatLanguage;
+    final explainMore = ChatTranslations.get('explain_more', lang);
+    final explainFurther = ChatTranslations.get('explain_further', lang);
+    final userAskedGenericExplain = _chatSuggestionTooSimilar(u, explainMore) ||
+        _chatSuggestionTooSimilar(u, explainFurther);
+    if (userAskedGenericExplain &&
+        (_chatSuggestionTooSimilar(s, explainMore) ||
+            _chatSuggestionTooSimilar(s, explainFurther))) {
+      return true;
+    }
+    return false;
+  }
+
+  /// Drop near-duplicate suggestion strings (same wording or very high word overlap).
+  List<String> _dedupeChatSuggestions(List<String> input, {int max = 3}) {
+    final out = <String>[];
+    for (final s in input) {
+      final t = s.trim();
+      if (t.isEmpty) continue;
+      if (out.any((o) => _chatSuggestionTooSimilar(o, t))) continue;
+      out.add(t);
+      if (out.length >= max) break;
+    }
+    return out;
+  }
+
+  bool _chatSuggestionTooSimilar(String a, String b) {
+    final xa = a.toLowerCase().trim();
+    final xb = b.toLowerCase().trim();
+    if (xa == xb) return true;
+    // Tamil: several templates share "மேலும் விளக்க" — treat as the same intent.
+    const taExplainCore = 'மேலும் விளக்க';
+    if (xa.contains(taExplainCore) && xb.contains(taExplainCore)) {
+      return true;
+    }
+    final wa = xa
+        .split(RegExp(r'\s+'))
+        .where((w) => w.length > 2)
+        .toSet();
+    final wb = xb
+        .split(RegExp(r'\s+'))
+        .where((w) => w.length > 2)
+        .toSet();
+    if (wa.isEmpty || wb.isEmpty) return false;
+    final inter = wa.intersection(wb).length;
+    final union = wa.union(wb).length;
+    if (union > 0 && (inter / union) > 0.65) return true;
+    // Tamil / CJK: few word boundaries — long shared prefix ≈ duplicate chip.
+    final ra = xa.runes.toList();
+    final rb = xb.runes.toList();
+    if (ra.length >= 12 && rb.length >= 12) {
+      var same = 0;
+      final n = ra.length < rb.length ? ra.length : rb.length;
+      for (var i = 0; i < n && i < 16; i++) {
+        if (ra[i] == rb[i]) same++;
+      }
+      if (same >= 12) return true;
+    }
+    return false;
   }
 
   // Extract key phrases/nouns from the response

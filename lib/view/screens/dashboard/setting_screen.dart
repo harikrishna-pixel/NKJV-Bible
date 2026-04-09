@@ -84,7 +84,7 @@ class _SettingScreenState extends State<SettingScreen>
         // Check current status
         final status = await Permission.notification.status;
         debugPrint("✅ Notification permission is granted  ${status.isGranted}");
-        if (status.isGranted) {
+        if (status.isGranted || status.isLimited || status.isProvisional) {
           debugPrint("✅ Notification permission is granted");
           setState(() {
             notificationButtonValue = nt ?? false;
@@ -1011,7 +1011,9 @@ class _SettingScreenState extends State<SettingScreen>
                         onToggle: (newVal) async {
                           final status = await Permission.notification.status;
 
-                          if (status.isGranted) {
+                          if (status.isGranted ||
+                              status.isLimited ||
+                              status.isProvisional) {
                             setState(() {
                               notificationButtonValue =
                                   !notificationButtonValue;
@@ -1087,7 +1089,9 @@ class _SettingScreenState extends State<SettingScreen>
                         onToggle: (newVal) async {
                           final status = await Permission.notification.status;
 
-                          if (status.isGranted) {
+                          if (status.isGranted ||
+                              status.isLimited ||
+                              status.isProvisional) {
                             setState(() {
                               notificationButtonValue1 =
                                   !notificationButtonValue1;
@@ -1161,7 +1165,9 @@ class _SettingScreenState extends State<SettingScreen>
                         onToggle: (newVal) async {
                           final status = await Permission.notification.status;
 
-                          if (status.isGranted) {
+                          if (status.isGranted ||
+                              status.isLimited ||
+                              status.isProvisional) {
                             setState(() {
                               notificationButtonValue2 =
                                   !notificationButtonValue2;

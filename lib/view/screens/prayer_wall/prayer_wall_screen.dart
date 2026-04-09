@@ -8,7 +8,9 @@ import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.da
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_models.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_share_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
+import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:flutter/material.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:provider/provider.dart';
 
 /// Prayer Wall — lists `GET /api/prayers`, supports category filter, like & comment counts.
@@ -324,6 +326,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
     final action = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
+        scrollable: true,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         backgroundColor: dialogBg,
         titlePadding: const EdgeInsets.fromLTRB(18, 16, 10, 8),
@@ -357,10 +360,12 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
             ),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             Text(
               'Title',
               style: TextStyle(
@@ -435,14 +440,18 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                 color: isDark ? Colors.white54 : Colors.grey.shade700,
               ),
             ),
-          ],
+            ],
+          ),
         ),
         actions: [
           SizedBox(
             width: double.infinity,
-            child: Row(
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 10,
               children: [
-                Expanded(
+                SizedBox(
+                  width: 160,
                   child: OutlinedButton(
                     onPressed: () => Navigator.pop(ctx, 'delete'),
                     style: OutlinedButton.styleFrom(
@@ -456,8 +465,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                     child: const Text('Delete'),
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
+                SizedBox(
+                  width: 160,
                   child: ElevatedButton(
                     onPressed: () => Navigator.pop(ctx, 'save'),
                     style: ElevatedButton.styleFrom(
@@ -513,9 +522,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
         await _hydratePrayerAuthorsFromDisk();
         await _refresh();
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Post deleted.')),
-        );
+        Constants.showToast('Post deleted.');
       } catch (e) {
         if (!mounted) return;
         _showAppleToast(_looksOffline(e)
@@ -537,9 +544,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
         if (!mounted) return;
         await _refresh();
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Post updated.')),
-        );
+        Constants.showToast('Post updated.');
       } catch (e) {
         if (!mounted) return;
         _showAppleToast(_looksOffline(e)
@@ -607,6 +612,11 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
         foregroundColor: Colors.white,
         elevation: isDark ? 8 : 6,
         onPressed: () async {
+          final isConnected = await InternetConnection().hasInternetAccess;
+          if (!isConnected) {
+            Constants.showToast('No internet connection', 5000);
+            return;
+          }
           final posted = await Navigator.of(context).push<bool>(
             MaterialPageRoute(
               builder: (_) => const PostPrayerScreen(),
@@ -728,32 +738,6 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                 ],
               ),
             ),
-            if (_viewerDisplayName.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 18,
-                      backgroundColor: isDark
-                          ? Colors.white.withOpacity(0.12)
-                          : brown.withOpacity(0.2),
-                      child: Text(
-                        userInitials,
-                        style: TextStyle(
-                          color: isDark ? Colors.white : brown,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: SizedBox.shrink(), // Remove "Hi, bala" text
-                    ),
-                  ],
-                ),
-              ),
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())

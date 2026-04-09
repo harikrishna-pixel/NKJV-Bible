@@ -1,4 +1,5 @@
 import 'package:biblebookapp/view/constants/colors.dart';
+import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
@@ -25,6 +26,7 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
   final _input = TextEditingController();
   bool _loading = true;
   bool _posting = false;
+  final Set<String> _editBusyIds = {};
   String? _error;
   List<Map<String, dynamic>> _rows = [];
   Set<String> _myIds = {};
@@ -75,9 +77,7 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
     final text = _input.text.trim();
     if (text.isEmpty) return;
     if (text.length > 1000) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Comment is too long (max 1000).')),
-      );
+      Constants.showToast('Comment is too long (max 1000).');
       return;
     }
     setState(() => _posting = true);
@@ -94,16 +94,10 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
         _myIds = {..._myIds, id};
       });
       await _reload();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Comment posted.')),
-        );
-      }
+      if (mounted) Constants.showToast('Comment posted.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not post: $e')),
-      );
+      Constants.showToast('Could not post. Please try again.');
     } finally {
       if (mounted) setState(() => _posting = false);
     }
@@ -112,6 +106,7 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
   Future<void> _edit(Map<String, dynamic> row) async {
     final id = _commentId(row);
     if (id == null) return;
+    if (_editBusyIds.contains(id)) return;
     final ctrl = TextEditingController(text: _commentText(row));
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
@@ -188,6 +183,8 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
     );
 
     if (newText == null || newText.isEmpty) return;
+    if (!mounted) return;
+    setState(() => _editBusyIds.add(id));
     try {
       await PrayerWallService.updateComment(
         commentId: id,
@@ -199,14 +196,13 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
       if (!mounted) return;
       await _reload();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Comment updated.')),
-      );
+      Constants.showToast('Comment updated.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not update: $e')),
-      );
+      Constants.showToast('Could not update. Please try again.');
+    } finally {
+      if (!mounted) return;
+      setState(() => _editBusyIds.remove(id));
     }
   }
 
@@ -238,14 +234,10 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
       setState(() => _myIds.remove(id));
       await _reload();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Comment deleted.')),
-      );
+      Constants.showToast('Comment deleted.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not delete: $e')),
-      );
+      Constants.showToast('Could not delete. Please try again.');
     }
   }
 
@@ -260,12 +252,6 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
     final brown = const Color(0xFF5C4033);
-    final cream = isDark
-        ? CommanColor.darkPrimaryColor
-        : (themeProvider.currentCustomTheme == AppCustomTheme.vintage
-            ? const Color(0xFFF5F0E6)
-            : themeProvider.backgroundColor);
-    final cardBg = isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white;
 
     return GestureDetector(
       behavior: HitTestBehavior.translucent,

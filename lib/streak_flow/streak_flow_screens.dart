@@ -9,6 +9,7 @@ import 'package:biblebookapp/streak_flow/mood_prayer_data.dart';
 import 'package:biblebookapp/streak_flow/streak_saved_storage.dart';
 import 'package:biblebookapp/streak/streak_service.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
@@ -372,6 +373,26 @@ Map<String, dynamic> _serializeMoodPrayerItem(MoodPrayerItem item) {
   };
 }
 
+MoodPrayerItem? _deserializeMoodPrayerItem(Object? raw) {
+  if (raw is! Map) return null;
+  try {
+    final m = Map<String, dynamic>.from(raw);
+    return MoodPrayerItem(
+      connectionLevel: (m['connectionLevel'] as num?)?.toInt() ?? 20,
+      bookName: m['bookName']?.toString() ?? '',
+      bookNumber: (m['bookNumber'] as num?)?.toInt() ?? 0,
+      chapterNumber: (m['chapterNumber'] as num?)?.toInt() ?? 0,
+      verseNumber: (m['verseNumber'] as num?)?.toInt() ?? 0,
+      verseText: m['verseText']?.toString() ?? '',
+      devotionalText: m['devotionalText']?.toString() ?? '',
+      prayerText: m['prayerText']?.toString() ?? '',
+      connectionSliderValue: (m['connectionSliderValue'] as num?)?.toDouble(),
+    );
+  } catch (_) {
+    return null;
+  }
+}
+
 Future<void> _storeActiveStreakFlowItem(MoodPrayerItem item) async {
   final dayKey = await _currentStreakFlowProgressDayKey();
   final map = await _readStreakFlowItemByDay();
@@ -692,6 +713,23 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
         child: SafeArea(
           child: Stack(
             children: [
+              // Add a subtle dark overlay so top pause icon and bottom note remain readable.
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.22),
+                        Colors.transparent,
+                        Colors.black.withOpacity(0.18),
+                      ],
+                      stops: const [0.0, 0.55, 1.0],
+                    ),
+                  ),
+                ),
+              ),
               // Scroll content first so the close control stays above and receives taps.
               SingleChildScrollView(
                 padding: EdgeInsets.fromLTRB(
@@ -703,32 +741,54 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
                       children: [
                         const SizedBox(height: 10),
                         Container(
-                          width: isTablet ? 84 : 78,
-                          height: isTablet ? 84 : 78,
+                          width: isTablet ? 92 : 86,
+                          height: isTablet ? 92 : 86,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
+                            color: Colors.black.withOpacity(0.14),
                             border: Border.all(
                                 color: _kStreakGold.withOpacity(0.9), width: 1.6),
                             boxShadow: [
                               BoxShadow(
-                                color: _kStreakGold.withOpacity(0.18),
-                                blurRadius: 16,
-                                spreadRadius: 0,
+                                color: Colors.black.withOpacity(0.28),
+                                blurRadius: 18,
+                                offset: const Offset(0, 10),
+                              ),
+                              BoxShadow(
+                                color: _kStreakGold.withOpacity(0.28),
+                                blurRadius: 22,
+                                spreadRadius: 1,
                               ),
                             ],
                           ),
                           child: Center(
                             child: Container(
-                              width: isTablet ? 50 : 44,
-                              height: isTablet ? 50 : 44,
+                              width: isTablet ? 58 : 52,
+                              height: isTablet ? 58 : 52,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
+                                color: Colors.black.withOpacity(0.55),
                                 border: Border.all(
                                     color: _kStreakGold.withOpacity(0.9),
-                                    width: 1.3),
+                                    width: 1.6),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.25),
+                                    blurRadius: 14,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                  BoxShadow(
+                                    color: _kStreakGold.withOpacity(0.25),
+                                    blurRadius: 14,
+                                    spreadRadius: 0.5,
+                                  ),
+                                ],
                               ),
-                              child: const Icon(Icons.pause,
-                                  color: _kStreakGold, size: 24),
+                              child: Icon(
+                                Icons.pause,
+                                color: Colors.white,
+                                size: isTablet ? 30 : 28,
+                              ),
                             ),
                           ),
                         ),
@@ -1232,7 +1292,11 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                         context,
                         label: 'Take the Next Step',
                         onPressed: () async {
-                          final item = await MoodPrayerLoader.pickItem(
+                          final dayKey = await _currentStreakFlowProgressDayKey();
+                          final byDay = await _readStreakFlowItemByDay();
+                          MoodPrayerItem? item =
+                              _deserializeMoodPrayerItem(byDay[dayKey]);
+                          item ??= await MoodPrayerLoader.pickItem(
                               connectionIndex: _connectionIndex);
                           if (!mounted) return;
                           if (item == null) {
@@ -1246,7 +1310,7 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                               SharPreferences.streakFlowStepsCompletedToday, 1);
                           await _storeActiveStreakFlowSteps(1);
                           if (!mounted) return;
-                          Get.to(() => StreakVerseScreen(item: item));
+                          Get.to(() => StreakVerseScreen(item: item!));
                         },
                       ),
               ),
@@ -1266,6 +1330,52 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
       fontFamily: 'Georgia',
     );
   }
+}
+
+/// Standard button helper for popups matching other app popups
+Widget _buildStandardButton({
+  required BuildContext context,
+  required String label,
+  required VoidCallback onTap,
+  required Color bgColor,
+  required bool isDark,
+  bool isSecondary = false,
+}) {
+  return Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(28),
+      child: Ink(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isSecondary 
+              ? Colors.transparent
+              : bgColor,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(
+            color: isSecondary 
+                ? (isDark ? Colors.grey.shade600 : Colors.grey.shade400)
+                : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: isSecondary 
+                ? (isDark ? Colors.white : Colors.black)
+                : Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            fontFamily: 'Georgia',
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 /// Helper for StreakPausedScreen buttons with proper dark mode support
@@ -1450,11 +1560,6 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Row(
                   children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back_ios,
-                          color: _streakTextColor(context)),
-                      onPressed: () => Get.back(),
-                    ),
                     Expanded(
                       child: Center(
                         child: _buildStepIndicator(context, 2),
@@ -1722,11 +1827,6 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Row(
                   children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back_ios,
-                          color: _streakTextColor(context)),
-                      onPressed: () => Get.back(),
-                    ),
                     Expanded(
                       child: Center(
                         child: _buildStepIndicator(context, 3),
@@ -1756,7 +1856,8 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
               Text(
                 'Devotional Moment',
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize:
+                      MediaQuery.of(context).size.width > 450 ? 26 : 22,
                   color: _streakTextColor(context).withOpacity(0.9),
                   fontFamily: 'Georgia',
                   fontWeight: FontWeight.w600,
@@ -1962,11 +2063,6 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Row(
                   children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back_ios,
-                          color: _streakTextColor(context)),
-                      onPressed: () => Get.back(),
-                    ),
                     Expanded(
                       child: Center(
                         child: _buildStepIndicator(context, 4),
@@ -1996,7 +2092,8 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
               Text(
                 'Prayer Moment',
                 style: TextStyle(
-                  fontSize: 20,
+                  fontSize:
+                      MediaQuery.of(context).size.width > 450 ? 26 : 22,
                   fontWeight: FontWeight.w600,
                   color: _streakTextColor(context),
                   fontFamily: 'Georgia',
@@ -2133,6 +2230,14 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                                 SharPreferences
                                     .pendingStreakCompleteCelebration,
                                 streakCount);
+                            // Do not show app-open ad immediately on streak completion.
+                            // Instead, schedule it for next cold start (Splash shows it after ~2s).
+                            try {
+                              final prefs =
+                                  await SharedPreferences.getInstance();
+                              await prefs.setString("showopenad", "true");
+                              await SharPreferences.setString('OpenAd', '1');
+                            } catch (_) {}
                             // Stop background music once Prayer moment is completed.
                             try {
                               await _StreakFlowBgMusic.stop();
@@ -2149,8 +2254,10 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                                     barrierDismissible: false,
                                     builder: (_) {
                                       final isDark = _isStreakDark(context);
-                                      final textColor = _streakTextColor(context);
-                                      final panelColor = _streakPanelColor(context);
+                                      // Standard popup colors matching other app popups
+                                      final bgColor = isDark ? const Color(0xFF2A1F12) : Colors.white;
+                                      final txtColor = isDark ? Colors.white : Colors.black;
+                                      final btnBg = isDark ? const Color(0xFF3B2A1A) : CommanColor.lightDarkPrimary(context);
                                       return Dialog(
                                         backgroundColor: Colors.transparent,
                                         insetPadding:
@@ -2158,10 +2265,10 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                                         child: Container(
                                           constraints: const BoxConstraints(maxWidth: 360),
                                           decoration: BoxDecoration(
-                                            color: panelColor,
+                                            color: bgColor,
                                             borderRadius: BorderRadius.circular(18),
                                             border: Border.all(
-                                              color: textColor.withOpacity(0.18),
+                                              color: isDark ? const Color(0xFF3B2A1A) : Colors.grey.shade300,
                                               width: 1.5,
                                             ),
                                             boxShadow: [
@@ -2190,7 +2297,7 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                                                   style: TextStyle(
                                                     fontSize: 22,
                                                     fontWeight: FontWeight.w800,
-                                                    color: textColor,
+                                                    color: txtColor,
                                                     fontFamily: 'Georgia',
                                                   ),
                                                 ),
@@ -2201,7 +2308,7 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                                                   style: TextStyle(
                                                     fontSize: 14,
                                                     height: 1.4,
-                                                    color: textColor.withOpacity(0.88),
+                                                    color: isDark ? Colors.white70 : Colors.black87,
                                                     fontFamily: 'Georgia',
                                                   ),
                                                 ),
@@ -2209,21 +2316,26 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                                                 Row(
                                                   children: [
                                                     Expanded(
-                                                      child: _buildParchmentButton(
+                                                      child: _buildStandardButton(
                                                         context: context,
                                                         label: 'Later',
                                                         isSecondary: true,
                                                         onTap: () =>
                                                             Navigator.of(context).pop(false),
+                                                        bgColor: btnBg,
+                                                        isDark: isDark,
                                                       ),
                                                     ),
                                                     const SizedBox(width: 12),
                                                     Expanded(
-                                                      child: _buildParchmentButton(
+                                                      child: _buildStandardButton(
                                                         context: context,
                                                         label: 'Start Today',
+                                                        isSecondary: false,
                                                         onTap: () =>
                                                             Navigator.of(context).pop(true),
+                                                        bgColor: btnBg,
+                                                        isDark: isDark,
                                                       ),
                                                     ),
                                                   ],
