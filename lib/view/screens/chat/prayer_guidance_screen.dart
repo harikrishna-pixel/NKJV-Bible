@@ -2706,35 +2706,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                     ),
                                     const SizedBox(height: 24),
                                     // Get Prayer button (opens custom prayer dialog; show Important Notice first)
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: ElevatedButton(
-                                        onPressed: () async {
-                                          final agreed = await _showPleaseNoteDialog();
-                                          if (!agreed || !mounted) return;
-                                          _showCustomPrayerDialog(context);
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: isDark
-                                              ? CommanColor.darkPrimaryColor
-                                              : const Color(0xFFD4A574),
-                                          padding: const EdgeInsets.symmetric(
-                                              vertical: 14),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                          ),
-                                        ),
-                                        child: Text(
-                                          'Get Prayer',
-                                          style: TextStyle(
-                                            fontSize: size.width > 450 ? 17 : 16,
-                                            fontWeight: FontWeight.w700,
-                                            color: isDark ? Colors.white : const Color(0xFF5C4033),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
+
                                     const SizedBox(height: 24),
                                   ],
                                 ),
@@ -2823,9 +2795,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                                         text: message.text));
                                                 Constants.showToast(
                                                     ChatTranslations.get(
-                                                        'copied',
-                                                        AppApiConstant
-                                                            .chatLanguage));
+                                                        'copied', 'EN'));
                                               },
                                               child: Padding(
                                                 padding:
@@ -2989,8 +2959,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                           ),
                         ),
                         child: Text(
-                          ChatTranslations.get(
-                              'amen_button', AppApiConstant.chatLanguage),
+                          ChatTranslations.get('amen_button', 'EN'),
                           style: TextStyle(
                             fontSize: size.width > 450 ? 18 : 16,
                             fontWeight: FontWeight.w700,

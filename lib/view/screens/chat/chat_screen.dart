@@ -3361,16 +3361,24 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
   }
 
   Widget _buildFollowUpSuggestions(double screenWidth, bool isDark) {
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    // Find last AI response
-    final lastAi = _messages.lastWhere(
-      (m) => !m.isUser,
-      orElse: () =>
-          ChatMessage(text: '', isUser: false, timestamp: DateTime.now()),
-    );
+    // Follow-ups must match the latest assistant reply. If the last message is
+    // the user's question (e.g. while loading), using lastWhere(!isUser) would
+    // pick the *previous* AI message and show unrelated suggestions.
+    if (_messages.isEmpty || _messages.last.isUser) {
+      return const SizedBox.shrink();
+    }
+    final lastAi = _messages.last;
     if (lastAi.text.isEmpty) return const SizedBox.shrink();
 
-    final suggestions = _getFollowUpList(lastAi.text);
+    String? precedingQuestion;
+    if (_messages.length >= 2 && _messages[_messages.length - 2].isUser) {
+      precedingQuestion = _messages[_messages.length - 2].text;
+    }
+
+    final suggestions = _getFollowUpList(
+      lastAi.text,
+      precedingQuestion: precedingQuestion,
+    );
     if (suggestions.isEmpty) return const SizedBox.shrink();
 
     return Container(
@@ -3484,8 +3492,17 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
     );
   }
 
-  List<String> _getFollowUpList(String answer) {
+  List<String> _getFollowUpList(
+    String answer, {
+    String? precedingQuestion,
+  }) {
     final bool hasVerseContext = widget.verseContext != null;
+
+    final pq = precedingQuestion?.trim();
+    final conceptSource = <String>[
+      if (pq != null && pq.isNotEmpty) pq,
+      answer.trim(),
+    ].join(' ');
 
     // Extract sentences from the response
     final sentences = answer
@@ -3512,12 +3529,26 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
             ];
     }
 
-    // Analyze the entire response to extract key information
-    final allText = answer.toLowerCase();
+    // Analyze question + reply so concepts/keywords align with this turn (e.g.
+    // English question + Tamil answer still yields relevant follow-ups).
+    final allText = conceptSource.toLowerCase();
     final firstSentence = sentences[0].toLowerCase();
 
     // Extract key phrases and nouns from the response
-    final keyPhrases = _extractKeyPhrases(answer, sentences);
+    var keyPhrases = List<String>.from(_extractKeyPhrases(answer, sentences));
+    if (pq != null && pq.isNotEmpty) {
+      final qSentences = pq
+          .split(RegExp(r'[.!?]\s+'))
+          .where((s) => s.trim().isNotEmpty)
+          .toList();
+      final qParts = qSentences.isEmpty ? <String>[pq] : qSentences;
+      for (final p in _extractKeyPhrases(pq, qParts)) {
+        if (keyPhrases.length >= 5) break;
+        if (!keyPhrases.any((k) => k.toLowerCase() == p.toLowerCase())) {
+          keyPhrases.add(p);
+        }
+      }
+    }
     final importantConcepts = _extractImportantConcepts(allText);
 
     // Generate truly dynamic questions based on actual content
