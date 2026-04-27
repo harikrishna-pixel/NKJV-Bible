@@ -40,6 +40,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
   Map<String, int> _likeCounts = {};
   Map<String, int> _commentCounts = {};
   Map<String, String> _prayerAuthorMap = {};
+  Set<String> _myPrayerIds = {};
   String _filter = 'All';
   String _sort = 'Latest';
   bool _loading = true;
@@ -118,6 +119,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
     super.initState();
     _hydrateLikesFromDisk();
     _hydratePrayerAuthorsFromDisk();
+    _hydrateMyPrayerIdsFromDisk();
     _loadAuthAndLocalName();
     _refresh();
   }
@@ -170,6 +172,12 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
     final m = await PrayerWallLocalStore.loadPrayerAuthorMap();
     if (!mounted) return;
     setState(() => _prayerAuthorMap = m);
+  }
+
+  Future<void> _hydrateMyPrayerIdsFromDisk() async {
+    final s = await PrayerWallLocalStore.loadMyPrayerIds();
+    if (!mounted) return;
+    setState(() => _myPrayerIds = s);
   }
 
   /// True if this device has marked the prayer as liked (see persisted map).
@@ -227,6 +235,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
   }
 
   bool _isMyPrayer(PrayerWallItem item) {
+    if (_myPrayerIds.contains(item.id)) return true;
     final uid = (_userId ?? '').trim();
     final uname = _viewerDisplayName;
     final authorId = (item.authorUserId ?? '').trim();
@@ -325,169 +334,226 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
 
     final action = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        scrollable: true,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        backgroundColor: dialogBg,
-        titlePadding: const EdgeInsets.fromLTRB(18, 16, 10, 8),
-        contentPadding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
-        actionsPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-        title: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: brown.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
+      builder: (ctx) {
+        final viewInsets = MediaQuery.of(ctx).viewInsets.bottom;
+        final screenH = MediaQuery.of(ctx).size.height;
+        return AnimatedPadding(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: EdgeInsets.only(bottom: viewInsets),
+          child: Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: 420,
+                maxHeight: screenH * 0.85,
               ),
-              child: Icon(Icons.edit_outlined, color: isDark ? Colors.white70 : brown, size: 18),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Edit your post',
-                style: TextStyle(
-                  color: isDark ? Colors.white : brown,
-                  fontWeight: FontWeight.w800,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: dialogBg,
+                  borderRadius: BorderRadius.circular(22),
                 ),
-              ),
-            ),
-            IconButton(
-              onPressed: () => Navigator.pop(ctx, 'cancel'),
-              icon: Icon(Icons.close, color: isDark ? Colors.white70 : brown),
-              tooltip: 'Close',
-            ),
-          ],
-        ),
-        content: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-            Text(
-              'Title',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: isDark ? Colors.white70 : Colors.grey.shade700,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Container(
-              decoration: BoxDecoration(
-                color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.08)
-                      : const Color(0xFFE7DCCB),
-                ),
-              ),
-              child: TextField(
-                controller: titleCtrl,
-                maxLength: 120,
-                style: TextStyle(color: isDark ? Colors.white : brown),
-                decoration: InputDecoration(
-                  hintText: 'Enter a short title',
-                  hintStyle: TextStyle(color: isDark ? Colors.white54 : Colors.grey.shade600),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-                  counterText: '',
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Details',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: isDark ? Colors.white70 : Colors.grey.shade700,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Container(
-              decoration: BoxDecoration(
-                color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.08)
-                      : const Color(0xFFE7DCCB),
-                ),
-              ),
-              child: TextField(
-                controller: descCtrl,
-                maxLines: 5,
-                maxLength: 2000,
-                style: TextStyle(color: isDark ? Colors.white : brown, height: 1.35),
-                decoration: InputDecoration(
-                  hintText: 'Write your prayer details…',
-                  hintStyle: TextStyle(color: isDark ? Colors.white54 : Colors.grey.shade600),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-                  counterText: '',
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Tip: Use “Read more” on long posts for a full view.',
-              style: TextStyle(
-                fontSize: 11,
-                color: isDark ? Colors.white54 : Colors.grey.shade700,
-              ),
-            ),
-            ],
-          ),
-        ),
-        actions: [
-          SizedBox(
-            width: double.infinity,
-            child: Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                SizedBox(
-                  width: 160,
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(ctx, 'delete'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red.shade700,
-                      side: BorderSide(color: Colors.red.shade200),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                child: Column(
+                  mainAxisSize: MainAxisSize.max,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 16, 10, 8),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: brown.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(Icons.edit_outlined,
+                                color: isDark ? Colors.white70 : brown,
+                                size: 18),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Edit your post',
+                              style: TextStyle(
+                                color: isDark ? Colors.white : brown,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(ctx, 'cancel'),
+                            icon: Icon(Icons.close,
+                                color: isDark ? Colors.white70 : brown),
+                            tooltip: 'Close',
+                          ),
+                        ],
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                    child: const Text('Delete'),
-                  ),
-                ),
-                SizedBox(
-                  width: 160,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(ctx, 'save'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: brown,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                          Text(
+                            'Title',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: isDark
+                                  ? Colors.white70
+                                  : Colors.grey.shade700,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.06)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isDark
+                                    ? Colors.white
+                                        .withValues(alpha: 0.08)
+                                    : const Color(0xFFE7DCCB),
+                              ),
+                            ),
+                            child: TextField(
+                              controller: titleCtrl,
+                              maxLength: 120,
+                              style: TextStyle(
+                                  color:
+                                      isDark ? Colors.white : brown),
+                              decoration: InputDecoration(
+                                hintText: 'Enter a short title',
+                                hintStyle: TextStyle(
+                                    color: isDark
+                                        ? Colors.white54
+                                        : Colors.grey.shade600),
+                                border: InputBorder.none,
+                                contentPadding:
+                                    const EdgeInsets.fromLTRB(
+                                        12, 12, 12, 10),
+                                counterText: '',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Details',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: isDark
+                                  ? Colors.white70
+                                  : Colors.grey.shade700,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.06)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isDark
+                                    ? Colors.white
+                                        .withValues(alpha: 0.08)
+                                    : const Color(0xFFE7DCCB),
+                              ),
+                            ),
+                            child: TextField(
+                              controller: descCtrl,
+                              maxLines: 5,
+                              maxLength: 2000,
+                              style: TextStyle(
+                                  color:
+                                      isDark ? Colors.white : brown,
+                                  height: 1.35),
+                              decoration: InputDecoration(
+                                hintText:
+                                    'Write your prayer details…',
+                                hintStyle: TextStyle(
+                                    color: isDark
+                                        ? Colors.white54
+                                        : Colors.grey.shade600),
+                                border: InputBorder.none,
+                                contentPadding:
+                                    const EdgeInsets.fromLTRB(
+                                        12, 12, 12, 10),
+                                counterText: '',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Tip: Use “Read more” on long posts for a full view.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark
+                                  ? Colors.white54
+                                  : Colors.grey.shade700,
+                            ),
+                          ),
+                        ],
+                        ),
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                    child: const Text(
-                      'Save',
-                      style: TextStyle(fontWeight: FontWeight.w700),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(ctx, 'delete'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.red.shade700,
+                                side: BorderSide(color: Colors.red.shade200),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                              child: const Text('Delete'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () => Navigator.pop(ctx, 'save'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: brown,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                              child: const Text(
+                                'Save',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
 
     if (action == null || action == 'cancel') return;
@@ -518,8 +584,10 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
       try {
         await PrayerWallService.deletePrayer(item.id);
         await PrayerWallLocalStore.removePrayerAuthor(prayerId: item.id);
+        await PrayerWallLocalStore.removeMyPrayerId(item.id);
         if (!mounted) return;
         await _hydratePrayerAuthorsFromDisk();
+        await _hydrateMyPrayerIdsFromDisk();
         await _refresh();
         if (!mounted) return;
         Constants.showToast('Post deleted.');
@@ -651,49 +719,66 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                     icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
-                  SizedBox(width: 90,),
-                  Text(
-                    'Prayer Wall',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Georgia',
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        'Prayer Wall',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Georgia',
+                        ),
+                      ),
                     ),
                   ),
-
+                  // Balance the back button so the title stays centered.
+                  const SizedBox(width: 48),
                 ],
               ),
             ),
             SizedBox(
-              height: 48,
+              // Increased height so category chips have enough vertical
+              // space and don't get visually cut off on some devices.
+              height: 56,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.fromLTRB(16, 10, 24, 10),
                 itemCount: _filterCategories.length,
                 itemBuilder: (context, i) {
                   final c = _filterCategories[i];
                   final sel = _filter == c;
                   return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      label: Text(c),
-                      selected: sel,
-                      onSelected: (_) => setState(() => _filter = c),
-                      selectedColor: brown,
-                      checkmarkColor: Colors.white,
-                      labelStyle: TextStyle(
-                        color: sel
-                            ? Colors.white
-                            : (isDark ? Colors.white : brown),
-                        fontWeight: FontWeight.w500,
-                      ),
-                      backgroundColor:
-                          isDark ? Colors.white12 : Colors.white,
-                      side: BorderSide(
-                        color: sel ? brown : Colors.grey.shade400,
+                    padding: EdgeInsets.only(
+                      right: i == _filterCategories.length - 1 ? 0 : 10,
+                    ),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => setState(() => _filter = c),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: sel
+                              ? brown
+                              : (isDark ? Colors.white12 : Colors.white),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: sel ? brown : Colors.grey.shade400,
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          c,
+                          style: TextStyle(
+                            color: sel
+                                ? Colors.white
+                                : (isDark ? Colors.white : brown),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
                     ),
                   );
@@ -1060,7 +1145,7 @@ class _PrayerCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.favorite_border, size: 14, color: isDark ? Colors.white70 : brown),
+                      // Icon(Icons.favorite_border, size: 14, color: isDark ? Colors.white70 : brown),
                       const SizedBox(width: 4),
                       Text(
                         item.category,

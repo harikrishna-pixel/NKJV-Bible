@@ -11,6 +11,7 @@ class PrayerWallLocalStore {
   static const _kMyCommentIds = 'prayer_wall_my_comment_ids_v1';
   static const _kPrayerAuthorMap = 'prayer_wall_prayer_author_map_v1';
   static const _kLastDisplayName = 'prayer_wall_last_display_name_v1';
+  static const _kMyPrayerIds = 'prayer_wall_my_prayer_ids_v1';
 
   static Future<Map<String, String>> loadLikeMap() async {
     final p = await SharedPreferences.getInstance();
@@ -114,5 +115,41 @@ class PrayerWallLocalStore {
     if (t.isEmpty) return;
     final p = await SharedPreferences.getInstance();
     await p.setString(_kLastDisplayName, t);
+  }
+
+  /// Tracks prayer ids created by this device so user can edit/delete even when
+  /// the API author fields are anonymous/blank.
+  static Future<Set<String>> loadMyPrayerIds() async {
+    final p = await SharedPreferences.getInstance();
+    final s = p.getString(_kMyPrayerIds);
+    if (s == null || s.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(s);
+      if (decoded is! List) return {};
+      return decoded.map((e) => e.toString()).toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> saveMyPrayerIds(Set<String> ids) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kMyPrayerIds, jsonEncode(ids.toList()));
+  }
+
+  static Future<void> addMyPrayerId(String prayerId) async {
+    final pid = prayerId.trim();
+    if (pid.isEmpty) return;
+    final s = await loadMyPrayerIds();
+    s.add(pid);
+    await saveMyPrayerIds(s);
+  }
+
+  static Future<void> removeMyPrayerId(String prayerId) async {
+    final pid = prayerId.trim();
+    if (pid.isEmpty) return;
+    final s = await loadMyPrayerIds();
+    s.remove(pid);
+    await saveMyPrayerIds(s);
   }
 }

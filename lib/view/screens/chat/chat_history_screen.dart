@@ -25,6 +25,120 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
   bool _isSelectionMode = false;
   Set<String> _selectedItems = <String>{};
 
+  Future<void> _showConfirmDialog(
+    BuildContext context, {
+    required String title,
+    required String message,
+    required String destructiveText,
+    required Future<void> Function() onConfirm,
+  }) async {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDark = themeProvider.themeMode == ThemeMode.dark;
+
+    // Match the app-wide delete confirmation style shown in reference:
+    // white dialog on dark background with two filled buttons.
+    final bg = Colors.white;
+    final titleColor = Colors.black;
+    final msgColor = Colors.black.withOpacity(0.72);
+    final cancelBg = const Color(0xFFE6E6E6);
+    final cancelColor = Colors.black.withOpacity(0.75);
+    final destructiveBg = const Color(0xFF3D2914);
+    final destructiveColor = Colors.white;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(isDark ? 0.55 : 0.35),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(22, 20, 22, 16),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: titleColor,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                message,
+                style: TextStyle(
+                  color: msgColor,
+                  fontSize: 13.5,
+                  height: 1.35,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 44,
+                      child: TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        style: TextButton.styleFrom(
+                          backgroundColor: cancelBg,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: cancelColor,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: SizedBox(
+                      height: 44,
+                      child: TextButton(
+                        onPressed: () async {
+                          Navigator.of(ctx).pop();
+                          await onConfirm();
+                        },
+                        style: TextButton.styleFrom(
+                          backgroundColor: destructiveBg,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: Text(
+                          destructiveText,
+                          style: TextStyle(
+                            color: destructiveColor,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -274,60 +388,13 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                     onPressed: _selectedItems.isEmpty
                         ? null
                         : () {
-                            showDialog(
-                              context: context,
-                              barrierDismissible: false,
-                              builder: (context) {
-                                final themeProvider = Provider.of<ThemeProvider>(context);
-                                final isDark = themeProvider.themeMode == ThemeMode.dark;
-                                final isVintage = themeProvider.currentCustomTheme == AppCustomTheme.vintage;
-                                final bgColor = isDark ? const Color(0xFF2A1F12) : Colors.white;
-                                final textColor = isDark ? Colors.white : Colors.black;
-                                final cancelColor = isDark ? Colors.white70 : Colors.black87;
-                                final deleteColor = isDark ? Colors.red[300] : Colors.red;
-                                
-                                return AlertDialog(
-                                  backgroundColor: bgColor,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(15),
-                                  ),
-                                  title: Text(
-                                    'Delete Selected',
-                                    style: TextStyle(
-                                      color: textColor,
-                                    ),
-                                  ),
-                                  content: Text(
-                                    'Are you sure you want to delete selected conversation(s)?',
-                                    style: TextStyle(
-                                      color: textColor,
-                                    ),
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Get.back(),
-                                      child: Text(
-                                        'Cancel',
-                                        style: TextStyle(
-                                          color: cancelColor,
-                                        ),
-                                      ),
-                                    ),
-                                    TextButton(
-                                      onPressed: () {
-                                        Get.back();
-                                        _deleteSelectedItems();
-                                      },
-                                      child: Text(
-                                        'Delete',
-                                        style: TextStyle(
-                                          color: deleteColor,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              },
+                            _showConfirmDialog(
+                              context,
+                              title: 'Delete Selected',
+                              message:
+                                  'Are you sure you want to delete selected conversation(s)?',
+                              destructiveText: 'Delete',
+                              onConfirm: () => _deleteSelectedItems(),
                             );
                           },
                   ),
@@ -359,59 +426,12 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                           : CommanColor.white,
                     ),
                     onPressed: () {
-                      showDialog(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (context) {
-                          final themeProvider = Provider.of<ThemeProvider>(context);
-                          final isDarkDialog = themeProvider.themeMode == ThemeMode.dark;
-                          final isVintage = themeProvider.currentCustomTheme == AppCustomTheme.vintage;
-                          final bgColor = isDarkDialog ? const Color(0xFF2A1F12) : Colors.white;
-                          final textColor = isDarkDialog ? Colors.white : Colors.black;
-                          final cancelColor = isDarkDialog ? Colors.white70 : Colors.black87;
-                          
-                          return AlertDialog(
-                            backgroundColor: bgColor,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            title: Text(
-                              'Clear All History',
-                              style: TextStyle(
-                                color: textColor,
-                              ),
-                            ),
-                            content: Text(
-                              'Are you sure you want to delete all chat history?',
-                              style: TextStyle(
-                                color: textColor,
-                              ),
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Get.back(),
-                                child: Text(
-                                  'Cancel',
-                                  style: TextStyle(
-                                    color: cancelColor,
-                                  ),
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: () async {
-                                  Get.back(result: true);
-                                  await _clearAllHistory();
-                                },
-                                child: Text(
-                                  'Delete',
-                                  style: TextStyle(
-                                    color: isDarkDialog ? Colors.red[300] : Colors.red,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
+                      _showConfirmDialog(
+                        context,
+                        title: 'Clear All History',
+                        message: 'Are you sure you want to delete all chat history?',
+                        destructiveText: 'Delete',
+                        onConfirm: () async => _clearAllHistory(),
                       );
                     },
                   ),

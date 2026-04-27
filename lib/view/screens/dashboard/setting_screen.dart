@@ -273,13 +273,38 @@ class _SettingScreenState extends State<SettingScreen>
       // Check current status
       final status = await Permission.notification.status;
       debugPrint("✅ Notification permission is granted  ${status.isGranted}");
-      if (status.isGranted) {
+      final permitted =
+          status.isGranted || status.isLimited || status.isProvisional;
+      if (permitted) {
         debugPrint("✅ Notification permission is granted");
+        // If user came from the "Enable Daily Reminder" CTA (streak completion),
+        // turn on all three schedules the first time (without altering core logic).
+        final shouldAutoEnableAll = widget.notificationValue == true &&
+            (nt ?? false) == false &&
+            (nt1 ?? false) == false &&
+            (nt2 ?? false) == false;
+
+        final nextMorning = shouldAutoEnableAll ? true : (nt ?? false);
+        final nextAfternoon = shouldAutoEnableAll ? true : (nt1 ?? false);
+        final nextEvening = shouldAutoEnableAll ? true : (nt2 ?? false);
+
         setState(() {
-          notificationButtonValue = nt ?? false;
-          notificationButtonValue1 = nt1 ?? false;
-          notificationButtonValue2 = nt2 ?? false;
+          notificationButtonValue = nextMorning;
+          notificationButtonValue1 = nextAfternoon;
+          notificationButtonValue2 = nextEvening;
         });
+
+        if (shouldAutoEnableAll) {
+          SharPreferences.setBoolean(
+              SharPreferences.isNotificationOn, nextMorning);
+          SharPreferences.setBoolean(
+              SharPreferences.isNotificationOn1, nextAfternoon);
+          SharPreferences.setBoolean(
+              SharPreferences.isNotificationOn2, nextEvening);
+          setNotification(NotificationTime.morning);
+          setNotification(NotificationTime.afternoon);
+          setNotification(NotificationTime.evening);
+        }
         // Proceed with your logic
       } else {
         setState(() {
@@ -1861,8 +1886,10 @@ class _SettingScreenState extends State<SettingScreen>
 
         final PermissionStatus status = await Permission.notification.request();
 
-        // await openAppSettings();
-        await showPermissionSettingsDialog(context);
+        // Only prompt to open Settings when permission wasn't granted.
+        if (!(status.isGranted || status.isLimited || status.isProvisional)) {
+          await showPermissionSettingsDialog(context);
+        }
 
         //  Get.back();
         // Get.offAll(() => HomeScreen(
@@ -1875,7 +1902,7 @@ class _SettingScreenState extends State<SettingScreen>
 
         // Request notification permission
         //final PermissionStatus status = await Permission.notification.request();
-        return status.isGranted;
+        return status.isGranted || status.isLimited || status.isProvisional;
       }
       return false;
     } catch (e) {

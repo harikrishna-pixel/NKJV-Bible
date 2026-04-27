@@ -23,8 +23,13 @@ class StreakIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = iconColor ?? CommanColor.whiteBlack(context);
-    return FutureBuilder<int>(
-      future: StreakService.getCurrentStreak(),
+    // Use a lightweight periodic refresh so streak stays consistent across screens
+    // even when preferences change without triggering a rebuild (e.g. after restore flow).
+    return StreamBuilder<int>(
+      // Provide a computation so this never emits null (required for non-nullable int).
+      stream: Stream<int>.periodic(const Duration(seconds: 2), (_) => 0)
+          .asyncMap((_) => StreakService.getCurrentStreak()),
+      initialData: 0,
       builder: (context, snapshot) {
         final streak = snapshot.data ?? 0;
         return InkWell(
@@ -101,13 +106,6 @@ class StreakUI {
                       const Color(0xFFFFB74D),
                     ],
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFE65100).withOpacity(0.4),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
                 ),
                 child: Icon(
                   Icons.local_fire_department_rounded,
@@ -117,7 +115,7 @@ class StreakUI {
               ),
               SizedBox(height: isTablet ? 20 : 16),
               Text(
-                streak > 0 ? '$streak Day Streak!' : 'Start Your Streak',
+                streak > 0 ? 'Day $streak Streak' : 'Start Your Streak',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: isTablet ? 24 : 22,

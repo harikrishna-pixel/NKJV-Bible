@@ -193,7 +193,7 @@ class _StreakCompleteCelebrationDialogState
                                 onTap: () {
                                   Navigator.of(context).pop();
                                   Get.to(() =>
-                                      SettingScreen(notificationValue: false));
+                                      SettingScreen(notificationValue: true));
                                 },
                                 borderRadius: BorderRadius.circular(14),
                                 child: Container(

@@ -1,8 +1,8 @@
 import 'dart:io';
 
-import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/images.dart';
+import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -73,11 +73,13 @@ class PrayerShareScreen extends StatelessWidget {
     final uri = Uri.parse('whatsapp://send?text=$text');
     final can = await canLaunchUrl(uri);
     if (can) {
-      await launchUrl(uri);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
       return;
     }
-    // Fallback to system share if WhatsApp scheme isn't available.
-    await _shareSystem(context);
+    // Don't open system share sheet here; user explicitly chose WhatsApp.
+    if (context.mounted) {
+      Constants.showToast('WhatsApp is not installed.');
+    }
   }
 
   @override
@@ -85,13 +87,10 @@ class PrayerShareScreen extends StatelessWidget {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
     final brown = const Color(0xFF5C4033);
-    final cream = isDark
-        ? CommanColor.darkPrimaryColor
-        : (themeProvider.currentCustomTheme == AppCustomTheme.vintage
-            ? const Color(0xFFF5F0E6)
-            : themeProvider.backgroundColor);
+    // Background is painted by the image; keep theme colors for widgets only.
 
-    final cardBg = isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white;
+    final cardBg = isDark ? Colors.white.withValues(alpha: 0.07) : Colors.white;
+    final tileBg = isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white;
 
     return Scaffold(
       body: Container(
@@ -163,6 +162,8 @@ class PrayerShareScreen extends StatelessWidget {
                 title: 'Share on WhatsApp',
                 subtitle: 'Send this prayer to a friend or group',
                 color: const Color(0xFF25D366),
+                isDark: isDark,
+                tileBg: tileBg,
                 onTap: () => _shareWhatsApp(context),
               ),
               const SizedBox(height: 10),
@@ -172,6 +173,8 @@ class PrayerShareScreen extends StatelessWidget {
                 title: 'Share',
                 subtitle: 'Use your phone share options',
                 color: brown,
+                isDark: isDark,
+                tileBg: tileBg,
                 onTap: () => _shareSystem(context),
               ),
               const SizedBox(height: 10),
@@ -181,6 +184,8 @@ class PrayerShareScreen extends StatelessWidget {
                 title: 'Copy',
                 subtitle: 'Copy text to share anywhere',
                 color: brown.withValues(alpha: 0.9),
+                isDark: isDark,
+                tileBg: tileBg,
                 onTap: () => _copy(context),
               ),
               const Spacer(),
@@ -207,6 +212,8 @@ class PrayerShareScreen extends StatelessWidget {
     required String title,
     required String subtitle,
     required Color color,
+    required bool isDark,
+    required Color tileBg,
     required VoidCallback onTap,
   }) {
     return Material(
@@ -217,7 +224,7 @@ class PrayerShareScreen extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.0),
+            color: tileBg,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: color.withValues(alpha: 0.22)),
           ),
@@ -239,10 +246,11 @@ class PrayerShareScreen extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
                         fontFamily: 'Georgia',
+                        color: isDark ? Colors.white : const Color(0xFF3D2914),
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -250,13 +258,14 @@ class PrayerShareScreen extends StatelessWidget {
                       subtitle,
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey.shade700,
+                        color: isDark ? Colors.white70 : Colors.grey.shade700,
                       ),
                     ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: Colors.grey.shade600),
+              Icon(Icons.chevron_right,
+                  color: isDark ? Colors.white54 : Colors.grey.shade600),
             ],
           ),
         ),

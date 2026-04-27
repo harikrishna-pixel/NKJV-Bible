@@ -161,9 +161,13 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
       if (effectiveName.isNotEmpty) {
         await PrayerWallLocalStore.saveLastDisplayName(effectiveName);
       }
-      if (!_isAnonymous) {
-        final prayerId = (_extractPrayerId(created) ?? '').trim();
-        if (prayerId.isNotEmpty && effectiveName.isNotEmpty) {
+      final prayerId = (_extractPrayerId(created) ?? '').trim();
+      if (prayerId.isNotEmpty) {
+        // Always track prayers created by this device so Edit/Delete works even
+        // for anonymous/community posts.
+        await PrayerWallLocalStore.addMyPrayerId(prayerId);
+        // Keep existing author map behavior for non-anonymous posts.
+        if (!_isAnonymous && effectiveName.isNotEmpty) {
           await PrayerWallLocalStore.putPrayerAuthor(
             prayerId: prayerId,
             authorName: effectiveName,

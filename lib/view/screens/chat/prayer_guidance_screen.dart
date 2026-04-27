@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:audioplayers/audioplayers.dart';
 import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
@@ -1265,7 +1264,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            "Let your prayer begin with a thought or feeling, or choose a theme below.",
+                            "Let your prayer begin with a thought or feeling.",
                             style: TextStyle(
                               fontSize: 14,
                               color: isDark ? Colors.white70 : const Color(0xFF6D6D6D),
@@ -2297,8 +2296,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                             ? const SizedBox.shrink()
                             : Center(
                                 child: Text(
-                                  ChatTranslations.get(
-                                      'prayer_guidance_title', 'EN'),
+                                  _messages.first.text,
                                   style: TextStyle(
                                     fontWeight: FontWeight.w700,
                                     color: CommanColor.whiteBlack(context)
@@ -2705,7 +2703,6 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                       },
                                     ),
                                     const SizedBox(height: 24),
-                                    // Get Prayer button (opens custom prayer dialog; show Important Notice first)
 
                                     const SizedBox(height: 24),
                                   ],
@@ -2740,6 +2737,11 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
 
                             final message = _messages[idx];
                             final isUser = message.isUser;
+                            // First user message is the selected category title; we show it in the top bar.
+                            // Keep the underlying message list intact; just avoid duplicating it in the chat.
+                            if (idx == 0 && isUser && _messages.any((m) => !m.isUser)) {
+                              return const SizedBox.shrink();
+                            }
                             return Padding(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               child: Align(
@@ -2795,7 +2797,9 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                                         text: message.text));
                                                 Constants.showToast(
                                                     ChatTranslations.get(
-                                                        'copied', 'EN'));
+                                                        'copied',
+                                                        AppApiConstant
+                                                            .chatLanguage));
                                               },
                                               child: Padding(
                                                 padding:
@@ -2953,13 +2957,13 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                           backgroundColor: isDark
                               ? const Color(0xFF8B6F47)
                               : const Color(0xFFD4A574),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(28),
                           ),
                         ),
                         child: Text(
-                          ChatTranslations.get('amen_button', 'EN'),
+                          'AMEN',
                           style: TextStyle(
                             fontSize: size.width > 450 ? 18 : 16,
                             fontWeight: FontWeight.w700,

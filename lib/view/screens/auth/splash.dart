@@ -1198,14 +1198,15 @@ class _SplashScreenState extends State<SplashScreen> {
       body: Container(
           height: MediaQuery.of(context).size.height,
           width: MediaQuery.of(context).size.width,
-          decoration: Provider.of<ThemeProvider>(context).currentCustomTheme ==
-                  AppCustomTheme.vintage
-              ? BoxDecoration(
-                  // color: Color(0x80605749),
-                  image: DecorationImage(
-                      image: AssetImage(Images.bgImage(context)),
-                      fit: BoxFit.fill))
-              : null,
+          // Always paint a stable background to avoid first-frame flicker
+          // when theme/provider initializes.
+          decoration: BoxDecoration(
+            color: CommanColor.backgrondcolor,
+            image: DecorationImage(
+              image: AssetImage(Images.bgImage(context)),
+              fit: BoxFit.cover,
+            ),
+          ),
           child: Stack(
             alignment: Alignment.center,
             children: [
@@ -1229,9 +1230,10 @@ class _SplashScreenState extends State<SplashScreen> {
                       const SizedBox(height: 12),
                       Text(
                         _loaderMessage,
-                        style: TextStyle(
-                            // color: Colors.black,
-                            ),
+                        style: const TextStyle(
+                          color: Colors.black87,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ))

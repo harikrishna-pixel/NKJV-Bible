@@ -295,7 +295,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
     final int todayWeekdayIndexInSun =
         DateTime.now().weekday % 7; // Sun=0..Sat=6
     final int todayViewIndex =
-        (todayWeekdayIndexInSun - _installWeekStartIndexInSun + 7) % 7;
+        (todayWeekdayIndexInSun - _installWeekStartIndexInSun + 7) % 7; 
 
     return Scaffold(
       body: Container(
@@ -475,8 +475,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                                             value: (effectiveStepsForDay / 4)
                                                 .clamp(0.0, 1.0),
                                             strokeWidth: isTablet ? 3 : 2.5,
-                                            backgroundColor:
-                                                Colors.transparent,
+                                            backgroundColor: Colors.transparent,
                                             valueColor:
                                                 const AlwaysStoppedAnimation<
                                                     Color>(

@@ -22,6 +22,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 
+
 // Color constants for streak completion screen
 const Color _kParchmentLight = Color(0xFFF5EAC6);
 const Color _kParchmentMid = Color(0xFFECE3CB);
@@ -202,7 +203,7 @@ Future<void> _shareAsImage(
       final path =
           '${dir.path}/streak_share_${DateTime.now().millisecondsSinceEpoch}.png';
       final file = File(path);
-      await file.writeAsBytes(imageBytes);
+      await file.writeAsBytes(imageBytes, flush: true);
       final shareText = _shareTextWithAppUrl(fallbackText);
       await Share.shareXFiles([XFile(path)], text: shareText);
       return;
@@ -456,9 +457,11 @@ Widget _buildStepIndicator(BuildContext context, int step) {
   final textColor = _streakTextColor(context);
   return Column(
     mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.center,
     children: [
       Text(
         'Step $step of 4',
+        textAlign: TextAlign.center,
         style: TextStyle(
           fontSize: MediaQuery.of(context).size.width > 450 ? 15 : 13,
           fontWeight: FontWeight.w600,
@@ -555,6 +558,8 @@ class StreakPausedScreen extends StatefulWidget {
 
 class _StreakPausedScreenState extends State<StreakPausedScreen> {
   static const int _restoreCost = 50;
+  static const String _restoreDebitedDateKey =
+      'streak_flow_restore_debited_date_v1';
   bool _busy = false;
   String _pausedDate = '';
 
@@ -649,6 +654,30 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
       return;
     }
 
+    final restoreDateToUse = _pausedDate.isNotEmpty
+        ? _pausedDate
+        : DateTime.now()
+            .subtract(const Duration(days: 1))
+            .toIso8601String()
+            .split('T')[0];
+
+    // If a restore is already active for this date, do not debit again.
+    final alreadyActive = (await SharPreferences.getBoolean(
+            SharPreferences.streakFlowRestoreActive)) ==
+        true;
+    final activeDate =
+        await SharPreferences.getString(SharPreferences.streakFlowRestoreDate);
+    final debitedFor =
+        await SharPreferences.getString(_restoreDebitedDateKey);
+    if (alreadyActive &&
+        activeDate != null &&
+        activeDate == restoreDateToUse &&
+        debitedFor == restoreDateToUse) {
+      if (!mounted) return;
+      Get.offAll(() => const StreakConnectionScreen());
+      return;
+    }
+
     final credits = await WalletService.getCredits();
     if (credits < _restoreCost) {
       if (mounted) _showInsufficientCreditsToast();
@@ -665,14 +694,10 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
 
     await SharPreferences.setBoolean(
         SharPreferences.streakFlowRestoreActive, true);
+    await SharPreferences.setString(_restoreDebitedDateKey, restoreDateToUse);
     await SharPreferences.setString(
       SharPreferences.streakFlowRestoreDate,
-      _pausedDate.isNotEmpty
-          ? _pausedDate
-          : DateTime.now()
-              .subtract(const Duration(days: 1))
-              .toIso8601String()
-              .split('T')[0],
+      restoreDateToUse,
     );
     await SharPreferences.setInt(
         SharPreferences.streakFlowStepsCompletedToday, 0);
@@ -681,7 +706,7 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
       DateTime.now().toIso8601String().split('T')[0],
     );
     if (!mounted) return;
-    _showAppleToast(context, 'Credits debited');
+    _showAppleToast(context, 'Credits debited from your wallet');
     Get.offAll(() => const StreakConnectionScreen());
   }
 
@@ -908,14 +933,28 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Text(
-                      'Note: Yesterday Streaks can Restored within 24 hours',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: warmText.withOpacity(0.8),
-                        fontSize: isTablet ? 14 : 13,
-                        fontFamily: 'Georgia',
-                        fontStyle: FontStyle.italic,
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.52),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.16),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        'Note: Yesterday Streaks can Restored within 24 hours',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.95),
+                          fontSize: isTablet ? 15 : 14,
+                          fontFamily: 'Georgia',
+                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -1083,6 +1122,37 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                           }
                           return;
                         }
+                        // If user abandons an active restore flow before completion,
+                        // refund the debited credits once and clear restore state.
+                        try {
+                          final isRestoreRun = (await SharPreferences.getBoolean(
+                                  SharPreferences.streakFlowRestoreActive)) ==
+                              true;
+                          if (isRestoreRun) {
+                            final restoreDate = await SharPreferences.getString(
+                                SharPreferences.streakFlowRestoreDate);
+                            final debitedFor = await SharPreferences.getString(
+                                _StreakPausedScreenState._restoreDebitedDateKey);
+                            if (restoreDate != null &&
+                                restoreDate.isNotEmpty &&
+                                debitedFor == restoreDate) {
+                              final stepsMap = await _readStreakFlowStepsByDay();
+                              final stepsForRestore = stepsMap[restoreDate] ?? 0;
+                              if (stepsForRestore <= 0) {
+                                await WalletService.addCredits(
+                                    _StreakPausedScreenState._restoreCost);
+                                await SharPreferences.setBoolean(
+                                    SharPreferences.streakFlowRestoreActive,
+                                    false);
+                                await SharPreferences.setString(
+                                    SharPreferences.streakFlowRestoreDate, '');
+                                await SharPreferences.setString(
+                                    _StreakPausedScreenState._restoreDebitedDateKey,
+                                    '');
+                              }
+                            }
+                          }
+                        } catch (_) {}
                         final today =
                             DateTime.now().toIso8601String().split('T')[0];
                         await SharPreferences.setString(
@@ -1208,7 +1278,7 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                                       alignment: Alignment.centerRight,
                                       child: FittedBox(
                                         fit: BoxFit.scaleDown,
-                                        child: Text('Seeking',
+                                        child: Text('Surrender',
                                             textAlign: TextAlign.center,
                                             style: _labelStyle(context,
                                                 active:
@@ -1448,9 +1518,9 @@ Widget _parchmentButton(
 }) {
   final isDark = _isStreakDark(context);
   final baseTextColor = _streakTextColor(context);
-  final btnBg =
-      isDark ? const Color(0xFF3B2A1A) : CommanColor.lightDarkPrimary(context);
-  final labelColor = isDark ? _kParchmentLight : Colors.white;
+  // Make button match the streak UI palette in both themes.
+  final btnBg = isDark ? const Color(0xFF2A1F12) : _kStreakGold;
+  final labelColor = isDark ? const Color(0xFFF5EAC6) : Colors.white;
   return Padding(
     padding: const EdgeInsets.symmetric(horizontal: 24),
     child: Material(
@@ -1463,16 +1533,16 @@ Widget _parchmentButton(
           decoration: BoxDecoration(
             color: btnBg,
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(
-                color: isDark ? _kCandleGold : Colors.transparent, width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color:
-                    (isDark ? _kCandleGold : baseTextColor).withOpacity(0.15),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            border: Border.all(color: _kCandleGold, width: 1.5),
+            boxShadow: isDark
+                ? null
+                : [
+                    BoxShadow(
+                      color: baseTextColor.withOpacity(0.18),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
           ),
           child: FittedBox(
             fit: BoxFit.scaleDown,
@@ -1560,6 +1630,9 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Row(
                   children: [
+                    // Placeholder to balance the close icon on the right so
+                    // the step indicator stays visually centered.
+                    const SizedBox(width: 48),
                     Expanded(
                       child: Center(
                         child: _buildStepIndicator(context, 2),
@@ -1718,8 +1791,11 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                           icon:
                               Icon(Icons.share, color: Colors.white, size: 26),
                           onPressed: () async {
+                            final dpr =
+                                MediaQuery.of(shareContext).devicePixelRatio;
                             final image = await _screenshotController.capture(
-                              delay: const Duration(milliseconds: 80),
+                              delay: const Duration(milliseconds: 220),
+                              pixelRatio: (dpr * 2).clamp(2.0, 4.0),
                             );
                             if (shareContext.mounted) {
                               await _shareAsImage(
@@ -1827,6 +1903,9 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Row(
                   children: [
+                    // Placeholder to balance the audio+close icons on the right
+                    // so the step indicator remains centered on screen.
+                    const SizedBox(width: 96),
                     Expanded(
                       child: Center(
                         child: _buildStepIndicator(context, 3),
@@ -1955,8 +2034,11 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                           icon: Icon(Icons.share,
                               color: _streakTextColor(shareContext), size: 26),
                           onPressed: () async {
+                            final dpr =
+                                MediaQuery.of(shareContext).devicePixelRatio;
                             final image = await _screenshotController.capture(
-                              delay: const Duration(milliseconds: 80),
+                              delay: const Duration(milliseconds: 220),
+                              pixelRatio: (dpr * 2).clamp(2.0, 4.0),
                             );
                             if (shareContext.mounted) {
                               await _shareAsImage(
@@ -2063,6 +2145,9 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Row(
                   children: [
+                    // Placeholder to balance the audio+close icons on the right
+                    // so the step indicator remains centered on screen.
+                    const SizedBox(width: 96),
                     Expanded(
                       child: Center(
                         child: _buildStepIndicator(context, 4),
@@ -2393,8 +2478,11 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                           icon: Icon(Icons.share,
                               color: _streakTextColor(shareContext), size: 26),
                           onPressed: () async {
+                            final dpr =
+                                MediaQuery.of(shareContext).devicePixelRatio;
                             final image = await _screenshotController.capture(
-                              delay: const Duration(milliseconds: 80),
+                              delay: const Duration(milliseconds: 220),
+                              pixelRatio: (dpr * 2).clamp(2.0, 4.0),
                             );
                             if (shareContext.mounted) {
                               await _shareAsImage(
@@ -2819,14 +2907,7 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
                                       child: Container(
                                         decoration: BoxDecoration(
                                           shape: BoxShape.circle,
-                                          boxShadow: [
-                                            // Icon inner glow
-                                            BoxShadow(
-                                              color: _kCandleGold.withOpacity(0.6),
-                                              blurRadius: 20,
-                                              spreadRadius: 2,
-                                            ),
-                                          ],
+                                          // No extra icon shadow (keep clean like design)
                                         ),
                                         child: const Icon(
                                           Icons.local_fire_department_rounded,
@@ -2847,7 +2928,7 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
 
                             Text(
                               streakDays > 0
-                                  ? '$streakDays Day Streak!'
+                                  ? 'Day $streakDays Streak'
                                   : 'Streak Completed!',
                               textAlign: TextAlign.center,
                               style: TextStyle(

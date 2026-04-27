@@ -63,8 +63,6 @@ class MilestoneJourneyDialog {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.menu_book_rounded, size: 48, color: brown.withValues(alpha: 0.85)),
-                const SizedBox(height: 16),
                 Text(
                   headline,
                   textAlign: TextAlign.center,
@@ -76,7 +74,7 @@ class MilestoneJourneyDialog {
                     height: 1.25,
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 16),
                 Text(
                   line1,
                   textAlign: TextAlign.center,

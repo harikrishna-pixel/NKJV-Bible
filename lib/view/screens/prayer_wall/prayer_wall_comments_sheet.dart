@@ -252,6 +252,15 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
     final brown = const Color(0xFF5C4033);
+    final iconTileBg = isDark
+        ? Colors.white.withValues(alpha: 0.14)
+        : brown.withValues(alpha: 0.12);
+    final iconTileBorder = isDark
+        ? Colors.white.withValues(alpha: 0.22)
+        : brown.withValues(alpha: 0.18);
+    final surfaceBg = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.white.withValues(alpha: 0.0);
 
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
@@ -309,12 +318,13 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: brown.withValues(alpha: 0.1),
+                                color: iconTileBg,
                                 borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: iconTileBorder),
                               ),
                               child: Icon(
                                 Icons.comment_outlined,
-                                color: brown,
+                                color: isDark ? Colors.white70 : brown,
                                 size: 20,
                               ),
                             ),
@@ -348,14 +358,6 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                                 ],
                               ),
                             ),
-                            IconButton(
-                              onPressed: () => Navigator.of(context).pop(),
-                              icon: Icon(
-                                Icons.close,
-                                color: isDark ? Colors.white70 : brown.withValues(alpha: 0.7),
-                                size: 22,
-                              ),
-                            ),
                           ],
                         ),
                       ],
@@ -367,14 +369,11 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                 margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage(Images.bgImage(context)),
-                    fit: BoxFit.cover,
-                  ),
+                  color: surfaceBg,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: isDark
-                        ? Colors.white.withValues(alpha: 0.1)
+                        ? Colors.white.withValues(alpha: 0.22)
                         : const Color(0xFFD4C4B0),
                     width: 1.5,
                   ),
@@ -407,7 +406,7 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                           contentPadding: const EdgeInsets.symmetric(vertical: 8),
                           counterText: '',
                           hintStyle: TextStyle(
-                            color: isDark ? Colors.white54 : Colors.grey.shade500,
+                            color: isDark ? Colors.white60 : Colors.grey.shade500,
                             fontSize: 15,
                           ),
                         ),
@@ -418,7 +417,9 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                         ? Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.16)
+                                  : Colors.grey.shade400,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: const SizedBox(
@@ -494,16 +495,13 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                                   return Container(
                                     margin: const EdgeInsets.only(bottom: 12),
                                     decoration: BoxDecoration(
-                                      image: DecorationImage(
-                                        image: AssetImage(Images.bgImage(context)),
-                                        fit: BoxFit.cover,
-                                      ),
+                                      color: surfaceBg,
                                       borderRadius: BorderRadius.circular(16),
                                       border: Border.all(
                                         color: mine
                                             ? brown.withValues(alpha: 0.3)
                                             : (isDark
-                                                ? Colors.white.withValues(alpha: 0.1)
+                                                ? Colors.white.withValues(alpha: 0.22)
                                                 : const Color(0xFFD4C4B0)),
                                         width: mine ? 1.5 : 1,
                                       ),
@@ -527,14 +525,14 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                                               color: mine
                                                   ? brown.withValues(alpha: 0.15)
                                                   : (isDark 
-                                                      ? Colors.white.withValues(alpha: 0.1)
+                                                      ? Colors.white.withValues(alpha: 0.12)
                                                       : Colors.grey.withValues(alpha: 0.15)),
                                               borderRadius: BorderRadius.circular(18),
                                               border: Border.all(
                                                 color: mine
                                                     ? brown.withValues(alpha: 0.3)
                                                     : (isDark 
-                                                        ? Colors.white.withValues(alpha: 0.2)
+                                                        ? Colors.white.withValues(alpha: 0.22)
                                                         : Colors.grey.withValues(alpha: 0.3)),
                                               ),
                                             ),
@@ -542,8 +540,8 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                                               mine ? Icons.account_circle : Icons.person_outline,
                                               size: 20,
                                               color: mine
-                                                  ? brown
-                                                  : (isDark ? Colors.white60 : Colors.grey.shade600),
+                                                  ? (isDark ? Colors.white : brown)
+                                                  : (isDark ? Colors.white70 : Colors.grey.shade600),
                                             ),
                                           ),
                                           const SizedBox(width: 12),
@@ -564,7 +562,7 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                                                       style: TextStyle(
                                                         fontSize: 11,
                                                         fontWeight: FontWeight.w600,
-                                                        color: brown,
+                                                        color: isDark ? Colors.white : brown,
                                                       ),
                                                     ),
                                                   ),
@@ -588,7 +586,7 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                                                 Container(
                                                   decoration: BoxDecoration(
                                                     color: isDark 
-                                                        ? Colors.white.withValues(alpha: 0.1)
+                                                        ? Colors.white.withValues(alpha: 0.12)
                                                         : brown.withValues(alpha: 0.1),
                                                     borderRadius: BorderRadius.circular(8),
                                                   ),
@@ -609,7 +607,9 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                                                 const SizedBox(width: 4),
                                                 Container(
                                                   decoration: BoxDecoration(
-                                                    color: Colors.red.withValues(alpha: 0.1),
+                                                    color: isDark
+                                                        ? Colors.red.withValues(alpha: 0.14)
+                                                        : Colors.red.withValues(alpha: 0.1),
                                                     borderRadius: BorderRadius.circular(8),
                                                   ),
                                                   child: IconButton(

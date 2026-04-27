@@ -10,7 +10,6 @@ import 'package:provider/provider.dart';
 // App-style dialog colors (match streak celebration dialog)
 const Color _dialogCream = Color(0xFFF8F4EB);
 const Color _dialogBrown = Color(0xFF3D2914);
-const Color _dialogStripBg = Color(0xFFF0E6D0);
 
 String _removedMessageForType(String type) {
   switch (type) {
@@ -69,103 +68,109 @@ void _showRemovedToast(BuildContext context, String type) {
 void _showRemoveDialog(BuildContext context, VoidCallback onConfirmRemove) {
   final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
   final isDark = themeProvider.themeMode == ThemeMode.dark;
-  
-  // Theme-aware colors
-  final bgColor = isDark ? const Color(0xFF2A1F12) : _dialogCream;
-  final textColor = isDark ? Colors.white : _dialogBrown;
-  final cancelColor = isDark ? Colors.white70 : _dialogBrown;
-  final buttonBgColor = isDark ? Colors.white.withOpacity(0.15) : _dialogStripBg;
-  final borderColor = isDark ? Colors.white.withOpacity(0.3) : _dialogBrown.withOpacity(0.2);
-  
+
+  // Match the app-wide delete confirmation style shown in reference:
+  // white dialog on dark background with two filled buttons.
+  final bgColor = Colors.white;
+  final titleColor = Colors.black;
+  final msgColor = Colors.black.withOpacity(0.72);
+  final cancelBg = const Color(0xFFE6E6E6);
+  final cancelColor = Colors.black.withOpacity(0.75);
+  final destructiveBg = _dialogBrown;
+  final destructiveColor = Colors.white;
+
   showDialog(
     context: context,
+    barrierColor: Colors.black.withOpacity(isDark ? 0.55 : 0.35),
     builder: (ctx) => Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 360),
+        padding: const EdgeInsets.fromLTRB(22, 20, 22, 16),
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: borderColor, width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black26,
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(12),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Remove',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: textColor,
-                  fontFamily: 'Georgia',
-                ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Remove',
+              style: TextStyle(
+                color: titleColor,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                fontFamily: 'Georgia',
               ),
-              const SizedBox(height: 12),
-              Text(
-                'Remove this item from your saved list?',
-                style: TextStyle(
-                  fontSize: 16,
-                  height: 1.4,
-                  color: textColor.withOpacity(0.9),
-                  fontFamily: 'Georgia',
-                ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Remove this item from your saved list?',
+              style: TextStyle(
+                color: msgColor,
+                fontSize: 13.5,
+                height: 1.35,
+                fontFamily: 'Georgia',
               ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
-                    child: Text(
-                      'Cancel',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: cancelColor,
-                        fontFamily: 'Georgia',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 44,
+                    child: TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      style: TextButton.styleFrom(
+                        backgroundColor: cancelBg,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Material(
-                    color: buttonBgColor,
-                    borderRadius: BorderRadius.circular(12),
-                    child: InkWell(
-                      onTap: () {
-                        Navigator.of(ctx).pop();
-                        onConfirmRemove();
-                      },
-                      borderRadius: BorderRadius.circular(12),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 12),
-                        child: Text(
-                          'Remove',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: textColor,
-                            fontFamily: 'Georgia',
-                          ),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: cancelColor,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Georgia',
                         ),
                       ),
                     ),
                   ),
-                ],
-              ),
-            ],
-          ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: SizedBox(
+                    height: 44,
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        onConfirmRemove();
+                      },
+                      style: TextButton.styleFrom(
+                        backgroundColor: destructiveBg,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text(
+                        'Remove',
+                        style: TextStyle(
+                          color: destructiveColor,
+                          fontWeight: FontWeight.w800,
+                          fontFamily: 'Georgia',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     ),

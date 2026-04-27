@@ -28,7 +28,12 @@ import 'package:biblebookapp/services/analytics/analytics_service.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 
 String _normalizeDailyVerseRef(String s) =>
-    s.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
+    s
+        .toLowerCase()
+        .replaceAll(RegExp(r'[\u2018\u2019\u201C\u201D]'), "'")
+        .replaceAll(RegExp(r'[^a-z0-9: ]+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
 
 /// Finds the list index for the verse shown on the home widget (handles spacing / parsing).
 int _indexOfVerseMatchingWidgetRef(
@@ -160,8 +165,18 @@ class _DailyVerseState extends State<DailyVerse> {
             return false;
           }
         })
-        .toSet()
         .toList();
+
+    // Stable ordering: newest (latest date) first so "first" is deterministic.
+    dailyVerseList.sort((a, b) {
+      try {
+        final da = DateTime.parse(a.date.toString());
+        final db = DateTime.parse(b.date.toString());
+        return db.compareTo(da);
+      } catch (_) {
+        return 0;
+      }
+    });
 
     // When opened from Verse of the Day widget, show the same verse as on the widget first
     if (widget.fromWidget && dailyVerseList.isNotEmpty) {
@@ -174,13 +189,15 @@ class _DailyVerseState extends State<DailyVerse> {
         if (idx < 0) {
           final widgetPlain =
               stripHtmlTagsForWidgetVerse(widgetData['text'] ?? '');
-          if (widgetPlain.length >= 15) {
-            final prefix = widgetPlain.substring(0, 15).toLowerCase();
+          final plain = widgetPlain.trim();
+          if (plain.length >= 12) {
+            final prefixLen = plain.length < 28 ? plain.length : 28;
+            final prefix = plain.substring(0, prefixLen).toLowerCase();
             idx = dailyVerseList.indexWhere((v) {
               final t = stripHtmlTagsForWidgetVerse(v.verse ?? '').toLowerCase();
               if (t.startsWith(prefix)) return true;
               if (t.isEmpty) return false;
-              final headLen = t.length < 15 ? t.length : 15;
+              final headLen = t.length < prefixLen ? t.length : prefixLen;
               return prefix.startsWith(t.substring(0, headLen));
             });
           }

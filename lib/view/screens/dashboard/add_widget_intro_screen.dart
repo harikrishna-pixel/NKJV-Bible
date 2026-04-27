@@ -53,8 +53,6 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
     final isTablet = size.width > 600;
     final useFullScreen = _isIOS;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
-    // Reserve space so carousel imagery does not sit under the action strip (esp. iPad).
-    final footerReserve = isTablet ? 220.0 : 180.0;
 
     return Scaffold(
       backgroundColor: CommanColor.backgrondcolor,
@@ -81,84 +79,75 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
         fit: StackFit.expand,
         children: [
           Positioned.fill(
-            child: Padding(
-              padding: EdgeInsets.only(bottom: footerReserve),
-              child: PageView.builder(
-                controller: _pageController,
-                onPageChanged: (index) => setState(() => _currentPage = index),
-                itemCount: _imagePaths.length,
-                itemBuilder: (context, index) {
-                  return Image.asset(
-                    _imagePaths[index],
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                  );
-                },
-              ),
+            child: PageView.builder(
+              controller: _pageController,
+              onPageChanged: (index) => setState(() => _currentPage = index),
+              itemCount: _imagePaths.length,
+              itemBuilder: (context, index) {
+                return Image.asset(
+                  _imagePaths[index],
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                );
+              },
             ),
           ),
           Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
+            left: isTablet ? 32 : 18,
+            right: isTablet ? 32 : 18,
+            bottom: (isTablet ? 18 : 14) + bottomInset,
             child: SafeArea(
               top: false,
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: CommanColor.backgrondcolor,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.14),
-                      blurRadius: 14,
-                      offset: const Offset(0, -4),
-                    ),
-                  ],
+              bottom: false,
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTablet ? 6 : 2,
+                  vertical: isTablet ? 4 : 2,
                 ),
-                padding: EdgeInsets.fromLTRB(
-                  isTablet ? 32 : 24,
-                  isTablet ? 18 : 14,
-                  isTablet ? 32 : 24,
-                  (isTablet ? 12 : 8) + bottomInset,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                child: Row(
                   children: [
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _onAddWidgetTap,
-                        icon: Icon(Icons.arrow_forward, color: Colors.white, size: 20),
-                        label: Text(
-                          _isLastPage ? 'Got it' : 'Next',
-                          style: TextStyle(
-                            fontSize: isTablet ? 18 : 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: CommanColor.lightDarkPrimary(context),
-                          padding: EdgeInsets.symmetric(vertical: isTablet ? 18 : 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: isTablet ? 12 : 10),
                     TextButton(
                       onPressed: () => Get.back(),
                       style: TextButton.styleFrom(
-                        minimumSize: const Size(48, 48),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        minimumSize: const Size(48, 44),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        foregroundColor: Colors.white.withValues(alpha: 0.95),
+                        backgroundColor: Colors.black.withValues(alpha: 0.35),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
                       ),
                       child: Text(
                         'Not Now',
                         style: TextStyle(
-                          fontSize: isTablet ? 16 : 15,
-                          color: Colors.grey,
+                          fontSize: isTablet ? 16 : 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    ElevatedButton.icon(
+                      onPressed: _onAddWidgetTap,
+                      icon: Icon(Icons.arrow_forward,
+                          color: Colors.white, size: isTablet ? 18 : 16),
+                      label: Text(
+                        _isLastPage ? 'Got it' : 'Next',
+                        style: TextStyle(
+                          fontSize: isTablet ? 16 : 14,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: CommanColor.lightDarkPrimary(context),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isTablet ? 18 : 14,
+                          vertical: isTablet ? 14 : 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
                         ),
                       ),
                     ),

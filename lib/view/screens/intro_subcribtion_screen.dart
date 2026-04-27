@@ -109,9 +109,22 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   void _applyInitialPlanSelectionIfAny() {
     final idx = widget.initialSelectedPlanIndex;
-    if (idx == null || _products.isEmpty) return;
-    final safe = idx.clamp(0, _products.length - 1);
-    selectedindex = safe;
+    if (_products.isEmpty) return;
+    if (idx != null) {
+      final safe = idx.clamp(0, _products.length - 1);
+      selectedindex = safe;
+      return;
+    }
+
+    // Main paywall default selection: prefer Lifetime when available.
+    // Keep milestone / invisible hosts and exit-offer flows unchanged.
+    if (!widget.invisiblePurchaseHost && !widget.fromHomeExitOffer) {
+      if (_products.length >= 3) {
+        selectedindex = 2;
+      } else if (_products.isNotEmpty) {
+        selectedindex = _products.length - 1;
+      }
+    }
   }
 
   void _sortProducts() {
@@ -297,7 +310,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               ),
             ),
             content: const Text(
-              "Would You like to Restore it",
+              "Would You like to Restore it ?",
               style: TextStyle(
                 fontSize: 16,
               ),

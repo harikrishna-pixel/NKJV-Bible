@@ -35,7 +35,7 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
         ? 'milestone_scripture_lifetime'
         : 'milestone_prayer_lifetime';
 
-    await Navigator.of(context).push<bool>(
+    final ok = await Navigator.of(context).push<bool>(
       PageRouteBuilder<bool>(
         opaque: false,
         barrierDismissible: false,
@@ -51,6 +51,11 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
         ),
       ),
     );
+
+    // If purchase succeeded, close this offer screen and return to previous screen.
+    if (ok == true && context.mounted) {
+      Navigator.of(context).maybePop(true);
+    }
   }
 
   @override
@@ -86,6 +91,9 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
       color: isDark ? Colors.white70 : Colors.black87,
       overflow: TextOverflow.ellipsis,
     );
+
+    final bonusColor = isDark ? const Color(0xFFB7F3C2) : const Color(0xFF2E7D32);
+    final offColor = isDark ? const Color(0xFFFFB4AB) : Colors.red.shade700;
 
     return Scaffold(
       backgroundColor: cream,
@@ -142,7 +150,7 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: const Color(0xFF2E7D32),
+                      color: bonusColor,
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -211,7 +219,7 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
-                                    color: Colors.red.shade700,
+                                    color: offColor,
                                   ),
                                 ),
                               ],
