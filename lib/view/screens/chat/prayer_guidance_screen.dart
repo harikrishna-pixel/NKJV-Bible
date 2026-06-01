@@ -40,17 +40,23 @@ class PrayerGuidanceScreen extends StatefulWidget {
   State<PrayerGuidanceScreen> createState() => _PrayerGuidanceScreenState();
 }
 
-class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
+class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
+    with SingleTickerProviderStateMixin {
   static const String _baseUrl =
       'https://my-backend-one-eta.vercel.app/api/gemini';
 
   final ScrollController _scrollController = ScrollController();
   final List<_GuidanceMessage> _messages = [];
   bool _isLoading = false;
+  /// Invalidates in-flight API responses after back / community navigation.
+  int _prayerRequestGeneration = 0;
+  /// Category or custom title for the response header (not the AI body).
+  String? _responseHeaderTitle;
   final TextEditingController _customPrayerController = TextEditingController();
 
   // Audio player for background music
   late AudioPlayer _audioPlayer;
+  late AnimationController _musicSpinController;
   bool _isAudioPlaying = false;
   bool _isAudioMuted = false;
 
@@ -93,6 +99,9 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
 
   // UI mode: true => Pray for Me view (search + categories). Community navigates to PrayerWallScreen.
   bool _isPrayForMeMode = true;
+
+  /// When false, hide the community "live" dot (e.g. offline).
+  bool _communityLiveOnline = false;
 
   // Background music asset path (without 'assets/' prefix as AssetSource adds it automatically)
   static const String _backgroundMusicUrl =
@@ -151,6 +160,37 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
           'Write a short prayer of praise and worship to God. Include 1-2 Geneva Bible verse references.',
     },
   ];
+
+  String? _prayerHeaderTitle() {
+    if (_responseHeaderTitle != null && _responseHeaderTitle!.isNotEmpty) {
+      return _responseHeaderTitle;
+    }
+    for (final m in _messages) {
+      if (m.isUser) return m.text;
+    }
+    return null;
+  }
+
+  void _resetPrayerChatView() {
+    _prayerRequestGeneration++;
+    _responseHeaderTitle = null;
+    _customPrayerController.clear();
+    if (!mounted) {
+      _messages.clear();
+      _isLoading = false;
+      return;
+    }
+    setState(() {
+      _messages.clear();
+      _isLoading = false;
+    });
+    if (_isAudioPlaying) {
+      _audioPlayer.stop();
+      setState(() {
+        _isAudioPlaying = false;
+      });
+    }
+  }
 
   // Get categories with English titles only (do not translate)
   List<_GuidanceCategory> get _categories => _categoryKeys
@@ -225,16 +265,20 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
-                              color: CommanColor.lightDarkPrimary(ctx),
+                              color: isDark
+                                  ? Colors.white
+                                  : CommanColor.lightDarkPrimary(ctx),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Text(
+                            child: Text(
                               'Agree & Continue',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.white,
+                                color: isDark
+                                    ? CommanColor.darkPrimaryColor
+                                    : Colors.white,
                               ),
                             ),
                           ),
@@ -395,8 +439,10 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen> {
     }
 
     final category = _categories[categoryIndex];
+    final requestId = ++_prayerRequestGeneration;
 
     setState(() {
+      _responseHeaderTitle = category.title;
       _messages.add(_GuidanceMessage(text: category.title, isUser: true));
       _isLoading = true;
     });
@@ -637,6 +683,7 @@ ${category.prompt}
             'Error: Failed to get response (Status: ${response.statusCode})';
       }
 
+      if (!mounted || requestId != _prayerRequestGeneration) return;
       setState(() {
         _messages.add(_GuidanceMessage(text: responseText, isUser: false));
         _isLoading = false;
@@ -648,7 +695,7 @@ ${category.prompt}
               responseText.toLowerCase().startsWith('error:');
       if (!isErrorResponse) {
         await WalletService.deductCredits(chatCost);
-        if (mounted) {
+        if (mounted && requestId == _prayerRequestGeneration) {
           final prefs = await SharedPreferences.getInstance();
           final creditDebitShown =
               prefs.getBool('prayer_credit_debit_shown') ?? false;
@@ -659,17 +706,34 @@ ${category.prompt}
           }
           _loadCreditsFromLocal();
         }
-        await updateBiblePrayerWidget(prayerText: responseText);
-        // Automatically unmute and play background music when prayer is generated
-        _isAudioMuted = false;
-        await _playBackgroundMusic();
-        await MilestoneLifetimePaywallCoordinator
-            .onPrayerGuidanceAiResponseSuccess(context);
+        if (requestId == _prayerRequestGeneration) {
+          await updateBiblePrayerWidget(prayerText: responseText);
+        }
+        // Prayer milestone paywall: keep bg music silent during dialog → lifetime offer.
+        if (mounted && requestId == _prayerRequestGeneration) {
+          if (_isAudioPlaying) {
+            await _audioPlayer.stop();
+            setState(() => _isAudioPlaying = false);
+          }
+          final prefs = await SharedPreferences.getInstance();
+          const milestoneDoneKey = 'milestone_prayer_10_flow_done_v1';
+          final milestoneDoneBefore =
+              prefs.getBool(milestoneDoneKey) ?? false;
+          await MilestoneLifetimePaywallCoordinator
+              .onPrayerGuidanceAiResponseSuccess(context);
+          if (!mounted || requestId != _prayerRequestGeneration) return;
+          final milestoneDoneAfter =
+              prefs.getBool(milestoneDoneKey) ?? false;
+          if (milestoneDoneBefore || !milestoneDoneAfter) {
+            _isAudioMuted = false;
+            await _playBackgroundMusic();
+          }
+        }
       }
 
       _scrollToTop();
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || requestId != _prayerRequestGeneration) return;
       setState(() {
         _messages.add(_GuidanceMessage(
             text: 'Error: Something went wrong. Please try again.',
@@ -800,7 +864,13 @@ ${category.prompt}
       return;
     }
 
+    final requestId = ++_prayerRequestGeneration;
+    final headerTitle = customRequest.trim().length <= 80
+        ? customRequest.trim()
+        : '${customRequest.trim().substring(0, 80)}...';
+
     setState(() {
+      _responseHeaderTitle = headerTitle;
       _messages.add(_GuidanceMessage(text: customRequest, isUser: true));
       _isLoading = true;
     });
@@ -1042,6 +1112,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
             'Error: Failed to get response (Status: ${response.statusCode})';
       }
 
+      if (!mounted || requestId != _prayerRequestGeneration) return;
       setState(() {
         _messages.add(_GuidanceMessage(text: responseText, isUser: false));
         _isLoading = false;
@@ -1053,7 +1124,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
               responseText.toLowerCase().startsWith('error:');
       if (!isErrorResponse) {
         await WalletService.deductCredits(chatCost);
-        if (mounted) {
+        if (mounted && requestId == _prayerRequestGeneration) {
           final prefs = await SharedPreferences.getInstance();
           final creditDebitShown =
               prefs.getBool('prayer_credit_debit_shown') ?? false;
@@ -1064,17 +1135,34 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
           }
           _loadCreditsFromLocal();
         }
-        await updateBiblePrayerWidget(prayerText: responseText);
-        // Automatically unmute and play background music when prayer is generated
-        _isAudioMuted = false;
-        await _playBackgroundMusic();
-        await MilestoneLifetimePaywallCoordinator
-            .onPrayerGuidanceAiResponseSuccess(context);
+        if (requestId == _prayerRequestGeneration) {
+          await updateBiblePrayerWidget(prayerText: responseText);
+        }
+        // Prayer milestone paywall: keep bg music silent during dialog → lifetime offer.
+        if (mounted && requestId == _prayerRequestGeneration) {
+          if (_isAudioPlaying) {
+            await _audioPlayer.stop();
+            setState(() => _isAudioPlaying = false);
+          }
+          final prefs = await SharedPreferences.getInstance();
+          const milestoneDoneKey = 'milestone_prayer_10_flow_done_v1';
+          final milestoneDoneBefore =
+              prefs.getBool(milestoneDoneKey) ?? false;
+          await MilestoneLifetimePaywallCoordinator
+              .onPrayerGuidanceAiResponseSuccess(context);
+          if (!mounted || requestId != _prayerRequestGeneration) return;
+          final milestoneDoneAfter =
+              prefs.getBool(milestoneDoneKey) ?? false;
+          if (milestoneDoneBefore || !milestoneDoneAfter) {
+            _isAudioMuted = false;
+            await _playBackgroundMusic();
+          }
+        }
       }
 
       _scrollToTop();
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || requestId != _prayerRequestGeneration) return;
       setState(() {
         _messages.add(_GuidanceMessage(
             text: 'Error: Something went wrong. Please try again.',
@@ -1380,11 +1468,25 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     );
   }
 
+  void _syncMusicIconAnimation() {
+    if (_isAudioMuted || !_isAudioPlaying) {
+      if (_musicSpinController.isAnimating) {
+        _musicSpinController.stop();
+      }
+    } else if (!_musicSpinController.isAnimating) {
+      _musicSpinController.repeat();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _audioPlayer = AudioPlayer();
     _audioPlayer.setReleaseMode(ReleaseMode.loop);
+    _musicSpinController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    );
 
     // Listen to player state changes
     _audioPlayer.onPlayerStateChanged.listen((state) {
@@ -1392,6 +1494,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
         setState(() {
           _isAudioPlaying = state == PlayerState.playing;
         });
+        _syncMusicIconAnimation();
       }
     });
 
@@ -1414,6 +1517,16 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
 
     // Show shared answer-length intro if needed (same behaviour as Chat).
     _showPrayerIntroIfNeeded();
+    _refreshCommunityLiveIndicator();
+  }
+
+  Future<void> _refreshCommunityLiveIndicator() async {
+    try {
+      final online = await InternetConnection().hasInternetAccess;
+      if (mounted) setState(() => _communityLiveOnline = online);
+    } catch (_) {
+      if (mounted) setState(() => _communityLiveOnline = false);
+    }
   }
 
   Future<void> _loadCreditsFromLocal() async {
@@ -1492,11 +1605,9 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                       topRight: Radius.circular(24),
                     ),
                   ),
-                  child: SingleChildScrollView(
-                    physics: const ClampingScrollPhysics(),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                         // Header with gradient (styled like provided mock)
                         Container(
                           width: double.infinity,
@@ -1590,13 +1701,16 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                             ],
                           ),
                         ),
-                        Padding(
-                          padding: EdgeInsets.all(
-                              screenWidth > 450 ? 24 : 20),
-                          child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                            children: [
+                        Flexible(
+                          child: SingleChildScrollView(
+                            physics: const ClampingScrollPhysics(),
+                            child: Padding(
+                              padding: EdgeInsets.all(
+                                  screenWidth > 450 ? 24 : 20),
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
                               Container(
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
@@ -1618,12 +1732,32 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                 ),
                                 child: Row(
                                   children: [
-                                    Icon(
-                                      Icons.lightbulb_outline,
-                                      color:
-                                          CommanColor.lightDarkPrimary(
-                                              context),
-                                      size: 20,
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: isDark
+                                            ? Colors.white.withOpacity(0.12)
+                                            : CommanColor.lightDarkPrimary(
+                                                    context)
+                                                .withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: isDark
+                                            ? Border.all(
+                                                color: Colors.white
+                                                    .withOpacity(0.35),
+                                                width: 1,
+                                              )
+                                            : null,
+                                      ),
+                                      child: Icon(
+                                        Icons.lightbulb_outline,
+                                        color: isDark
+                                            ? const Color(0xFFFFD54F)
+                                            : CommanColor.lightDarkPrimary(
+                                                context),
+                                        size: 20,
+                                      ),
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(
@@ -1688,81 +1822,76 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                 cost: '100 Credits',
                                 setBottomSheetState: setBottomSheetState,
                               ),
-                              const SizedBox(height: 24),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor:
-                                        Colors.transparent,
-                                    shadowColor: Colors.transparent,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(16),
-                                      side: isDark
-                                          ? const BorderSide(
-                                              color: Colors.white,
-                                              width: 1.5)
-                                          : BorderSide.none,
-                                    ),
-                                    padding: EdgeInsets.zero,
+                            ],
+                          ),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            screenWidth > 450 ? 24 : 20,
+                            8,
+                            screenWidth > 450 ? 24 : 20,
+                            MediaQuery.of(context).viewInsets.bottom + 16,
+                          ),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  side: isDark
+                                      ? const BorderSide(
+                                          color: Colors.white, width: 1.5)
+                                      : BorderSide.none,
+                                ),
+                                padding: EdgeInsets.zero,
+                              ),
+                              onPressed: () async {
+                                final prefs =
+                                    await SharedPreferences.getInstance();
+                                await prefs.setBool(
+                                    'chat_intro_seen', true);
+                                if (mounted) {
+                                  Navigator.pop(context);
+                                }
+                              },
+                              child: Ink(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16),
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFF763201),
+                                      Color(0xFFD5821F),
+                                      Color(0xFF763201),
+                                    ],
                                   ),
-                                  onPressed: () async {
-                                    final prefs =
-                                        await SharedPreferences
-                                            .getInstance();
-                                    await prefs.setBool(
-                                        'chat_intro_seen', true);
-                                    if (mounted) {
-                                      Navigator.pop(context);
-                                    }
-                                  },
-                                  child: Ink(
-                                    decoration: BoxDecoration(
-                                      borderRadius:
-                                          BorderRadius.circular(16),
-                                      gradient: const LinearGradient(
-                                        colors: [
-                                          Color(0xFF763201),
-                                          Color(0xFFD5821F),
-                                          Color(0xFF763201),
-                                        ],
-                                      ),
-                                    ),
-                                    child: Container(
-                                      alignment: Alignment.center,
-                                      padding: EdgeInsets.symmetric(
-                                        vertical: screenWidth > 450
-                                            ? 16
-                                            : 14,
-                                      ),
-                                      child: Text(
-                                        'Continue',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: screenWidth > 450
-                                              ? 17
-                                              : 16,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
+                                ),
+                                child: Container(
+                                  alignment: Alignment.center,
+                                  padding: EdgeInsets.symmetric(
+                                    vertical:
+                                        screenWidth > 450 ? 16 : 14,
+                                  ),
+                                  child: Text(
+                                    'Continue',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize:
+                                          screenWidth > 450 ? 17 : 16,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ),
                               ),
-                              SizedBox(
-                                height: MediaQuery.of(context)
-                                        .viewInsets
-                                        .bottom +
-                                    10,
-                              ),
-                            ],
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
                 ),
               ),
             );
@@ -1805,7 +1934,9 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
               ? (isDark
                   ? CommanColor.lightDarkPrimary(context).withOpacity(0.15)
                   : CommanColor.lightDarkPrimary(context).withOpacity(0.08))
-              : (isDark ? Colors.white.withOpacity(0.03) : Colors.grey.shade50),
+              : (isDark
+                  ? const Color(0xFF4A342B)
+                  : Colors.grey.shade50),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
@@ -1813,9 +1944,9 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                     ? Colors.white
                     : CommanColor.lightDarkPrimary(context))
                 : (isDark
-                    ? Colors.white.withOpacity(0.1)
+                    ? Colors.white.withOpacity(0.45)
                     : Colors.grey.shade200),
-            width: isSelected ? 2 : 1,
+            width: isSelected ? 2 : 1.5,
           ),
         ),
         child: Row(
@@ -1940,6 +2071,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     _amenToastTimer?.cancel();
     _amenToastEntry?.remove();
     _amenToastEntry = null;
+    _musicSpinController.dispose();
     _audioPlayer.stop();
     _audioPlayer.dispose();
     _customPrayerController.dispose();
@@ -2005,6 +2137,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
 
     if (mounted) {
       setState(() {});
+      _syncMusicIconAnimation();
     }
   }
 
@@ -2214,30 +2347,271 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     );
   }
 
+  Color _guidanceResponseTextColor(BuildContext context, bool isDark) {
+    return isDark ? Colors.white : const Color(0xFF3D2914);
+  }
+
+  Widget _guidanceResponseContentBox(
+      BuildContext context, bool isDark, Widget child) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark
+            ? CommanColor.darkPrimaryColor.withOpacity(0.6)
+            : Colors.white.withOpacity(0.88),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? Colors.white24 : const Color(0xFFD4C4B0),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.10),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  Widget _buildGuidanceResponseBody(String text, Size size, bool isDark) {
+    final textColor = _guidanceResponseTextColor(context, isDark);
+    final fontSize = size.width > 450 ? 22.0 : 20.0;
+    final versePattern = RegExp(
+      r'(\d?\s?[A-Za-z]+\s+\d+:\d+(?:-\d+)?)',
+      caseSensitive: false,
+    );
+    final matches = versePattern.allMatches(text);
+    if (matches.isEmpty) {
+      return Text(
+        text,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: fontSize,
+          height: 1.7,
+          color: textColor,
+          fontFamily: 'Georgia',
+          fontWeight: FontWeight.w400,
+        ),
+      );
+    }
+    final spans = <TextSpan>[];
+    int lastMatchEnd = 0;
+    for (final match in matches) {
+      if (match.start > lastMatchEnd) {
+        spans.add(TextSpan(text: text.substring(lastMatchEnd, match.start)));
+      }
+      spans.add(TextSpan(
+        text: match.group(0)!,
+        style: TextStyle(
+          color: isDark ? const Color(0xFF64B5F6) : const Color(0xFF1976D2),
+          fontWeight: FontWeight.w600,
+        ),
+      ));
+      lastMatchEnd = match.end;
+    }
+    if (lastMatchEnd < text.length) {
+      spans.add(TextSpan(text: text.substring(lastMatchEnd)));
+    }
+    return RichText(
+      textAlign: TextAlign.center,
+      text: TextSpan(
+        style: TextStyle(
+          fontSize: fontSize,
+          height: 1.7,
+          color: textColor,
+          fontFamily: 'Georgia',
+          fontWeight: FontWeight.w400,
+        ),
+        children: spans,
+      ),
+    );
+  }
+
+  Widget _buildPrayerResponseActions(String messageText, Size size, bool isDark) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        InkWell(
+          onTap: () async {
+            await Clipboard.setData(ClipboardData(text: messageText));
+            Constants.showToast(
+              ChatTranslations.get('copied', AppApiConstant.chatLanguage),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isDark
+                      ? Colors.white.withOpacity(0.14)
+                      : Colors.black.withOpacity(0.12),
+                ),
+              ),
+              child: Image.asset(
+                "assets/Bookmark icons/Frame 3630.png",
+                height: size.width > 450 ? 20 : 18,
+                width: size.width > 450 ? 20 : 18,
+                color: isDark
+                    ? Colors.white.withOpacity(0.8)
+                    : Colors.black.withOpacity(0.6),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        InkWell(
+          onTap: () async {
+            final screenSize = MediaQuery.of(context).size;
+            final sharePositionOrigin = Rect.fromLTWH(
+              screenSize.width / 2 - 50,
+              screenSize.height / 2 - 50,
+              100,
+              100,
+            );
+            await Share.share(
+              _buildShareText(messageText),
+              sharePositionOrigin: sharePositionOrigin,
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isDark
+                      ? Colors.white.withOpacity(0.14)
+                      : Colors.black.withOpacity(0.12),
+                ),
+              ),
+              child: Icon(
+                Icons.share,
+                size: size.width > 450 ? 20 : 18,
+                color: isDark
+                    ? Colors.white.withOpacity(0.8)
+                    : Colors.black.withOpacity(0.6),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPrayerResponseView(
+      BuildContext context, Size size, bool isDark, Color accentFill) {
+    final title = _prayerHeaderTitle() ?? '';
+    String? aiText;
+    for (var i = _messages.length - 1; i >= 0; i--) {
+      if (!_messages[i].isUser) {
+        aiText = _messages[i].text;
+        break;
+      }
+    }
+    final textColor = _guidanceResponseTextColor(context, isDark);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.volunteer_activism,
+              color: isDark ? Colors.white70 : accentFill,
+              size: size.width > 450 ? 32 : 28,
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: size.width > 450 ? 24 : 22,
+                  fontWeight: FontWeight.w600,
+                  color: textColor,
+                  fontFamily: 'Georgia',
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                controller: _scrollController,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Center(
+                    child: _guidanceResponseContentBox(
+                      context,
+                      isDark,
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          if (_isLoading && aiText == null)
+                            Text(
+                              'Please wait...',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: textColor.withOpacity(0.75),
+                                fontSize: size.width > 450 ? 18 : 16,
+                                fontFamily: 'Georgia',
+                                fontWeight: FontWeight.w500,
+                              ),
+                            )
+                          else if (aiText != null) ...[
+                            _buildGuidanceResponseBody(aiText, size, isDark),
+                            const SizedBox(height: 16),
+                            _buildPrayerResponseActions(aiText, size, isDark),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
+    final isWhiteLight = !isDark &&
+        themeProvider.currentCustomTheme == AppCustomTheme.white;
+    final accentFill = isWhiteLight
+        ? const Color(0xFF424242)
+        : const Color(0xFF5C4033);
+    final titleInk = isDark
+        ? Colors.white
+        : (isWhiteLight ? const Color(0xFF212121) : const Color(0xFF3D2914));
 
     return WillPopScope(
       onWillPop: () async {
         // If viewing responses, go back to category selection view
-        if (_messages.isNotEmpty) {
+        if (_messages.isNotEmpty || _isLoading || _responseHeaderTitle != null) {
           debugPrint(
               '🔙 BACK BUTTON: System back pressed, clearing messages...');
-          setState(() {
-            _messages.clear();
-            _isLoading = false;
-            _customPrayerController.clear();
-          });
-          // Stop audio when going back to category view
-          if (_isAudioPlaying) {
-            await _audioPlayer.stop();
-            setState(() {
-              _isAudioPlaying = false;
-            });
-          }
+          _resetPrayerChatView();
           return false; // Stay on screen, just clear messages
         }
         // If on category selection view, close the screen (show interstitial for unsubscribed then pop)
@@ -2249,12 +2623,20 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
         body: Container(
           width: size.width,
           height: size.height,
-          decoration: BoxDecoration(
-            image: DecorationImage(
-              image: AssetImage(Images.bgImage(context)),
-              fit: BoxFit.cover,
-            ),
-          ),
+          decoration: Provider.of<ThemeProvider>(context).currentCustomTheme ==
+                  AppCustomTheme.vintage
+              ? BoxDecoration(
+                  image: DecorationImage(
+                    image: AssetImage(Images.bgImage(context)),
+                    fit: BoxFit.cover,
+                  ),
+                )
+              : BoxDecoration(
+                  color: Provider.of<ThemeProvider>(context).themeMode ==
+                          ThemeMode.dark
+                      ? CommanColor.darkPrimaryColor
+                      : Provider.of<ThemeProvider>(context).backgroundColor,
+                ),
           child: SafeArea(
             child: Column(
               children: [
@@ -2266,21 +2648,12 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                       IconButton(
                         onPressed: () async {
                           // If viewing responses, go back to category selection view
-                          if (_messages.isNotEmpty) {
+                          if (_messages.isNotEmpty ||
+                              _isLoading ||
+                              _responseHeaderTitle != null) {
                             debugPrint(
                                 '🔙 BACK BUTTON: Back arrow pressed, clearing messages...');
-                            setState(() {
-                              _messages.clear();
-                              _isLoading = false;
-                              _customPrayerController.clear();
-                            });
-                            // Stop audio when going back to category view
-                            if (_isAudioPlaying) {
-                              await _audioPlayer.stop();
-                              setState(() {
-                                _isAudioPlaying = false;
-                              });
-                            }
+                            _resetPrayerChatView();
                             return;
                           }
                           // If on category selection view, close the screen (show interstitial for unsubscribed then pop)
@@ -2291,21 +2664,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                         icon: Icon(Icons.arrow_back_ios,
                             color: CommanColor.whiteBlack(context), size: 18),
                       ),
-                      Expanded(
-                        child: _messages.isEmpty
-                            ? const SizedBox.shrink()
-                            : Center(
-                                child: Text(
-                                  _messages.first.text,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: CommanColor.whiteBlack(context)
-                                        .withOpacity(0.7),
-                                    fontSize: size.width > 450 ? 22 : 18,
-                                  ),
-                                ),
-                              ),
-                      ),
+                      const Expanded(child: SizedBox.shrink()),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -2384,13 +2743,24 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                               ),
                               child: IconButton(
                                 onPressed: _toggleAudio,
-                                icon: Icon(
-                                  _isAudioMuted
-                                      ? Icons.music_off
-                                      : Icons.music_note,
-                                  color: CommanColor.whiteBlack(context),
-                                  size: 22,
-                                ),
+                                icon: _isAudioMuted || !_isAudioPlaying
+                                    ? Icon(
+                                        _isAudioMuted
+                                            ? Icons.music_off
+                                            : Icons.music_note,
+                                        color:
+                                            CommanColor.whiteBlack(context),
+                                        size: 22,
+                                      )
+                                    : RotationTransition(
+                                        turns: _musicSpinController,
+                                        child: Icon(
+                                          Icons.music_note,
+                                          color: CommanColor.whiteBlack(
+                                              context),
+                                          size: 22,
+                                        ),
+                                      ),
                                 tooltip:
                                     _isAudioMuted ? 'Audio Off' : 'Audio On',
                               ),
@@ -2417,9 +2787,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                   Icon(
                                     Icons.volunteer_activism,
                                     size: size.width > 450 ? 56 : 48,
-                                    color: isDark
-                                        ? Colors.white70
-                                        : const Color(0xFF5C4033),
+                                    color: isDark ? Colors.white70 : accentFill,
                                   ),
                                   const SizedBox(height: 12),
                                   Text(
@@ -2428,9 +2796,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      color: isDark
-                                          ? Colors.white
-                                          : const Color(0xFF3D2914),
+                                      color: titleInk,
                                       fontSize: size.width > 450 ? 24 : 22,
                                       fontFamily: 'Georgia',
                                     ),
@@ -2468,20 +2834,32 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                             padding: const EdgeInsets.symmetric(vertical: 10),
                                             decoration: BoxDecoration(
                                               color: _isPrayForMeMode
-                                                  ? (isDark ? const Color(0xFF5C4033) : const Color(0xFF5C4033))
-                                                  : (isDark ? Colors.transparent : Colors.white),
+                                                  ? accentFill
+                                                  : (isDark
+                                                      ? Colors.transparent
+                                                      : Colors.white),
                                               borderRadius: BorderRadius.circular(28),
                                               border: Border.all(
                                                 color: _isPrayForMeMode
                                                     ? Colors.transparent
-                                                    : (isDark ? Colors.white24 : const Color(0xFFD4C4B0)),
+                                                    : (isDark
+                                                        ? Colors.white24
+                                                        : (isWhiteLight
+                                                            ? Colors.grey
+                                                                .shade300
+                                                            : const Color(
+                                                                0xFFD4C4B0))),
                                               ),
                                             ),
                                             child: Center(
                                               child: Text(
                                                 'Pray for Me',
                                                 style: TextStyle(
-                                                  color: _isPrayForMeMode ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF3D2914)),
+                                                  color: _isPrayForMeMode
+                                                      ? Colors.white
+                                                      : (isDark
+                                                          ? Colors.white70
+                                                          : titleInk),
                                                   fontWeight: FontWeight.w700,
                                                 ),
                                               ),
@@ -2494,17 +2872,21 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                         child: InkWell(
                                           onTap: () async {
                                             // Navigate to Prayer Wall (community prayers)
+                                            _resetPrayerChatView();
                                             if (mounted) {
                                               setState(() {
                                                 _isPrayForMeMode = false;
                                               });
                                             }
+                                            await _refreshCommunityLiveIndicator();
                                             await Navigator.of(context).push(
                                               MaterialPageRoute(
                                                 builder: (_) => const PrayerWallScreen(),
                                               ),
                                             );
                                             if (mounted) {
+                                              await _refreshCommunityLiveIndicator();
+                                              _resetPrayerChatView();
                                               setState(() {
                                                 _isPrayForMeMode = true;
                                               });
@@ -2515,40 +2897,64 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                             padding: const EdgeInsets.symmetric(vertical: 10),
                                             decoration: BoxDecoration(
                                               color: !_isPrayForMeMode
-                                                  ? (isDark ? const Color(0xFF5C4033) : const Color(0xFF5C4033))
-                                                  : (isDark ? Colors.transparent : Colors.white),
+                                                  ? accentFill
+                                                  : (isDark
+                                                      ? Colors.transparent
+                                                      : Colors.white),
                                               borderRadius: BorderRadius.circular(28),
                                               border: Border.all(
                                                 color: !_isPrayForMeMode
                                                     ? Colors.transparent
-                                                    : (isDark ? Colors.white24 : const Color(0xFFD4C4B0)),
+                                                    : (isDark
+                                                        ? Colors.white24
+                                                        : (isWhiteLight
+                                                            ? Colors.grey
+                                                                .shade300
+                                                            : const Color(
+                                                                0xFFD4C4B0))),
                                               ),
                                             ),
                                             child: Stack(
+                                              clipBehavior: Clip.none,
                                               alignment: Alignment.center,
                                               children: [
                                                 Center(
                                                   child: Text(
                                                     'Community Prayers',
                                                     style: TextStyle(
-                                                      color: !_isPrayForMeMode ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF3D2914)),
+                                                      color: !_isPrayForMeMode
+                                                          ? Colors.white
+                                                          : (isDark
+                                                              ? Colors.white70
+                                                              : titleInk),
                                                       fontWeight: FontWeight.w600,
                                                     ),
                                                   ),
                                                 ),
-                                                Positioned(
-                                                  right: 8,
-                                                  top: 6,
-                                                  child: Container(
-                                                    width: 10,
-                                                    height: 10,
-                                                    decoration: BoxDecoration(
-                                                      color: const Color(0xFF4CAF50),
-                                                      shape: BoxShape.circle,
-                                                      border: Border.all(color: Colors.white, width: 1.2),
+                                                if (_communityLiveOnline)
+                                                  Positioned(
+                                                    top: -3,
+                                                    right: 6,
+                                                    child: Container(
+                                                      width: 9,
+                                                      height: 9,
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.red,
+                                                        shape: BoxShape.circle,
+                                                        border: Border.all(
+                                                          color: Colors.white,
+                                                          width: 1.5,
+                                                        ),
+                                                        boxShadow: [
+                                                          BoxShadow(
+                                                            color: Colors.red
+                                                                .withOpacity(0.55),
+                                                            blurRadius: 4,
+                                                          ),
+                                                        ],
+                                                      ),
                                                     ),
                                                   ),
-                                                ),
                                               ],
                                             ),
                                           ),
@@ -2711,200 +3117,8 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                             ),
                           ],
                         )
-                      : ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          itemCount: _messages.length + (_isLoading ? 1 : 0),
-                          itemBuilder: (context, idx) {
-                            if (_isLoading && idx == _messages.length) {
-                              return Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 10),
-                                child: Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(
-                                    'Please wait...',
-                                    style: TextStyle(
-                                      color: CommanColor.whiteBlack(context)
-                                          .withOpacity(0.7),
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }
-
-                            final message = _messages[idx];
-                            final isUser = message.isUser;
-                            // First user message is the selected category title; we show it in the top bar.
-                            // Keep the underlying message list intact; just avoid duplicating it in the chat.
-                            if (idx == 0 && isUser && _messages.any((m) => !m.isUser)) {
-                              return const SizedBox.shrink();
-                            }
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: Align(
-                                alignment: isUser
-                                    ? Alignment.centerRight
-                                    : Alignment.centerLeft,
-                                child: Container(
-                                  constraints: BoxConstraints(
-                                    maxWidth: isUser
-                                        ? size.width * 0.92
-                                        : size.width,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 14, vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: isUser
-                                        ? CommanColor.lightDarkPrimary(context)
-                                        : (isDark
-                                            ? CommanColor.darkPrimaryColor
-                                                .withOpacity(0.6)
-                                            : Colors.white.withOpacity(0.85)),
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(
-                                      color: !isUser && isDark
-                                          ? Colors.white
-                                          : Colors.transparent,
-                                      width: !isUser && isDark ? 1.2 : 0,
-                                    ),
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _buildMessageWithVerseLinks(
-                                        message.text,
-                                        isUser,
-                                        size,
-                                        isDark,
-                                      ),
-                                      const SizedBox(height: 6),
-                                      // Action icons (Copy / Share) for responses only
-                                      if (!isUser)
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.end,
-                                          children: [
-                                            // Copy (same style as Chat screen)
-                                            InkWell(
-                                              onTap: () async {
-                                                await Clipboard.setData(
-                                                    ClipboardData(
-                                                        text: message.text));
-                                                Constants.showToast(
-                                                    ChatTranslations.get(
-                                                        'copied',
-                                                        AppApiConstant
-                                                            .chatLanguage));
-                                              },
-                                              child: Padding(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 2,
-                                                        vertical: 2),
-                                                child: Container(
-                                                  padding:
-                                                      const EdgeInsets.all(4),
-                                                  decoration: BoxDecoration(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            8),
-                                                    border: Border.all(
-                                                      color: isDark
-                                                          ? Colors.white
-                                                              .withOpacity(0.14)
-                                                          : Colors.black
-                                                              .withOpacity(
-                                                                  0.12),
-                                                      width: 1.0,
-                                                    ),
-                                                  ),
-                                                  child: Image.asset(
-                                                    "assets/Bookmark icons/Frame 3630.png",
-                                                    height: size.width > 450
-                                                        ? 18
-                                                        : 15,
-                                                    width: size.width > 450
-                                                        ? 18
-                                                        : 15,
-                                                    color: isDark
-                                                        ? Colors.white
-                                                            .withOpacity(0.8)
-                                                        : Colors.black
-                                                            .withOpacity(0.6),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 2),
-                                            // Share (same style as Chat screen)
-                                            InkWell(
-                                              onTap: () async {
-                                                // Rating request shown only on 2nd app open (see home_screen), not here
-                                                final screenSize =
-                                                    MediaQuery.of(context).size;
-                                                final sharePositionOrigin =
-                                                    Rect.fromLTWH(
-                                                  screenSize.width / 2 - 50,
-                                                  screenSize.height / 2 - 50,
-                                                  100,
-                                                  100,
-                                                );
-                                                await Share.share(
-                                                  _buildShareText(message.text),
-                                                  sharePositionOrigin:
-                                                      sharePositionOrigin,
-                                                );
-                                              },
-                                              child: Padding(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 2,
-                                                        vertical: 2),
-                                                child: Container(
-                                                  padding:
-                                                      const EdgeInsets.all(4),
-                                                  decoration: BoxDecoration(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            8),
-                                                    border: Border.all(
-                                                      color: isDark
-                                                          ? Colors.white
-                                                              .withOpacity(0.14)
-                                                          : Colors.black
-                                                              .withOpacity(
-                                                                  0.12),
-                                                      width: 1.0,
-                                                    ),
-                                                  ),
-                                                  child: Icon(
-                                                    Icons.share,
-                                                    size: size.width > 450
-                                                        ? 18
-                                                        : 15,
-                                                    color: isDark
-                                                        ? Colors.white
-                                                            .withOpacity(0.8)
-                                                        : Colors.black
-                                                            .withOpacity(0.6),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                      : _buildPrayerResponseView(
+                          context, size, isDark, accentFill),
                 ),
                 // AMEN button at the bottom - only show after prayer is generated (at least one AI response)
                 if (_messages.any((m) => !m.isUser))

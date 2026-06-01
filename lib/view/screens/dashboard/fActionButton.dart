@@ -953,6 +953,15 @@ class floatingButtonState extends State<floatingButton>
           decoration: BoxDecoration(
             color: CommanColor.whiteLightModePrimary(context),
             shape: BoxShape.circle,
+            boxShadow: CommanColor.isDarkTheme(context)
+                ? const [
+                    BoxShadow(
+                      color: Colors.black45,
+                      blurRadius: 8,
+                      offset: Offset(0, 3),
+                    ),
+                  ]
+                : null,
           ),
           child: GestureDetector(
             child: Center(
@@ -1162,6 +1171,15 @@ class floatingButtonState extends State<floatingButton>
             decoration: BoxDecoration(
               color: CommanColor.whiteLightModePrimary(context),
               shape: BoxShape.circle,
+              boxShadow: CommanColor.isDarkTheme(context)
+                  ? const [
+                      BoxShadow(
+                        color: Colors.black45,
+                        blurRadius: 8,
+                        offset: Offset(0, 3),
+                      ),
+                    ]
+                  : null,
             ),
             child: GestureDetector(
               child: Center(
@@ -1239,6 +1257,15 @@ class floatingButtonState extends State<floatingButton>
         decoration: BoxDecoration(
           color: CommanColor.whiteLightModePrimary(context),
           shape: BoxShape.circle,
+          boxShadow: CommanColor.isDarkTheme(context)
+              ? const [
+                  BoxShadow(
+                    color: Colors.black45,
+                    blurRadius: 8,
+                    offset: Offset(0, 3),
+                  ),
+                ]
+              : null,
         ),
         child: GestureDetector(
           child: Center(

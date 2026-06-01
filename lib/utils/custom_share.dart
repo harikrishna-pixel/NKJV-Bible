@@ -288,7 +288,7 @@ class ImageBottomSheets extends StatelessWidget {
                                       Text(
                                         BibleInfo.bible_shortName,
                                         style: TextStyle(
-                                          color: Colors.white,
+                                          color: const Color(0xFF3E2723),
                                           letterSpacing: BibleInfo.letterSpacing,
                                           fontSize: BibleInfo.fontSizeScale * 15,
                                           fontWeight: FontWeight.w700,
@@ -400,7 +400,8 @@ class ImageBottomSheets extends StatelessWidget {
             await countprovider.decrementCount(context);
           }
           final image = await controller.screenshotController.value.capture(
-            delay: const Duration(milliseconds: 10),
+            delay: const Duration(milliseconds: 400),
+            pixelRatio: MediaQuery.of(context).devicePixelRatio * 2,
           );
 
           if (image == null) {
@@ -417,20 +418,8 @@ class ImageBottomSheets extends StatelessWidget {
               await Future.delayed(const Duration(milliseconds: 400));
             }
             
-            final appPackageName =
-                (await PackageInfo.fromPlatform()).packageName;
-            String appid = BibleInfo.apple_AppId;
-            String message = "";
-
-            if (Platform.isAndroid) {
-              message =
-                  " \n Read More at: https://play.google.com/store/apps/details?id=$appPackageName";
-            } else if (Platform.isIOS) {
-              message =
-                  " \n Read More at: https://itunes.apple.com/app/id$appid";
-            }
-
-            saveAndShare(image, "bible", message, context: context);
+            // Image-only share (same as home Verse of the Day); branding is on the image.
+            saveAndShare(image, "bible", "", context: context);
             // Track Share event
             AnalyticsService.trackShare();
           } else if (label == "Save") {

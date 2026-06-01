@@ -26,16 +26,20 @@ class StreakIconButton extends StatelessWidget {
     // Use a lightweight periodic refresh so streak stays consistent across screens
     // even when preferences change without triggering a rebuild (e.g. after restore flow).
     return StreamBuilder<int>(
+      // Fetch once immediately (avoid initial "blank"), then refresh periodically.
       // Provide a computation so this never emits null (required for non-nullable int).
-      stream: Stream<int>.periodic(const Duration(seconds: 2), (_) => 0)
-          .asyncMap((_) => StreakService.getCurrentStreak()),
+      stream: (() async* {
+        yield await StreakService.getCurrentStreak();
+        yield* Stream<int>.periodic(const Duration(seconds: 2), (_) => 0)
+            .asyncMap((_) => StreakService.getCurrentStreak());
+      })(),
       initialData: 0,
       builder: (context, snapshot) {
         final streak = snapshot.data ?? 0;
         return InkWell(
           onTap: () => Get.to(() => const DailyJourneyScreen()),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            padding: const EdgeInsets.all(4),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [

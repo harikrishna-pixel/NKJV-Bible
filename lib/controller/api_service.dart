@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:android_id/android_id.dart';
 import 'package:biblebookapp/Model/category_model.dart';
 import 'package:biblebookapp/Model/image_model.dart';
+import 'package:biblebookapp/core/library_backup_upload_service.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
 import 'package:biblebookapp/view/constants/assets_constants.dart';
@@ -273,7 +274,11 @@ Future<dynamic> feedbackSubmit({device_id}) async {
     );
     Map<String, dynamic> responseBody = jsonDecode(response.body);
     if (response.statusCode == 200) {
+      print(response.body);
+      print(response.body);
+      print(response.body);
       return responseBody;
+
     }
   } on TimeoutException catch (e) {
     Constants.showToast(e.message.toString());
@@ -647,6 +652,8 @@ Future<UserModel> loginUser(
           key: "name", value: '${data['data']['user']['name']}');
       await cacheNotifier.writeCache(
           key: "authtoken", value: '${data['data']['token']}');
+
+      LibraryBackupUploadService.runAfterLogin();
 
       // Constants.showToast(
       //     "Hi ${data['data']['user']['name']}, Welcome to ${BibleInfo.bible_shortName}");

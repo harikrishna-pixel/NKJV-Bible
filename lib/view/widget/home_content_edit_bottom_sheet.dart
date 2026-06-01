@@ -6141,8 +6141,9 @@ class ImageBottomSheet extends StatelessWidget {
 
     return Consumer<HomeContentEditProvider>(
       builder: (context, bookmarkProvider, child) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
+        return SizedBox(
+          height: MediaQuery.of(context).size.height * 0.88,
+          child: Column(
           children: [
             controller.isImageBannerAdLoaded.value &&
                     controller.imageBannerAd != null &&
@@ -6158,15 +6159,9 @@ class ImageBottomSheet extends StatelessWidget {
                           ),
                     ),
                   )
-                : SizedBox(height: screenWidth < 380 ? 2 : 95),
-            Flexible(
-              child: FractionallySizedBox(
-                heightFactor: screenWidth < 380
-                    ? 0.85
-                    : screenWidth > 450
-                        ? 0.82
-                        : 0.81,
-                child: Container(
+                : const SizedBox(height: 4),
+            Expanded(
+              child: Container(
                   decoration: const BoxDecoration(
                     borderRadius: BorderRadius.only(
                       topLeft: Radius.circular(0),
@@ -6176,7 +6171,6 @@ class ImageBottomSheet extends StatelessWidget {
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
                       const SizedBox(height: 6),
                       // GestureDetector(
@@ -6195,7 +6189,8 @@ class ImageBottomSheet extends StatelessWidget {
                       //   ),
                       // ),
                       // const SizedBox(height: 2),
-                      Stack(
+                      Expanded(
+                        child: Stack(
                         children: [
                           Screenshot(
                             controller: controller.screenshotController.value,
@@ -6207,31 +6202,15 @@ class ImageBottomSheet extends StatelessWidget {
                               },
                               child: Obx(
                                 () => Stack(
+                                  fit: StackFit.expand,
                                   children: [
-                                    SizedBox(
-                                      height: screenWidth < 380
-                                          ? MediaQuery.of(context).size.height *
-                                              0.735
-                                          : screenWidth > 450
-                                              ? MediaQuery.of(context)
-                                                      .size
-                                                      .height *
-                                                  0.69
-                                              : MediaQuery.of(context)
-                                                      .size
-                                                      .height *
-                                                  0.62,
-                                      width: MediaQuery.sizeOf(context).width,
-                                      child:
-                                          // Obx(
-                                          //   () =>
-                                          Image(
+                                    Positioned.fill(
+                                      child: Image(
                                         image: AssetImage(controller
                                                 .bgImagesList[
                                             controller.selectedBgImage.value]),
-                                        fit: BoxFit.fill,
+                                        fit: BoxFit.cover,
                                       ),
-                                      // ),
                                     ),
                                     Positioned(
                                       left: 10,
@@ -6306,55 +6285,77 @@ class ImageBottomSheet extends StatelessWidget {
                                       left: 0,
                                       right: 0,
                                       bottom: 7,
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Image.asset(
-                                            "assets/Icon-1024.png",
-                                            height: 30,
-                                            width: 30,
+                                      child: Center(
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 8,
                                           ),
-                                          const SizedBox(width: 10),
-                                          Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              SizedBox(
-                                                height: 20,
+                                          decoration: BoxDecoration(
+                                            color:
+                                                Colors.white.withOpacity(0.94),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            boxShadow: const [
+                                              BoxShadow(
+                                                color: Colors.black26,
+                                                blurRadius: 6,
+                                                offset: Offset(0, 2),
                                               ),
-                                              Text(
-                                                bibleName,
-                                                style: const TextStyle(
-                                                  color: Color.fromARGB(
-                                                      255, 135, 130, 130),
-                                                  letterSpacing:
-                                                      BibleInfo.letterSpacing,
-                                                  fontSize:
-                                                      BibleInfo.fontSizeScale *
-                                                          16,
-                                                  fontWeight: FontWeight.w500,
-                                                  height: 1.3,
-                                                ),
-                                                textAlign: TextAlign.center,
-                                              ),
-                                              if (Platform.isAndroid)
-                                                const Text(
-                                                  "Search in Playstore}",
-                                                  style: TextStyle(
-                                                      color: Color.fromARGB(
-                                                          255, 135, 130, 130)),
-                                                )
-                                              else if (Platform.isIOS)
-                                                const Text(
-                                                  "Search in Appstore",
-                                                  style: TextStyle(
-                                                      color: Color.fromARGB(
-                                                          255, 135, 130, 130)),
-                                                ),
                                             ],
                                           ),
-                                        ],
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Image.asset(
+                                                "assets/Icon-1024.png",
+                                                height: 30,
+                                                width: 30,
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Text(
+                                                    bibleName,
+                                                    style: const TextStyle(
+                                                      color: Color(0xFF2C2C2C),
+                                                      letterSpacing:
+                                                          BibleInfo
+                                                              .letterSpacing,
+                                                      fontSize: BibleInfo
+                                                              .fontSizeScale *
+                                                          16,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      height: 1.2,
+                                                    ),
+                                                  ),
+                                                  if (Platform.isAndroid)
+                                                    const Text(
+                                                      'Search in Playstore',
+                                                      style: TextStyle(
+                                                        color:
+                                                            Color(0xFF5A5A5A),
+                                                        fontSize: 12,
+                                                      ),
+                                                    )
+                                                  else if (Platform.isIOS)
+                                                    const Text(
+                                                      'Search in Appstore',
+                                                      style: TextStyle(
+                                                        color:
+                                                            Color(0xFF5A5A5A),
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -6456,23 +6457,29 @@ class ImageBottomSheet extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const Spacer(),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildShareImageButton(context, "Share"),
-                          _buildShareImageButton(context, "Save"),
-                          _buildShareImageButton(context, "Close"),
-                        ],
                       ),
-                      const Spacer(),
-                      const SizedBox(height: 1),
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          0,
+                          8,
+                          0,
+                          MediaQuery.of(context).padding.bottom + 6,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _buildShareImageButton(context, "Share"),
+                            _buildShareImageButton(context, "Save"),
+                            _buildShareImageButton(context, "Close"),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
-              ),
             ),
           ],
+          ),
         );
       },
     );

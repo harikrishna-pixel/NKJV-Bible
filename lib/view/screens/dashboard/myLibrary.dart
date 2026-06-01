@@ -1,5 +1,6 @@
 // ignore_for_file: use_full_hex_values_for_flutter_colors
 import 'package:biblebookapp/core/export_db.dart';
+import 'package:biblebookapp/core/library_backup_upload_service.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/utils/custom_alert.dart';
@@ -234,152 +235,155 @@ class _LibraryScreenState extends State<LibraryScreen>
                     ),
                     GestureDetector(
                       onTap: () async {
-                        final downloadProvider =
-                            Provider.of<DownloadProvider>(context,
-                                listen: false);
-                        final subscriptionPlan =
-                            await downloadProvider.getSubscriptionPlan();
-                        final isSubscribed = subscriptionPlan != null &&
-                            subscriptionPlan.isNotEmpty &&
-                            ['platinum', 'gold', 'silver'].contains(
-                                subscriptionPlan.toLowerCase());
-                        if (isSubscribed) {
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (context) => const MainBackupDialog(),
-                          );
-                        } else {
-                          await SharPreferences.setString('OpenAd', '1');
-                          if (!context.mounted) return;
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (ctx) {
-                              final dlgWidth =
-                                  MediaQuery.of(ctx).size.width;
-                              return Dialog(
-                                backgroundColor: CommanColor.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(15),
-                                ),
-                                elevation: 16,
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 24),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      Text(
-                                        "You're not subscribed. Subscribe to export and import your data.",
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: CommanColor.black,
-                                          fontSize:
-                                              dlgWidth > 450 ? 19 : 15,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 20),
-                                      GestureDetector(
-                                        onTap: () {
-                                          Navigator.pop(ctx);
-                                          final sixMonthPlan =
-                                              BibleInfo.sixMonthPlanid;
-                                          final oneYearPlan =
-                                              BibleInfo.oneYearPlanid;
-                                          final lifeTimePlan =
-                                              BibleInfo.lifeTimePlanid;
-                                          Get.to(
-                                            () => SubscriptionScreen(
-                                              sixMonthPlan: sixMonthPlan,
-                                              oneYearPlan: oneYearPlan,
-                                              lifeTimePlan: lifeTimePlan,
-                                              checkad: 'library',
-                                            ),
-                                            transition:
-                                                Transition.cupertinoDialog,
-                                            duration: const Duration(
-                                                milliseconds: 300),
-                                          );
-                                        },
-                                        child: Container(
-                                          padding: const EdgeInsets
-                                              .symmetric(vertical: 8),
-                                          decoration: BoxDecoration(
-                                            color: CommanColor
-                                                .lightDarkPrimary(ctx),
-                                            borderRadius:
-                                                const BorderRadius.all(
-                                                    Radius.circular(5)),
-                                            boxShadow: const [
-                                              BoxShadow(
-                                                  color: Colors.black26,
-                                                  blurRadius: 2)
-                                            ],
-                                          ),
-                                          child: Text(
-                                            'Subscribe',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              letterSpacing:
-                                                  BibleInfo.letterSpacing,
-                                              fontSize:
-                                                  BibleInfo.fontSizeScale *
-                                                      14,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      GestureDetector(
-                                        onTap: () =>
-                                            Navigator.pop(ctx),
-                                        child: Container(
-                                          padding: const EdgeInsets
-                                              .symmetric(vertical: 8),
-                                          decoration: BoxDecoration(
-                                            color: CommanColor.lightGrey1,
-                                            borderRadius:
-                                                const BorderRadius.all(
-                                                    Radius.circular(5)),
-                                            boxShadow: const [
-                                              BoxShadow(
-                                                  color: Colors.black26,
-                                                  blurRadius: 2)
-                                            ],
-                                          ),
-                                          child: Text(
-                                            'Cancel',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              letterSpacing:
-                                                  BibleInfo.letterSpacing,
-                                              fontSize:
-                                                  BibleInfo.fontSizeScale *
-                                                      14,
-                                              fontWeight: FontWeight.w500,
-                                              color: CommanColor.black),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          );
-                        }
+                        // Subscription gate temporarily disabled — open backup directly.
+                        // final downloadProvider =
+                        //     Provider.of<DownloadProvider>(context,
+                        //         listen: false);
+                        // final subscriptionPlan =
+                        //     await downloadProvider.getSubscriptionPlan();
+                        // final isSubscribed = subscriptionPlan != null &&
+                        //     subscriptionPlan.isNotEmpty &&
+                        //     ['platinum', 'gold', 'silver'].contains(
+                        //         subscriptionPlan.toLowerCase());
+                        // if (isSubscribed) {
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) => const MainBackupDialog(),
+                        );
+                        // } else {
+                        //   await SharPreferences.setString('OpenAd', '1');
+                        //   if (!context.mounted) return;
+                        //   showDialog(
+                        //     context: context,
+                        //     barrierDismissible: false,
+                        //     builder: (ctx) {
+                        //       final dlgWidth =
+                        //           MediaQuery.of(ctx).size.width;
+                        //       return Dialog(
+                        //         backgroundColor: CommanColor.white,
+                        //         shape: RoundedRectangleBorder(
+                        //           borderRadius:
+                        //               BorderRadius.circular(15),
+                        //         ),
+                        //         elevation: 16,
+                        //         child: Padding(
+                        //           padding: const EdgeInsets.symmetric(
+                        //               horizontal: 16, vertical: 24),
+                        //           child: Column(
+                        //             mainAxisSize: MainAxisSize.min,
+                        //             crossAxisAlignment:
+                        //                 CrossAxisAlignment.stretch,
+                        //             children: [
+                        //               Text(
+                        //                 "You're not subscribed. Subscribe to export and import your data.",
+                        //                 textAlign: TextAlign.center,
+                        //                 style: TextStyle(
+                        //                   color: CommanColor.black,
+                        //                   fontSize:
+                        //                       dlgWidth > 450 ? 19 : 15,
+                        //                 ),
+                        //               ),
+                        //               const SizedBox(height: 20),
+                        //               GestureDetector(
+                        //                 onTap: () {
+                        //                   Navigator.pop(ctx);
+                        //                   final sixMonthPlan =
+                        //                       BibleInfo.sixMonthPlanid;
+                        //                   final oneYearPlan =
+                        //                       BibleInfo.oneYearPlanid;
+                        //                   final lifeTimePlan =
+                        //                       BibleInfo.lifeTimePlanid;
+                        //                   Get.to(
+                        //                     () => SubscriptionScreen(
+                        //                       sixMonthPlan: sixMonthPlan,
+                        //                       oneYearPlan: oneYearPlan,
+                        //                       lifeTimePlan: lifeTimePlan,
+                        //                       checkad: 'library',
+                        //                     ),
+                        //                     transition:
+                        //                         Transition.cupertinoDialog,
+                        //                     duration: const Duration(
+                        //                         milliseconds: 300),
+                        //                   );
+                        //                 },
+                        //                 child: Container(
+                        //                   padding: const EdgeInsets
+                        //                       .symmetric(vertical: 8),
+                        //                   decoration: BoxDecoration(
+                        //                     color: CommanColor
+                        //                         .lightDarkPrimary(ctx),
+                        //                     borderRadius:
+                        //                         const BorderRadius.all(
+                        //                             Radius.circular(5)),
+                        //                     boxShadow: const [
+                        //                       BoxShadow(
+                        //                           color: Colors.black26,
+                        //                           blurRadius: 2)
+                        //                     ],
+                        //                   ),
+                        //                   child: Text(
+                        //                     'Subscribe',
+                        //                     textAlign: TextAlign.center,
+                        //                     style: TextStyle(
+                        //                       letterSpacing:
+                        //                           BibleInfo.letterSpacing,
+                        //                       fontSize:
+                        //                           BibleInfo.fontSizeScale *
+                        //                               14,
+                        //                       fontWeight: FontWeight.w500,
+                        //                       color: Colors.white,
+                        //                     ),
+                        //                   ),
+                        //                 ),
+                        //               ),
+                        //               const SizedBox(height: 12),
+                        //               GestureDetector(
+                        //                 onTap: () =>
+                        //                     Navigator.pop(ctx),
+                        //                 child: Container(
+                        //                   padding: const EdgeInsets
+                        //                       .symmetric(vertical: 8),
+                        //                   decoration: BoxDecoration(
+                        //                     color: CommanColor.lightGrey1,
+                        //                     borderRadius:
+                        //                         const BorderRadius.all(
+                        //                             Radius.circular(5)),
+                        //                     boxShadow: const [
+                        //                       BoxShadow(
+                        //                           color: Colors.black26,
+                        //                           blurRadius: 2)
+                        //                     ],
+                        //                   ),
+                        //                   child: Text(
+                        //                     'Cancel',
+                        //                     textAlign: TextAlign.center,
+                        //                     style: TextStyle(
+                        //                       letterSpacing:
+                        //                           BibleInfo.letterSpacing,
+                        //                       fontSize:
+                        //                           BibleInfo.fontSizeScale *
+                        //                               14,
+                        //                       fontWeight: FontWeight.w500,
+                        //                       color: CommanColor.black),
+                        //                   ),
+                        //                 ),
+                        //               ),
+                        //             ],
+                        //           ),
+                        //         ),
+                        //       );
+                        //     },
+                        //   );
+                        // }
                       },
-                      child: Icon(
-                        size: screenWidth > 450 ? 35 : 20,
-                        Icons.menu_rounded,
-                        color:
-                            CommanColor.inDarkWhiteAndInLightPrimary(context),
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 12.0),
+                        child: Image.asset(
+                          "assets/home icons/Frame 3631.png",
+                          height: screenWidth > 450 ? 28 : 22,
+                          width: screenWidth > 450 ? 28 : 22,
+                        ),
                       ),
                     ),
                     // PopupMenuButton(
@@ -1285,9 +1289,22 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
                 ],
               ),
               const SizedBox(height: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  BibleInfo.autoCloudBackupText,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: isTablet ? 15 : 13,
+                    height: 1.45,
+                    color: CommanColor.black.withValues(alpha: 0.75),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
               _buildActionButton(
                 context,
-                label: "EXPORT",
+                label: "EXPORT (Manual)",
                 icon: 'assets/sd.png',
                 onTap: () async {
                   Get.back();
@@ -1336,7 +1353,7 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
               const SizedBox(height: 16),
               _buildActionButton(
                 context,
-                label: "IMPORT",
+                label: "IMPORT (Manual)",
                 icon: 'assets/rd.png',
                 onTap: () {
                   Get.back();
@@ -1372,6 +1389,30 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
                       },
                     ),
                   );
+                },
+              ),
+              const SizedBox(height: 16),
+              _buildActionButton(
+                context,
+                label: "IMPORT FROM CLOUD",
+                icon: 'assets/rd.png',
+                onTap: () async {
+                  Get.back();
+                  await SharPreferences.setString('OpenAd', '1');
+                  updateLoading(true, mess: 'Downloading backup...');
+                  final ok =
+                      await LibraryBackupUploadService.downloadAndImportFromCloud();
+                  updateLoading(false);
+                  await SharPreferences.setString('OpenAd', '1');
+                  if (ok) {
+                    Get.offAll(() => HomeScreen(
+                        From: "splash",
+                        selectedVerseNumForRead: "",
+                        selectedBookForRead: "",
+                        selectedChapterForRead: "",
+                        selectedBookNameForRead: "",
+                        selectedVerseForRead: ""));
+                  }
                 },
               ),
             ],

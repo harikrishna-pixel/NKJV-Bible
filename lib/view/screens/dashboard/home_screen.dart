@@ -13,15 +13,12 @@ import 'package:biblebookapp/core/notifiers/auth/auth.notifier.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/main.dart';
-import 'package:biblebookapp/utils/book_apps_helper.dart';
-import 'package:biblebookapp/utils/custom_alert.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:biblebookapp/view/screens/bible_select_screen.dart';
 import 'package:biblebookapp/view/screens/books/books_screen.dart';
-import 'package:biblebookapp/view/screens/books/model/book_model.dart';
 import 'package:biblebookapp/view/screens/calendar_screen/view/calendar_screen.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/add_widget_intro_screen.dart';
@@ -36,7 +33,6 @@ import 'package:biblebookapp/view/screens/dashboard/fActionButton.dart';
 import 'package:biblebookapp/view/screens/dashboard/remove_add-screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/setting_screen.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
-import 'package:biblebookapp/view/screens/more_apps/model/app_model.dart';
 import 'package:biblebookapp/view/screens/more_apps/more_apps_screen.dart';
 import 'package:biblebookapp/view/screens/profile/view/profile_screen.dart';
 import 'package:biblebookapp/view/screens/quote_screen/quote_screen.dart';
@@ -44,7 +40,6 @@ import 'package:biblebookapp/view/screens/wallpaper_screen/wallpaper_screen.dart
 import 'package:biblebookapp/view/screens/chat/chat_screen.dart';
 import 'package:biblebookapp/view/screens/chat/prayer_guidance_screen.dart';
 import 'package:biblebookapp/streak/streak_ui.dart';
-import 'package:biblebookapp/streak_flow/daily_journey_screen.dart';
 import 'package:biblebookapp/services/smart_notification_helper.dart';
 import 'package:biblebookapp/services/streak_notification_helper.dart';
 import 'package:biblebookapp/streak_flow/streak_complete_celebration_dialog.dart';
@@ -1094,6 +1089,7 @@ class _HomeScreenState extends State<HomeScreen>
   bool _isBottomSheetOpen = false;
   bool _hasInitialized = false;
   bool _showUI = true; // Track UI visibility for scroll-based hide/show
+  bool _showBackToTop = false;
   BuildContext? _bottomSheetContext; // Track bottom sheet context to dismiss it
   bool _exitOfferCooldownActive = false; // Red dot indicator (show after 3 days)
   Timer?
@@ -3324,57 +3320,74 @@ class _HomeScreenState extends State<HomeScreen>
                                   )),
                             )
                           : SizedBox(),
-                      InkWell(
-                          onTap: () {
-                            if (controller.adFree.value == false) {
-                              controller.bannerAd?.dispose();
-                              controller.bannerAd?.load();
-                            }
-                            Get.to(
-                                () => SearchScreen(
-                                      controller: controller,
-                                    ),
-                                transition: Transition.cupertinoDialog,
-                                duration: const Duration(milliseconds: 300));
-                          },
-                          child: Image.asset(
-                            "assets/home icons/search.png",
-                            height: screenWidth > 450 ? 30 : 22,
-                            width: screenWidth > 450 ? 30 : 22,
-                            color: CommanColor.whiteBlack(context),
-                          )),
-                      StreakIconButton(
-                        iconSize: screenWidth > 450 ? 28 : 22,
-                      ),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10.0),
-                        child: ChangeThemeButtonWidget(),
+                        padding: const EdgeInsets.only(right: 4),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            InkWell(
+                              onTap: () {
+                                if (controller.adFree.value == false) {
+                                  controller.bannerAd?.dispose();
+                                  controller.bannerAd?.load();
+                                }
+                                Get.to(
+                                    () => SearchScreen(
+                                          controller: controller,
+                                        ),
+                                    transition: Transition.cupertinoDialog,
+                                    duration:
+                                        const Duration(milliseconds: 300));
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: Image.asset(
+                                  "assets/home icons/search.png",
+                                  height: screenWidth > 450 ? 30 : 22,
+                                  width: screenWidth > 450 ? 30 : 22,
+                                  color: CommanColor.whiteBlack(context),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            StreakIconButton(
+                              iconSize: screenWidth > 450 ? 28 : 22,
+                            ),
+                            const SizedBox(width: 6),
+                            Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: ChangeThemeButtonWidget(),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
-                    title: IntrinsicWidth(
-                      child: InkWell(
-                        onTap: () async {
-                          if (controller.adFree.value == false) {
-                            controller.bannerAd?.dispose();
-                            controller.bannerAd?.load();
-                          }
-                          Get.to(() => const BookListScreen(),
-                              transition: Transition.cupertinoDialog,
-                              duration: const Duration(milliseconds: 300));
-                        },
+                    title: InkWell(
+                      onTap: () async {
+                        if (controller.adFree.value == false) {
+                          controller.bannerAd?.dispose();
+                          controller.bannerAd?.load();
+                        }
+                        Get.to(() => const BookListScreen(),
+                            transition: Transition.cupertinoDialog,
+                            duration: const Duration(milliseconds: 300));
+                      },
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
                         child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            Flexible(
-                              child: Text(
-                                  "${selectedBookname ?? controller.selectedBook}",
-                                  style:
-                                      CommanStyle.appBarStyle(context).copyWith(
-                                    fontSize: screenWidth > 450
-                                        ? BibleInfo.fontSizeScale * 26
-                                        : BibleInfo.fontSizeScale * 18,
-                                  )),
+                            Text(
+                              "${selectedBookname ?? controller.selectedBook}",
+                              maxLines: 1,
+                              style: CommanStyle.appBarStyle(context).copyWith(
+                                fontSize: screenWidth > 450
+                                    ? BibleInfo.fontSizeScale * 26
+                                    : BibleInfo.fontSizeScale * 18,
+                                overflow: TextOverflow.visible,
+                              ),
                             ),
                             Padding(
                               padding: const EdgeInsets.only(top: 3.0, left: 4),
@@ -3383,7 +3396,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 color: CommanColor.whiteBlack(context),
                                 size: screenWidth > 450 ? 39 : 24,
                               ),
-                            )
+                            ),
                           ],
                         ),
                       ),
@@ -3395,20 +3408,45 @@ class _HomeScreenState extends State<HomeScreen>
                             hintColor: CommanColor.whiteAndDark(context)),
                         child: Container(
                           height: screenWidth > 450 ? 45 : 30.0,
-                          color:
-                              Provider.of<ThemeProvider>(context).themeMode ==
-                                      ThemeMode.dark
-                                  ? p.Provider.of<ThemeProvider>(context)
-                                              .currentCustomTheme ==
-                                          AppCustomTheme.vintage
-                                      ? CommanColor.darkPrimaryColor
-                                      : CommanColor.darkPrimaryColor200
-                                  : p.Provider.of<ThemeProvider>(context)
-                                              .currentCustomTheme ==
-                                          AppCustomTheme.vintage
-                                      ? CommanColor.white
-                                      : p.Provider.of<ThemeProvider>(context)
-                                          .backgroundColor,
+                          decoration: () {
+                            final themeProvider =
+                                p.Provider.of<ThemeProvider>(context);
+                            final isDark =
+                                themeProvider.themeMode == ThemeMode.dark;
+                            final isVintage = themeProvider
+                                    .currentCustomTheme ==
+                                AppCustomTheme.vintage;
+                            if (isDark) {
+                              final base = isVintage
+                                  ? CommanColor.darkPrimaryColor
+                                  : CommanColor.darkPrimaryColor200;
+                              return BoxDecoration(
+                                color: Color.lerp(
+                                  base,
+                                  Colors.white,
+                                  0.22,
+                                )!
+                                    .withOpacity(0.88),
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: Colors.white.withOpacity(0.35),
+                                    width: 1,
+                                  ),
+                                ),
+                              );
+                            }
+                            return BoxDecoration(
+                              color: isVintage
+                                  ? CommanColor.white
+                                  : themeProvider.backgroundColor,
+                              border: Border(
+                                bottom: BorderSide(
+                                  color: Colors.black.withOpacity(0.08),
+                                  width: 1,
+                                ),
+                              ),
+                            );
+                          }(),
                           alignment: Alignment.center,
                           child: InkWell(
                             onTap: () {
@@ -3935,101 +3973,18 @@ class _HomeScreenState extends State<HomeScreen>
                                                                 } else {
                                                                   print(
                                                                       'Not Load Interstitial Ad');
-
-                                                                  final randomItem =
-                                                                      await StorageHelper
-                                                                          .getRandomBookOrApp();
-
-                                                                  if (randomItem
-                                                                      is BookModel) {
-                                                                    print(
-                                                                        "Random Book: ${randomItem.bookName}");
-
-                                                                    final connectivityResult =
-                                                                        await Connectivity()
-                                                                            .checkConnectivity();
-                                                                    if (connectivityResult[
-                                                                            0] ==
-                                                                        ConnectivityResult
-                                                                            .none) {
-                                                                      return Get
-                                                                          .to(() =>
-                                                                              MarkAsReadScreen(
-                                                                                ReadedChapter: controller.selectedChapter.value,
-                                                                                RededBookName: controller.selectedBook.value,
-                                                                                SelectedBookChapterCount: controller.selectedBookChapterCount.value,
-                                                                              ));
-                                                                      // return Constants
-                                                                      //     .showToast(
-                                                                      //         "Check your Internet connection");
-                                                                    }
-                                                                    Get.to(
-                                                                      () =>
-                                                                          FullScreenAd(
-                                                                        networkimage:
-                                                                            randomItem.bookThumbURL,
-                                                                        title: randomItem
-                                                                            .bookName,
-                                                                        description:
-                                                                            randomItem.bookDescription,
-                                                                        iteamurl:
-                                                                            randomItem.bookUrl,
-                                                                        rededBookName: controller
-                                                                            .selectedBook
-                                                                            .value,
-                                                                        readedChapter: controller
+                                                                  Get.to(() =>
+                                                                      MarkAsReadScreen(
+                                                                        ReadedChapter: controller
                                                                             .selectedChapter
                                                                             .value,
-                                                                        selectedBookChapterCount: controller
-                                                                            .selectedBookChapterCount
-                                                                            .value,
-                                                                      ),
-                                                                    );
-                                                                  } else if (randomItem
-                                                                      is AppModel) {
-                                                                    print(
-                                                                        "Random App: ${randomItem.appName}");
-                                                                    final connectivityResult =
-                                                                        await Connectivity()
-                                                                            .checkConnectivity();
-                                                                    if (connectivityResult[
-                                                                            0] ==
-                                                                        ConnectivityResult
-                                                                            .none) {
-                                                                      return Get
-                                                                          .to(() =>
-                                                                              MarkAsReadScreen(
-                                                                                ReadedChapter: controller.selectedChapter.value,
-                                                                                RededBookName: controller.selectedBook.value,
-                                                                                SelectedBookChapterCount: controller.selectedBookChapterCount.value,
-                                                                              ));
-                                                                      // return Constants
-                                                                      //     .showToast(
-                                                                      //         "Check your Internet connection");
-                                                                    }
-                                                                    Get.to(
-                                                                      () =>
-                                                                          FullScreenAd(
-                                                                        networkimage:
-                                                                            randomItem.thumburl,
-                                                                        title: randomItem
-                                                                            .appName,
-                                                                        description:
-                                                                            randomItem.apptype,
-                                                                        iteamurl:
-                                                                            randomItem.appurl,
-                                                                        rededBookName: controller
+                                                                        RededBookName: controller
                                                                             .selectedBook
                                                                             .value,
-                                                                        readedChapter: controller
-                                                                            .selectedChapter
-                                                                            .value,
-                                                                        selectedBookChapterCount: controller
+                                                                        SelectedBookChapterCount: controller
                                                                             .selectedBookChapterCount
                                                                             .value,
-                                                                      ),
-                                                                    );
-                                                                  }
+                                                                      ));
 
                                                                   // Get.to(() =>
                                                                   //     MarkAsReadScreen(
@@ -4410,73 +4365,11 @@ class _HomeScreenState extends State<HomeScreen>
                                                                             }
                                                                           } else {
                                                                             print('Not Load Interstitial Ad');
-
-                                                                            if (controller.adFree.value !=
-                                                                                false) {
-                                                                              return Get.to(() => MarkAsReadScreen(
-                                                                                    ReadedChapter: controller.selectedChapter.value,
-                                                                                    RededBookName: controller.selectedBook.value,
-                                                                                    SelectedBookChapterCount: controller.selectedBookChapterCount.value,
-                                                                                  ));
-                                                                            } else {
-                                                                              // Get.to(() =>
-                                                                              //     MarkAsReadScreen(
-                                                                              //       ReadedChapter: controller.selectedChapter.value,
-                                                                              //       RededBookName: controller.selectedBook.value,
-                                                                              //       SelectedBookChapterCount: controller.selectedBookChapterCount.value,
-                                                                              //     ));
-                                                                              final randomItem = await StorageHelper.getRandomBookOrApp();
-
-                                                                              if (randomItem is BookModel) {
-                                                                                print("Random Book: ${randomItem.bookName}");
-                                                                                final connectivityResult = await Connectivity().checkConnectivity();
-                                                                                if (connectivityResult[0] == ConnectivityResult.none) {
-                                                                                  return Get.to(() => MarkAsReadScreen(
-                                                                                        ReadedChapter: controller.selectedChapter.value,
-                                                                                        RededBookName: controller.selectedBook.value,
-                                                                                        SelectedBookChapterCount: controller.selectedBookChapterCount.value,
-                                                                                      ));
-                                                                                  // return Constants
-                                                                                  //     .showToast(
-                                                                                  //         "Check your Internet connection");
-                                                                                }
-                                                                                Get.to(
-                                                                                  () => FullScreenAd(
-                                                                                    networkimage: randomItem.bookThumbURL,
-                                                                                    title: randomItem.bookName,
-                                                                                    description: randomItem.bookDescription,
-                                                                                    iteamurl: randomItem.bookUrl,
-                                                                                    rededBookName: controller.selectedBook.value,
-                                                                                    readedChapter: controller.selectedChapter.value,
-                                                                                    selectedBookChapterCount: controller.selectedBookChapterCount.value,
-                                                                                  ),
-                                                                                );
-                                                                              } else if (randomItem is AppModel) {
-                                                                                final connectivityResult = await Connectivity().checkConnectivity();
-                                                                                if (connectivityResult[0] == ConnectivityResult.none) {
-                                                                                  return Get.to(() => MarkAsReadScreen(
-                                                                                        ReadedChapter: controller.selectedChapter.value,
-                                                                                        RededBookName: controller.selectedBook.value,
-                                                                                        SelectedBookChapterCount: controller.selectedBookChapterCount.value,
-                                                                                      ));
-                                                                                  // return Constants
-                                                                                  //     .showToast(
-                                                                                  //         "Check your Internet connection");
-                                                                                }
-                                                                                print("Random App: ${randomItem.appName}");
-                                                                                Get.to(
-                                                                                  () => FullScreenAd(
-                                                                                    networkimage: randomItem.thumburl,
-                                                                                    title: randomItem.appName,
-                                                                                    description: randomItem.apptype,
-                                                                                    iteamurl: randomItem.appurl,
-                                                                                    rededBookName: controller.selectedBook.value,
-                                                                                    readedChapter: controller.selectedChapter.value,
-                                                                                    selectedBookChapterCount: controller.selectedBookChapterCount.value,
-                                                                                  ),
-                                                                                );
-                                                                              }
-                                                                            }
+                                                                            Get.to(() => MarkAsReadScreen(
+                                                                                  ReadedChapter: controller.selectedChapter.value,
+                                                                                  RededBookName: controller.selectedBook.value,
+                                                                                  SelectedBookChapterCount: controller.selectedBookChapterCount.value,
+                                                                                ));
                                                                           }
                                                                         },
                                                                       );
@@ -4702,48 +4595,6 @@ class _HomeScreenState extends State<HomeScreen>
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          GestureDetector(
-                            onTap: () => Get.to(() => const DailyJourneyScreen()),
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: screenWidth > 600
-                                    ? 48
-                                    : screenWidth > 450
-                                        ? 40
-                                        : 32,
-                              ),
-                              child: Container(
-                                height: screenWidth > 600
-                                    ? 56
-                                    : screenWidth > 450
-                                        ? 50
-                                        : 35,
-                                width: screenWidth > 600
-                                    ? 56
-                                    : screenWidth > 450
-                                        ? 50
-                                        : 35,
-                                decoration: BoxDecoration(
-                                  // Match Bible Chat FAB: white circle in dark mode, primary in light.
-                                  color: CommanColor.whiteLightModePrimary(context),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Center(
-                                  child: Icon(
-                                    Icons.local_fire_department_rounded,
-                                    color: Provider.of<ThemeProvider>(context,
-                                                listen: false)
-                                            .themeMode ==
-                                        ThemeMode.dark
-                                    ? CommanColor.lightModePrimary
-                                    : Colors.yellowAccent,
-                                    size: screenWidth > 450 ? 26 : 22,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          SizedBox(height: screenWidth > 450 ? 12 : 8),
                           if (BibleInfo.chat == 1)
                             Builder(
                               builder: (buttonContext) => GestureDetector(
@@ -4789,6 +4640,15 @@ class _HomeScreenState extends State<HomeScreen>
                                         color: CommanColor.whiteLightModePrimary(
                                             context),
                                         shape: BoxShape.circle,
+                                        boxShadow: CommanColor.isDarkTheme(context)
+                                            ? const [
+                                                BoxShadow(
+                                                  color: Colors.black45,
+                                                  blurRadius: 8,
+                                                  offset: Offset(0, 3),
+                                                ),
+                                              ]
+                                            : null,
                                       ),
                                       child: Center(
                                         child: isOpenChat
@@ -4812,6 +4672,8 @@ class _HomeScreenState extends State<HomeScreen>
                                                     : screenWidth > 450
                                                         ? 24
                                                         : 22,
+                                                color: CommanColor
+                                                    .darkModePrimaryWhite(context),
                                               ),
                                       )),
                                 ),
@@ -4820,13 +4682,70 @@ class _HomeScreenState extends State<HomeScreen>
                           else
                             SizedBox(
                               width: screenWidth > 600
-                                  ? 56 + (48 * 2)
+                                  ? 56
                                   : screenWidth > 450
-                                      ? 50 + (40 * 2)
-                                      : 35 + (32 * 2),
+                                      ? 50
+                                      : 35,
                             ),
                         ],
                       ),
+                      if (_showBackToTop &&
+                          controller.selectedBookContent.isNotEmpty)
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              final scrollController =
+                                  controller.autoScrollController.value;
+                              if (!scrollController.hasClients) return;
+                              scrollController.animateTo(
+                                0,
+                                duration: const Duration(milliseconds: 450),
+                                curve: Curves.easeOutCubic,
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(24),
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: screenWidth > 450 ? 14 : 12,
+                                vertical: screenWidth > 450 ? 10 : 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: CommanColor.whiteLightModePrimary(
+                                    context),
+                                borderRadius: BorderRadius.circular(24),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 6,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.keyboard_arrow_up_rounded,
+                                    size: screenWidth > 450 ? 22 : 20,
+                                    color: CommanColor.darkModePrimaryWhite(
+                                        context),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Top',
+                                    style: TextStyle(
+                                      color: CommanColor.darkModePrimaryWhite(
+                                          context),
+                                      fontSize: screenWidth > 450 ? 14 : 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
                       floatingButton(
                         chapterNum: controller.selectedChapter.value,
                         bookName: controller.selectedBook.value,
@@ -5288,144 +5207,145 @@ class _HomeScreenState extends State<HomeScreen>
                         GestureDetector(
                           onTap: () async {
                             Navigator.of(context).pop();
+                            // Subscription gate temporarily disabled — open backup directly.
                             // Same logic as Library hamburger: subscription check, then MainBackupDialog or Subscribe dialog
-                            final downloadProvider =
-                                Provider.of<DownloadProvider>(context,
-                                    listen: false);
-                            final subscriptionPlan =
-                                await downloadProvider.getSubscriptionPlan();
-                            final isSubscribed = subscriptionPlan != null &&
-                                subscriptionPlan.isNotEmpty &&
-                                ['platinum', 'gold', 'silver']
-                                    .contains(subscriptionPlan.toLowerCase());
-                            if (isSubscribed) {
-                              showDialog(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (context) => const MainBackupDialog(),
-                              );
-                            } else {
-                              await SharPreferences.setString('OpenAd', '1');
-                              if (!context.mounted) return;
-                              showDialog(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (ctx) {
-                                  final dlgWidth =
-                                      MediaQuery.of(ctx).size.width;
-                                  return Dialog(
-                                    backgroundColor: CommanColor.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(15),
-                                    ),
-                                    elevation: 16,
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 16, vertical: 24),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        children: [
-                                          Text(
-                                            "You're not subscribed. Subscribe to export and import your data.",
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              color: CommanColor.black,
-                                              fontSize:
-                                                  dlgWidth > 450 ? 19 : 15,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 20),
-                                          GestureDetector(
-                                            onTap: () {
-                                              Navigator.pop(ctx);
-                                              Get.to(
-                                                () => SubscriptionScreen(
-                                                  sixMonthPlan:
-                                                      BibleInfo.sixMonthPlanid,
-                                                  oneYearPlan:
-                                                      BibleInfo.oneYearPlanid,
-                                                  lifeTimePlan:
-                                                      BibleInfo.lifeTimePlanid,
-                                                  checkad: 'drawer',
-                                                ),
-                                                transition:
-                                                    Transition.cupertinoDialog,
-                                                duration: const Duration(
-                                                    milliseconds: 300),
-                                              );
-                                            },
-                                            child: Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      vertical: 8),
-                                              decoration: BoxDecoration(
-                                                color: CommanColor
-                                                    .lightDarkPrimary(ctx),
-                                                borderRadius:
-                                                    const BorderRadius.all(
-                                                        Radius.circular(5)),
-                                                boxShadow: const [
-                                                  BoxShadow(
-                                                      color: Colors.black26,
-                                                      blurRadius: 2)
-                                                ],
-                                              ),
-                                              child: Text(
-                                                'Subscribe',
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                  letterSpacing:
-                                                      BibleInfo.letterSpacing,
-                                                  fontSize:
-                                                      BibleInfo.fontSizeScale *
-                                                          14,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 12),
-                                          GestureDetector(
-                                            onTap: () => Navigator.pop(ctx),
-                                            child: Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      vertical: 8),
-                                              decoration: BoxDecoration(
-                                                color: CommanColor.lightGrey1,
-                                                borderRadius:
-                                                    const BorderRadius.all(
-                                                        Radius.circular(5)),
-                                                boxShadow: const [
-                                                  BoxShadow(
-                                                      color: Colors.black26,
-                                                      blurRadius: 2)
-                                                ],
-                                              ),
-                                              child: Text(
-                                                'Cancel',
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                    letterSpacing:
-                                                        BibleInfo.letterSpacing,
-                                                    fontSize: BibleInfo
-                                                            .fontSizeScale *
-                                                        14,
-                                                    fontWeight: FontWeight.w500,
-                                                    color: CommanColor.black),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              );
-                            }
+                            // final downloadProvider =
+                            //     Provider.of<DownloadProvider>(context,
+                            //         listen: false);
+                            // final subscriptionPlan =
+                            //     await downloadProvider.getSubscriptionPlan();
+                            // final isSubscribed = subscriptionPlan != null &&
+                            //     subscriptionPlan.isNotEmpty &&
+                            //     ['platinum', 'gold', 'silver']
+                            //         .contains(subscriptionPlan.toLowerCase());
+                            // if (isSubscribed) {
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (context) => const MainBackupDialog(),
+                            );
+                            // } else {
+                            //   await SharPreferences.setString('OpenAd', '1');
+                            //   if (!context.mounted) return;
+                            //   showDialog(
+                            //     context: context,
+                            //     barrierDismissible: false,
+                            //     builder: (ctx) {
+                            //       final dlgWidth =
+                            //           MediaQuery.of(ctx).size.width;
+                            //       return Dialog(
+                            //         backgroundColor: CommanColor.white,
+                            //         shape: RoundedRectangleBorder(
+                            //           borderRadius: BorderRadius.circular(15),
+                            //         ),
+                            //         elevation: 16,
+                            //         child: Padding(
+                            //           padding: const EdgeInsets.symmetric(
+                            //               horizontal: 16, vertical: 24),
+                            //           child: Column(
+                            //             mainAxisSize: MainAxisSize.min,
+                            //             crossAxisAlignment:
+                            //                 CrossAxisAlignment.stretch,
+                            //             children: [
+                            //               Text(
+                            //                 "You're not subscribed. Subscribe to export and import your data.",
+                            //                 textAlign: TextAlign.center,
+                            //                 style: TextStyle(
+                            //                   color: CommanColor.black,
+                            //                   fontSize:
+                            //                       dlgWidth > 450 ? 19 : 15,
+                            //                 ),
+                            //               ),
+                            //               const SizedBox(height: 20),
+                            //               GestureDetector(
+                            //                 onTap: () {
+                            //                   Navigator.pop(ctx);
+                            //                   Get.to(
+                            //                     () => SubscriptionScreen(
+                            //                       sixMonthPlan:
+                            //                           BibleInfo.sixMonthPlanid,
+                            //                       oneYearPlan:
+                            //                           BibleInfo.oneYearPlanid,
+                            //                       lifeTimePlan:
+                            //                           BibleInfo.lifeTimePlanid,
+                            //                       checkad: 'drawer',
+                            //                     ),
+                            //                     transition:
+                            //                         Transition.cupertinoDialog,
+                            //                     duration: const Duration(
+                            //                         milliseconds: 300),
+                            //                   );
+                            //                 },
+                            //                 child: Container(
+                            //                   padding:
+                            //                       const EdgeInsets.symmetric(
+                            //                           vertical: 8),
+                            //                   decoration: BoxDecoration(
+                            //                     color: CommanColor
+                            //                         .lightDarkPrimary(ctx),
+                            //                     borderRadius:
+                            //                         const BorderRadius.all(
+                            //                             Radius.circular(5)),
+                            //                     boxShadow: const [
+                            //                       BoxShadow(
+                            //                           color: Colors.black26,
+                            //                           blurRadius: 2)
+                            //                     ],
+                            //                   ),
+                            //                   child: Text(
+                            //                     'Subscribe',
+                            //                     textAlign: TextAlign.center,
+                            //                     style: TextStyle(
+                            //                       letterSpacing:
+                            //                           BibleInfo.letterSpacing,
+                            //                       fontSize:
+                            //                           BibleInfo.fontSizeScale *
+                            //                               14,
+                            //                       fontWeight: FontWeight.w500,
+                            //                       color: Colors.white,
+                            //                     ),
+                            //                   ),
+                            //                 ),
+                            //               ),
+                            //               const SizedBox(height: 12),
+                            //               GestureDetector(
+                            //                 onTap: () => Navigator.pop(ctx),
+                            //                 child: Container(
+                            //                   padding:
+                            //                       const EdgeInsets.symmetric(
+                            //                           vertical: 8),
+                            //                   decoration: BoxDecoration(
+                            //                     color: CommanColor.lightGrey1,
+                            //                     borderRadius:
+                            //                         const BorderRadius.all(
+                            //                             Radius.circular(5)),
+                            //                     boxShadow: const [
+                            //                       BoxShadow(
+                            //                           color: Colors.black26,
+                            //                           blurRadius: 2)
+                            //                     ],
+                            //                   ),
+                            //                   child: Text(
+                            //                     'Cancel',
+                            //                     textAlign: TextAlign.center,
+                            //                     style: TextStyle(
+                            //                         letterSpacing:
+                            //                             BibleInfo.letterSpacing,
+                            //                         fontSize: BibleInfo
+                            //                                 .fontSizeScale *
+                            //                             14,
+                            //                         fontWeight: FontWeight.w500,
+                            //                         color: CommanColor.black),
+                            //                   ),
+                            //                 ),
+                            //               ),
+                            //             ],
+                            //           ),
+                            //         ),
+                            //       );
+                            //     },
+                            //   );
+                            // }
                           },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -6729,6 +6649,11 @@ class _HomeScreenState extends State<HomeScreen>
 
           final direction = scrollController.position.userScrollDirection;
           final currentOffset = scrollController.position.pixels;
+
+          final showBackToTop = currentOffset > 320;
+          if (_showBackToTop != showBackToTop && mounted) {
+            setState(() => _showBackToTop = showBackToTop);
+          }
 
           // If at the top, always show UI
           if (currentOffset <= 0) {

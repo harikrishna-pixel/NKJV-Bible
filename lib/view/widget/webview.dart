@@ -7,7 +7,7 @@ import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -24,7 +24,6 @@ class FeedbackWebView extends StatefulWidget {
 
 class _FeedbackWebViewState extends State<FeedbackWebView> {
   final GlobalKey webViewKey = GlobalKey();
-  var connectionStatus = <ConnectivityResult>[].obs;
   InAppWebViewController? webViewController;
   InAppWebViewSettings settings = InAppWebViewSettings(
       isInspectable: kDebugMode,
@@ -38,6 +37,23 @@ class _FeedbackWebViewState extends State<FeedbackWebView> {
   String? url;
   bool isLoading = true;
   double progress = 0;
+
+  bool _isFeedbackSuccessUrl(Uri uri) {
+    if (!uri.toString().contains('m_feedback/API/feedback_form/index.php')) {
+      return false;
+    }
+    // Server returns response screen params like:
+    // ?repsonse_screen=1&r_res=suc&r_msg=Thank%20you...
+    final responseScreen = uri.queryParameters['repsonse_screen'];
+    final result = uri.queryParameters['r_res'];
+    return responseScreen == '1' && result == 'suc';
+  }
+
+  String? _feedbackSuccessMessage(Uri uri) {
+    final msg = uri.queryParameters['r_msg'];
+    if (msg == null || msg.trim().isEmpty) return null;
+    return msg;
+  }
 
   @override
   void initState() {
@@ -66,16 +82,13 @@ class _FeedbackWebViewState extends State<FeedbackWebView> {
   }
 
   Future<void> checknetwork() async {
-    // bool hasConnection = connectionStatus.first == ConnectivityResult.wifi ||
-    //         connectionStatus.first == ConnectivityResult.mobile
-    //     ? true
-    //     : false;
-    final connectionStatus = await (Connectivity().checkConnectivity());
-
-    if (connectionStatus.first == ConnectivityResult.wifi ||
-        connectionStatus.first == ConnectivityResult.mobile) {
-    } else {
-      return Constants.showToast("No internet connection");
+    try {
+      final hasInternet = await InternetConnection().hasInternetAccess;
+      if (!hasInternet) {
+        Constants.showToast("No internet connection");
+      }
+    } catch (_) {
+      // Do not block feedback when connectivity check fails.
     }
   }
 
@@ -154,15 +167,26 @@ class _FeedbackWebViewState extends State<FeedbackWebView> {
                           this.url = url.toString();
                           isLoading = true;
                         });
-                        if (url.toString().contains('addUserSurveyData.php')) {
+                        final uri = Uri.tryParse(url.toString());
+                        if (uri != null && _isFeedbackSuccessUrl(uri)) {
                           Get.back();
                           Constants.showToast(
-                              'Your submission has been received!!');
+                              _feedbackSuccessMessage(uri) ??
+                                  'Thank you for the valuable feedback!');
+                          return;
                         }
                       },
                       shouldOverrideUrlLoading:
                           (controller, navigationAction) async {
                         var uri = navigationAction.request.url!;
+
+                        if (_isFeedbackSuccessUrl(Uri.parse(uri.toString()))) {
+                          Get.back();
+                          Constants.showToast(
+                              _feedbackSuccessMessage(Uri.parse(uri.toString())) ??
+                                  'Thank you for the valuable feedback!');
+                          return NavigationActionPolicy.CANCEL;
+                        }
 
                         if (![
                           "http",
@@ -187,11 +211,20 @@ class _FeedbackWebViewState extends State<FeedbackWebView> {
                           isLoading = false;
                         });
                       },
-                      onReceivedError: (controller, request, error) {
+                      onReceivedError: (controller, request, error) async {
                         pullToRefreshController?.endRefreshing();
                         if (error.description ==
                             "The Internet connection appears to be offline.") {
-                          Constants.showToast("No internet connection", 4000);
+                          try {
+                            final hasInternet =
+                                await InternetConnection().hasInternetAccess;
+                            if (!hasInternet) {
+                              Constants.showToast(
+                                  "No internet connection", 4000);
+                            }
+                          } catch (_) {
+                            // Skip toast when connectivity cannot be verified.
+                          }
                         }
                         setState(() {
                           isLoading = false; // Hide loader on error

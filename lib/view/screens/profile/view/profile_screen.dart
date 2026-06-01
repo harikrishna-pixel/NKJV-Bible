@@ -549,8 +549,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                 Padding(
                                   padding: const EdgeInsets.symmetric(
                                       vertical: 10, horizontal: 5),
-                                  child: InkWell(
-                                    onTap: () async {
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      InkWell(
+                                        onTap: () async {
                                       // Same logic as Library hamburger: if subscribed show Export dialog, else show Subscribe dialog
                                       final downloadProvider =
                                           P.Provider.of<DownloadProvider>(
@@ -757,14 +761,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                           },
                                         );
                                       }
-                                    },
-                                    child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.center,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.start,
-                                      children: [
-                                        Container(
+                                        },
+                                        child: Container(
                                           padding: const EdgeInsets.symmetric(
                                               vertical: 8, horizontal: 12),
                                           decoration: BoxDecoration(
@@ -793,27 +791,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                                         18),
                                           ),
                                         ),
-                                        const Spacer(),
-                                        Text(
-                                          'Last Backup Date: ${(lastExportedDate) == null ? 'Not Yet' : DateFormat('yyyy/MM/dd').format(lastExportedDate!)}',
-                                          style: CommanStyle.bw16500(context)
-                                              .copyWith(
-                                                  letterSpacing:
-                                                      BibleInfo.letterSpacing,
-                                                  fontSize:
-                                                      BibleInfo.fontSizeScale *
-                                                          12,
-                                                  fontWeight: FontWeight.w400),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Icon(
-                                          Icons.keyboard_arrow_right_outlined,
-                                          color:
-                                              CommanColor.whiteBlack(context),
-                                          size: 28,
-                                        )
-                                      ],
-                                    ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        'Last Backup Date: ${(lastExportedDate) == null ? 'Not Yet' : DateFormat('yyyy/MM/dd').format(lastExportedDate!)}',
+                                        textAlign: TextAlign.center,
+                                        style: CommanStyle.bw16500(context)
+                                            .copyWith(
+                                                letterSpacing:
+                                                    BibleInfo.letterSpacing,
+                                                fontSize:
+                                                    BibleInfo.fontSizeScale *
+                                                        12,
+                                                fontWeight: FontWeight.w400),
+                                      ),
+                                    ],
                                   ),
                                 )
                               ],

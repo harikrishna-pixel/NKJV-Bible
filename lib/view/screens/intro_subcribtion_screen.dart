@@ -116,13 +116,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       return;
     }
 
-    // Main paywall default selection: prefer Lifetime when available.
+    // Main paywall default selection: prefer 1-year plan when available.
     // Keep milestone / invisible hosts and exit-offer flows unchanged.
     if (!widget.invisiblePurchaseHost && !widget.fromHomeExitOffer) {
-      if (_products.length >= 3) {
-        selectedindex = 2;
+      if (_products.length >= 2) {
+        selectedindex = 1;
       } else if (_products.isNotEmpty) {
-        selectedindex = _products.length - 1;
+        selectedindex = 0;
       }
     }
   }

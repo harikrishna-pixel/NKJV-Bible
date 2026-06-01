@@ -140,6 +140,16 @@ bool _isStreakDark(BuildContext context) {
   }
 }
 
+bool _isStreakWhiteLight(BuildContext context) {
+  try {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    return themeProvider.currentCustomTheme == AppCustomTheme.white &&
+        themeProvider.themeMode != ThemeMode.dark;
+  } catch (_) {
+    return false;
+  }
+}
+
 /// Old-paper (parchment) colors for Streak Flow; avoids app default (e.g. light yellow).
 List<Color> _streakGradientColors(BuildContext context) {
   try {
@@ -147,6 +157,13 @@ List<Color> _streakGradientColors(BuildContext context) {
     if (themeProvider.themeMode == ThemeMode.dark) {
       final Color dark = CommanColor.darkPrimaryColor;
       return [dark, dark, dark];
+    }
+    if (themeProvider.currentCustomTheme == AppCustomTheme.white) {
+      return [
+        Colors.white,
+        const Color(0xFFF7F7F7),
+        const Color(0xFFEFEFEF),
+      ];
     }
     // Use fixed old-paper palette so Connection and Streak Flow feel consistent.
     return [
@@ -163,11 +180,115 @@ List<Color> _streakGradientColors(BuildContext context) {
   }
 }
 
-Color _streakTextColor(BuildContext context) =>
-    _isStreakDark(context) ? Colors.white : _kStreakBrown;
+Color _streakTextColor(BuildContext context) {
+  if (_isStreakDark(context)) return Colors.white;
+  if (_isStreakWhiteLight(context)) return const Color(0xFF2C2C2C);
+  return _kStreakBrown;
+}
 
 Color _streakPanelColor(BuildContext context) =>
     _isStreakDark(context) ? Colors.white.withOpacity(0.12) : _kStreakCream;
+
+/// Shared frosted panel used on Verse / Devotional / Prayer streak steps.
+BoxDecoration _streakStepContentBoxDecoration(BuildContext context) {
+  final isDark = _isStreakDark(context);
+  return BoxDecoration(
+    color: _streakPanelColor(context)
+        .withOpacity(isDark ? 0.18 : 0.88),
+    borderRadius: BorderRadius.circular(12),
+    border: Border.all(
+      color: _streakTextColor(context).withOpacity(isDark ? 0.18 : 0.12),
+      width: 1.2,
+    ),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withOpacity(isDark ? 0.18 : 0.10),
+        blurRadius: 18,
+        offset: const Offset(0, 8),
+      ),
+    ],
+  );
+}
+
+Widget _streakStepContentBox(BuildContext context, Widget child) {
+  return Container(
+    padding: const EdgeInsets.all(24),
+    decoration: _streakStepContentBoxDecoration(context),
+    child: child,
+  );
+}
+
+/// Opaque wrapper so screenshot capture produces a solid share image.
+Widget _streakShareScreenshotChild(BuildContext context, Widget child) {
+  final isDark = _isStreakDark(context);
+  return Container(
+    color: isDark ? const Color(0xFF1E1408) : const Color(0xFFF5F0E6),
+    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+    child: _streakStepContentBox(context, child),
+  );
+}
+
+/// Share card with app branding (matches home Verse of the Day footer).
+Widget _streakShareCardForCapture(BuildContext context, Widget content) {
+  final isDark = _isStreakDark(context);
+  final labelColor = isDark ? _kParchmentLight : const Color(0xFF3E2723);
+  final screenWidth = MediaQuery.sizeOf(context).width;
+  return SizedBox(
+    width: screenWidth > 450 ? 400 : screenWidth.clamp(300.0, 400.0),
+    child: Container(
+      color: isDark ? const Color(0xFF1E1408) : const Color(0xFFF5F0E6),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _streakStepContentBox(context, content),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Image.asset(
+                'assets/Icon-1024.png',
+                height: 28,
+                width: 28,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                BibleInfo.bible_shortName,
+                style: TextStyle(
+                  color: labelColor,
+                  letterSpacing: BibleInfo.letterSpacing,
+                  fontSize: BibleInfo.fontSizeScale * 15,
+                  fontWeight: FontWeight.w700,
+                  height: 1.2,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<Uint8List?> _captureStreakShareImage(
+  BuildContext context, {
+  required Widget content,
+}) async {
+  final dpr = MediaQuery.of(context).devicePixelRatio;
+  final controller = ScreenshotController();
+  try {
+    return await controller.captureFromWidget(
+      _streakShareCardForCapture(context, content),
+      delay: const Duration(milliseconds: 350),
+      pixelRatio: (dpr * 2).clamp(2.5, 4.0),
+      context: context,
+    );
+  } catch (e) {
+    debugPrint('Streak share capture failed: $e');
+    return null;
+  }
+}
 
 String _shareTextWithAppUrl(String content) {
   final androidLink =
@@ -204,10 +325,18 @@ Future<void> _shareAsImage(
           '${dir.path}/streak_share_${DateTime.now().millisecondsSinceEpoch}.png';
       final file = File(path);
       await file.writeAsBytes(imageBytes, flush: true);
-      final shareText = _shareTextWithAppUrl(fallbackText);
-      await Share.shareXFiles([XFile(path)], text: shareText);
+      final box = context.findRenderObject() as RenderBox?;
+      await Share.shareXFiles(
+        [XFile(path, mimeType: 'image/png')],
+        subject: '${BibleInfo.bible_shortName} app',
+        text: '',
+        sharePositionOrigin: box != null
+            ? box.localToGlobal(Offset.zero) & box.size
+            : null,
+      );
       return;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Streak image share failed: $e');
       // fall through to text share
     }
   }
@@ -470,16 +599,18 @@ Widget _buildStepIndicator(BuildContext context, int step) {
         ),
       ),
       const SizedBox(height: 6),
-      Transform.rotate(
-        angle: 0.785398, // 45 degrees for diamond
-        child: Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: _kStreakGold,
-            border: Border.all(
-              color: _kStreakGold.withOpacity(0.8),
-              width: 1,
+      Center(
+        child: Transform.rotate(
+          angle: 0.785398, // 45 degrees for diamond
+          child: Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: _kStreakGold,
+              border: Border.all(
+                color: _kStreakGold.withOpacity(0.8),
+                width: 1,
+              ),
             ),
           ),
         ),
@@ -1109,57 +1240,20 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Row(
                   children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back_ios,
-                          color: _streakTextColor(context)),
-                      onPressed: () async {
-                        if (widget.viewOnly) {
-                          if (context.mounted &&
-                              Navigator.of(context).canPop()) {
-                            Navigator.of(context).pop();
-                          } else {
-                            Get.back();
-                          }
-                          return;
-                        }
-                        // If user abandons an active restore flow before completion,
-                        // refund the debited credits once and clear restore state.
-                        try {
-                          final isRestoreRun = (await SharPreferences.getBoolean(
-                                  SharPreferences.streakFlowRestoreActive)) ==
-                              true;
-                          if (isRestoreRun) {
-                            final restoreDate = await SharPreferences.getString(
-                                SharPreferences.streakFlowRestoreDate);
-                            final debitedFor = await SharPreferences.getString(
-                                _StreakPausedScreenState._restoreDebitedDateKey);
-                            if (restoreDate != null &&
-                                restoreDate.isNotEmpty &&
-                                debitedFor == restoreDate) {
-                              final stepsMap = await _readStreakFlowStepsByDay();
-                              final stepsForRestore = stepsMap[restoreDate] ?? 0;
-                              if (stepsForRestore <= 0) {
-                                await WalletService.addCredits(
-                                    _StreakPausedScreenState._restoreCost);
-                                await SharPreferences.setBoolean(
-                                    SharPreferences.streakFlowRestoreActive,
-                                    false);
-                                await SharPreferences.setString(
-                                    SharPreferences.streakFlowRestoreDate, '');
-                                await SharPreferences.setString(
-                                    _StreakPausedScreenState._restoreDebitedDateKey,
-                                    '');
+                    widget.viewOnly
+                        ? IconButton(
+                            icon: Icon(Icons.arrow_back_ios,
+                                color: _streakTextColor(context)),
+                            onPressed: () async {
+                              if (context.mounted &&
+                                  Navigator.of(context).canPop()) {
+                                Navigator.of(context).pop();
+                              } else {
+                                Get.back();
                               }
-                            }
-                          }
-                        } catch (_) {}
-                        final today =
-                            DateTime.now().toIso8601String().split('T')[0];
-                        await SharPreferences.setString(
-                            SharPreferences.streakFlowDismissedDate, today);
-                        _goToHome(context);
-                      },
-                    ),
+                            },
+                          )
+                        : const SizedBox(width: 48),
                     Expanded(
                       child: Center(
                         child: _buildStepIndicator(context, 1),
@@ -1358,30 +1452,64 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                 padding: const EdgeInsets.only(bottom: 32),
                 child: widget.viewOnly
                     ? const SizedBox.shrink()
-                    : _parchmentButton(
-                        context,
-                        label: 'Take the Next Step',
-                        onPressed: () async {
-                          final dayKey = await _currentStreakFlowProgressDayKey();
-                          final byDay = await _readStreakFlowItemByDay();
-                          MoodPrayerItem? item =
-                              _deserializeMoodPrayerItem(byDay[dayKey]);
-                          item ??= await MoodPrayerLoader.pickItem(
-                              connectionIndex: _connectionIndex);
-                          if (!mounted) return;
-                          if (item == null) {
-                            _goToHome(context);
-                            return;
-                          }
-                          await _storeActiveStreakFlowItem(
-                            item.copyWith(connectionSliderValue: _value),
-                          );
-                          await SharPreferences.setInt(
-                              SharPreferences.streakFlowStepsCompletedToday, 1);
-                          await _storeActiveStreakFlowSteps(1);
-                          if (!mounted) return;
-                          Get.to(() => StreakVerseScreen(item: item!));
-                        },
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _parchmentButton(
+                            context,
+                            label: 'Take the Next Step',
+                            onPressed: () async {
+                              final dayKey =
+                                  await _currentStreakFlowProgressDayKey();
+                              final byDay = await _readStreakFlowItemByDay();
+                              MoodPrayerItem? item =
+                                  _deserializeMoodPrayerItem(byDay[dayKey]);
+                              item ??= await MoodPrayerLoader.pickItem(
+                                  connectionIndex: _connectionIndex);
+                              if (!mounted) return;
+                              if (item == null) {
+                                _goToHome(context);
+                                return;
+                              }
+                              await _storeActiveStreakFlowItem(
+                                item.copyWith(connectionSliderValue: _value),
+                              );
+                              await SharPreferences.setInt(
+                                  SharPreferences.streakFlowStepsCompletedToday,
+                                  1);
+                              await _storeActiveStreakFlowSteps(1);
+                              if (!mounted) return;
+                              Get.to(() => StreakVerseScreen(item: item!));
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          TextButton(
+                            onPressed: () async {
+                              final today = DateTime.now()
+                                  .toIso8601String()
+                                  .split('T')[0];
+                              await SharPreferences.setString(
+                                  SharPreferences.streakFlowDismissedDate,
+                                  today);
+                              _goToHome(context);
+                            },
+                            child: Text(
+                              'Skip',
+                              style: TextStyle(
+                                fontSize: MediaQuery.of(context).size.width > 450
+                                    ? 16
+                                    : 15,
+                                fontWeight: FontWeight.w600,
+                                color: _streakTextColor(context)
+                                    .withOpacity(0.85),
+                                fontFamily: 'Georgia',
+                                decoration: TextDecoration.underline,
+                                decorationColor: _streakTextColor(context)
+                                    .withOpacity(0.6),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
               ),
             ],
@@ -1517,9 +1645,12 @@ Widget _parchmentButton(
   required VoidCallback onPressed,
 }) {
   final isDark = _isStreakDark(context);
+  final isWhiteLight = _isStreakWhiteLight(context);
   final baseTextColor = _streakTextColor(context);
   // Make button match the streak UI palette in both themes.
-  final btnBg = isDark ? const Color(0xFF2A1F12) : _kStreakGold;
+  final btnBg = isDark
+      ? const Color(0xFF2A1F12)
+      : (isWhiteLight ? const Color(0xFF424242) : _kStreakGold);
   final labelColor = isDark ? const Color(0xFFF5EAC6) : Colors.white;
   return Padding(
     padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -1630,9 +1761,15 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Row(
                   children: [
-                    // Placeholder to balance the close icon on the right so
-                    // the step indicator stays visually centered.
-                    const SizedBox(width: 48),
+                    IgnorePointer(
+                      child: Opacity(
+                        opacity: 0,
+                        child: IconButton(
+                          icon: const Icon(Icons.close, size: 24),
+                          onPressed: () {},
+                        ),
+                      ),
+                    ),
                     Expanded(
                       child: Center(
                         child: _buildStepIndicator(context, 2),
@@ -1677,27 +1814,9 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                         child: Center(
                           child: Screenshot(
                             controller: _screenshotController,
-                            child: Container(
-                              padding: const EdgeInsets.all(24),
-                              decoration: BoxDecoration(
-                                // color: _streakPanelColor(context).withOpacity(
-                                //     _isStreakDark(context) ? 0.18 : 0.88),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: _streakTextColor(context).withOpacity(
-                                      _isStreakDark(context) ? 0.18 : 0.12),
-                                  width: 1.2,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(
-                                        _isStreakDark(context) ? 0.18 : 0.10),
-                                    blurRadius: 18,
-                                    offset: const Offset(0, 8),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
+                            child: _streakShareScreenshotChild(
+                              context,
+                              Column(
                                 mainAxisSize: MainAxisSize.min,
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
@@ -1745,7 +1864,7 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                       IconButton(
                         icon: Icon(
                           _saved ? Icons.bookmark : Icons.bookmark_border,
-                          color: _streakTextColor(context),
+                          color: Colors.white,
                           size: 28,
                         ),
                         onPressed: () async {
@@ -1788,14 +1907,47 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                       ),
                       Builder(
                         builder: (shareContext) => IconButton(
-                          icon:
-                              Icon(Icons.share, color: Colors.white, size: 26),
+                          icon: Icon(
+                            Icons.share,
+                            color: Colors.white,
+                            size: 28,
+                          ),
                           onPressed: () async {
-                            final dpr =
-                                MediaQuery.of(shareContext).devicePixelRatio;
-                            final image = await _screenshotController.capture(
-                              delay: const Duration(milliseconds: 220),
-                              pixelRatio: (dpr * 2).clamp(2.0, 4.0),
+                            final item = widget.item;
+                            final image = await _captureStreakShareImage(
+                              shareContext,
+                              content: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    '"${item.verseText}"',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: MediaQuery.of(shareContext)
+                                                  .size
+                                                  .width >
+                                              450
+                                          ? 26
+                                          : 22,
+                                      height: 1.5,
+                                      color: _streakTextColor(shareContext),
+                                      fontFamily: 'Georgia',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    '- ${item.verseReference}',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontStyle: FontStyle.italic,
+                                      color: _streakTextColor(shareContext),
+                                      fontFamily: 'Georgia',
+                                    ),
+                                  ),
+                                ],
+                              ),
                             );
                             if (shareContext.mounted) {
                               await _shareAsImage(
@@ -1954,9 +2106,9 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                         child: Center(
                           child: Screenshot(
                             controller: _screenshotController,
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Text(
+                            child: _streakShareScreenshotChild(
+                              context,
+                              Text(
                                 item.devotionalText,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
@@ -1986,7 +2138,7 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                       IconButton(
                         icon: Icon(
                           _saved ? Icons.bookmark : Icons.bookmark_border,
-                          color: _streakTextColor(context),
+                          color: Colors.white,
                           size: 28,
                         ),
                         onPressed: () async {
@@ -2032,13 +2184,26 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                       Builder(
                         builder: (shareContext) => IconButton(
                           icon: Icon(Icons.share,
-                              color: _streakTextColor(shareContext), size: 26),
+                              color: Colors.white, size: 28),
                           onPressed: () async {
-                            final dpr =
-                                MediaQuery.of(shareContext).devicePixelRatio;
-                            final image = await _screenshotController.capture(
-                              delay: const Duration(milliseconds: 220),
-                              pixelRatio: (dpr * 2).clamp(2.0, 4.0),
+                            final item = widget.item;
+                            final image = await _captureStreakShareImage(
+                              shareContext,
+                              content: Text(
+                                item.devotionalText,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: MediaQuery.of(shareContext)
+                                              .size
+                                              .width >
+                                          450
+                                      ? 22
+                                      : 20,
+                                  height: 1.6,
+                                  color: _streakTextColor(shareContext),
+                                  fontFamily: 'Georgia',
+                                ),
+                              ),
                             );
                             if (shareContext.mounted) {
                               await _shareAsImage(
@@ -2196,9 +2361,9 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                         child: Center(
                           child: Screenshot(
                             controller: _screenshotController,
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Text(
+                            child: _streakShareScreenshotChild(
+                              context,
+                              Text(
                                 item.prayerText,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
@@ -2228,7 +2393,7 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                       IconButton(
                         icon: Icon(
                           _saved ? Icons.bookmark : Icons.bookmark_border,
-                          color: _streakTextColor(context),
+                          color: Colors.white,
                           size: 28,
                         ),
                         onPressed: () async {
@@ -2476,13 +2641,26 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                       Builder(
                         builder: (shareContext) => IconButton(
                           icon: Icon(Icons.share,
-                              color: _streakTextColor(shareContext), size: 26),
+                              color: Colors.white, size: 28),
                           onPressed: () async {
-                            final dpr =
-                                MediaQuery.of(shareContext).devicePixelRatio;
-                            final image = await _screenshotController.capture(
-                              delay: const Duration(milliseconds: 220),
-                              pixelRatio: (dpr * 2).clamp(2.0, 4.0),
+                            final item = widget.item;
+                            final image = await _captureStreakShareImage(
+                              shareContext,
+                              content: Text(
+                                item.prayerText,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: MediaQuery.of(shareContext)
+                                              .size
+                                              .width >
+                                          450
+                                      ? 22
+                                      : 20,
+                                  height: 1.7,
+                                  color: _streakTextColor(shareContext),
+                                  fontFamily: 'Georgia',
+                                ),
+                              ),
                             );
                             if (shareContext.mounted) {
                               await _shareAsImage(
@@ -2542,7 +2720,7 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF3B2A1A) : _kInkBrown,
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(color: _kCandleGold, width: 1.5),
           boxShadow: [
             BoxShadow(
@@ -2826,6 +3004,22 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
         child: SafeArea(
           child: Stack(
             children: [
+              if (isDark)
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withOpacity(0.62),
+                          Colors.black.withOpacity(0.45),
+                          Colors.black.withOpacity(0.58),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               // 1. Candlelight rays (same logic, parchment palette)
               _lightRaysOverlay(isDark),
               // 2. Ink-bleed celebration burst (same logic, parchment palette)
@@ -2834,7 +3028,12 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
                 top: 0,
                 right: 0,
                 child: IconButton(
-                  icon: Icon(Icons.close, color: textColor.withOpacity(0.85)),
+                  icon: Icon(
+                    Icons.close,
+                    color: isDark
+                        ? Colors.white.withOpacity(0.9)
+                        : textColor.withOpacity(0.85),
+                  ),
                   onPressed: () => _goToHome(context),
                   tooltip: 'Close',
                 ),
@@ -2937,15 +3136,25 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
                                         ? 30
                                         : 24,
                                 fontWeight: FontWeight.w800,
-                                color: textColor,
+                                color: isDark ? Colors.white : textColor,
                                 fontFamily: 'Georgia',
-                                // Slight letter-spacing for inscription feel
                                 letterSpacing: 1.0,
+                                shadows: isDark
+                                    ? const [
+                                        Shadow(
+                                          color: Colors.black87,
+                                          blurRadius: 10,
+                                          offset: Offset(0, 2),
+                                        ),
+                                      ]
+                                    : null,
                               ),
                             ),
 
                             const SizedBox(height: 8),
-                            _ManuscriptRule(color: _kInkSepia.withOpacity(0.5)),
+                            _ManuscriptRule(
+                                color: (isDark ? Colors.white : _kInkSepia)
+                                    .withOpacity(0.5)),
                           ],
                         ),
                       ),
@@ -2957,23 +3166,66 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
                 const SizedBox(height: 8),
 
                 // Scripture-style subtitle
-                Text(
-                  'You\'re walking faithfully today.',
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: textColor.withOpacity(0.85),
-                    fontFamily: 'Georgia',
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Keep the light alive.',
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: textColor.withOpacity(0.85),
-                    fontFamily: 'Georgia',
-                    fontStyle: FontStyle.italic,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 28),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Colors.black.withOpacity(0.35)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      child: Column(
+                        children: [
+                          Text(
+                            'You\'re walking faithfully today.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 15,
+                              color: isDark
+                                  ? Colors.white.withOpacity(0.95)
+                                  : textColor.withOpacity(0.85),
+                              fontFamily: 'Georgia',
+                              fontStyle: FontStyle.italic,
+                              shadows: isDark
+                                  ? const [
+                                      Shadow(
+                                        color: Colors.black87,
+                                        blurRadius: 8,
+                                        offset: Offset(0, 1),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Keep the light alive.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 15,
+                              color: isDark
+                                  ? Colors.white.withOpacity(0.95)
+                                  : textColor.withOpacity(0.85),
+                              fontFamily: 'Georgia',
+                              fontStyle: FontStyle.italic,
+                              shadows: isDark
+                                  ? const [
+                                      Shadow(
+                                        color: Colors.black87,
+                                        blurRadius: 8,
+                                        offset: Offset(0, 1),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
 

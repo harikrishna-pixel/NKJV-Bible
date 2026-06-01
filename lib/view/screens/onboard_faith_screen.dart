@@ -702,6 +702,9 @@ class _OnboardingThemeSelectionScreenState
 
   Widget themeBox(AppCustomTheme theme) {
     final color = getColor(theme);
+    const outerRadius = 10.0;
+    const borderWidth = 3.0;
+    const innerRadius = outerRadius - borderWidth;
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -716,20 +719,28 @@ class _OnboardingThemeSelectionScreenState
         width: 70,
         height: 70,
         decoration: BoxDecoration(
-          color: color,
-          image: theme == AppCustomTheme.vintage
-              ? DecorationImage(
-                  image: AssetImage(Images.bgImage(context)),
-                  fit: BoxFit.cover,
-                )
-              : null,
+          borderRadius: BorderRadius.circular(outerRadius),
           border: Border.all(
             color: _selectedTheme == theme
                 ? Colors.brown
                 : const Color.fromARGB(255, 144, 144, 144),
-            width: 3,
+            width: borderWidth,
           ),
-          borderRadius: BorderRadius.circular(10),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(innerRadius),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: color,
+              image: theme == AppCustomTheme.vintage
+                  ? DecorationImage(
+                      image: AssetImage(Images.bgImage(context)),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: const SizedBox.expand(),
+          ),
         ),
       ),
     );
@@ -827,38 +838,45 @@ class _OnboardingThemeSelectionScreenState
                             ),
                             const SizedBox(height: 10),
                             Container(
-                              decoration: Provider.of<ThemeProvider>(context)
-                                          .currentCustomTheme ==
-                                      AppCustomTheme.vintage
-                                  ? BoxDecoration(
-                                      image: DecorationImage(
-                                          image: AssetImage(
-                                              Images.bgImage(context)),
-                                          fit: BoxFit.cover),
-                                      border: Border.all(
-                                        color: const Color(0xFFB08D6E)
-                                            .withValues(alpha: 0.7),
-                                      ),
-                                    )
-                                  : BoxDecoration(
-                                      color: Provider.of<ThemeProvider>(context)
-                                          .backgroundColor,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: const Color(0xFFB08D6E)
-                                            .withValues(alpha: 0.7),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: const Color(0xFFB08D6E)
+                                      .withValues(alpha: 0.7),
+                                ),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: DecoratedBox(
+                                  decoration: Provider.of<ThemeProvider>(context)
+                                              .currentCustomTheme ==
+                                          AppCustomTheme.vintage
+                                      ? BoxDecoration(
+                                          image: DecorationImage(
+                                            image: AssetImage(
+                                                Images.bgImage(context)),
+                                            fit: BoxFit.cover,
+                                          ),
+                                        )
+                                      : BoxDecoration(
+                                          color: Provider.of<ThemeProvider>(
+                                                  context)
+                                              .backgroundColor,
+                                        ),
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(14),
+                                    child: Text(
+                                      '1. In the beginning God created the heaven and the earth.\n\n'
+                                      '2. And the earth was without form, and void; and darkness was upon the face of the deep. '
+                                      'And the Spirit of God moved upon the face of the waters.',
+                                      style: TextStyle(
+                                        height: 1.4,
+                                        fontSize: 15.5,
+                                        color: Color(0xFF2E2C2B),
+                                        fontWeight: FontWeight.w500,
                                       ),
                                     ),
-                              padding: const EdgeInsets.all(14),
-                              child: const Text(
-                                '1. In the beginning God created the heaven and the earth.\n\n'
-                                '2. And the earth was without form, and void; and darkness was upon the face of the deep. '
-                                'And the Spirit of God moved upon the face of the waters.',
-                                style: TextStyle(
-                                  height: 1.4,
-                                  fontSize: 15.5,
-                                  color: Color(0xFF2E2C2B),
-                                  fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ),
                             ),
@@ -959,6 +977,9 @@ class _ThemePageState extends State<_ThemePage> {
 
   Widget themeBox(AppCustomTheme theme) {
     final color = getColor(theme);
+    const outerRadius = 10.0;
+    const borderWidth = 3.0;
+    const innerRadius = outerRadius - borderWidth;
     return GestureDetector(
       onTap: () {
         widget.onChanged(theme.name);
@@ -973,20 +994,28 @@ class _ThemePageState extends State<_ThemePage> {
         width: 70,
         height: 70,
         decoration: BoxDecoration(
-          color: color,
-          image: theme == AppCustomTheme.vintage
-              ? DecorationImage(
-                  image: AssetImage(Images.bgImage(context)),
-                  fit: BoxFit.cover,
-                )
-              : null,
+          borderRadius: BorderRadius.circular(outerRadius),
           border: Border.all(
             color: _selectedTheme == theme
                 ? Colors.brown
                 : const Color.fromARGB(255, 144, 144, 144),
-            width: 3,
+            width: borderWidth,
           ),
-          borderRadius: BorderRadius.circular(10),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(innerRadius),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: color,
+              image: theme == AppCustomTheme.vintage
+                  ? DecorationImage(
+                      image: AssetImage(Images.bgImage(context)),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: const SizedBox.expand(),
+          ),
         ),
       ),
     );
@@ -1038,34 +1067,42 @@ class _ThemePageState extends State<_ThemePage> {
           ),
           const SizedBox(height: 10),
           Container(
-            decoration: Provider.of<ThemeProvider>(context)
-                        .currentCustomTheme ==
-                    AppCustomTheme.vintage
-                ? BoxDecoration(
-                    image: DecorationImage(
-                        image: AssetImage(Images.bgImage(context)),
-                        fit: BoxFit.cover),
-                    border: Border.all(
-                      color: const Color(0xFFB08D6E).withValues(alpha: 0.7),
-                    ),
-                  )
-                : BoxDecoration(
-                    color: Provider.of<ThemeProvider>(context).backgroundColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: const Color(0xFFB08D6E).withValues(alpha: 0.7),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFB08D6E).withValues(alpha: 0.7),
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: DecoratedBox(
+                decoration: Provider.of<ThemeProvider>(context)
+                            .currentCustomTheme ==
+                        AppCustomTheme.vintage
+                    ? BoxDecoration(
+                        image: DecorationImage(
+                          image: AssetImage(Images.bgImage(context)),
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : BoxDecoration(
+                        color:
+                            Provider.of<ThemeProvider>(context).backgroundColor,
+                      ),
+                child: const Padding(
+                  padding: EdgeInsets.all(14),
+                  child: Text(
+                    '1. In the beginning God created the heaven and the earth.\n\n'
+                    '2. And the earth was without form, and void; and darkness was upon the face of the deep. '
+                    'And the Spirit of God moved upon the face of the waters.',
+                    style: TextStyle(
+                      height: 1.4,
+                      fontSize: 14,
+                      color: Color(0xFF2E2C2B),
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-            padding: const EdgeInsets.all(14),
-            child: const Text(
-              '1. In the beginning God created the heaven and the earth.\n\n'
-              '2. And the earth was without form, and void; and darkness was upon the face of the deep. '
-              'And the Spirit of God moved upon the face of the waters.',
-              style: TextStyle(
-                height: 1.4,
-                fontSize: 14,
-                color: Color(0xFF2E2C2B),
-                fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ),

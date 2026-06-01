@@ -671,6 +671,9 @@ class _SearchScreenState extends State<SearchScreen> {
                             scrollDirection: Axis.horizontal,
                             itemCount: 3,
                             itemBuilder: (context, index) {
+                              final isDark = CommanColor.isDarkTheme(context);
+                              final isSelected =
+                                  selectedValueFilterIndex == index;
                               return GestureDetector(
                                 onTap: () async {
                                   await SharPreferences.setString(
@@ -700,12 +703,28 @@ class _SearchScreenState extends State<SearchScreen> {
                                     width: screenWidth > 450 ? 65 : 50,
                                     height: 30,
                                     child: Card(
-                                      elevation: 2,
-                                      color: selectedValueFilterIndex == index
-                                          ? CommanColor.lightDarkPrimary(
-                                              context)
+                                      elevation: isSelected && isDark ? 0 : 2,
+                                      color: isSelected
+                                          ? (isDark
+                                              ? Colors.transparent
+                                              : CommanColor.lightDarkPrimary(
+                                                  context))
                                           : Colors.white,
                                       margin: EdgeInsets.only(right: 10),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        side: BorderSide(
+                                          color: isSelected
+                                              ? (isDark
+                                                  ? Colors.white
+                                                  : CommanColor.lightDarkPrimary(
+                                                      context))
+                                              : (isDark
+                                                  ? Colors.white70
+                                                  : Colors.grey.shade300),
+                                          width: isSelected ? 2 : 1,
+                                        ),
+                                      ),
                                       child: Center(
                                         child: index == 0
                                             ? Text(

@@ -518,6 +518,17 @@ class BackupDialog extends StatelessWidget {
               ),
             )),
       ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              "• ${BibleInfo.autoCloudBackupText}",
+              style: const TextStyle(
+                color: CommanColor.black,
+              ),
+            )),
+      ),
       const SizedBox(height: 20),
       Row(
         children: [
@@ -617,6 +628,15 @@ class BackupDialog extends StatelessWidget {
             color: CommanColor.black,
           ),
           // textAlign: TextAlign.left,
+        ),
+      ),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: const Text(
+          "• Also saved to your account when signed in",
+          style: TextStyle(
+            color: CommanColor.black,
+          ),
         ),
       ),
       const SizedBox(height: 20),

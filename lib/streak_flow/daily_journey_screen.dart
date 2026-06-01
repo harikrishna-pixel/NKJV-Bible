@@ -32,11 +32,42 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   int _stepsCompletedToday = 0;
   bool _loaded = false;
   int _currentStreak = 0;
-  List<WeekDayStatus> _weekStatuses = List.filled(7, WeekDayStatus.future);
   Map<String, int> _stepsByDay = {};
   // Rotates the weekly calendar to start from the app install day.
   // 0=Sun, 1=Mon, ..., 6=Sat (matches StreakService.getWeekDayStatuses order).
   int _installWeekStartIndexInSun = 0;
+  DateTime? _installDateOnly;
+
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  /// First day of the current 7-day Faith Journey week (anchored to install weekday).
+  DateTime _currentInstallWeekStart() {
+    final now = DateTime.now();
+    final todayWeekdayIndexInSun = now.weekday % 7;
+    final todayViewIndex =
+        (todayWeekdayIndexInSun - _installWeekStartIndexInSun + 7) % 7;
+    return _dateOnly(now).subtract(Duration(days: todayViewIndex));
+  }
+
+  DateTime _dayDateForViewIndex(int viewIndex) =>
+      _currentInstallWeekStart().add(Duration(days: viewIndex));
+
+  String _dayKeyForViewIndex(int viewIndex) =>
+      _dayDateForViewIndex(viewIndex).toIso8601String().split('T')[0];
+
+  WeekDayStatus _statusForInstallWeekDay(DateTime dayDate) {
+    final today = _dateOnly(DateTime.now());
+    final d = _dateOnly(dayDate);
+    if (_installDateOnly != null && d.isBefore(_installDateOnly!)) {
+      return WeekDayStatus.future;
+    }
+    if (d.isAfter(today)) return WeekDayStatus.future;
+    if (d == today) return WeekDayStatus.ongoing;
+    final dayKey = d.toIso8601String().split('T')[0];
+    final steps = _stepsByDay[dayKey] ?? 0;
+    if (steps >= 4) return WeekDayStatus.completed;
+    return WeekDayStatus.missed;
+  }
 
   @override
   void initState() {
@@ -61,7 +92,6 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
       }
     }
     final streak = await StreakService.getCurrentStreak();
-    final statuses = await StreakService.getWeekDayStatuses();
 
     // Save the "install/open" date once so the calendar UI starts from that weekday.
     final todayKey = DateTime.now().toIso8601String().split('T')[0];
@@ -97,9 +127,9 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
       setState(() {
         _stepsCompletedToday = steps;
         _currentStreak = streak;
-        _weekStatuses = statuses;
         _stepsByDay = parsedStepsMap;
         _installWeekStartIndexInSun = installIndexInSun;
+        _installDateOnly = _dateOnly(installDate);
         _loaded = true;
       });
     }
@@ -228,18 +258,10 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   }) async {
     final todayKey = DateTime.now().toIso8601String().split('T')[0];
 
-    // Calculate the date for the tapped day based on the rotated calendar.
-    // _weekStatuses from StreakService is ordered Sun..Sat, so we map view index → Sun-index.
-    final now = DateTime.now();
-    final todayDate = DateTime(now.year, now.month, now.day);
-    final todayWeekdayIndexInSun = now.weekday % 7; // Sun=0..Sat=6
-    final weekStartSunday =
-        todayDate.subtract(Duration(days: todayWeekdayIndexInSun));
-    final baseIndexInSun = (dayIndex + _installWeekStartIndexInSun) % 7;
-    final dayDate = weekStartSunday.add(Duration(days: baseIndexInSun));
-    final dayKey = dayDate.toIso8601String().split('T')[0];
+    final dayKey = _dayKeyForViewIndex(dayIndex);
+    final resolvedStatus = _statusForInstallWeekDay(_dayDateForViewIndex(dayIndex));
 
-    if (status == WeekDayStatus.future) {
+    if (resolvedStatus == WeekDayStatus.future) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Your streak days are coming soon.')),
@@ -250,7 +272,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
     final stored = _stepsByDay[dayKey];
     final stepsForDay = (dayKey == todayKey)
         ? ((stored != null && stored > 0) ? stored : _stepsCompletedToday)
-        : (stored ?? (status == WeekDayStatus.completed ? 4 : 0));
+        : (stored ?? (resolvedStatus == WeekDayStatus.completed ? 4 : 0));
 
     if (stepsForDay <= 0) {
       if (!mounted) return;
@@ -278,9 +300,11 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
 
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isVintage =
+        themeProvider.currentCustomTheme == AppCustomTheme.vintage;
     Color bgColor;
     try {
-      final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
       bgColor = themeProvider.themeMode == ThemeMode.dark
           ? CommanColor.darkPrimaryColor
           : themeProvider.backgroundColor;
@@ -288,8 +312,13 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
       bgColor = const Color(0xFFF5F0E6);
     }
     final isDark = bgColor == CommanColor.darkPrimaryColor;
-    final Color textColor = isDark ? Colors.white : _brown;
-    final Color panelColor = isDark ? Colors.white.withOpacity(0.12) : _panel;
+    final isWhiteLight = !isDark &&
+        themeProvider.currentCustomTheme == AppCustomTheme.white;
+    final Color accentBrown = isWhiteLight ? const Color(0xFF424242) : _brown;
+    final Color textColor = isDark ? Colors.white : accentBrown;
+    final Color panelColor = isDark
+        ? Colors.white.withOpacity(0.12)
+        : (isWhiteLight ? const Color(0xFFF0F0F0) : _panel);
 
     // Rotated calendar: view index 0 corresponds to install weekday.
     final int todayWeekdayIndexInSun =
@@ -301,12 +330,14 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage(Images.bgImage(context)),
-            fit: BoxFit.cover,
-          ),
-        ),
+        decoration: isVintage
+            ? BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage(Images.bgImage(context)),
+                  fit: BoxFit.cover,
+                ),
+              )
+            : BoxDecoration(color: bgColor),
         child: SafeArea(
           child: Column(
             children: [
@@ -365,34 +396,26 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                 ),
               ),
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SizedBox(height: 16),
-                      // Week circles: completed / missed / ongoing
-                      Row(
+                child: Column(
+                  children: [
+                    // Pinned: weekly streak + today's progress (scrolls independently below).
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Week circles: completed / missed / ongoing
+                          Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: List.generate(7, (i) {
                           final baseIndex =
                               (i + _installWeekStartIndexInSun) % 7;
-                          final status = baseIndex < _weekStatuses.length
-                              ? _weekStatuses[baseIndex]
-                              : WeekDayStatus.future;
+                          final dayDate = _dayDateForViewIndex(i);
+                          final dayKey = dayDate.toIso8601String().split('T')[0];
+                          final status = _statusForInstallWeekDay(dayDate);
                           final isToday = i == todayViewIndex;
                           final todayFullyCompleted =
                               isToday && _stepsCompletedToday >= 4;
-                          final DateTime now = DateTime.now();
-                          final DateTime todayDate =
-                              DateTime(now.year, now.month, now.day);
-                          final int todayWeekdayIndexInSun = now.weekday % 7;
-                          final DateTime weekStartSunday = todayDate
-                              .subtract(Duration(days: todayWeekdayIndexInSun));
-                          final dayKey = weekStartSunday
-                              .add(Duration(days: baseIndex))
-                              .toIso8601String()
-                              .split('T')[0];
                           final storedSteps = _stepsByDay[dayKey];
                           final int effectiveStepsForDay = (dayKey ==
                                   DateTime.now()
@@ -408,9 +431,8 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                           final bool isOngoing =
                               status == WeekDayStatus.ongoing &&
                                   !storedCompleted;
-                          final bool isCompleted = storedCompleted ||
-                              status == WeekDayStatus.completed ||
-                              todayFullyCompleted;
+                          final bool isCompleted =
+                              storedCompleted || todayFullyCompleted;
                           final bool isMissed = status == WeekDayStatus.missed;
                           final bool isFutureDay =
                               status == WeekDayStatus.future;
@@ -550,7 +572,20 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                           fontFamily: 'Georgia',
                         ),
                       ),
-                      const SizedBox(height: 20),
+                        ],
+                      ),
+                    ),
+                    Divider(
+                      height: 1,
+                      thickness: 1,
+                      color: textColor.withOpacity(isDark ? 0.12 : 0.08),
+                    ),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
                       // Today's Reward — only when daily streak is completed (all 4 steps)
                       if (_stepsCompletedToday >= 4) ...[
                         _card(
@@ -769,8 +804,11 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         ),
                       ),
                       const SizedBox(height: 32),
-                    ],
-                  ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

@@ -5,7 +5,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Celebration dialog when user completes the full 4-step streak (Day X Complete).
-/// Shows app logo, "Day X Complete", streak started strip, and Enable Daily Reminder.
+/// Shows "Day X Complete", streak summary strip, and Enable Daily Reminder.
 class StreakCompleteCelebrationDialog extends StatefulWidget {
   const StreakCompleteCelebrationDialog({
     super.key,
@@ -28,6 +28,11 @@ class _StreakCompleteCelebrationDialogState
 
   bool _isNotificationEnabled = false;
   bool _isLoading = true;
+
+  String get _streakStripLabel {
+    if (widget.streakCount <= 1) return 'Streak started!';
+    return '${widget.streakCount}-day streak!';
+  }
 
   bool _coercePrefsBool(Object? raw) {
     if (raw is bool) return raw;
@@ -158,9 +163,9 @@ class _StreakCompleteCelebrationDialogState
                       children: [
                         Icon(Icons.star, color: _gold, size: 22),
                         const SizedBox(width: 10),
-                        const Text(
-                          'Streak Started',
-                          style: TextStyle(
+                        Text(
+                          _streakStripLabel,
+                          style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                             color: _brown,

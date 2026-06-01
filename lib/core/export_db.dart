@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
+import 'package:biblebookapp/core/library_backup_upload_service.dart';
 import 'package:biblebookapp/Model/overall_db_model.dart';
 import 'package:biblebookapp/utils/custom_alert.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
@@ -174,12 +176,18 @@ class ExportDb {
     }
   }
 
+  static Future<File> writeBackupFileToDirectory(Directory folder) async {
+    final fileName = '${BibleInfo.bible_shortName}_Backup.enc';
+    final jsonData = await syncAllData();
+    final encodedData = encryptData(jsonEncode(jsonData));
+    final file = File('${folder.path}/$fileName');
+    await file.writeAsString(encodedData);
+    return file;
+  }
+
   static Future<void> getAllDataToExport(BuildContext context1) async {
     EasyLoading.show(status: "Please wait...");
     try {
-      final fileName = '${BibleInfo.bible_shortName}_Backup.enc';
-      final jsonData = await syncAllData();
-      String encodedData = encryptData(jsonEncode(jsonData));
       Directory? folder;
       Directory? directory;
       await SharPreferences.setString('OpenAd', '1');
@@ -210,11 +218,10 @@ class ExportDb {
       log('Directory: ${folder?.path}');
       await SharPreferences.setString('OpenAd', '1');
       if (folder != null) {
-        final file = File('${folder.path}/$fileName');
-        // final mainFolder = directory.path.split('/').last;
-        await file.writeAsString(encodedData);
+        final file = await writeBackupFileToDirectory(folder);
         await SharPreferences.setString(
             SharPreferences.lastExportedDate, DateTime.now().toString());
+        unawaited(LibraryBackupUploadService.uploadBackupFile(file));
         // await Share.shareXFiles([XFile(file.path)], text: "Here is your file");
 
         await Future.delayed(Duration(seconds: 2));
@@ -298,6 +305,31 @@ class ExportDb {
     OverallDbModel overAllDB = OverallDbModel.fromJson(jsonData);
     await overAllDB.updateLocalDB();
     await overAllDB.updateLocalDBsync();
+  }
+
+  /// Restores library data from an existing .enc backup file (e.g. cloud download).
+  /// Does not change [importData] file-picker flow.
+  static Future<String?> restoreBackupFromFile(File file) async {
+    await SharPreferences.setString('OpenAd', '1');
+    try {
+      if (!await file.exists()) {
+        Constants.showToast("File is not selected");
+        return "File is not selected";
+      }
+      final encryptedContent = await file.readAsString();
+      final decryptedContent = decryptData(encryptedContent);
+      await saveAllData(decryptedContent);
+      await Future.delayed(const Duration(seconds: 3));
+      await SharPreferences.setString('OpenAd', '1');
+      Constants.showToast(
+          "Data Imported Successfully. Please restart app to see the changes");
+      return null;
+    } catch (e, st) {
+      log('Error: $e,$st');
+      await SharPreferences.setString('OpenAd', '1');
+      Constants.showToast(e.toString());
+      return e.toString();
+    }
   }
 
   static Future importData() async {

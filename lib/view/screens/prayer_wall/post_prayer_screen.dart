@@ -219,6 +219,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
       onTap: () => FocusScope.of(context).unfocus(),
       behavior: HitTestBehavior.opaque,
       child: Scaffold(
+        resizeToAvoidBottomInset: false,
         body: Container(
           width: double.infinity,
           height: double.infinity,
@@ -229,6 +230,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
             ),
           ),
           child: Scaffold(
+            resizeToAvoidBottomInset: false,
             backgroundColor: Colors.transparent,
             body: SafeArea(
         child: Column(
@@ -270,7 +272,14 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  16,
+                  20,
+                  24 + MediaQuery.of(context).viewInsets.bottom,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -333,6 +342,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                           selected: sel,
                           onSelected: (_) => setState(() => _category = c),
                           selectedColor: brown,
+                          checkmarkColor: Colors.white,
                           labelStyle: TextStyle(
                             color: sel
                                 ? Colors.white
@@ -343,7 +353,12 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                               ? Colors.white.withOpacity(0.1)
                               : Colors.white,
                           side: BorderSide(
-                            color: sel ? brown : Colors.grey.shade400,
+                            color: sel
+                                ? brown
+                                : (isDark
+                                    ? Colors.white.withOpacity(0.45)
+                                    : Colors.grey.shade400),
+                            width: sel ? 1.5 : 1,
                           ),
                         );
                       }).toList(),
@@ -398,7 +413,21 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                         ),
                       ),
                       value: _isAnonymous,
-                      activeColor: brown,
+                      activeThumbColor: Colors.white,
+                      activeTrackColor:
+                          isDark ? const Color(0xFFB8956A) : brown,
+                      inactiveThumbColor:
+                          isDark ? Colors.white54 : Colors.grey.shade400,
+                      inactiveTrackColor: isDark
+                          ? Colors.white.withOpacity(0.18)
+                          : Colors.grey.shade300,
+                      trackOutlineColor: WidgetStateProperty.resolveWith(
+                        (states) => states.contains(WidgetState.selected)
+                            ? Colors.transparent
+                            : (isDark
+                                ? Colors.white.withOpacity(0.35)
+                                : Colors.grey.shade400),
+                      ),
                       onChanged: (v) => setState(() => _isAnonymous = v),
                     ),
                     const SizedBox(height: 24),

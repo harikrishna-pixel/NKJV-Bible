@@ -44,6 +44,8 @@ class SharPreferences {
   static const adPauseDiff = 'adPauseDiff';
   static const isTtsActive = 'isTTSActive';
   static const lastExportedDate = 'lastExportedDate';
+  static const lastCloudBackupDate = 'lastCloudBackupDate';
+  static const lastScheduledCloudBackupDate = 'lastScheduledCloudBackupDate';
   static const userLocalData = 'userLocalData';
   static const calendarLocal = 'calendarLocal';
   static const bookadscatid = 'bookadscatid';

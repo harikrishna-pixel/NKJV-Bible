@@ -1,8 +1,9 @@
-import 'dart:io';
-
 import 'package:biblebookapp/view/constants/colors.dart';
+import 'package:biblebookapp/view/constants/images.dart';
+import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:provider/provider.dart';
 
 /// Shows the 5 home-widget images one by one with swipe; user taps "Add Widget"
 /// to advance or on last screen close and return to Home.
@@ -25,8 +26,6 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
 
   final PageController _pageController = PageController();
   int _currentPage = 0;
-
-  bool get _isIOS => Platform.isIOS;
 
   @override
   void dispose() {
@@ -51,112 +50,201 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
-    final useFullScreen = _isIOS;
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isVintage =
+        themeProvider.currentCustomTheme == AppCustomTheme.vintage;
 
     return Scaffold(
-      backgroundColor: CommanColor.backgrondcolor,
-      appBar: useFullScreen
-          ? null
-          : AppBar(
-              backgroundColor: CommanColor.lightDarkPrimary(context),
-              leading: IconButton(
-                icon: Icon(
-                    Icons.arrow_back_ios,
-                    color: CommanColor.whiteBlack(context)),
-                onPressed: () => Get.back(),
-              ),
-              title: Text(
-                'Add Widget',
-                style: TextStyle(
-                  color: CommanColor.whiteBlack(context),
-                  fontSize: isTablet ? 22 : 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          Positioned.fill(
-            child: PageView.builder(
-              controller: _pageController,
-              onPageChanged: (index) => setState(() => _currentPage = index),
-              itemCount: _imagePaths.length,
-              itemBuilder: (context, index) {
-                return Image.asset(
-                  _imagePaths[index],
+      backgroundColor: isVintage ? null : themeProvider.backgroundColor,
+      body: Container(
+        decoration: isVintage
+            ? BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage(Images.bgImage(context)),
                   fit: BoxFit.cover,
-                  width: double.infinity,
-                  height: double.infinity,
-                );
-              },
-            ),
-          ),
-          Positioned(
-            left: isTablet ? 32 : 18,
-            right: isTablet ? 32 : 18,
-            bottom: (isTablet ? 18 : 14) + bottomInset,
-            child: SafeArea(
-              top: false,
-              bottom: false,
-              child: Padding(
+                ),
+              )
+            : BoxDecoration(color: themeProvider.backgroundColor),
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
                 padding: EdgeInsets.symmetric(
-                  horizontal: isTablet ? 6 : 2,
-                  vertical: isTablet ? 4 : 2,
+                  horizontal: isTablet ? 20 : 12,
+                  vertical: 8,
                 ),
                 child: Row(
                   children: [
-                    TextButton(
-                      onPressed: () => Get.back(),
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size(48, 44),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
-                        foregroundColor: Colors.white.withValues(alpha: 0.95),
-                        backgroundColor: Colors.black.withValues(alpha: 0.35),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(999),
-                        ),
+                    IconButton(
+                      icon: Icon(
+                        Icons.arrow_back_ios,
+                        size: 20,
+                        color: CommanColor.whiteBlack(context),
                       ),
+                      onPressed: () => Get.back(),
+                    ),
+                    Expanded(
                       child: Text(
-                        'Not Now',
-                        style: TextStyle(
-                          fontSize: isTablet ? 16 : 14,
-                          fontWeight: FontWeight.w700,
+                        'Add Widget',
+                        textAlign: TextAlign.center,
+                        style: CommanStyle.appBarStyle(context).copyWith(
+                          fontSize: isTablet ? 22 : 18,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
-                    const Spacer(),
-                    ElevatedButton.icon(
-                      onPressed: _onAddWidgetTap,
-                      icon: Icon(Icons.arrow_forward,
-                          color: Colors.white, size: isTablet ? 18 : 16),
-                      label: Text(
-                        _isLastPage ? 'Got it' : 'Next',
-                        style: TextStyle(
-                          fontSize: isTablet ? 16 : 14,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                    const SizedBox(width: 48),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: isTablet ? 24 : 20),
+                child: Text(
+                  'Step ${_currentPage + 1} of ${_imagePaths.length}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: isTablet ? 16 : 14,
+                    fontWeight: FontWeight.w700,
+                    color: CommanColor.whiteBlack(context),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(_imagePaths.length, (index) {
+                  final active = index == _currentPage;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: active ? 22 : 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: active
+                          ? CommanColor.lightDarkPrimary(context)
+                          : CommanColor.lightDarkPrimary(context)
+                              .withOpacity(0.35),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: isTablet ? 28 : 16),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: isVintage
+                          ? Colors.white.withOpacity(0.92)
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: CommanColor.lightDarkPrimary(context)
+                            .withOpacity(0.25),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: PageView.builder(
+                        controller: _pageController,
+                        onPageChanged: (index) =>
+                            setState(() => _currentPage = index),
+                        itemCount: _imagePaths.length,
+                        itemBuilder: (context, index) {
+                          return Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Image.asset(
+                              _imagePaths[index],
+                              fit: BoxFit.contain,
+                              width: double.infinity,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  isTablet ? 28 : 20,
+                  12,
+                  isTablet ? 28 : 20,
+                  12 + MediaQuery.paddingOf(context).bottom,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Get.back(),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: CommanColor.whiteBlack(context),
+                          side: BorderSide(
+                            color: CommanColor.lightDarkPrimary(context)
+                                .withOpacity(0.5),
+                          ),
+                          padding: EdgeInsets.symmetric(
+                            vertical: isTablet ? 14 : 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          'Not Now',
+                          style: TextStyle(
+                            fontSize: isTablet ? 16 : 14,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: CommanColor.lightDarkPrimary(context),
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isTablet ? 18 : 14,
-                          vertical: isTablet ? 14 : 12,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        onPressed: _onAddWidgetTap,
+                        icon: Icon(
+                          _isLastPage
+                              ? Icons.check_rounded
+                              : Icons.arrow_forward_rounded,
+                          size: isTablet ? 20 : 18,
                         ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                        label: Text(
+                          _isLastPage ? 'Got it' : 'Next',
+                          style: TextStyle(
+                            fontSize: isTablet ? 16 : 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              CommanColor.lightDarkPrimary(context),
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(
+                            vertical: isTablet ? 14 : 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

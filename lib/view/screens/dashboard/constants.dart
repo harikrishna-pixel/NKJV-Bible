@@ -103,6 +103,8 @@ class BibleInfo {
   static String exportText =
       'Save your Bookmarked verses, Highlights, Notes and Verse Images directly to your device. This option stores a backup file locally, which can be transferred or accessed later. You can import this file into the app whenever needed, even on another device.';
   static String importText = 'Please select the file you exported last time.';
+  static String autoCloudBackupText =
+      'If you don\'t export manually, your library is backed up automatically when you sign in. A daily cloud backup also runs after 2:00 AM when you open the app (signed-in users only).';
 
   static String termsandConditionURL =
       "https://bibleoffice.com/terms_conditions.html";

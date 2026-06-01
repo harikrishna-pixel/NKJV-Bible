@@ -4,6 +4,7 @@ import 'package:biblebookapp/core/notifiers/bottom.notifier.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/background_api_service.dart';
+import 'package:biblebookapp/core/library_backup_upload_service.dart';
 import 'package:biblebookapp/services/analytics/analytics_service.dart';
 
 import 'package:biblebookapp/view/widget/adhelper.dart';
@@ -222,6 +223,8 @@ Future<void> _bootstrapBackgroundStartup() async {
   } catch (e) {
     debugPrint("main: home widget init failed: $e");
   }
+
+  LibraryBackupUploadService.scheduleDeferredBackupCheck();
 }
 
 configLoading() {
@@ -285,6 +288,10 @@ class _LifecycleWrapperState extends State<LifecycleWrapper>
         final closead = await SharPreferences.getBoolean('closead') ?? true;
         debugPrint(
             "App resumed: $state, OpenAd: $checkad, isActive: $_isAppInActive, $closead");
+
+        Future.delayed(const Duration(seconds: 30), () {
+          unawaited(LibraryBackupUploadService.runScheduledBackupIfNeeded());
+        });
 
         if (_isAppInBackground && checkad != '1' && _isAppInActive && closead) {
           _isAppInBackground = false;

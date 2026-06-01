@@ -69,7 +69,7 @@ class OnboardingGuidanceScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-                SizedBox(height: isTablet ? 45 : 38),
+                const Spacer(),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 65),
                   child: SizedBox(
@@ -114,7 +114,6 @@ class OnboardingGuidanceScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-
                 SizedBox(height: isTablet ? 20 : 16),
               ],
             ),

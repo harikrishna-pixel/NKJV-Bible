@@ -264,10 +264,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           topRight: Radius.circular(24),
                         ),
                       ),
-                      child: SingleChildScrollView(
-                        physics: const ClampingScrollPhysics(),
-                        child:
-                            Column(mainAxisSize: MainAxisSize.min, children: [
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                           // Header Section with Gradient
                           Container(
                             width: double.infinity,
@@ -358,14 +357,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                               ],
                             ),
                           ),
-
-                          // Content Section
-                          Padding(
-                            padding:
-                                EdgeInsets.all(screenWidth > 450 ? 24 : 20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
+                          Flexible(
+                            child: SingleChildScrollView(
+                              physics: const ClampingScrollPhysics(),
+                              child: Padding(
+                                padding: EdgeInsets.all(
+                                    screenWidth > 450 ? 24 : 20),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
                                 // Info Card
                                 Container(
                                   padding: const EdgeInsets.all(16),
@@ -385,11 +385,32 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                   ),
                                   child: Row(
                                     children: [
-                                      Icon(
-                                        Icons.lightbulb_outline,
-                                        color: CommanColor.lightDarkPrimary(
-                                            context),
-                                        size: 20,
+                                      Container(
+                                        width: 36,
+                                        height: 36,
+                                        decoration: BoxDecoration(
+                                          color: isDark
+                                              ? Colors.white.withOpacity(0.12)
+                                              : CommanColor.lightDarkPrimary(
+                                                      context)
+                                                  .withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: isDark
+                                              ? Border.all(
+                                                  color: Colors.white
+                                                      .withOpacity(0.35),
+                                                  width: 1,
+                                                )
+                                              : null,
+                                        ),
+                                        child: Icon(
+                                          Icons.lightbulb_outline,
+                                          color: isDark
+                                              ? const Color(0xFFFFD54F)
+                                              : CommanColor.lightDarkPrimary(
+                                                  context),
+                                          size: 20,
+                                        ),
                                       ),
                                       const SizedBox(width: 12),
                                       Expanded(
@@ -452,73 +473,74 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                   '100 Credits',
                                   setBottomSheetState,
                                 ),
-                                const SizedBox(height: 24),
-
-                                // Action Button
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.transparent,
-                                      shadowColor: Colors.transparent,
-                                      elevation: 0,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                        side: isDark
-                                            ? const BorderSide(
-                                                color: Colors.white, width: 1.5)
-                                            : BorderSide.none,
-                                      ),
-                                      padding: EdgeInsets.zero, // IMPORTANT
+                              ],
+                            ),
+                          ),
+                            ),
+                          ),
+                          Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              screenWidth > 450 ? 24 : 20,
+                              8,
+                              screenWidth > 450 ? 24 : 20,
+                              MediaQuery.of(context).viewInsets.bottom + 16,
+                            ),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  shadowColor: Colors.transparent,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    side: isDark
+                                        ? const BorderSide(
+                                            color: Colors.white, width: 1.5)
+                                        : BorderSide.none,
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                ),
+                                onPressed: () async {
+                                  final prefs =
+                                      await SharedPreferences.getInstance();
+                                  await prefs.setBool(
+                                      'chat_intro_seen', true);
+                                  if (mounted) {
+                                    Navigator.pop(context);
+                                  }
+                                },
+                                child: Ink(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(16),
+                                    gradient: const LinearGradient(
+                                      colors: [
+                                        Color(0xFF763201),
+                                        Color(0xFFD5821F),
+                                        Color(0xFF763201),
+                                      ],
                                     ),
-                                    onPressed: () async {
-                                      final prefs =
-                                          await SharedPreferences.getInstance();
-                                      await prefs.setBool(
-                                          'chat_intro_seen', true);
-                                      if (mounted) {
-                                        Navigator.pop(context);
-                                      }
-                                    },
-                                    child: Ink(
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(16),
-                                        gradient: const LinearGradient(
-                                          colors: [
-                                            Color(0xFF763201),
-                                            Color(0xFFD5821F),
-                                            Color(0xFF763201),
-                                          ],
-                                        ),
-                                      ),
-                                      child: Container(
-                                        alignment: Alignment.center,
-                                        padding: EdgeInsets.symmetric(
-                                          vertical: screenWidth > 450 ? 16 : 14,
-                                        ),
-                                        child: Text(
-                                          'Got it, Let\'s Chat!',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize:
-                                                screenWidth > 450 ? 17 : 16,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
+                                  ),
+                                  child: Container(
+                                    alignment: Alignment.center,
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: screenWidth > 450 ? 16 : 14,
+                                    ),
+                                    child: Text(
+                                      'Got it, Let\'s Chat!',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize:
+                                            screenWidth > 450 ? 17 : 16,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ),
                                 ),
-
-                                SizedBox(
-                                    height: MediaQuery.of(context)
-                                            .viewInsets
-                                            .bottom +
-                                        10),
-                              ],
+                              ),
                             ),
                           ),
-                        ]),
+                        ],
                       ),
                     )));
           },
@@ -560,7 +582,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               ? (isDark
                   ? CommanColor.lightDarkPrimary(context).withOpacity(0.15)
                   : CommanColor.lightDarkPrimary(context).withOpacity(0.08))
-              : (isDark ? Colors.white.withOpacity(0.03) : Colors.grey.shade50),
+              : (isDark
+                  ? const Color(0xFF4A342B)
+                  : Colors.grey.shade50),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
@@ -568,9 +592,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     ? Colors.white
                     : CommanColor.lightDarkPrimary(context))
                 : (isDark
-                    ? Colors.white.withOpacity(0.1)
+                    ? Colors.white.withOpacity(0.45)
                     : Colors.grey.shade200),
-            width: isSelected ? 2 : 1,
+            width: isSelected ? 2 : 1.5,
           ),
         ),
         child: Row(
@@ -957,16 +981,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
-                              color: CommanColor.lightDarkPrimary(ctx),
+                              color: isDark
+                                  ? Colors.white
+                                  : CommanColor.lightDarkPrimary(ctx),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Text(
+                            child: Text(
                               'Agree & Continue',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.white,
+                                color: isDark
+                                    ? CommanColor.darkPrimaryColor
+                                    : Colors.white,
                               ),
                             ),
                           ),
@@ -2519,15 +2547,15 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                               ),
                               decoration: BoxDecoration(
                                 color: isDark
-                                    ? CommanColor.darkPrimaryColor
-                                        .withOpacity(0.35)
+                                    ? const Color(0xFF4A342B)
                                     : const Color(0xFFF6F1E9).withOpacity(0.65),
                                 borderRadius: BorderRadius.circular(22),
                                 border: Border.all(
                                   color: isDark
-                                      ? Colors.white.withOpacity(0.18)
+                                      ? Colors.white.withOpacity(0.5)
                                       : const Color(0xFF8D6E63)
                                           .withOpacity(0.18),
+                                  width: isDark ? 1.5 : 1,
                                 ),
                               ),
                               child: Row(
@@ -2549,12 +2577,23 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Icon(
-                                          Icons.account_balance_wallet,
-                                          size: screenWidth > 450 ? 22 : 20,
-                                          color: isDark
-                                              ? Colors.white
-                                              : const Color(0xFF8D6E63),
+                                        Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: isDark
+                                              ? BoxDecoration(
+                                                  color: Colors.white
+                                                      .withOpacity(0.12),
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                )
+                                              : null,
+                                          child: Icon(
+                                            Icons.account_balance_wallet,
+                                            size: screenWidth > 450 ? 22 : 20,
+                                            color: isDark
+                                                ? Colors.white
+                                                : const Color(0xFF8D6E63),
+                                          ),
                                         ),
                                         const SizedBox(width: 6),
                                         Text(
@@ -4880,7 +4919,7 @@ Your 3 questions (exactly 3 lines):''';
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            InkWell(
+                            _ChatTapFeedbackIcon(
                               onTap: () async {
                                 await Clipboard.setData(
                                     ClipboardData(text: message.text));
@@ -4888,16 +4927,13 @@ Your 3 questions (exactly 3 lines):''';
                                     'Message copied to clipboard', 5000);
                               },
                               child: Padding(
-                                // reduced outer padding to tighten spacing
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 2, vertical: 2),
                                 child: Container(
-                                  // reduced inner padding for a smaller footprint
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
-                                      // lighter border color for both themes
                                       color: isDark
                                           ? Colors.white.withOpacity(0.14)
                                           : Colors.black.withOpacity(0.12),
@@ -4910,16 +4946,14 @@ Your 3 questions (exactly 3 lines):''';
                                     width: screenWidth > 450 ? 18 : 15,
                                     color: isDark
                                         ? Colors.white.withOpacity(0.8)
-                                        : Colors.black.withOpacity(
-                                            0.6), // lighter icon color
+                                        : Colors.black.withOpacity(0.6),
                                   ),
                                 ),
                               ),
                             ),
                             const SizedBox(width: 2),
-                            InkWell(
+                            _ChatTapFeedbackIcon(
                               onTap: () async {
-                                // Get screen size for sharePositionOrigin (required on iOS)
                                 final screenSize = MediaQuery.of(context).size;
                                 final sharePositionOrigin = Rect.fromLTWH(
                                   screenSize.width / 2 - 50,
@@ -4951,8 +4985,7 @@ Your 3 questions (exactly 3 lines):''';
                                     size: screenWidth > 450 ? 18 : 15,
                                     color: isDark
                                         ? Colors.white.withOpacity(0.8)
-                                        : Colors.black.withOpacity(
-                                            0.6), // lighter icon color
+                                        : Colors.black.withOpacity(0.6),
                                   ),
                                 ),
                               ),
@@ -5184,18 +5217,38 @@ Your 3 questions (exactly 3 lines):''';
                 // Voice input button temporarily hidden
                 const SizedBox(width: 0, height: 0),
                 const SizedBox(width: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    color: sendBgColor,
-                    shape: BoxShape.circle,
-                  ),
-                  child: IconButton(
-                    icon: Image.asset(
-                      "assets/send-2.png",
-                      color: CommanColor.white,
-                      width: screenWidth > 450 ? 24 : 20,
+                Material(
+                  color: isDark
+                      ? (hasText && !_isLoading
+                          ? Colors.white
+                          : Colors.white.withOpacity(0.35))
+                      : sendBgColor,
+                  shape: const CircleBorder(),
+                  elevation: isDark && hasText && !_isLoading ? 3 : 0,
+                  shadowColor: Colors.black45,
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: (!_isLoading && hasText) ? _sendMessage : null,
+                    child: SizedBox(
+                      width: screenWidth > 450 ? 48 : 44,
+                      height: screenWidth > 450 ? 48 : 44,
+                      child: Center(
+                        child: isDark
+                            ? Icon(
+                                Icons.send_rounded,
+                                color: hasText && !_isLoading
+                                    ? CommanColor.darkPrimaryColor
+                                    : CommanColor.darkPrimaryColor
+                                        .withOpacity(0.45),
+                                size: screenWidth > 450 ? 24 : 22,
+                              )
+                            : Image.asset(
+                                "assets/send-2.png",
+                                color: CommanColor.white,
+                                width: screenWidth > 450 ? 24 : 20,
+                              ),
+                      ),
                     ),
-                    onPressed: (!_isLoading && hasText) ? _sendMessage : null,
                   ),
                 ),
               ],
@@ -5316,6 +5369,66 @@ class _WaveLoaderState extends State<_WaveLoader>
           },
         );
       }),
+    );
+  }
+}
+
+/// Brief scale pulse on tap so copy/share actions feel acknowledged.
+class _ChatTapFeedbackIcon extends StatefulWidget {
+  const _ChatTapFeedbackIcon({
+    required this.onTap,
+    required this.child,
+  });
+
+  final Future<void> Function() onTap;
+  final Widget child;
+
+  @override
+  State<_ChatTapFeedbackIcon> createState() => _ChatTapFeedbackIconState();
+}
+
+class _ChatTapFeedbackIconState extends State<_ChatTapFeedbackIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
+    _scale = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.82), weight: 40),
+      TweenSequenceItem(tween: Tween(begin: 0.82, end: 1.08), weight: 35),
+      TweenSequenceItem(tween: Tween(begin: 1.08, end: 1.0), weight: 25),
+    ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleTap() async {
+    await _controller.forward(from: 0);
+    await widget.onTap();
+    if (mounted) {
+      await _controller.reverse();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _scale,
+      child: InkWell(
+        onTap: _handleTap,
+        borderRadius: BorderRadius.circular(8),
+        child: widget.child,
+      ),
     );
   }
 }

@@ -431,6 +431,197 @@ class _SettingScreenState extends State<SettingScreen>
     }
   }
 
+  bool _notificationEnabled(NotificationTime time) {
+    switch (time) {
+      case NotificationTime.morning:
+        return notificationButtonValue;
+      case NotificationTime.afternoon:
+        return notificationButtonValue1;
+      case NotificationTime.evening:
+        return notificationButtonValue2;
+    }
+  }
+
+  String _notificationTimeLabel(NotificationTime time) {
+    switch (time) {
+      case NotificationTime.morning:
+        return selectedTime;
+      case NotificationTime.afternoon:
+        return selectedTime1;
+      case NotificationTime.evening:
+        return selectedTime2;
+    }
+  }
+
+  Future<void> _toggleNotification(NotificationTime time) async {
+    final status = await Permission.notification.status;
+    if (status.isGranted || status.isLimited || status.isProvisional) {
+      setState(() {
+        switch (time) {
+          case NotificationTime.morning:
+            notificationButtonValue = !notificationButtonValue;
+            break;
+          case NotificationTime.afternoon:
+            notificationButtonValue1 = !notificationButtonValue1;
+            break;
+          case NotificationTime.evening:
+            notificationButtonValue2 = !notificationButtonValue2;
+            break;
+        }
+      });
+      switch (time) {
+        case NotificationTime.morning:
+          await SharPreferences.setBoolean(
+              SharPreferences.isNotificationOn, notificationButtonValue);
+          if (notificationButtonValue) {
+            setNotification(NotificationTime.morning);
+          } else {
+            disableNotification(NotificationTime.morning);
+            SmartNotificationHelper.scheduleSmartNotificationIfNeeded();
+          }
+          break;
+        case NotificationTime.afternoon:
+          await SharPreferences.setBoolean(
+              SharPreferences.isNotificationOn1, notificationButtonValue1);
+          if (notificationButtonValue1) {
+            setNotification(NotificationTime.afternoon);
+          } else {
+            disableNotification(NotificationTime.afternoon);
+            SmartNotificationHelper.scheduleSmartNotificationIfNeeded();
+          }
+          break;
+        case NotificationTime.evening:
+          await SharPreferences.setBoolean(
+              SharPreferences.isNotificationOn2, notificationButtonValue2);
+          if (notificationButtonValue2) {
+            setNotification(NotificationTime.evening);
+          } else {
+            disableNotification(NotificationTime.evening);
+            SmartNotificationHelper.scheduleSmartNotificationIfNeeded();
+          }
+          break;
+      }
+    } else {
+      checkNotificationPermission();
+    }
+  }
+
+  Widget _buildNotificationScheduleRow({
+    required String label,
+    required NotificationTime notificationTime,
+    required double screenWidth,
+  }) {
+    final isDark =
+        Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark;
+    // In dark mode, lightDarkPrimary matches the scaffold — use high-contrast colors.
+    final accent = isDark
+        ? CommanColor.inDarkWhiteAndInLightPrimary(context)
+        : CommanColor.lightDarkPrimary(context);
+    final time = _notificationTimeLabel(notificationTime);
+    final enabled = _notificationEnabled(notificationTime);
+    final compactFont = screenWidth < 380
+        ? BibleInfo.fontSizeScale * 13
+        : BibleInfo.fontSizeScale * 14;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: 20,
+        vertical: screenWidth < 380 ? 4 : 6,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => showNotificationDialog(notificationTime),
+                borderRadius: BorderRadius.circular(8),
+                child: Ink(
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withOpacity(0.1)
+                        : accent.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withOpacity(0.45)
+                          : accent.withOpacity(0.28),
+                      width: 1,
+                    ),
+                  ),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: screenWidth < 380 ? 8 : 10,
+                    vertical: screenWidth < 380 ? 7 : 8,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.schedule,
+                        size: screenWidth < 380 ? 16 : 18,
+                        color: accent,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        label,
+                        style: CommanStyle.bw16500(context).copyWith(
+                          fontSize: compactFont,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          time,
+                          style: CommanStyle.bw12400(context).copyWith(
+                            color: accent,
+                            fontWeight: FontWeight.w600,
+                            fontSize: compactFont,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right,
+                        color: accent.withOpacity(0.85),
+                        size: screenWidth < 380 ? 18 : 20,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          FlutterSwitch(
+            duration: Duration.zero,
+            showOnOff: true,
+            activeTextColor: Colors.white,
+            inactiveTextColor: Colors.white,
+            activeTextFontWeight: FontWeight.w400,
+            inactiveTextFontWeight: FontWeight.w400,
+            value: enabled,
+            toggleSize: screenWidth < 380 ? 16 : 22,
+            padding: 0,
+            height: screenWidth < 380 ? 17 : 25,
+            width: screenWidth < 380 ? 45 : 55,
+            valueFontSize: screenWidth < 380
+                ? BibleInfo.fontSizeScale * 12
+                : BibleInfo.fontSizeScale * 14,
+            activeColor: const Color(0xFF368117),
+            inactiveColor: isDark
+                ? const Color(0xFF3A2923)
+                : CommanColor.lightGrey,
+            activeToggleColor: Colors.white,
+            inactiveToggleColor: Colors.white,
+            onToggle: (_) => _toggleNotification(notificationTime),
+          ),
+        ],
+      ),
+    );
+  }
+
   updateOnTimeChange(NotificationTime notificationTime, DateTime time) {
     final hourtime = DateFormat("hh:mm a").format(time);
     final onlyhourtime = DateFormat("HH:mm").format(time);
@@ -504,25 +695,33 @@ class _SettingScreenState extends State<SettingScreen>
     );
   }
 
+  int _notificationHour24(NotificationTime notificationTime) {
+    switch (notificationTime) {
+      case NotificationTime.morning:
+        return int.tryParse(notificationHours) ?? 8;
+      case NotificationTime.afternoon:
+        return int.tryParse(notificationHours1) ?? 14;
+      case NotificationTime.evening:
+        return int.tryParse(notificationHours2) ?? 20;
+    }
+  }
+
+  int _notificationMinute(NotificationTime notificationTime) {
+    switch (notificationTime) {
+      case NotificationTime.morning:
+        return int.tryParse(notificationMinute) ?? 0;
+      case NotificationTime.afternoon:
+        return int.tryParse(notificationMinute1) ?? 0;
+      case NotificationTime.evening:
+        return int.tryParse(notificationMinute2) ?? 0;
+    }
+  }
+
   void setNotification(NotificationTime notificationTime) async {
     await SmartNotificationHelper.cancelSmartNotification();
     final int id = getNotificationId(notificationTime);
-    final int hh;
-    final int mm;
-    switch (notificationTime) {
-      case NotificationTime.morning:
-        hh = 8;
-        mm = 0;
-        break;
-      case NotificationTime.afternoon:
-        hh = 14;
-        mm = 0;
-        break;
-      case NotificationTime.evening:
-        hh = 20;
-        mm = 0;
-        break;
-    }
+    final int hh = _notificationHour24(notificationTime);
+    final int mm = _notificationMinute(notificationTime);
     final content = notificationTime == NotificationTime.morning
         ? await StreakNotificationHelper.getMorningContent()
         : notificationTime == NotificationTime.afternoon
@@ -986,234 +1185,20 @@ class _SettingScreenState extends State<SettingScreen>
                 const SizedBox(
                   height: 5,
                 ),
-                /////
-                /// Morning Notification
-                /////
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: 20, vertical: screenWidth < 380 ? 7 : 10),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      InkWell(
-                        onTap: () async {
-                          showNotificationDialog(NotificationTime.morning);
-                        },
-                        child: Row(
-                          children: [
-                            Text(
-                              "Morning",
-                              style: CommanStyle.bw16500(context),
-                            ),
-                            const SizedBox(
-                              width: 5,
-                            ),
-                            Text(
-                              "($selectedTime)",
-                              style: CommanStyle.bw12400(context),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Spacer(),
-                      FlutterSwitch(
-                        duration: Duration.zero,
-                        showOnOff: true,
-                        activeTextColor: Colors.white,
-                        inactiveTextColor: Colors.white,
-                        activeTextFontWeight: FontWeight.w400,
-                        inactiveTextFontWeight: FontWeight.w400,
-                        value: notificationButtonValue,
-                        toggleSize: screenWidth < 380 ? 16 : 22,
-                        padding: 0,
-                        height: screenWidth < 380 ? 17 : 25,
-                        width: screenWidth < 380 ? 45 : 55,
-                        valueFontSize: screenWidth < 380
-                            ? BibleInfo.fontSizeScale * 12
-                            : BibleInfo.fontSizeScale * 14,
-                        activeColor: const Color(0xFF368117),
-                        onToggle: (newVal) async {
-                          final status = await Permission.notification.status;
-
-                          if (status.isGranted ||
-                              status.isLimited ||
-                              status.isProvisional) {
-                            setState(() {
-                              notificationButtonValue =
-                                  !notificationButtonValue;
-                            });
-                            SharPreferences.setBoolean(
-                                SharPreferences.isNotificationOn,
-                                notificationButtonValue);
-                            if (notificationButtonValue) {
-                              setNotification(NotificationTime.morning);
-                              // showNotificationAlertDialog(context);
-                            } else {
-                              disableNotification(NotificationTime.morning);
-                              SmartNotificationHelper.scheduleSmartNotificationIfNeeded();
-                            }
-                          } else {
-                            checkNotificationPermission();
-                          }
-                        },
-                      ),
-                    ],
-                  ),
+                _buildNotificationScheduleRow(
+                  label: 'Morning',
+                  notificationTime: NotificationTime.morning,
+                  screenWidth: screenWidth,
                 ),
-                const SizedBox(
-                  height: 5,
+                _buildNotificationScheduleRow(
+                  label: 'Afternoon',
+                  notificationTime: NotificationTime.afternoon,
+                  screenWidth: screenWidth,
                 ),
-                ////
-                /// Afternoon
-                ////
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: 20, vertical: screenWidth < 380 ? 4 : 10),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      InkWell(
-                        onTap: () async {
-                          showNotificationDialog(NotificationTime.afternoon);
-                        },
-                        child: Row(
-                          children: [
-                            Text(
-                              "Afternoon",
-                              style: CommanStyle.bw16500(context),
-                            ),
-                            const SizedBox(
-                              width: 5,
-                            ),
-                            Text(
-                              "($selectedTime1)",
-                              style: CommanStyle.bw12400(context),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Spacer(),
-                      FlutterSwitch(
-                        duration: Duration.zero,
-                        showOnOff: true,
-                        activeTextColor: Colors.white,
-                        inactiveTextColor: Colors.white,
-                        activeTextFontWeight: FontWeight.w400,
-                        inactiveTextFontWeight: FontWeight.w400,
-                        value: notificationButtonValue1,
-                        toggleSize: screenWidth < 380 ? 16 : 22,
-                        padding: 0,
-                        height: screenWidth < 380 ? 17 : 25,
-                        width: screenWidth < 380 ? 45 : 55,
-                        valueFontSize: screenWidth < 380
-                            ? BibleInfo.fontSizeScale * 12
-                            : BibleInfo.fontSizeScale * 14,
-                        activeColor: const Color(0xFF368117),
-                        onToggle: (newVal) async {
-                          final status = await Permission.notification.status;
-
-                          if (status.isGranted ||
-                              status.isLimited ||
-                              status.isProvisional) {
-                            setState(() {
-                              notificationButtonValue1 =
-                                  !notificationButtonValue1;
-                            });
-                            SharPreferences.setBoolean(
-                                SharPreferences.isNotificationOn1,
-                                notificationButtonValue1);
-                            if (notificationButtonValue1) {
-                              setNotification(NotificationTime.afternoon);
-                              // showNotificationAlertDialog(context);
-                            } else {
-                              disableNotification(NotificationTime.afternoon);
-                              SmartNotificationHelper.scheduleSmartNotificationIfNeeded();
-                            }
-                          } else {
-                            checkNotificationPermission();
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(
-                  height: 5,
-                ),
-                //////Evening
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: 20, vertical: screenWidth < 380 ? 7 : 10),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      InkWell(
-                        onTap: () async {
-                          showNotificationDialog(NotificationTime.evening);
-                        },
-                        child: Row(
-                          children: [
-                            Text(
-                              "Evening",
-                              style: CommanStyle.bw16500(context),
-                            ),
-                            const SizedBox(
-                              width: 5,
-                            ),
-                            Text(
-                              "($selectedTime2)",
-                              style: CommanStyle.bw12400(context),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Spacer(),
-                      FlutterSwitch(
-                        duration: Duration.zero,
-                        showOnOff: true,
-                        activeTextColor: Colors.white,
-                        inactiveTextColor: Colors.white,
-                        activeTextFontWeight: FontWeight.w400,
-                        inactiveTextFontWeight: FontWeight.w400,
-                        value: notificationButtonValue2,
-                        toggleSize: screenWidth < 380 ? 16 : 22,
-                        padding: 0,
-                        height: screenWidth < 380 ? 17 : 25,
-                        width: screenWidth < 380 ? 45 : 55,
-                        valueFontSize: screenWidth < 380
-                            ? BibleInfo.fontSizeScale * 12
-                            : BibleInfo.fontSizeScale * 14,
-                        activeColor: const Color(0xFF368117),
-                        onToggle: (newVal) async {
-                          final status = await Permission.notification.status;
-
-                          if (status.isGranted ||
-                              status.isLimited ||
-                              status.isProvisional) {
-                            setState(() {
-                              notificationButtonValue2 =
-                                  !notificationButtonValue2;
-                            });
-                            SharPreferences.setBoolean(
-                                SharPreferences.isNotificationOn2,
-                                notificationButtonValue2);
-                            if (notificationButtonValue2) {
-                              setNotification(NotificationTime.evening);
-                              //   showNotificationAlertDialog(context);
-                            } else {
-                              disableNotification(NotificationTime.evening);
-                              SmartNotificationHelper.scheduleSmartNotificationIfNeeded();
-                            }
-                          } else {
-                            checkNotificationPermission();
-                          }
-                        },
-                      ),
-                    ],
-                  ),
+                _buildNotificationScheduleRow(
+                  label: 'Evening',
+                  notificationTime: NotificationTime.evening,
+                  screenWidth: screenWidth,
                 ),
                 const SizedBox(
                   height: 5,

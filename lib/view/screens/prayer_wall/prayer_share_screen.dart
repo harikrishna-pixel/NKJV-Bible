@@ -158,17 +158,6 @@ class PrayerShareScreen extends StatelessWidget {
               const SizedBox(height: 16),
               _actionTile(
                 context,
-                icon: Icons.chat_bubble,
-                title: 'Share on WhatsApp',
-                subtitle: 'Send this prayer to a friend or group',
-                color: const Color(0xFF25D366),
-                isDark: isDark,
-                tileBg: tileBg,
-                onTap: () => _shareWhatsApp(context),
-              ),
-              const SizedBox(height: 10),
-              _actionTile(
-                context,
                 icon: Icons.share,
                 title: 'Share',
                 subtitle: 'Use your phone share options',

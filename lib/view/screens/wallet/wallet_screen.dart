@@ -939,9 +939,15 @@ class _WalletScreenState extends State<WalletScreen> {
                         padding: EdgeInsets.all(screenWidth > 450 ? 24 : 20),
                         decoration: BoxDecoration(
                           color: isDark
-                              ? CommanColor.darkPrimaryColor.withOpacity(0.8)
+                              ? const Color(0xFF4A342B)
                               : Colors.white,
                           borderRadius: BorderRadius.circular(16),
+                          border: isDark
+                              ? Border.all(
+                                  color: Colors.white.withOpacity(0.85),
+                                  width: 1.5,
+                                )
+                              : null,
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.1),
@@ -1066,10 +1072,14 @@ class _WalletScreenState extends State<WalletScreen> {
     return Container(
       padding: EdgeInsets.all(screenWidth > 450 ? 16 : 14),
       decoration: BoxDecoration(
-        color: isDark
-            ? CommanColor.darkPrimaryColor.withOpacity(0.8)
-            : Colors.white,
+        color: isDark ? const Color(0xFF4A342B) : Colors.white,
         borderRadius: BorderRadius.circular(12),
+        border: isDark
+            ? Border.all(
+                color: Colors.white.withOpacity(0.85),
+                width: 1.5,
+              )
+            : null,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -1085,9 +1095,15 @@ class _WalletScreenState extends State<WalletScreen> {
             height: screenWidth > 450 ? 50 : 45,
             decoration: BoxDecoration(
               color: isDark
-                  ? Colors.white.withOpacity(0.15)
+                  ? Colors.white.withOpacity(0.12)
                   : CommanColor.lightDarkPrimary(context).withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
+              border: isDark
+                  ? Border.all(
+                      color: Colors.white.withOpacity(0.25),
+                      width: 1,
+                    )
+                  : null,
             ),
             child: Icon(
               icon,
@@ -1126,13 +1142,18 @@ class _WalletScreenState extends State<WalletScreen> {
             opacity: buttonOpacity,
             child: Container(
               decoration: BoxDecoration(
-                color: isDisabled
-                    ? CommanColor.lightDarkPrimary(context).withOpacity(0.6)
-                    : CommanColor.lightDarkPrimary(context),
+                color: isDark
+                    ? Colors.transparent
+                    : (isDisabled
+                        ? CommanColor.lightDarkPrimary(context)
+                            .withOpacity(0.6)
+                        : CommanColor.lightDarkPrimary(context)),
                 borderRadius: BorderRadius.circular(8),
                 border: isDark
                     ? Border.all(
-                        color: Colors.white,
+                        color: isDisabled
+                            ? Colors.white.withOpacity(0.4)
+                            : Colors.white,
                         width: 1.5,
                       )
                     : null,
@@ -1249,18 +1270,18 @@ class _WalletScreenState extends State<WalletScreen> {
               child: Container(
                 padding: EdgeInsets.all(screenWidth > 450 ? 16 : 14),
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? CommanColor.darkPrimaryColor.withOpacity(0.8)
-                      : Colors.white,
+                  color: isDark ? const Color(0xFF4A342B) : Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: isSelected
-                      ? Border.all(
-                          color: isDark
-                              ? Colors.white.withOpacity(0.5)
-                              : Colors.grey.withOpacity(0.5),
-                          width: 2,
-                        )
-                      : null,
+                  border: Border.all(
+                    color: isDark
+                        ? (isSelected
+                            ? Colors.white
+                            : Colors.white.withOpacity(0.85))
+                        : (isSelected
+                            ? Colors.grey.withOpacity(0.5)
+                            : Colors.grey.withOpacity(0.25)),
+                    width: isDark ? 1.5 : (isSelected ? 2 : 1),
+                  ),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.05),
@@ -1276,11 +1297,16 @@ class _WalletScreenState extends State<WalletScreen> {
                       height: screenWidth > 450 ? 50 : 45,
                       decoration: BoxDecoration(
                         color: isDark
-                            ? CommanColor.lightDarkPrimary(context)
-                                .withOpacity(0.2)
+                            ? Colors.white.withOpacity(0.12)
                             : CommanColor.lightDarkPrimary(context)
                                 .withOpacity(0.1),
                         borderRadius: BorderRadius.circular(10),
+                        border: isDark
+                            ? Border.all(
+                                color: Colors.white.withOpacity(0.25),
+                                width: 1,
+                              )
+                            : null,
                       ),
                       child: Icon(
                         Icons.monetization_on,
@@ -1316,10 +1342,12 @@ class _WalletScreenState extends State<WalletScreen> {
                             onPressed:
                                 () {}, // Empty handler to keep button enabled appearance
                             style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  CommanColor.lightDarkPrimary(context),
-                              disabledBackgroundColor:
-                                  CommanColor.lightDarkPrimary(context),
+                              backgroundColor: isDark
+                                  ? Colors.transparent
+                                  : CommanColor.lightDarkPrimary(context),
+                              disabledBackgroundColor: isDark
+                                  ? Colors.transparent
+                                  : CommanColor.lightDarkPrimary(context),
                               fixedSize: Size(
                                 screenWidth > 450 ? 150 : 130,
                                 screenWidth > 450 ? 46 : 42,
@@ -1446,10 +1474,14 @@ class _WalletScreenState extends State<WalletScreen> {
     return Container(
       padding: EdgeInsets.all(screenWidth > 450 ? 16 : 14),
       decoration: BoxDecoration(
-        color: isDark
-            ? CommanColor.darkPrimaryColor.withOpacity(0.8)
-            : Colors.white,
+        color: isDark ? const Color(0xFF4A342B) : Colors.white,
         borderRadius: BorderRadius.circular(12),
+        border: isDark
+            ? Border.all(
+                color: Colors.white.withOpacity(0.85),
+                width: 1.5,
+              )
+            : null,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -1467,9 +1499,15 @@ class _WalletScreenState extends State<WalletScreen> {
               height: screenWidth > 450 ? 50 : 45,
               decoration: BoxDecoration(
                 color: isDark
-                    ? CommanColor.lightDarkPrimary(context).withOpacity(0.2)
+                    ? Colors.white.withOpacity(0.12)
                     : CommanColor.lightDarkPrimary(context).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
+                border: isDark
+                    ? Border.all(
+                        color: Colors.white.withOpacity(0.25),
+                        width: 1,
+                      )
+                    : null,
               ),
               child: Icon(
                 Icons.text_fields,
@@ -1626,15 +1664,19 @@ class _WalletScreenState extends State<WalletScreen> {
           color: isSelected
               ? CommanColor.lightDarkPrimary(context).withOpacity(0.1)
               : (isDark
-                  ? CommanColor.darkPrimaryColor.withOpacity(0.3)
+                  ? const Color(0xFF4A342B)
                   : Colors.grey.shade100),
           borderRadius: BorderRadius.circular(12),
-          border: isSelected
-              ? Border.all(
-                  color: CommanColor.lightDarkPrimary(context),
-                  width: 2,
-                )
-              : null,
+          border: Border.all(
+            color: isSelected
+                ? (isDark
+                    ? Colors.white
+                    : CommanColor.lightDarkPrimary(context))
+                : (isDark
+                    ? Colors.white.withOpacity(0.45)
+                    : Colors.grey.shade300),
+            width: isSelected ? 2 : 1.5,
+          ),
         ),
         child: Row(
           children: [

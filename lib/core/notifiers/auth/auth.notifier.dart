@@ -13,6 +13,7 @@ import '../../../Model/auth/register_model.dart';
 import '../../../constant/size_config.dart';
 import '../../../view/constants/colors.dart';
 import '../../../view/screens/dashboard/home_screen.dart';
+import 'package:biblebookapp/core/library_backup_upload_service.dart';
 import '../../api/auth/profile_update.api.dart';
 import '../../api/auth/register.api.dart';
 
@@ -58,6 +59,8 @@ class AuthNotifier extends ChangeNotifier {
 
           await cacheNotifier.writeCache(
               key: "authtoken", value: data.data!.token.toString());
+
+          LibraryBackupUploadService.runAfterLogin();
 
           await cacheNotifier.writeCache(key: "skip", value: "false");
           return showDialog(
@@ -224,6 +227,8 @@ class AuthNotifier extends ChangeNotifier {
           await cacheNotifier.writeCache(
               key: "authtoken", value: '${datafn['data']['token']}');
           await cacheNotifier.writeCache(key: "skip", value: "false");
+
+          LibraryBackupUploadService.runAfterLogin();
 
           if (context.mounted) {
             // context.pushReplacementNamed(AppRouteConst.navhomeRoute,
