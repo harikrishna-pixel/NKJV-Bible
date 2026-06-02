@@ -427,31 +427,61 @@ class EditProfileScreenState extends State<EditProfileScreen> {
                                   } catch (e) {}
                                 },
                                 child: Container(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 14, horizontal: 14),
                                   decoration: BoxDecoration(
-                                      shape: BoxShape.rectangle,
-                                      borderRadius: BorderRadius.circular(3),
-                                      boxShadow: const [
-                                        BoxShadow(
-                                          color: Colors.black38,
-                                          blurRadius: 0.5,
-                                          spreadRadius: 1,
-                                          offset: Offset(0, 1),
+                                    borderRadius: BorderRadius.circular(12),
+                                    color: CommanColor.lightDarkPrimary(context)
+                                        .withOpacity(0.95),
+                                    border: Border.all(
+                                      color: const Color(0xFFD4A574)
+                                          .withOpacity(0.65),
+                                      width: 2,
+                                    ),
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Colors.black26,
+                                        blurRadius: 10,
+                                        offset: Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 28,
+                                        height: 28,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: const Color(0xFFD4A574)
+                                                .withOpacity(0.7),
+                                          ),
                                         ),
-                                      ],
-                                      color: CommanColor.whiteBlack45(context)),
-                                  child: Text(
-                                    "Update Profile",
-                                    textAlign: TextAlign.center,
-                                    style: CommanStyle
-                                            .inDarkPrimaryInLightWhite12400(
-                                                context)
-                                        .copyWith(
-                                            letterSpacing:
-                                                BibleInfo.letterSpacing,
-                                            fontSize:
-                                                BibleInfo.fontSizeScale * 16),
+                                        child: const Icon(
+                                          Icons.edit_outlined,
+                                          size: 16,
+                                          color: Color(0xFFF5F0E6),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        "Update Profile",
+                                        textAlign: TextAlign.center,
+                                        style: CommanStyle
+                                                .inDarkPrimaryInLightWhite12400(
+                                                    context)
+                                            .copyWith(
+                                          letterSpacing: BibleInfo.letterSpacing,
+                                          fontSize:
+                                              BibleInfo.fontSizeScale * 16,
+                                          color: const Color(0xFFF5F0E6),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -462,22 +492,34 @@ class EditProfileScreenState extends State<EditProfileScreen> {
                                 },
                                 child: Container(
                                   padding:
-                                      const EdgeInsets.symmetric(vertical: 12),
-                                  child: Text(
-                                    "Delete Account",
-                                    textAlign: TextAlign.center,
-                                    style:
-                                        CommanStyle
+                                      const EdgeInsets.symmetric(vertical: 10),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.delete_outline,
+                                        size: 18,
+                                        color: const Color(0xFF8B5A5A)
+                                            .withOpacity(0.95),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        "Delete Account",
+                                        textAlign: TextAlign.center,
+                                        style: CommanStyle
                                                 .inDarkPrimaryInLightWhite12400(
                                                     context)
                                             .copyWith(
-                                                letterSpacing:
-                                                    BibleInfo.letterSpacing,
-                                                fontSize:
-                                                    BibleInfo.fontSizeScale *
-                                                        16,
-                                                color: CommanColor.whiteBlack45(
-                                                    context)),
+                                          letterSpacing: BibleInfo.letterSpacing,
+                                          fontSize:
+                                              BibleInfo.fontSizeScale * 16,
+                                          color: const Color(0xFF8B5A5A)
+                                              .withOpacity(0.95),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),

@@ -1,12 +1,11 @@
+import 'package:biblebookapp/streak_flow/take_moment_rest_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
-import 'package:biblebookapp/view/constants/images.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 
-/// "You have released your worries to God." + verse 1 Peter 5:7, "Continue Your Journey".
 /// Final screen of Find Peace flow; tapping Continue goes to Home Screen.
 class TakeMomentReleasedScreen extends StatelessWidget {
   const TakeMomentReleasedScreen({super.key});
@@ -15,29 +14,38 @@ class TakeMomentReleasedScreen extends StatelessWidget {
   static const Color _gold = Color(0xFFC9A227);
   static const Color _cream = Color(0xFFF5F0E6);
 
+  void _goHome() {
+    Get.offAll(() => HomeScreen(
+          From: "splash",
+          selectedVerseNumForRead: "",
+          selectedBookForRead: "",
+          selectedChapterForRead: "",
+          selectedBookNameForRead: "",
+          selectedVerseForRead: "",
+        ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width > 450;
-    final isDark = Provider.of<ThemeProvider>(context, listen: false).themeMode == ThemeMode.dark;
+    final isDark = Provider.of<ThemeProvider>(context, listen: false).themeMode ==
+        ThemeMode.dark;
     final lightBtnColor = CommanColor.lightDarkPrimary(context).withOpacity(0.92);
-    final List<Color> gradientColors = isDark
-        ? [CommanColor.darkPrimaryColor, CommanColor.darkPrimaryColor, CommanColor.darkPrimaryColor]
-        : [const Color(0xFFF5F0E6), const Color(0xFFE8DED0), const Color(0xFFDDD0C0)];
     final Color textColor = isDark ? Colors.white : _brown;
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           image: DecorationImage(
-            image: AssetImage(Images.bgImage(context)),
+            image: AssetImage(TakeMomentRestScreen.doveBackground),
             fit: BoxFit.cover,
           ),
         ),
         child: SafeArea(
           child: Column(
             children: [
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -48,7 +56,18 @@ class TakeMomentReleasedScreen extends StatelessWidget {
                   _dot(active: true, textColor: textColor),
                 ],
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 28),
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _gold.withOpacity(0.15),
+                  border: Border.all(color: _gold, width: 2),
+                ),
+                child: const Icon(Icons.check_rounded, color: _gold, size: 32),
+              ),
+              const SizedBox(height: 24),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 28),
                 child: Text(
@@ -63,7 +82,35 @@ class TakeMomentReleasedScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Divider(
+                        color: textColor.withOpacity(0.25),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Text(
+                        '◆',
+                        style: TextStyle(
+                          color: _gold,
+                          fontSize: isTablet ? 14 : 12,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Divider(
+                        color: textColor.withOpacity(0.25),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 32),
                 child: Text(
@@ -95,48 +142,62 @@ class TakeMomentReleasedScreen extends StatelessWidget {
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: () {
-                        Get.offAll(() => HomeScreen(
-                              From: "splash",
-                              selectedVerseNumForRead: "",
-                              selectedBookForRead: "",
-                              selectedChapterForRead: "",
-                              selectedBookNameForRead: "",
-                              selectedVerseForRead: "",
-                            ));
-                      },
+                      onTap: _goHome,
                       borderRadius: BorderRadius.circular(28),
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         decoration: BoxDecoration(
-                          color: isDark ? Colors.white.withOpacity(0.2) : lightBtnColor,
+                          color:
+                              isDark ? Colors.white.withOpacity(0.2) : lightBtnColor,
                           borderRadius: BorderRadius.circular(28),
                           border: Border.all(color: _gold, width: 2),
-                          boxShadow: [
+                          boxShadow: const [
                             BoxShadow(
                               color: Colors.black26,
                               blurRadius: 8,
-                              offset: const Offset(0, 2),
+                              offset: Offset(0, 2),
                             ),
                           ],
                         ),
-                        child: Center(
-                          child: Text(
-                            'Continue Your Journey',
-                            style: TextStyle(
-                              fontSize: isTablet ? 18 : 16,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? Colors.white : _cream,
-                              fontFamily: 'Georgia',
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Continue Your Journey',
+                              style: TextStyle(
+                                fontSize: isTablet ? 18 : 16,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? Colors.white : _cream,
+                                fontFamily: 'Georgia',
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 8),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: isDark ? Colors.white : _cream,
+                              size: 22,
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: _goHome,
+                child: Text(
+                  'Return to Home',
+                  style: TextStyle(
+                    fontSize: isTablet ? 16 : 14,
+                    color: textColor.withOpacity(0.85),
+                    fontFamily: 'Georgia',
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 28),
             ],
           ),
         ),
@@ -155,7 +216,9 @@ class TakeMomentReleasedScreen extends StatelessWidget {
           color: active ? _gold : textColor.withOpacity(0.3),
           width: active ? 2 : 1.5,
         ),
-        boxShadow: active ? [BoxShadow(color: _gold.withOpacity(0.5), blurRadius: 8)] : null,
+        boxShadow: active
+            ? [BoxShadow(color: _gold.withOpacity(0.5), blurRadius: 8)]
+            : null,
       ),
     );
   }

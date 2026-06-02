@@ -192,20 +192,33 @@ Color _streakPanelColor(BuildContext context) =>
 /// Shared frosted panel used on Verse / Devotional / Prayer streak steps.
 BoxDecoration _streakStepContentBoxDecoration(BuildContext context) {
   final isDark = _isStreakDark(context);
+  // The previous border looked like a harsh "white frame" on top of the
+  // background image. Keep a soft manuscript feel with an inner tint and a
+  // very subtle outline only when needed (dark mode).
   return BoxDecoration(
-    color: _streakPanelColor(context)
-        .withOpacity(isDark ? 0.18 : 0.88),
+    // Keep the card more "floating" over the background (less solid white).
+    color: _streakPanelColor(context).withOpacity(isDark ? 0.18 : 0.74),
     borderRadius: BorderRadius.circular(12),
-    border: Border.all(
-      color: _streakTextColor(context).withOpacity(isDark ? 0.18 : 0.12),
-      width: 1.2,
-    ),
+    border: isDark
+        ? Border.all(
+            color: Colors.white.withOpacity(0.10),
+            width: 1,
+          )
+        : null,
     boxShadow: [
       BoxShadow(
         color: Colors.black.withOpacity(isDark ? 0.18 : 0.10),
         blurRadius: 18,
         offset: const Offset(0, 8),
       ),
+      // Subtle warm glow so the card blends with vintage backgrounds.
+      if (!isDark)
+        BoxShadow(
+          color: const Color(0xFFD4A574).withOpacity(0.12),
+          blurRadius: 14,
+          spreadRadius: -6,
+          offset: const Offset(0, 6),
+        ),
     ],
   );
 }
@@ -222,7 +235,10 @@ Widget _streakStepContentBox(BuildContext context, Widget child) {
 Widget _streakShareScreenshotChild(BuildContext context, Widget child) {
   final isDark = _isStreakDark(context);
   return Container(
-    color: isDark ? const Color(0xFF1E1408) : const Color(0xFFF5F0E6),
+    // In light mode, avoid an extra opaque backdrop behind the card.
+    // That contrast was reading as a "white border/frame" around the content.
+    // Keep an opaque background only for dark mode (and for share readability).
+    color: isDark ? const Color(0xFF1E1408) : Colors.transparent,
     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
     child: _streakStepContentBox(context, child),
   );

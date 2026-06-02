@@ -2359,18 +2359,27 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
       decoration: BoxDecoration(
         color: isDark
             ? CommanColor.darkPrimaryColor.withOpacity(0.6)
-            : Colors.white.withOpacity(0.88),
+            : const Color(0xFFF8F4EB).withOpacity(0.78),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? Colors.white24 : const Color(0xFFD4C4B0),
-          width: 1.2,
-        ),
+        border: isDark
+            ? Border.all(
+                color: Colors.white.withOpacity(0.10),
+                width: 1,
+              )
+            : null,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.10),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),
+          if (!isDark)
+            BoxShadow(
+              color: const Color(0xFFD4A574).withOpacity(0.10),
+              blurRadius: 14,
+              spreadRadius: -6,
+              offset: const Offset(0, 6),
+            ),
         ],
       ),
       child: child,

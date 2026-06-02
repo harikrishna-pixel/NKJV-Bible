@@ -50,60 +50,40 @@ class LoginScreen extends HookConsumerWidget {
                 : null,
         child: Column(
           children: [
-              const SafeArea(
-                child: SizedBox(
-                  height: 12,
-                ),
-              ),
-              Row(
-                children: [
-                  InkWell(
-                    onTap: () {
-                      if (popOnSuccess) {
-                        Get.back();
-                      } else {
-                        Get.offAll(() => HomeScreen(
-                            From: "splash",
-                            selectedVerseNumForRead: "",
-                            selectedBookForRead: "",
-                            selectedChapterForRead: "",
-                            selectedBookNameForRead: "",
-                            selectedVerseForRead: ""));
-                      }
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 15.0),
-                      child: Icon(
+            SafeArea(
+              bottom: false,
+              child: SizedBox(
+                height: 56,
+                child: Row(
+                  children: [
+                    IconButton(
+                      padding: const EdgeInsets.only(left: 8),
+                      icon: Icon(
                         Icons.arrow_back_ios,
                         size: screenWidth > 450 ? 30 : 20,
                         color: CommanColor.whiteBlack(context),
                       ),
+                      onPressed: () {
+                        if (popOnSuccess) {
+                          Get.back();
+                        } else {
+                          Get.offAll(() => HomeScreen(
+                              From: "splash",
+                              selectedVerseNumForRead: "",
+                              selectedBookForRead: "",
+                              selectedChapterForRead: "",
+                              selectedBookNameForRead: "",
+                              selectedVerseForRead: ""));
+                        }
+                      },
                     ),
-                  ),
-                  const Spacer(),
-                  // if (hasSkip)
-                  //   GestureDetector(
-                  //     onTap: () async {
-                  //       NotificationsServices().initialiseNotifications();
-
-                  //       Get.offAll(() => HomeScreen(
-                  //           From: "splash",
-                  //           selectedVerseNumForRead: "",
-                  //           selectedBookForRead: "",
-                  //           selectedChapterForRead: "",
-                  //           selectedBookNameForRead: "",
-                  //           selectedVerseForRead: ""));
-                  //     },
-                  //     child: Text("Continue without Login",
-                  //         style: screenWidth > 450
-                  //             ? CommanStyle.bw22500(context).copyWith(
-                  //                 decoration: TextDecoration.underline)
-                  //             : CommanStyle.bw14400(context).copyWith(
-                  //                 decoration: TextDecoration.underline)),
-                  //   ),
-                  const SizedBox(width: 20)
-                ],
+                    const Spacer(),
+                    // if (hasSkip) ... existing logic intentionally unchanged ...
+                    const SizedBox(width: 20),
+                  ],
+                ),
               ),
+            ),
               const SizedBox(
                 height: 20,
               ),

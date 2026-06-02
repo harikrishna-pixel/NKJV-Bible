@@ -56,6 +56,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
   String? _currentConversationId;
+  bool _openedRecentFromHome = false;
   static const String _baseUrl =
       'https://my-backend-one-eta.vercel.app/api/gemini';
   int? _selectedTopicIndex; // Track which topic button is selected
@@ -1310,12 +1311,32 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _returnToChatHome() async {
+    setState(() {
+      _openedRecentFromHome = false;
+      _messages.clear();
+      _usedFollowUpSuggestionKeys.clear();
+      _geminiFollowUpSuggestions = null;
+      _geminiFollowUpsMessageHash = null;
+      _currentConversationId = _generateConversationId();
+    });
+    await _loadRecentConversations();
+  }
+
   Future<void> _handleBack() async {
     // Only one back-handler runs at a time; avoid interstitial showing multiple times
     if (_isHandlingBack) {
       if (mounted) Get.back();
       return;
     }
+
+    if (_openedRecentFromHome &&
+        widget.historyDateKey == null &&
+        widget.verseContext == null) {
+      await _returnToChatHome();
+      return;
+    }
+
     _isHandlingBack = true;
     if (_userDidActivity && !_hasShownBackInterstitial && mounted) {
       final downloadProvider =
@@ -1651,6 +1672,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
     // Clear only the current conversation, keep history intact
     setState(() {
+      _openedRecentFromHome = false;
       _messages.clear();
       _usedFollowUpSuggestionKeys.clear();
       _geminiFollowUpSuggestions = null;
@@ -3385,7 +3407,10 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                 ),
                 child: InkWell(
                   onTap: () {
-                    _currentConversationId = conversation['id'] as String;
+                    setState(() {
+                      _openedRecentFromHome = true;
+                      _currentConversationId = conversation['id'] as String;
+                    });
                     _loadChatHistory();
                   },
                   child: Row(

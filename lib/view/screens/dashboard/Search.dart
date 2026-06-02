@@ -174,6 +174,172 @@ class _SearchScreenState extends State<SearchScreen> {
     // }
   }
 
+  Future<void> _performSearch() async {
+    setState(() {
+      isLoading = true;
+    });
+    Provider.of<DownloadProvider>(context, listen: false).disableAd();
+    final currentFocus = FocusScope.of(context);
+    await SharPreferences.setString('OpenAd', '1');
+    if (!currentFocus.hasPrimaryFocus) {
+      currentFocus.unfocus();
+    }
+    await loadLocal();
+    _searchFilter(searchController.text);
+    await SharPreferences.setString('OpenAd', '1');
+    if (mounted) {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _onFilterSelected(int index) async {
+    await SharPreferences.setString('OpenAd', '1');
+    final currentFocus = FocusScope.of(context);
+    if (!currentFocus.hasPrimaryFocus) {
+      currentFocus.unfocus();
+    }
+    setState(() {
+      selectedBook = MainBookListModel(bookNum: -1);
+      selectedValueFilter =
+          index == 0 ? "ALL" : index == 1 ? "OT" : "NT";
+      selectedValueFilterIndex = index;
+      filterSelectedVersesContent.clear();
+      _searchFilter(searchController.text);
+    });
+  }
+
+  /// Resolves a [DropdownButton2] value that exists in the current items list.
+  /// Avoids assertion failures when OT/NT lists omit [_allChapterItem].
+  MainBookListModel? _resolveDropdownValue() {
+    if (selectedValueFilterIndex == 0) {
+      if (selectedBook.bookNum == -1) return _allChapterItem;
+      for (final book in bookList) {
+        if (book.bookNum == selectedBook.bookNum) return book;
+      }
+      return _allChapterItem;
+    }
+
+    final list = selectedValueFilterIndex == 1 ? oTBookList : nTBookList;
+    if (selectedBook.bookNum == -1) return null;
+    for (final book in list) {
+      if (book.bookNum == selectedBook.bookNum) return book;
+    }
+    return null;
+  }
+
+  Widget _buildFilterChip({
+    required int index,
+    required String label,
+    required double screenWidth,
+  }) {
+    final isDark = CommanColor.isDarkTheme(context);
+    final isSelected = selectedValueFilterIndex == index;
+    final primary = CommanColor.lightDarkPrimary(context);
+    return GestureDetector(
+      onTap: () => _onFilterSelected(index),
+      child: Padding(
+        padding: EdgeInsets.only(right: screenWidth > 450 ? 10 : 8),
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: screenWidth > 450 ? 14 : 10,
+            vertical: screenWidth > 450 ? 8 : 6,
+          ),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? (isDark ? primary : primary)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isSelected
+                  ? primary
+                  : (isDark ? Colors.white70 : primary.withOpacity(0.45)),
+              width: isSelected ? 1.5 : 1,
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: screenWidth > 450 ? 16 : 13,
+              fontWeight: FontWeight.w600,
+              color: isSelected
+                  ? Colors.white
+                  : (isDark ? Colors.white : primary),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchEmptyState(double screenWidth) {
+    final textColor = CommanColor.whiteBlack(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              Images.searchPlaceHolder(context),
+              height: screenWidth > 450 ? 170 : 140,
+              width: screenWidth > 450 ? 170 : 140,
+            ),
+            const SizedBox(height: 20),
+            Text.rich(
+              TextSpan(
+                style: TextStyle(
+                  fontSize: screenWidth > 450 ? 18 : 15,
+                  height: 1.5,
+                  color: textColor.withOpacity(0.85),
+                  fontFamily: 'Georgia',
+                ),
+                children: const [
+                  TextSpan(text: 'Search by '),
+                  TextSpan(
+                    text: 'word',
+                    style: TextStyle(fontStyle: FontStyle.italic),
+                  ),
+                  TextSpan(text: ' or '),
+                  TextSpan(
+                    text: 'book name',
+                    style: TextStyle(fontStyle: FontStyle.italic),
+                  ),
+                ],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text.rich(
+              TextSpan(
+                style: TextStyle(
+                  fontSize: screenWidth > 450 ? 16 : 14,
+                  height: 1.45,
+                  color: textColor.withOpacity(0.7),
+                  fontFamily: 'Georgia',
+                ),
+                children: const [
+                  TextSpan(text: 'Example: '),
+                  TextSpan(
+                    text: 'Love',
+                    style: TextStyle(fontStyle: FontStyle.italic),
+                  ),
+                  TextSpan(text: ' or '),
+                  TextSpan(
+                    text: 'Genesis',
+                    style: TextStyle(fontStyle: FontStyle.italic),
+                  ),
+                ],
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future loadLocal() async {
     final downloadProvider =
         Provider.of<DownloadProvider>(context, listen: false);
@@ -500,584 +666,341 @@ class _SearchScreenState extends State<SearchScreen> {
                   const SizedBox(
                     height: 5,
                   ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Stack(
+                    alignment: Alignment.center,
                     children: [
-                      InkWell(
-                        onTap: () async {
-                          // if (_myProvider != null) {
-                          //   _myProvider?.enableAd();
-                          // }
-                          Provider.of<DownloadProvider>(context, listen: false)
-                              .enableAd();
-                          await SharPreferences.setString('OpenAd', '1');
-                          Get.back();
-                          // Get.offAll(
-                          //   () => HomeScreen(
-                          //     From: "splash",
-                          //     selectedVerseNumForRead: "",
-                          //     selectedBookForRead: "",
-                          //     selectedChapterForRead: "",
-                          //     selectedBookNameForRead: "",
-                          //     selectedVerseForRead: "",
-                          //   ),
-                          //   transition: Transition
-                          //       .rightToLeftWithFade, // You can also try slide, rightToLeft, etc.
-                          //   duration: const Duration(milliseconds: 900),
-                          // );
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 15.0),
-                          child: Icon(
-                            Icons.arrow_back_ios,
-                            size: screenWidth > 450 ? 30 : 20,
-                            color: CommanColor.whiteBlack(context),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: InkWell(
+                          onTap: () async {
+                            Provider.of<DownloadProvider>(context, listen: false)
+                                .enableAd();
+                            await SharPreferences.setString('OpenAd', '1');
+                            Get.back();
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 15.0),
+                            child: Icon(
+                              Icons.arrow_back_ios,
+                              size: screenWidth > 450 ? 30 : 20,
+                              color: CommanColor.whiteBlack(context),
+                            ),
                           ),
                         ),
                       ),
-                      Padding(
-                        padding: EdgeInsets.only(right: 20.0),
-                        child: Text("Search",
-                            style: screenWidth > 450
-                                ? CommanStyle.appBarStyle(context).copyWith(
-                                    fontSize: 29,
-                                    color: CommanColor.whiteBlack(context))
-                                : CommanStyle.appBarStyle(context).copyWith(
-                                    color: CommanColor.whiteBlack(context))),
+                      Text(
+                        "Search",
+                        style: screenWidth > 450
+                            ? CommanStyle.appBarStyle(context).copyWith(
+                                fontSize: 29,
+                                color: CommanColor.whiteBlack(context))
+                            : CommanStyle.appBarStyle(context).copyWith(
+                                color: CommanColor.whiteBlack(context)),
                       ),
-                      SizedBox()
                     ],
                   ),
-                  const SizedBox(
-                    height: 15,
-                  ),
+                  const SizedBox(height: 8),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Container(
-                      width: MediaQuery.of(context).size.width,
-                      height: screenWidth > 450 ? 55 : 42,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.light
-                            ? Colors.grey.shade100
-                            : Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      margin: EdgeInsets.only(
-                        bottom: 20.0,
-                        left: 15,
-                        right: 15,
-                      ),
-                      child: TextFormField(
-                        style: CommanStyle.black16500.copyWith(
-                            fontSize: screenWidth > 450
-                                ? BibleInfo.fontSizeScale * 22
-                                : BibleInfo.fontSizeScale * 16),
-                        controller: searchController,
-                        cursorColor: CommanColor.lightDarkPrimary(context),
-                        onFieldSubmitted: (v) async {
-                          setState(() {
-                            isLoading = true;
-                          });
-                          Provider.of<DownloadProvider>(context, listen: false)
-                              .disableAd();
-                          FocusScopeNode currentFocus = FocusScope.of(context);
-                          await SharPreferences.setString('OpenAd', '1');
-                          if (!currentFocus.hasPrimaryFocus) {
-                            currentFocus.unfocus();
-                          }
-                          await loadLocal();
-                          _searchFilter(searchController.text);
-
-                          await SharPreferences.setString('OpenAd', '1');
-                          setState(() {
-                            isLoading = false;
-                          });
-                        },
-                        // onSaved: (value) async {
-                        //   // _searchFilter(value);
-                        //   // Provider.of<DownloadProvider>(context,
-                        //   //         listen: false)
-                        //   //     .disableAd();
-                        //   // await SharPreferences.setString(
-                        //   //     'OpenAd', '1');
-                        // },
-                        decoration: InputDecoration(
-                            contentPadding: EdgeInsets.symmetric(
-                                horizontal: 15.0, vertical: 8),
-                            hintText: "Search",
-                            suffixIcon: InkWell(
-                              onTap: () async {
-                                setState(() {
-                                  isLoading = true;
-                                });
-                                Provider.of<DownloadProvider>(context,
-                                        listen: false)
-                                    .disableAd();
-                                FocusScopeNode currentFocus =
-                                    FocusScope.of(context);
-                                await SharPreferences.setString('OpenAd', '1');
-                                if (!currentFocus.hasPrimaryFocus) {
-                                  currentFocus.unfocus();
-                                }
-                                await loadLocal();
-                                _searchFilter(searchController.text);
-
-                                await SharPreferences.setString('OpenAd', '1');
-                                setState(() {
-                                  isLoading = false;
-                                });
-                              },
-                              child: Container(
-                                  width: screenWidth > 450 ? 55 : 45,
-                                  height: screenWidth > 450 ? 55 : 45,
-                                  padding: EdgeInsets.all(11),
-                                  decoration: BoxDecoration(
-                                      color:
-                                          CommanColor.lightDarkPrimary(context),
-                                      borderRadius: BorderRadius.only(
-                                          topRight: Radius.circular(7.5),
-                                          bottomRight: Radius.circular(7.5))),
-                                  child: Image.asset(
-                                    "assets/search.png",
-                                    height: screenWidth > 450 ? 20 : 12,
-                                    width: 15,
-                                    color: Colors.white,
-                                  )),
-                            ),
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide.none),
-                            enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide.none),
-                            focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide.none),
-                            hintStyle: CommanStyle.grey13400,
-                            fillColor: Colors.white),
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        SizedBox(
-                          height: screenWidth > 450 ? 45 : 30,
-                          child: ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            scrollDirection: Axis.horizontal,
-                            itemCount: 3,
-                            itemBuilder: (context, index) {
-                              final isDark = CommanColor.isDarkTheme(context);
-                              final isSelected =
-                                  selectedValueFilterIndex == index;
-                              return GestureDetector(
-                                onTap: () async {
-                                  await SharPreferences.setString(
-                                      'OpenAd', '1');
-                                  FocusScopeNode currentFocus =
-                                      FocusScope.of(context);
-
-                                  if (!currentFocus.hasPrimaryFocus) {
-                                    currentFocus.unfocus();
-                                  }
-                                  setState(() {
-                                    selectedBook =
-                                        MainBookListModel(bookNum: -1);
-                                    index == 0
-                                        ? selectedValueFilter = "ALL"
-                                        : index == 1
-                                            ? selectedValueFilter = "OT"
-                                            : selectedValueFilter = "NT";
-                                    selectedValueFilterIndex = index;
-                                    filterSelectedVersesContent.clear();
-                                    _searchFilter(searchController.text);
-                                  });
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsets.only(right: 12),
-                                  child: SizedBox(
-                                    width: screenWidth > 450 ? 65 : 50,
-                                    height: 30,
-                                    child: Card(
-                                      elevation: isSelected && isDark ? 0 : 2,
-                                      color: isSelected
-                                          ? (isDark
-                                              ? Colors.transparent
-                                              : CommanColor.lightDarkPrimary(
-                                                  context))
-                                          : Colors.white,
-                                      margin: EdgeInsets.only(right: 10),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        side: BorderSide(
-                                          color: isSelected
-                                              ? (isDark
-                                                  ? Colors.white
-                                                  : CommanColor.lightDarkPrimary(
-                                                      context))
-                                              : (isDark
-                                                  ? Colors.white70
-                                                  : Colors.grey.shade300),
-                                          width: isSelected ? 2 : 1,
-                                        ),
-                                      ),
-                                      child: Center(
-                                        child: index == 0
-                                            ? Text(
-                                                "ALL",
-                                                style: selectedValueFilter ==
-                                                        "ALL"
-                                                    ? screenWidth > 450
-                                                        ? CommanStyle.white14500
-                                                            .copyWith(
-                                                                fontSize: 19,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w600)
-                                                        : CommanStyle.white14500
-                                                    : screenWidth > 450
-                                                        ? CommanStyle.black14500
-                                                            .copyWith(
-                                                                fontSize: 19,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w600)
-                                                        : CommanStyle
-                                                            .black15400,
-                                              )
-                                            : index == 1
-                                                ? Text(
-                                                    "OT",
-                                                    style: selectedValueFilter ==
-                                                            "OT"
-                                                        ? screenWidth > 450
-                                                            ? CommanStyle
-                                                                .white14500
-                                                                .copyWith(
-                                                                    fontSize:
-                                                                        19,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600)
-                                                            : CommanStyle
-                                                                .white14500
-                                                        : screenWidth > 450
-                                                            ? CommanStyle
-                                                                .black14500
-                                                                .copyWith(
-                                                                    fontSize:
-                                                                        19,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600)
-                                                            : CommanStyle
-                                                                .black15400,
-                                                  )
-                                                : Text(
-                                                    "NT",
-                                                    style: selectedValueFilter ==
-                                                            "NT"
-                                                        ? screenWidth > 450
-                                                            ? CommanStyle
-                                                                .white14500
-                                                                .copyWith(
-                                                                    fontSize:
-                                                                        19,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600)
-                                                            : CommanStyle
-                                                                .white14500
-                                                        : screenWidth > 450
-                                                            ? CommanStyle
-                                                                .black14500
-                                                                .copyWith(
-                                                                    fontSize:
-                                                                        19,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600)
-                                                            : CommanStyle
-                                                                .black15400,
-                                                  ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
+                        Expanded(
+                          child: Divider(
+                            color: CommanColor.lightDarkPrimary(context)
+                                .withOpacity(0.35),
                           ),
                         ),
-                        if (!_isBookNameSearchMode)
-                          DropdownButtonHideUnderline(
-                            child: DropdownButton2<MainBookListModel>(
-                              isExpanded: true,
-                              items: selectedValueFilterIndex == 0
-                                  ? [
-                                      DropdownMenuItem<MainBookListModel>(
-                                        value: _allChapterItem,
-                                        child: Text(
-                                          _allChapterItem.title ??
-                                              "All Chapter",
-                                          style: TextStyle(
-                                            letterSpacing:
-                                                BibleInfo.letterSpacing,
-                                            fontSize: BibleInfo.fontSizeScale *
-                                                        screenWidth >
-                                                    450
-                                                ? 19
-                                                : 15,
-                                            fontWeight: FontWeight.w400,
-                                            color: selectedBook.bookNum == -1
-                                                ? CommanColor.lightDarkPrimary(
-                                                    context)
-                                                : Colors.black,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      ...bookList
-                                          .where((b) => b.bookNum != -1)
-                                          .map((item) => DropdownMenuItem<
-                                                  MainBookListModel>(
-                                                value: item,
-                                                child: Text(
-                                                  item.title.toString(),
-                                                  style: TextStyle(
-                                                    letterSpacing:
-                                                        BibleInfo.letterSpacing,
-                                                    fontSize:
-                                                        BibleInfo.fontSizeScale *
-                                                                    screenWidth >
-                                                                450
-                                                            ? 19
-                                                            : 15,
-                                                    fontWeight: FontWeight.w400,
-                                                    color: selectedBook.title ==
-                                                            item.title
-                                                        ? CommanColor
-                                                            .lightDarkPrimary(
-                                                                context)
-                                                        : Colors.black,
-                                                  ),
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              )),
-                                    ]
-                                  : selectedValueFilterIndex == 1
-                                      ? oTBookList
-                                          .map((item) => DropdownMenuItem<
-                                                  MainBookListModel>(
-                                                value: item,
-                                                child: Text(
-                                                  item.title.toString(),
-                                                  style: TextStyle(
-                                                    letterSpacing:
-                                                        BibleInfo.letterSpacing,
-                                                    fontSize:
-                                                        BibleInfo.fontSizeScale *
-                                                                    screenWidth >
-                                                                450
-                                                            ? 19
-                                                            : 15,
-                                                    fontWeight: FontWeight.w400,
-                                                    color: selectedBook.title ==
-                                                            item.title
-                                                        ? CommanColor
-                                                            .lightDarkPrimary(
-                                                                context)
-                                                        : Colors.black,
-                                                  ),
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ))
-                                          .toList()
-                                      : nTBookList
-                                          .map((item) => DropdownMenuItem<
-                                                  MainBookListModel>(
-                                                value: item,
-                                                child: Text(
-                                                  item.title.toString(),
-                                                  style: TextStyle(
-                                                    letterSpacing:
-                                                        BibleInfo.letterSpacing,
-                                                    fontSize:
-                                                        BibleInfo.fontSizeScale *
-                                                                    screenWidth >
-                                                                450
-                                                            ? 19
-                                                            : 15,
-                                                    fontWeight: FontWeight.w400,
-                                                    color: selectedBook.title ==
-                                                            item.title
-                                                        ? CommanColor
-                                                            .lightDarkPrimary(
-                                                                context)
-                                                        : Colors.black,
-                                                  ),
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ))
-                                          .toList(),
-                              value: selectedBook.bookNum == -1
-                                  ? _allChapterItem
-                                  : selectedBook,
-                              onChanged: (newValue) async {
-                                FocusScopeNode currentFocus =
-                                    FocusScope.of(context);
-                                await SharPreferences.setString('OpenAd', '1');
-                                if (!currentFocus.hasPrimaryFocus) {
-                                  currentFocus.unfocus();
-                                }
-                                setState(() {
-                                  selectedBook = newValue!;
-                                  filterSelectedVersesContent.clear();
-                                });
-                                _searchFilter(searchController.text);
-                              },
-                              hint: Text("All Chapter",
-                                  style: screenWidth > 450
-                                      ? CommanStyle.black15400.copyWith(
-                                          fontSize: 19,
-                                          fontFamily: selectedFontFamily)
-                                      : CommanStyle.black15400.copyWith(
-                                          fontFamily: selectedFontFamily)),
-                              iconStyleData: IconStyleData(
-                                icon: const Icon(
-                                  Icons.keyboard_arrow_down_sharp,
-                                ),
-                                iconSize: screenWidth > 450 ? 30 : 20,
-                                iconEnabledColor:
-                                    CommanColor.lightDarkPrimary(context),
-                                iconDisabledColor:
-                                    CommanColor.lightDarkPrimary(context),
-                              ),
-                              buttonStyleData: ButtonStyleData(
-                                  height: screenWidth > 450 ? 45 : 33,
-                                  width:
-                                      MediaQuery.of(context).size.width * 0.43,
-                                  padding:
-                                      const EdgeInsets.only(left: 8, right: 3),
-                                  decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(5),
-                                      color: Colors.white),
-                                  elevation: 1,
-                                  overlayColor:
-                                      WidgetStateProperty.all(Colors.white)),
-                              menuItemStyleData: MenuItemStyleData(
-                                height: 33,
-                                padding:
-                                    const EdgeInsets.only(left: 8, right: 3),
-                              ),
-                              dropdownStyleData: DropdownStyleData(
-                                maxHeight: 200,
-                                width: MediaQuery.of(context).size.width * 0.43,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(5),
-                                  color: Colors.white,
-                                ),
-                                elevation: 1,
-                                scrollbarTheme: ScrollbarThemeData(
-                                    radius: const Radius.circular(20),
-                                    thickness: WidgetStateProperty.all(5.0),
-                                    minThumbLength: 20),
-                                offset: const Offset(0, -5),
-                              ),
-                              style: TextStyle(
-                                letterSpacing: BibleInfo.letterSpacing,
-                                fontSize: BibleInfo.fontSizeScale * 14,
-                                fontWeight: FontWeight.w400,
-                                color: Colors.black,
-                              ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          child: Text(
+                            '◆',
+                            style: TextStyle(
+                              color: CommanColor.lightDarkPrimary(context)
+                                  .withOpacity(0.7),
+                              fontSize: screenWidth > 450 ? 14 : 12,
                             ),
                           ),
+                        ),
+                        Expanded(
+                          child: Divider(
+                            color: CommanColor.lightDarkPrimary(context)
+                                .withOpacity(0.35),
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  SizedBox(
-                    height: 10,
-                  ),
-                  searchController.text.isEmpty
-                      ? Padding(
-                          padding: EdgeInsets.only(
-                              top: MediaQuery.of(context).size.height * 0.15),
-                          child: Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.center,
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 15),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Container(
+                            height: screenWidth > 450 ? 55 : 48,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8F4EB),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: CommanColor.lightDarkPrimary(context)
+                                    .withOpacity(0.2),
+                              ),
+                            ),
+                            child: Row(
                               children: [
-                                Image.asset(
-                                  Images.searchPlaceHolder(context),
-                                  height: 160,
-                                  width: 160,
-                                ),
-
-                                // Text(
-                                //   'Search by Words',
-                                //   style: TextStyle(
-                                //     fontSize: 20,
-                                //     fontWeight: FontWeight.bold,
-                                //     color: CommanColor.whiteBlack(context),
-                                //   ),
-                                //   textAlign: TextAlign.center,
-                                // ),
-
                                 Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 40),
-                                  child: Text(
-                                    'Search by word or book name\nExample: Love or Genesis',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.normal,
-                                      color: CommanColor.whiteBlack(context)
-                                          .withOpacity(0.7),
-                                      height: 1.5,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12),
+                                  child: Icon(
+                                    Icons.search,
+                                    size: screenWidth > 450 ? 24 : 20,
+                                    color:
+                                        CommanColor.lightDarkPrimary(context),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: TextFormField(
+                                    style: CommanStyle.black16500.copyWith(
+                                      fontSize: screenWidth > 450
+                                          ? BibleInfo.fontSizeScale * 20
+                                          : BibleInfo.fontSizeScale * 16,
                                     ),
-                                    textAlign: TextAlign.center,
+                                    controller: searchController,
+                                    cursorColor:
+                                        CommanColor.lightDarkPrimary(context),
+                                    onFieldSubmitted: (_) => _performSearch(),
+                                    decoration: InputDecoration(
+                                      contentPadding: EdgeInsets.symmetric(
+                                        vertical: screenWidth > 450 ? 14 : 12,
+                                        horizontal: 4,
+                                      ),
+                                      hintText: 'Search',
+                                      hintStyle: CommanStyle.grey13400,
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      filled: false,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        )
-                      : filterSelectedVersesContent.isEmpty
-                          ? SingleChildScrollView(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  SizedBox(
-                                      height:
-                                          MediaQuery.of(context).size.height *
-                                              0.13),
-                                  Image.asset(
-                                    Images.searchPlaceHolder(context),
-                                    height: 150,
-                                    width: 150,
-                                    color: Colors.transparent.withOpacity(0.3),
-                                  ),
-                                  SizedBox(
-                                    height: 10,
-                                  ),
-                                  Text(
-                                    isLoading
-                                        ? "Fetching data... Please wait"
-                                        : "No results found",
-                                    style: CommanStyle.black16500.copyWith(
-                                        color: CommanColor.whiteBlack(context)),
-                                  )
-                                ],
+                        ),
+                        const SizedBox(width: 8),
+                        InkWell(
+                          onTap: _performSearch,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            width: screenWidth > 450 ? 55 : 48,
+                            height: screenWidth > 450 ? 55 : 48,
+                            decoration: BoxDecoration(
+                              color: CommanColor.lightDarkPrimary(context),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Center(
+                              child: Image.asset(
+                                'assets/search.png',
+                                height: screenWidth > 450 ? 22 : 18,
+                                width: 18,
+                                color: Colors.white,
                               ),
-                            )
-                          : Expanded(
-                              child: ListView.builder(
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 15),
+                    child: Center(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _buildFilterChip(
+                              index: 0,
+                              label: 'ALL',
+                              screenWidth: screenWidth,
+                            ),
+                            _buildFilterChip(
+                              index: 1,
+                              label: 'OT',
+                              screenWidth: screenWidth,
+                            ),
+                            _buildFilterChip(
+                              index: 2,
+                              label: 'NT',
+                              screenWidth: screenWidth,
+                            ),
+                            if (!_isBookNameSearchMode) ...[
+                              Container(
+                                width: 1,
+                                height: 28,
+                                margin:
+                                    const EdgeInsets.symmetric(horizontal: 6),
+                                color: CommanColor.lightDarkPrimary(context)
+                                    .withOpacity(0.25),
+                              ),
+                              SizedBox(
+                                width: screenWidth > 450 ? 140 : 110,
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton2<MainBookListModel>(
+                                    isExpanded: true,
+                                    items: selectedValueFilterIndex == 0
+                                        ? [
+                                            DropdownMenuItem<
+                                                MainBookListModel>(
+                                              value: _allChapterItem,
+                                              child: Text(
+                                                _allChapterItem.title ??
+                                                    'All Chapter',
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            ...bookList
+                                                .where((b) => b.bookNum != -1)
+                                                .map(
+                                                  (item) => DropdownMenuItem<
+                                                      MainBookListModel>(
+                                                    value: item,
+                                                    child: Text(
+                                                      item.title.toString(),
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ),
+                                          ]
+                                        : selectedValueFilterIndex == 1
+                                            ? oTBookList
+                                                .map(
+                                                  (item) => DropdownMenuItem<
+                                                      MainBookListModel>(
+                                                    value: item,
+                                                    child: Text(
+                                                      item.title.toString(),
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                )
+                                                .toList()
+                                            : nTBookList
+                                                .map(
+                                                  (item) => DropdownMenuItem<
+                                                      MainBookListModel>(
+                                                    value: item,
+                                                    child: Text(
+                                                      item.title.toString(),
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                )
+                                                .toList(),
+                                    value: _resolveDropdownValue(),
+                                    hint: Text(
+                                      'All Chapter',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: screenWidth > 450 ? 14 : 12,
+                                        color:
+                                            CommanColor.lightDarkPrimary(context),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    onChanged: (newValue) async {
+                                      final currentFocus =
+                                          FocusScope.of(context);
+                                      await SharPreferences.setString(
+                                          'OpenAd', '1');
+                                      if (!currentFocus.hasPrimaryFocus) {
+                                        currentFocus.unfocus();
+                                      }
+                                      setState(() {
+                                        selectedBook = newValue!;
+                                        filterSelectedVersesContent.clear();
+                                      });
+                                      _searchFilter(searchController.text);
+                                    },
+                                    iconStyleData: IconStyleData(
+                                      icon: const Icon(
+                                        Icons.keyboard_arrow_down_sharp,
+                                      ),
+                                      iconSize: screenWidth > 450 ? 22 : 18,
+                                      iconEnabledColor:
+                                          CommanColor.lightDarkPrimary(context),
+                                    ),
+                                    buttonStyleData: ButtonStyleData(
+                                      height: screenWidth > 450 ? 40 : 34,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 4),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.transparent,
+                                      ),
+                                      overlayColor: WidgetStateProperty.all(
+                                          Colors.transparent),
+                                    ),
+                                    menuItemStyleData:
+                                        const MenuItemStyleData(height: 36),
+                                    dropdownStyleData: DropdownStyleData(
+                                      maxHeight: 220,
+                                      width: screenWidth > 450 ? 220 : 180,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(8),
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    style: TextStyle(
+                                      fontSize: screenWidth > 450 ? 14 : 12,
+                                      color:
+                                          CommanColor.lightDarkPrimary(context),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: searchController.text.isEmpty
+                        ? _buildSearchEmptyState(screenWidth)
+                        : filterSelectedVersesContent.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Image.asset(
+                                      Images.searchPlaceHolder(context),
+                                      height: 120,
+                                      width: 120,
+                                      color:
+                                          Colors.transparent.withOpacity(0.3),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      isLoading
+                                          ? 'Fetching data... Please wait'
+                                          : 'No results found',
+                                      style: CommanStyle.black16500.copyWith(
+                                        color:
+                                            CommanColor.whiteBlack(context),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.builder(
                                 shrinkWrap: true,
                                 itemCount: filterSelectedVersesContent.length,
                                 padding: EdgeInsets.symmetric(horizontal: 15),

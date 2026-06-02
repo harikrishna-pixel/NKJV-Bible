@@ -532,56 +532,17 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 15),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               const SizedBox(
                 height: 10,
               ),
-              widget.isSetting == true
-                  ? Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        InkWell(
-                          onTap: () {
-                            // checknotification();
-                            Navigator.of(context).pop();
-                          },
-                          child: Icon(
-                            Icons.arrow_back_ios,
-                            size: screenWidth > 600 ? 29 : 20,
-                            color: CommanColor.whiteBlack(context),
-                          ),
-                        ),
-                        // Padding(
-                        //   padding: const EdgeInsets.only(right: 15.0),
-                        //   child: Text("Change Preferences",
-                        //       style: CommanStyle.appBarStyle(context).copyWith(
-                        //           fontSize: screenWidth > 600
-                        //               ? BibleInfo.fontSizeScale * 21
-                        //               : BibleInfo.fontSizeScale * 18)),
-                        // ),
-                        const SizedBox(),
-                        const SizedBox()
-                      ],
-                    )
-                  : InkWell(
+              if (widget.isSetting)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    InkWell(
                       onTap: () {
-                        // checknotification();
-                        // If coming from onboarding, navigate to Theme Selection Screen
-                        // Otherwise, just pop back
-                        if (widget.isSetting == false) {
-                          Get.off(() => OnboardingThemeSelectionScreen(
-                                onThemeSelected: () {
-                                  // Navigate back to PreferenceSelectionScreen after theme selection
-                                  Get.off(() => PreferenceSelectionScreen(
-                                        isSetting: false,
-                                        selectedbible: widget.selectedbible,
-                                      ));
-                                },
-                              ));
-                        } else {
-                          Navigator.of(context).pop();
-                        }
+                        Navigator.of(context).pop();
                       },
                       child: Icon(
                         Icons.arrow_back_ios,
@@ -589,23 +550,85 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                         color: CommanColor.whiteBlack(context),
                       ),
                     ),
-              const SizedBox(
-                height: 20,
-              ),
-              Text(
-                "Jesus Will Guide You!",
-                style: TextStyle(
-                    color: CommanColor.whiteBlack(context),
-                    fontSize: screenWidth > 600 ? 25 : 22,
-                    fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                "Choose your preferred verse topics",
-                style: TextStyle(
-                    color: CommanColor.whiteBlack(context),
-                    fontSize: screenWidth > 600 ? 22 : 16),
-              ),
+                    const SizedBox(),
+                    const SizedBox()
+                  ],
+                )
+              else
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: InkWell(
+                        onTap: () {
+                          Get.off(() => OnboardingThemeSelectionScreen(
+                                onThemeSelected: () {
+                                  Get.off(() => PreferenceSelectionScreen(
+                                        isSetting: false,
+                                        selectedbible: widget.selectedbible,
+                                      ));
+                                },
+                              ));
+                        },
+                        child: Icon(
+                          Icons.arrow_back_ios,
+                          size: screenWidth > 600 ? 29 : 20,
+                          color: CommanColor.whiteBlack(context),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              if (widget.isSetting) ...[
+                const SizedBox(height: 20),
+                Text(
+                  "Jesus Will Guide You!",
+                  style: TextStyle(
+                      color: CommanColor.whiteBlack(context),
+                      fontSize: screenWidth > 600 ? 25 : 22,
+                      fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Choose your preferred verse topics",
+                  style: TextStyle(
+                      color: CommanColor.whiteBlack(context),
+                      fontSize: screenWidth > 600 ? 22 : 16),
+                ),
+              ] else ...[
+                const SizedBox(height: 8),
+                Center(
+                  child: ColorFiltered(
+                    colorFilter: const ColorFilter.mode(
+                      Color(0xFF805531),
+                      BlendMode.srcIn,
+                    ),
+                    child: Image.asset(
+                      'assets/biblebook.png',
+                      height: screenWidth > 600 ? 88 : 72,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  "Jesus Will Guide You!",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: CommanColor.whiteBlack(context),
+                      fontSize: screenWidth > 600 ? 28 : 24,
+                      fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Choose your preferred verse topics",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: CommanColor.whiteBlack(context),
+                      fontSize: screenWidth > 600 ? 20 : 16),
+                ),
+              ],
               const SizedBox(height: 16),
               Expanded(
                 child: SingleChildScrollView(
@@ -1235,6 +1258,77 @@ Future<List<VerseBookContentModel>> _parseVerseContent(
 }
 
 class FaithJourneyDialog {
+  static const Color _paperIconBrown = Color(0xFF805531);
+  static const Color _paperIconCream = Color(0xFFF3E5C2);
+
+  static Widget _themedCompletionIcon({required bool isTablet}) {
+    final outer = isTablet ? 108.0 : 92.0;
+    final inner = isTablet ? 88.0 : 74.0;
+    return SizedBox(
+      width: outer,
+      height: outer,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: inner,
+            height: inner,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFFF8F4EB),
+                  _paperIconCream,
+                ],
+              ),
+              border: Border.all(color: _paperIconBrown, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: _paperIconBrown.withValues(alpha: 0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(isTablet ? 14 : 12),
+              child: ColorFiltered(
+                colorFilter: const ColorFilter.mode(
+                  _paperIconBrown,
+                  BlendMode.srcIn,
+                ),
+                child: Image.asset(
+                  'assets/biblebook.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            right: isTablet ? 6 : 4,
+            bottom: isTablet ? 6 : 4,
+            child: Container(
+              width: isTablet ? 30 : 26,
+              height: isTablet ? 30 : 26,
+              decoration: BoxDecoration(
+                color: const Color(0xFF763201),
+                shape: BoxShape.circle,
+                border: Border.all(color: _paperIconCream, width: 2),
+              ),
+              child: Icon(
+                Icons.check_rounded,
+                color: _paperIconCream,
+                size: isTablet ? 18 : 16,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Show Loading Dialog
   static Future<void> showLoadingDialog(BuildContext context,
       {VoidCallback? onContinue}) async {
@@ -1369,33 +1463,63 @@ class FaithJourneyDialog {
         final screenWidth = MediaQuery.of(context).size.width;
         return Center(
           child: Container(
-            width: isTablet ? mq.width * 0.4 : mq.width * 0.8,
-            padding: EdgeInsets.all(isTablet ? 24 : 16),
+            width: isTablet ? mq.width * 0.42 : mq.width * 0.86,
+            padding: EdgeInsets.all(isTablet ? 28 : 20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFFFFFDF8),
+                  Color(0xFFF8F0E4),
+                ],
+              ),
               borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFB08D6E).withValues(alpha: 0.45)),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.check_circle,
-                  color: const Color.fromARGB(255, 26, 161, 30),
-                  size: isTablet ? 95 : 80,
-                ),
-                SizedBox(height: isTablet ? 24 : 16),
+                _themedCompletionIcon(isTablet: isTablet),
+                SizedBox(height: isTablet ? 20 : 16),
                 Text(
                   "Your Bible Experience Is Ready!",
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: isTablet ? 20 : 18,
+                    fontSize: isTablet ? 22 : 18,
                     fontWeight: FontWeight.bold,
-                    color: CommanColor.black,
+                    color: const Color(0xFF3D2914),
+                    fontFamily: 'Georgia',
                   ),
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Divider(
+                        color: const Color(0xFF7A5435).withValues(alpha: 0.25),
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(
+                        '◆',
+                        style: TextStyle(
+                          color: Color(0xFF7A5435),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Divider(
+                        color: const Color(0xFF7A5435).withValues(alpha: 0.25),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 Text(
-                  "We've personalized your experience\n with verses that reflect your\n spiritual journey.\n\nLet's begin this beautiful walk together in God's Word.",
+                  "We've personalized your experience with verses that reflect your spiritual journey.\n\nLet's begin this beautiful walk together in God's Word.",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: screenWidth < 380
@@ -1403,10 +1527,11 @@ class FaithJourneyDialog {
                         : isTablet
                             ? 16
                             : 14.7,
-                    color: CommanColor.black,
+                    height: 1.45,
+                    color: const Color(0xFF3D2914),
                   ),
                 ),
-                SizedBox(height: 20),
+                SizedBox(height: isTablet ? 24 : 20),
                 ElevatedButton(
                   onPressed: () async {
                     Navigator.of(ctx).pop(); // Close dialog

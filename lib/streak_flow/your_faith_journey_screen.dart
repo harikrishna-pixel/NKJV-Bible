@@ -20,7 +20,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
   static const Color _brown = Color(0xFF3D2914);
   static const Color _panel = Color(0xFFF8F4EB);
   static const Color _gold = Color(0xFFC9A227);
-  static const Color _weekHighlight = Color(0xFFE8DFD0);
+  static const Color _startedOrange = Color(0xFFE8A030);
 
   int _currentStreak = 0;
   int _bestStreak = 0;
@@ -135,21 +135,6 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
                     ),
                     const SizedBox(width: 48),
                   ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(8, (_) => Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 2),
-                    width: 3,
-                    height: 3,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: textColor.withOpacity(0.25),
-                    ),
-                  )),
                 ),
               ),
               Expanded(
@@ -288,13 +273,11 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
           LayoutBuilder(
             builder: (context, constraints) {
               final cellW = constraints.maxWidth / 7;
-              const double cellH = 40;
+              const double cellH = 46;
               final rows = <Widget>[];
               int day = 1;
-              final todayRowIndex = _todayRowIndex(year, month, firstWeekday, daysInMonth, today);
               for (int i = 0; i < 6; i++) {
                 final rowChildren = <Widget>[];
-                final isHighlightRow = (todayRowIndex >= 0 && i == todayRowIndex);
                 for (int j = 0; j < 7; j++) {
                   if (i == 0 && j < firstWeekday) {
                     rowChildren.add(SizedBox(width: cellW, height: cellH));
@@ -316,12 +299,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
                       width: cellW,
                       height: cellH,
                       child: Container(
-                        decoration: isHighlightRow
-                            ? BoxDecoration(
-                                color: isDark ? textColor.withOpacity(0.08) : _weekHighlight,
-                                borderRadius: BorderRadius.circular(4),
-                              )
-                            : null,
+                        // Don't auto-highlight a week row. Only special dates should stand out.
                         child: Center(
                           child: _dayCell(
                             day: day,
@@ -372,24 +350,73 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
     );
   }
 
-  int _todayRowIndex(int year, int month, int firstWeekday, int daysInMonth, DateTime today) {
-    if (year != today.year || month != today.month) return -1;
-    final dayOfMonth = today.day;
-    int cellIndex = firstWeekday + (dayOfMonth - 1);
-    return cellIndex ~/ 7;
-  }
+  Widget _statusIcon({
+    required bool isCompleted,
+    required bool isStartedNotFinished,
+    required bool isToday,
+    required bool isFuture,
+    required Color textColor,
+    bool compact = false,
+  }) {
+    final double size = compact ? 18 : 22;
+    final double iconSize = compact ? 11 : 14;
+    final double dotSize = compact ? 4 : 5;
 
-  Widget _halfCircle(Color textColor) {
-    return SizedBox(
-      width: 14,
-      height: 14,
-      child: CustomPaint(
-        painter: _HalfCirclePainter(
-          color: textColor.withOpacity(0.6),
-          strokeWidth: 1.5,
+    if (isCompleted) {
+      return Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: _brown,
         ),
-      ),
-    );
+        child: Icon(Icons.check, size: iconSize, color: Colors.white),
+      );
+    }
+    if (isStartedNotFinished) {
+      return Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: _startedOrange,
+        ),
+        child: Icon(Icons.schedule_rounded,
+            size: iconSize, color: Colors.white),
+      );
+    }
+    if (isToday) {
+      return Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: textColor.withOpacity(0.45), width: 1.5),
+        ),
+        child: Container(
+          width: dotSize,
+          height: dotSize,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: textColor.withOpacity(0.7),
+          ),
+        ),
+      );
+    }
+    if (!isFuture) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: textColor.withOpacity(0.28), width: 1.5),
+        ),
+      );
+    }
+    return SizedBox(width: size, height: size);
   }
 
   String _monthYearLabel(int month, int year) {
@@ -410,42 +437,30 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
   }) {
     return SizedBox(
       width: 28,
-      height: 34,
-      child: ClipRect(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              '$day',
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.1,
-                color: isFuture ? textColor.withOpacity(0.4) : textColor,
-                fontFamily: 'Georgia',
-              ),
+      height: 40,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '$day',
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.0,
+              color: isFuture ? textColor.withOpacity(0.4) : textColor,
+              fontFamily: 'Georgia',
             ),
-            const SizedBox(height: 1),
-            if (isCompleted)
-              Icon(Icons.local_fire_department_rounded, size: 16, color: _gold)
-            else if (isStartedNotFinished)
-              _halfCircle(textColor)
-            else if (isToday)
-              Icon(Icons.check_circle, size: 18, color: textColor)
-            else if (!isFuture)
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.transparent,
-                  border: Border.all(color: textColor.withOpacity(0.3), width: 1),
-                ),
-              )
-            else
-              const SizedBox(width: 10, height: 10),
-          ],
-        ),
+          ),
+          const SizedBox(height: 1),
+          _statusIcon(
+            isCompleted: isCompleted,
+            isStartedNotFinished: isStartedNotFinished,
+            isToday: isToday,
+            isFuture: isFuture,
+            textColor: textColor,
+            compact: true,
+          ),
+        ],
       ),
     );
   }
@@ -459,8 +474,14 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.local_fire_department_rounded, size: 16, color: _gold),
-            const SizedBox(width: 4),
+            _statusIcon(
+              isCompleted: true,
+              isStartedNotFinished: false,
+              isToday: false,
+              isFuture: false,
+              textColor: textColor,
+            ),
+            const SizedBox(width: 6),
             Text('Completed Journey',
                 style: TextStyle(fontSize: 11, color: textColor, fontFamily: 'Georgia')),
           ],
@@ -468,17 +489,14 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              width: 14,
-              height: 14,
-              child: CustomPaint(
-                painter: _HalfCirclePainter(
-                  color: textColor.withOpacity(0.6),
-                  strokeWidth: 1.5,
-                ),
-              ),
+            _statusIcon(
+              isCompleted: false,
+              isStartedNotFinished: true,
+              isToday: false,
+              isFuture: false,
+              textColor: textColor,
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 6),
             Text('Started but not finished',
                 style: TextStyle(fontSize: 11, color: textColor, fontFamily: 'Georgia')),
           ],
@@ -486,15 +504,14 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: textColor.withOpacity(0.3)),
-              ),
+            _statusIcon(
+              isCompleted: false,
+              isStartedNotFinished: false,
+              isToday: false,
+              isFuture: false,
+              textColor: textColor,
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 6),
             Text('Missed day',
                 style: TextStyle(fontSize: 11, color: textColor, fontFamily: 'Georgia')),
           ],
@@ -502,8 +519,14 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check_circle, size: 14, color: textColor),
-            const SizedBox(width: 4),
+            _statusIcon(
+              isCompleted: false,
+              isStartedNotFinished: false,
+              isToday: true,
+              isFuture: false,
+              textColor: textColor,
+            ),
+            const SizedBox(width: 6),
             Text('Today',
                 style: TextStyle(fontSize: 11, color: textColor, fontFamily: 'Georgia')),
           ],
@@ -587,7 +610,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
                   ),
                 ),
                 Text(
-                  'Since joining',
+                  'Keep walking with faith',
                   style: TextStyle(
                     fontSize: 12,
                     color: textColor.withOpacity(0.8),
@@ -732,28 +755,4 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
     ];
     return names[m - 1];
   }
-}
-
-class _HalfCirclePainter extends CustomPainter {
-  _HalfCirclePainter({required this.color, this.strokeWidth = 1.5});
-  final Color color;
-  final double strokeWidth;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
-    canvas.drawArc(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      0.5 * 3.14159,
-      3.14159,
-      false,
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

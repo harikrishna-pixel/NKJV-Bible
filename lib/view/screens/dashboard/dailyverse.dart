@@ -669,7 +669,66 @@ class _DailyVerseState extends State<DailyVerse> {
                             fontWeight: FontWeight.w400),
                       ),
                     ),
-                    SizedBox(),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: () {
+                          Get.to(() => PreferenceSelectionScreen(
+                                isSetting: true,
+                                from: true,
+                              ));
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color:
+                                Provider.of<ThemeProvider>(context, listen: false)
+                                            .themeMode ==
+                                        ThemeMode.dark
+                                    ? CommanColor.lightDarkPrimary(context)
+                                        .withOpacity(0.92)
+                                    : CommanColor.lightDarkPrimary(context)
+                                        .withOpacity(0.14),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: CommanColor.lightDarkPrimary(context)
+                                  .withOpacity(0.28),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.mood,
+                                size: 16,
+                                color:
+                                    Provider.of<ThemeProvider>(context, listen: false)
+                                                .themeMode ==
+                                            ThemeMode.dark
+                                        ? Colors.white
+                                        : CommanColor.lightDarkPrimary(context),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Choose a feeling',
+                                style: TextStyle(
+                                  fontSize: screenWidth > 450 ? 14 : 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Provider.of<ThemeProvider>(context,
+                                                  listen: false)
+                                              .themeMode ==
+                                          ThemeMode.dark
+                                      ? Colors.white
+                                      : CommanColor.lightDarkPrimary(context),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 SizedBox(

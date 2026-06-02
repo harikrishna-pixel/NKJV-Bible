@@ -194,14 +194,19 @@ class _FaithOnboardingScreenState extends State<FaithOnboardingScreen> {
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       } else {
-        Get.offAll(() => const WelcomeScreen());
+        Get.off(
+          () => const WelcomeScreen(),
+          transition: Transition.leftToRight,
+          duration: const Duration(milliseconds: 400),
+        );
       }
       return;
     }
 
     setState(() => step -= 1);
     _page.previousPage(
-        duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOutCubic);
   }
 
   bool _isStepAnswered(int index) {
@@ -700,11 +705,25 @@ class _OnboardingThemeSelectionScreenState
     }
   }
 
-  Widget themeBox(AppCustomTheme theme) {
+  String _themeDisplayName(AppCustomTheme theme) {
+    switch (theme) {
+      case AppCustomTheme.vintage:
+        return 'Classic Parchment';
+      case AppCustomTheme.white:
+        return 'Pure Light';
+      case AppCustomTheme.lightbrown:
+        return 'Warm Cream';
+    }
+  }
+
+  Widget _themeOption(AppCustomTheme theme, bool isTablet) {
     final color = getColor(theme);
+    final selected = _selectedTheme == theme;
     const outerRadius = 10.0;
     const borderWidth = 3.0;
     const innerRadius = outerRadius - borderWidth;
+    final boxSize = isTablet ? 78.0 : 70.0;
+
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -714,35 +733,145 @@ class _OnboardingThemeSelectionScreenState
               .setCustomTheme(theme);
         });
       },
-      child: Container(
-        margin: const EdgeInsets.all(8),
-        width: 70,
-        height: 70,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(outerRadius),
-          border: Border.all(
-            color: _selectedTheme == theme
-                ? Colors.brown
-                : const Color.fromARGB(255, 144, 144, 144),
-            width: borderWidth,
-          ),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(innerRadius),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: color,
-              image: theme == AppCustomTheme.vintage
-                  ? DecorationImage(
-                      image: AssetImage(Images.bgImage(context)),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
+      child: SizedBox(
+        width: isTablet ? 108 : 96,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: boxSize,
+                  height: boxSize,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(outerRadius),
+                    border: Border.all(
+                      color: selected
+                          ? const Color(0xFF7A5435)
+                          : const Color.fromARGB(255, 144, 144, 144),
+                      width: borderWidth,
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(innerRadius),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: color,
+                        image: theme == AppCustomTheme.vintage
+                            ? DecorationImage(
+                                image: AssetImage(Images.bgImage(context)),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
+                      ),
+                      child: const SizedBox.expand(),
+                    ),
+                  ),
+                ),
+                if (selected)
+                  Positioned(
+                    top: -6,
+                    right: -6,
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF7A5435),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.check, color: Colors.white, size: 14),
+                    ),
+                  ),
+              ],
             ),
-            child: const SizedBox.expand(),
-          ),
+            const SizedBox(height: 8),
+            Text(
+              _themeDisplayName(theme),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: isTablet ? 14 : 12,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: const Color(0xFF2E2C2B),
+                height: 1.2,
+              ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildThemeSelectionCard(bool isTablet, List<AppCustomTheme> themes) {
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.topCenter,
+      children: [
+        Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(top: 14),
+          padding: EdgeInsets.fromLTRB(12, isTablet ? 32 : 28, 12, 16),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: const Color(0xFFB08D6E).withValues(alpha: 0.75),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children:
+                themes.map((theme) => _themeOption(theme, isTablet)).toList(),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFF7A5435),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFB08D6E)),
+          ),
+          child: Text(
+            'Select Theme',
+            style: TextStyle(
+              fontSize: isTablet ? 15 : 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPreviewDivider(bool isTablet) {
+    return Row(
+      children: [
+        Expanded(
+          child: Divider(
+            color: const Color(0xFF7A5435).withValues(alpha: 0.35),
+            thickness: 1,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Text(
+            '◆ Preview ◆',
+            style: TextStyle(
+              fontSize: isTablet ? 16 : 14,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF7A5435),
+            ),
+          ),
+        ),
+        Expanded(
+          child: Divider(
+            color: const Color(0xFF7A5435).withValues(alpha: 0.35),
+            thickness: 1,
+          ),
+        ),
+      ],
     );
   }
 
@@ -821,66 +950,95 @@ class _OnboardingThemeSelectionScreenState
                               ),
                             ),
                             const SizedBox(height: 18),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: themes.map(themeBox).toList(),
-                            ),
-                            const SizedBox(height: 18),
-                            Center(
-                              child: Text(
-                                'Preview',
-                                style: TextStyle(
-                                  fontSize: isTablet ? 18 : 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF7A5435),
+                            _buildThemeSelectionCard(isTablet, themes),
+                            const SizedBox(height: 20),
+                            _buildPreviewDivider(isTablet),
+                            const SizedBox(height: 12),
+                            Expanded(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: const Color(0xFFB08D6E)
+                                        .withValues(alpha: 0.7),
+                                  ),
                                 ),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: const Color(0xFFB08D6E)
-                                      .withValues(alpha: 0.7),
-                                ),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: DecoratedBox(
-                                  decoration: Provider.of<ThemeProvider>(context)
-                                              .currentCustomTheme ==
-                                          AppCustomTheme.vintage
-                                      ? BoxDecoration(
-                                          image: DecorationImage(
-                                            image: AssetImage(
-                                                Images.bgImage(context)),
-                                            fit: BoxFit.cover,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: DecoratedBox(
+                                    decoration: Provider.of<ThemeProvider>(
+                                                    context)
+                                                .currentCustomTheme ==
+                                            AppCustomTheme.vintage
+                                        ? BoxDecoration(
+                                            image: DecorationImage(
+                                              image: AssetImage(
+                                                  Images.bgImage(context)),
+                                              fit: BoxFit.cover,
+                                            ),
+                                          )
+                                        : BoxDecoration(
+                                            color:
+                                                Provider.of<ThemeProvider>(
+                                                        context)
+                                                    .backgroundColor,
                                           ),
-                                        )
-                                      : BoxDecoration(
-                                          color: Provider.of<ThemeProvider>(
-                                                  context)
-                                              .backgroundColor,
-                                        ),
-                                  child: const Padding(
-                                    padding: EdgeInsets.all(14),
-                                    child: Text(
-                                      '1. In the beginning God created the heaven and the earth.\n\n'
-                                      '2. And the earth was without form, and void; and darkness was upon the face of the deep. '
-                                      'And the Spirit of God moved upon the face of the waters.',
-                                      style: TextStyle(
-                                        height: 1.4,
-                                        fontSize: 15.5,
-                                        color: Color(0xFF2E2C2B),
-                                        fontWeight: FontWeight.w500,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(14),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                width: 28,
+                                                height: 28,
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF7A5435),
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                ),
+                                                child: const Icon(
+                                                  Icons.bookmark,
+                                                  color: Colors.white,
+                                                  size: 16,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              const Text(
+                                                'Genesis 1:1–2',
+                                                style: TextStyle(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Color(0xFF2E2C2B),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 10),
+                                          const Expanded(
+                                            child: SingleChildScrollView(
+                                              child: Text(
+                                                '1. In the beginning God created the heaven and the earth.\n\n'
+                                                '2. And the earth was without form, and void; and darkness was upon the face of the deep. '
+                                                'And the Spirit of God moved upon the face of the waters.',
+                                                style: TextStyle(
+                                                  height: 1.4,
+                                                  fontSize: 15.5,
+                                                  color: Color(0xFF2E2C2B),
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ),
                                 ),
                               ),
                             ),
-                            const Spacer(),
                             Padding(
                               padding: EdgeInsets.fromLTRB(
                                   16, 12, 16, 20 + mq.padding.bottom),

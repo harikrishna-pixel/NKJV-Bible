@@ -1,16 +1,15 @@
 import 'dart:async';
 import 'package:biblebookapp/streak_flow/take_moment_released_screen.dart';
-import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
-import 'package:biblebookapp/view/constants/images.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 
 /// "Rest in His presence" - Breathing meditation exercise
-/// Serene, professional UI designed to reduce stress and create a sanctuary-like experience
 class TakeMomentRestScreen extends StatefulWidget {
   const TakeMomentRestScreen({super.key});
+
+  static const String doveBackground = 'assets/dove_faith.png';
 
   @override
   State<TakeMomentRestScreen> createState() => _TakeMomentRestScreenState();
@@ -23,17 +22,12 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
   Timer? _timer;
   bool _isHolding = false;
   late AnimationController _breathingController;
-  late AnimationController _pulseController;
   late AnimationController _glowController;
   late Animation<double> _breathingAnimation;
   late Animation<double> _glowAnimation;
 
-  // Serene color palette
   static const Color _deepStone = Color(0xFF2B2416);
-  static const Color _warmBeige = Color(0xFFF5F0E6);
   static const Color _softGold = Color(0xFFD4A574);
-  static const Color _paleSage = Color(0xFFE8ECDC);
-  static const Color _dustyBlue = Color(0xFF5C6B7C);
 
   void _startCountdown() {
     _timer?.cancel();
@@ -66,7 +60,6 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
   void initState() {
     super.initState();
 
-    // Breathing animation - slow, meditative cycle
     _breathingController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 4000),
@@ -76,7 +69,6 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
     );
     _breathingController.repeat(reverse: true);
 
-    // Glow animation for calming effect
     _glowController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 3000),
@@ -85,12 +77,6 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
       CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
     );
     _glowController.repeat(reverse: true);
-
-    // Pulse for interaction feedback
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
   }
 
   @override
@@ -98,7 +84,6 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
     _timer?.cancel();
     _breathingController.dispose();
     _glowController.dispose();
-    _pulseController.dispose();
     super.dispose();
   }
 
@@ -109,39 +94,25 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
         Provider.of<ThemeProvider>(context, listen: false).themeMode ==
             ThemeMode.dark;
 
-    final Color backgroundColor = isDark ? const Color(0xFF1A1410) : _warmBeige;
     final Color accentColor = isDark ? const Color(0xFFC9A227) : _softGold;
     final Color textColor = isDark ? Colors.white : _deepStone;
     final Color secondaryText = isDark ? Colors.white70 : _deepStone;
-
-    final List<Color> gradientColors = isDark
-        ? [
-            const Color(0xFF1A1410),
-            const Color(0xFF2A231A),
-            const Color(0xFF1A1410)
-          ]
-        : [
-            const Color(0xFFFAF7F1),
-            const Color(0xFFF5F0E6),
-            const Color(0xFFEFE9DD)
-          ];
 
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           image: DecorationImage(
-            image: AssetImage(Images.bgImage(context)),
+            image: AssetImage(TakeMomentRestScreen.doveBackground),
             fit: BoxFit.cover,
           ),
         ),
         child: SafeArea(
           child: Column(
             children: [
-              // Progress dots with subtle animation
               Padding(
-                padding: const EdgeInsets.only(top: 16.0, bottom: 32),
+                padding: const EdgeInsets.only(top: 12, bottom: 20),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -153,61 +124,51 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
                   ],
                 ),
               ),
-
-              // Header text with refined typography
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 28),
                 child: Column(
                   children: [
                     Text(
                       'Rest in',
                       style: TextStyle(
-                        fontSize: isTablet ? 26 : 22,
+                        fontSize: isTablet ? 24 : 20,
                         fontWeight: FontWeight.w400,
-                        color: secondaryText,
+                        color: secondaryText.withOpacity(0.9),
                         fontFamily: 'Georgia',
-                        letterSpacing: 1.2,
+                        letterSpacing: 0.5,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'His presence',
                       style: TextStyle(
-                        fontSize: isTablet ? 42 : 36,
+                        fontSize: isTablet ? 40 : 34,
                         fontWeight: FontWeight.w600,
                         color: textColor,
                         fontFamily: 'Georgia',
-                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'A moment to breathe and find peace',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: isTablet ? 17 : 15,
+                        color: secondaryText.withOpacity(0.85),
+                        fontFamily: 'Georgia',
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
                   ],
                 ),
               ),
-
-              const SizedBox(height: 24),
-
-              // Subtitle with gentle guidance
-              Text(
-                'A moment to breathe and find peace',
-                style: TextStyle(
-                  fontSize: isTablet ? 16 : 14,
-                  color: secondaryText,
-                  fontFamily: 'Georgia',
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-
-              const SizedBox(height: 48),
-
-              // Main breathing circle with multiple layers
+              const SizedBox(height: 28),
               Expanded(
                 child: Center(
                   child: Listener(
                     onPointerDown: (_) {
                       if (!_isHolding && mounted) {
                         setState(() => _isHolding = true);
-                        _pulseController.forward();
                         _startCountdown();
                       }
                     },
@@ -216,29 +177,26 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        // Outer glow effect
                         AnimatedBuilder(
                           animation: _glowAnimation,
                           builder: (context, _) {
                             return Container(
-                              width: 240,
-                              height: 240,
+                              width: isTablet ? 260 : 220,
+                              height: isTablet ? 260 : 220,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
                                     color: accentColor.withOpacity(
-                                        _glowAnimation.value * 0.3),
-                                    blurRadius: 40,
-                                    spreadRadius: 20,
+                                        _glowAnimation.value * 0.25),
+                                    blurRadius: 36,
+                                    spreadRadius: 12,
                                   ),
                                 ],
                               ),
                             );
                           },
                         ),
-
-                        // Breathing circle animation
                         AnimatedBuilder(
                           animation: _breathingAnimation,
                           builder: (context, _) {
@@ -260,31 +218,41 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
                   ),
                 ),
               ),
-
-              // Instructional text below circle
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32),
-                child: Column(
-                  children: [
-                    AnimatedOpacity(
-                      opacity: _isHolding ? 0.3 : 1.0,
-                      duration: const Duration(milliseconds: 300),
-                      child: Text(
-                        _isHolding
-                            ? 'Hold to continue...'
-                            : 'Hold the circle to start',
-                        style: TextStyle(
-                          fontSize: isTablet ? 15 : 13,
-                          color: secondaryText,
-                          fontFamily: 'Georgia',
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.3,
-                        ),
-                        textAlign: TextAlign.center,
+                padding: const EdgeInsets.fromLTRB(28, 0, 28, 28),
+                child: AnimatedOpacity(
+                  opacity: _isHolding ? 0.35 : 1.0,
+                  duration: const Duration(milliseconds: 300),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Colors.black.withOpacity(0.25)
+                          : Colors.white.withOpacity(0.55),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: accentColor.withOpacity(0.55),
+                        width: 1.5,
                       ),
                     ),
-                  ],
+                    child: Text(
+                      _isHolding
+                          ? 'Hold to continue...'
+                          : 'Hold the circle to start',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: isTablet ? 16 : 14,
+                        color: textColor,
+                        fontFamily: 'Georgia',
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -300,28 +268,29 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
     required Color accentColor,
     required Color textColor,
   }) {
+    final size = isTablet ? 200.0 : 180.0;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOut,
-      width: 180,
-      height: 180,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: _isHolding
             ? (isDark
                 ? Colors.white.withOpacity(0.08)
-                : _softGold.withOpacity(0.15))
+                : _softGold.withOpacity(0.12))
             : Colors.transparent,
         border: Border.all(
-          color: _isHolding ? accentColor : accentColor.withOpacity(0.6),
-          width: _isHolding ? 3 : 2.5,
+          color: _isHolding ? accentColor : accentColor.withOpacity(0.65),
+          width: _isHolding ? 2.5 : 2,
         ),
         boxShadow: [
           if (_isHolding)
             BoxShadow(
-              color: accentColor.withOpacity(0.3),
-              blurRadius: 20,
-              spreadRadius: 4,
+              color: accentColor.withOpacity(0.25),
+              blurRadius: 18,
+              spreadRadius: 2,
             ),
         ],
       ),
@@ -329,24 +298,17 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Countdown number with breathing animation
-            ScaleTransition(
-              scale: Tween<double>(begin: 1.0, end: 1.05).animate(
-                CurvedAnimation(
-                    parent: _breathingController, curve: Curves.easeInOut),
-              ),
-              child: Text(
-                '$_count',
-                style: TextStyle(
-                  fontSize: 72,
-                  fontWeight: FontWeight.w300,
-                  color: textColor,
-                  fontFamily: 'Georgia',
-                  height: 1.0,
-                ),
+            Text(
+              '$_count',
+              style: TextStyle(
+                fontSize: isTablet ? 76 : 68,
+                fontWeight: FontWeight.w400,
+                color: textColor,
+                fontFamily: 'Georgia',
+                height: 1.0,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               _isHolding ? 'Hold' : 'Breathe in',
               style: TextStyle(
@@ -354,7 +316,6 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
                 color: textColor.withOpacity(0.8),
                 fontFamily: 'Georgia',
                 fontWeight: FontWeight.w500,
-                letterSpacing: 1.0,
               ),
             ),
           ],
@@ -364,9 +325,7 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
   }
 
   Widget _progressDot(bool active, Color accentColor) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeOut,
+    return Container(
       width: active ? 12 : 8,
       height: active ? 12 : 8,
       decoration: BoxDecoration(
@@ -376,15 +335,6 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
           color: accentColor.withOpacity(active ? 1.0 : 0.4),
           width: active ? 0 : 1.5,
         ),
-        boxShadow: active
-            ? [
-                BoxShadow(
-                  color: accentColor.withOpacity(0.4),
-                  blurRadius: 8,
-                  spreadRadius: 2,
-                ),
-              ]
-            : null,
       ),
     );
   }

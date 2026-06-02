@@ -332,7 +332,6 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
     final titleCtrl = TextEditingController(text: item.title);
     final descCtrl = TextEditingController(text: item.description);
     final scrollCtrl = ScrollController();
-    final descFocus = FocusNode();
 
     void scrollFieldIntoView() {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -344,12 +343,6 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
         );
       });
     }
-
-    void onDescFocusChanged() {
-      if (descFocus.hasFocus) scrollFieldIntoView();
-    }
-
-    descFocus.addListener(onDescFocusChanged);
 
     String? action;
     try {
@@ -500,7 +493,6 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                                 ),
                                 child: TextField(
                                   controller: descCtrl,
-                                  focusNode: descFocus,
                                   maxLines: 5,
                                   maxLength: 2000,
                                   onTap: scrollFieldIntoView,
@@ -585,8 +577,6 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
         },
       );
     } finally {
-      descFocus.removeListener(onDescFocusChanged);
-      descFocus.dispose();
       scrollCtrl.dispose();
     }
 
@@ -984,29 +974,29 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: Padding(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          0,
-          16,
-          16 + MediaQuery.of(context).padding.bottom,
-        ),
-        child: ElevatedButton(
-          onPressed: () => _openPostPrayerScreen(showSuccessToast: true),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: brown,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(28),
-            ),
-          ),
-          child: const Text(
-            'Post a Prayer',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-        ),
-      ),
+      // bottomNavigationBar: Padding(
+      //   padding: EdgeInsets.fromLTRB(
+      //     16,
+      //     0,
+      //     16,
+      //     16 + MediaQuery.of(context).padding.bottom,
+      //   ),
+      //   child: ElevatedButton(
+      //     onPressed: () => _openPostPrayerScreen(showSuccessToast: true),
+      //     style: ElevatedButton.styleFrom(
+      //       backgroundColor: brown,
+      //       foregroundColor: Colors.white,
+      //       padding: const EdgeInsets.symmetric(vertical: 16),
+      //       shape: RoundedRectangleBorder(
+      //         borderRadius: BorderRadius.circular(28),
+      //       ),
+      //     ),
+      //     child: const Text(
+      //       'Post a Prayer',
+      //       style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+      //     ),
+      //   ),
+      // ),
         )
       )
     );
@@ -1017,8 +1007,10 @@ Widget _metaChip({
   required String label,
   required Color brown,
   required bool isDark,
+  IconData? leadingIcon,
+  String? tooltip,
 }) {
-  return Container(
+  final chip = Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
     decoration: BoxDecoration(
       color: isDark ? const Color(0xFF4A382C) : brown.withOpacity(0.14),
@@ -1027,15 +1019,31 @@ Widget _metaChip({
         color: isDark ? const Color(0xFF6B5344) : brown.withOpacity(0.35),
       ),
     ),
-    child: Text(
-      label,
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        color: isDark ? const Color(0xFFF5EDE3) : brown,
-      ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (leadingIcon != null) ...[
+          Icon(
+            leadingIcon,
+            size: 12,
+            color: isDark ? const Color(0xFFF5EDE3) : brown,
+          ),
+          const SizedBox(width: 4),
+        ],
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: isDark ? const Color(0xFFF5EDE3) : brown,
+          ),
+        ),
+      ],
     ),
   );
+
+  if (tooltip == null || tooltip.trim().isEmpty) return chip;
+  return Tooltip(message: tooltip, child: chip);
 }
 
 class _PrayerCard extends StatelessWidget {
@@ -1182,6 +1190,8 @@ class _PrayerCard extends StatelessWidget {
                               label: item.category,
                               brown: brown,
                               isDark: isDark,
+                              leadingIcon: Icons.label_outline_rounded,
+                              tooltip: 'Prayer category',
                             ),
                           ],
                         ),

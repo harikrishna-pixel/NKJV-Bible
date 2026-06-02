@@ -53,7 +53,10 @@ class PrayerShareScreen extends StatelessWidget {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Copied to clipboard.')),
+      const SnackBar(
+        content: Text('Copied to clipboard.'),
+        duration: Duration(seconds: 2),
+      ),
     );
   }
 

@@ -51,6 +51,109 @@ class _WalletScreenState extends State<WalletScreen> {
   static const String _processedWalletPurchaseKey =
       'wallet_processed_purchases';
 
+  static const String _walletIntroSeenKey = 'wallet_intro_seen';
+
+  Future<void> _showWalletIntroIfNeeded() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final seen = prefs.getBool(_walletIntroSeenKey) ?? false;
+      if (seen || !mounted) return;
+
+      // Mark as seen first to avoid double showing on rapid rebuilds.
+      await prefs.setBool(_walletIntroSeenKey, true);
+      if (!mounted) return;
+
+      final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+      final isDark = themeProvider.themeMode == ThemeMode.dark;
+      final titleColor = CommanColor.whiteBlack(context);
+      final subColor = CommanColor.whiteBlack(context).withOpacity(0.8);
+      final bg = isDark
+          ? CommanColor.darkPrimaryColor.withOpacity(0.98)
+          : const Color(0xFFF6F1E9);
+
+      await showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: false,
+        builder: (ctx) {
+          return SafeArea(
+            child: Container(
+              margin: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: (isDark ? Colors.white : const Color(0xFF8D6E63))
+                      .withOpacity(0.18),
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.account_balance_wallet,
+                        color: isDark ? Colors.white : const Color(0xFF8D6E63),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Credits',
+                          style: TextStyle(
+                            color: titleColor,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'Georgia',
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        icon: Icon(
+                          Icons.close,
+                          color: isDark ? Colors.white : const Color(0xFF8D6E63),
+                        ),
+                        tooltip: 'Close',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Credits are used for AI features like Bible Chat and Prayer Guidance. You can also change the answer length here to control how many credits each response uses.',
+                    style: TextStyle(
+                      color: subColor,
+                      fontSize: 13,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: CommanColor.lightDarkPrimary(context),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text(
+                      'Got it',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    } catch (_) {}
+  }
+
   Future<bool> _markPurchaseProcessedOnce(PurchaseDetails details) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -160,6 +263,11 @@ class _WalletScreenState extends State<WalletScreen> {
     });
     // Initialize max ads check
     _checkMaxAdsWatched();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _showWalletIntroIfNeeded();
+    });
   }
 
   Future<void> _checkConnectivityAndShowToast() async {

@@ -3530,9 +3530,19 @@ class _HomeScreenState extends State<HomeScreen>
                 return false;
               },
               child: GestureDetector(
-                onHorizontalDragEnd: (dragDetail) async {
+                onPanEnd: (dragDetail) async {
+                  // Avoid triggering chapter navigation while user is scrolling vertically.
+                  final vx = dragDetail.velocity.pixelsPerSecond.dx;
+                  final vy = dragDetail.velocity.pixelsPerSecond.dy;
+                  if (vx.abs() <= vy.abs()) {
+                    return;
+                  }
+                  // Require a meaningful horizontal swipe velocity.
+                  if (vx.abs() < 250) {
+                    return;
+                  }
                   // Show ad every 5 swipes
-                  if (dragDetail.velocity.pixelsPerSecond.dx < 1) {
+                  if (vx < 0) {
                     //! AD interstitialAd
 
                     swipeCount++;

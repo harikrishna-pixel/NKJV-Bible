@@ -35,7 +35,6 @@ class WelcomeScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  SizedBox(height: isTablet ? 190 : 170),
                   // Old logo → New logo
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -176,18 +175,6 @@ class WelcomeScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Spacer(
-                    flex: 1,
-                  ),
-                  // Text(
-                  //   "Designed to help you grow daily in God’s Word",
-                  //   textAlign: TextAlign.center,
-                  //   style: TextStyle(
-                  //     fontSize: isTablet ? 18 : 13,
-                  //     fontStyle: FontStyle.normal,
-                  //     color: Colors.black87,
-                  //   ),
-                  // ),
                 ],
               ),
             ),

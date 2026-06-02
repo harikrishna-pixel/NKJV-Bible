@@ -35,6 +35,22 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
 
   bool get _isLastPage => _currentPage >= _imagePaths.length - 1;
 
+  /// The onboarding images already contain their own dot indicator baked in.
+  /// We crop a small strip from the top so users only see the app indicator.
+  Widget _buildCroppedSlideImage(String path) {
+    return ClipRect(
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        heightFactor: 0.93,
+        child: Image.asset(
+          path,
+          fit: BoxFit.contain,
+          width: double.infinity,
+        ),
+      ),
+    );
+  }
+
   void _onAddWidgetTap() {
     if (!_isLastPage) {
       _pageController.nextPage(
@@ -162,11 +178,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
                         itemBuilder: (context, index) {
                           return Padding(
                             padding: const EdgeInsets.all(12),
-                            child: Image.asset(
-                              _imagePaths[index],
-                              fit: BoxFit.contain,
-                              width: double.infinity,
-                            ),
+                            child: _buildCroppedSlideImage(_imagePaths[index]),
                           );
                         },
                       ),
@@ -174,72 +186,75 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
                   ),
                 ),
               ),
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  isTablet ? 28 : 20,
-                  12,
-                  isTablet ? 28 : 20,
-                  12 + MediaQuery.paddingOf(context).bottom,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Get.back(),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: CommanColor.whiteBlack(context),
-                          side: BorderSide(
-                            color: CommanColor.lightDarkPrimary(context)
-                                .withOpacity(0.5),
+              SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    isTablet ? 28 : 20,
+                    12,
+                    isTablet ? 28 : 20,
+                    12,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Get.back(),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: CommanColor.whiteBlack(context),
+                            side: BorderSide(
+                              color: CommanColor.lightDarkPrimary(context)
+                                  .withOpacity(0.5),
+                            ),
+                            padding: EdgeInsets.symmetric(
+                              vertical: isTablet ? 14 : 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
-                          padding: EdgeInsets.symmetric(
-                            vertical: isTablet ? 14 : 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Text(
-                          'Not Now',
-                          style: TextStyle(
-                            fontSize: isTablet ? 16 : 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton.icon(
-                        onPressed: _onAddWidgetTap,
-                        icon: Icon(
-                          _isLastPage
-                              ? Icons.check_rounded
-                              : Icons.arrow_forward_rounded,
-                          size: isTablet ? 20 : 18,
-                        ),
-                        label: Text(
-                          _isLastPage ? 'Got it' : 'Next',
-                          style: TextStyle(
-                            fontSize: isTablet ? 16 : 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              CommanColor.lightDarkPrimary(context),
-                          foregroundColor: Colors.white,
-                          padding: EdgeInsets.symmetric(
-                            vertical: isTablet ? 14 : 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                          child: Text(
+                            'Not Now',
+                            style: TextStyle(
+                              fontSize: isTablet ? 16 : 14,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton.icon(
+                          onPressed: _onAddWidgetTap,
+                          icon: Icon(
+                            _isLastPage
+                                ? Icons.check_rounded
+                                : Icons.arrow_forward_rounded,
+                            size: isTablet ? 20 : 18,
+                          ),
+                          label: Text(
+                            _isLastPage ? 'Got it' : 'Next',
+                            style: TextStyle(
+                              fontSize: isTablet ? 16 : 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                CommanColor.lightDarkPrimary(context),
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(
+                              vertical: isTablet ? 14 : 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
