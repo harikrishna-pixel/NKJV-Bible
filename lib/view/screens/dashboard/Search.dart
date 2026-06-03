@@ -909,8 +909,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         fontSize: screenWidth > 450 ? 14 : 12,
-                                        color:
-                                            CommanColor.lightDarkPrimary(context),
+                                        color: CommanColor.whiteBlack(context),
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -934,7 +933,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                       ),
                                       iconSize: screenWidth > 450 ? 22 : 18,
                                       iconEnabledColor:
-                                          CommanColor.lightDarkPrimary(context),
+                                          CommanColor.whiteBlack(context),
                                     ),
                                     buttonStyleData: ButtonStyleData(
                                       height: screenWidth > 450 ? 40 : 34,
@@ -958,8 +957,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                     ),
                                     style: TextStyle(
                                       fontSize: screenWidth > 450 ? 14 : 12,
-                                      color:
-                                          CommanColor.lightDarkPrimary(context),
+                                      color: CommanColor.whiteBlack(context),
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -984,8 +982,6 @@ class _SearchScreenState extends State<SearchScreen> {
                                       Images.searchPlaceHolder(context),
                                       height: 120,
                                       width: 120,
-                                      color:
-                                          Colors.transparent.withOpacity(0.3),
                                     ),
                                     const SizedBox(height: 10),
                                     Text(
@@ -1136,7 +1132,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                     "assets/Bookmark icons/Frame 3630.png",
                                                                     height: 28,
                                                                     color: CommanColor
-                                                                        .lightDarkPrimary(
+                                                                        .whiteBlack(
                                                                             context)))),
                                                         const SizedBox(
                                                           height: 15,
@@ -1237,7 +1233,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                 height: 25,
                                                                 width: 15,
                                                                 color: CommanColor
-                                                                    .lightDarkPrimary(
+                                                                    .whiteBlack(
                                                                         context),
                                                               )),
                                                           const SizedBox(
@@ -1345,7 +1341,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                 "assets/share.png",
                                                                 height: 40,
                                                                 color: CommanColor
-                                                                    .lightDarkPrimary(
+                                                                    .whiteBlack(
                                                                         context))),
                                                         const SizedBox(
                                                           height: 15,
@@ -1648,7 +1644,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                               width: 1.4,
                                                                             ),
                                                                           ),
-                                                                          child: Image.asset("assets/Bookmark icons/Frame 3630.png", height: 25, width: 25, color: CommanColor.lightDarkPrimary(context)))),
+                                                                          child: Image.asset("assets/Bookmark icons/Frame 3630.png", height: 25, width: 25, color: CommanColor.whiteBlack(context)))),
                                                                   const SizedBox(
                                                                     height: 15,
                                                                   ),
@@ -1745,7 +1741,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                           width:
                                                                               15,
                                                                           color:
-                                                                              CommanColor.lightDarkPrimary(context),
+                                                                              CommanColor.whiteBlack(context),
                                                                         )),
                                                                     const SizedBox(
                                                                       height:
@@ -1822,7 +1818,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                           height:
                                                                               40,
                                                                           color:
-                                                                              CommanColor.lightDarkPrimary(context))),
+                                                                              CommanColor.whiteBlack(context))),
                                                                   const SizedBox(
                                                                     height: 15,
                                                                   ),

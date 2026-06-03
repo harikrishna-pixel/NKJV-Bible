@@ -33,16 +33,20 @@ class TakeMomentReleasedScreen extends StatelessWidget {
     final lightBtnColor = CommanColor.lightDarkPrimary(context).withOpacity(0.92);
     final Color textColor = isDark ? Colors.white : _brown;
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage(TakeMomentRestScreen.doveBackground),
-            fit: BoxFit.cover,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage(TakeMomentRestScreen.doveBackground),
+                fit: BoxFit.cover,
+              ),
+            ),
           ),
-        ),
-        child: SafeArea(
+          if (isDark)
+            Container(color: Colors.black.withOpacity(0.58)),
+          SafeArea(
           child: Column(
             children: [
               const SizedBox(height: 16),
@@ -147,10 +151,14 @@ class TakeMomentReleasedScreen extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         decoration: BoxDecoration(
-                          color:
-                              isDark ? Colors.white.withOpacity(0.2) : lightBtnColor,
+                          color: isDark
+                              ? Colors.black.withOpacity(0.45)
+                              : lightBtnColor,
                           borderRadius: BorderRadius.circular(28),
-                          border: Border.all(color: _gold, width: 2),
+                          border: Border.all(
+                            color: _gold.withOpacity(isDark ? 0.85 : 1),
+                            width: 2,
+                          ),
                           boxShadow: const [
                             BoxShadow(
                               color: Colors.black26,
@@ -201,6 +209,7 @@ class TakeMomentReleasedScreen extends StatelessWidget {
             ],
           ),
         ),
+        ],
       ),
     );
   }

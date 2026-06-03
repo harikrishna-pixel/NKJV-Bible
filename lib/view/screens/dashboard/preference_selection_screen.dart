@@ -790,18 +790,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                               setState(() {
                                 isLoading = false;
                               });
-                              if (widget.from == true) {
-                                Get.offAll(() => HomeScreen(
-                                      From: "home",
-                                      selectedVerseNumForRead: "",
-                                      selectedBookForRead: "",
-                                      selectedChapterForRead: "",
-                                      selectedBookNameForRead: "",
-                                      selectedVerseForRead: "",
-                                    ));
-                              } else {
-                                Get.back();
-                              }
+                              Get.back();
                             } else {
                               if (widget.selectedbible != null &&
                                   widget.selectedbible!.isNotEmpty) {

@@ -170,7 +170,13 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: TextStyle(color: brown)),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDark ? const Color(0xFFF5EDE3) : brown,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
@@ -209,19 +215,42 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
   Future<void> _delete(Map<String, dynamic> row) async {
     final id = _commentId(row);
     if (id == null) return;
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDark = themeProvider.themeMode == ThemeMode.dark;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete comment?'),
-        content: const Text('This comment will be permanently deleted.'),
+        backgroundColor:
+            isDark ? CommanColor.darkPrimaryColor : null,
+        surfaceTintColor: Colors.transparent,
+        title: Text(
+          'Delete comment?',
+          style: TextStyle(color: isDark ? Colors.white : null),
+        ),
+        content: Text(
+          'This comment will be permanently deleted.',
+          style: TextStyle(color: isDark ? Colors.white70 : null),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDark ? const Color(0xFFF5EDE3) : null,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
+            child: Text(
+              'Delete',
+              style: TextStyle(
+                color: isDark ? Colors.red.shade300 : null,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),

@@ -186,6 +186,32 @@ Color _streakTextColor(BuildContext context) {
   return _kStreakBrown;
 }
 
+/// Headers over full-bleed photos (verse / devotional / prayer) — white text
+/// washes out on bright sky; use warm ink with a soft light halo in dark mode.
+Color _streakHeaderOnPhotoColor(BuildContext context) {
+  if (_isStreakDark(context)) return const Color(0xFF2A1F12);
+  if (_isStreakWhiteLight(context)) return const Color(0xFF2C2C2C);
+  return _kStreakBrown;
+}
+
+List<Shadow> _streakHeaderOnPhotoShadows(BuildContext context) {
+  if (_isStreakDark(context)) {
+    return [
+      Shadow(
+        color: Colors.white.withOpacity(0.9),
+        blurRadius: 10,
+        offset: const Offset(0, 0),
+      ),
+      Shadow(
+        color: Colors.white.withOpacity(0.45),
+        blurRadius: 4,
+        offset: const Offset(0, 1),
+      ),
+    ];
+  }
+  return const [];
+}
+
 Color _streakPanelColor(BuildContext context) =>
     _isStreakDark(context) ? Colors.white.withOpacity(0.12) : _kStreakCream;
 
@@ -231,19 +257,6 @@ Widget _streakStepContentBox(BuildContext context, Widget child) {
   );
 }
 
-/// Opaque wrapper so screenshot capture produces a solid share image.
-Widget _streakShareScreenshotChild(BuildContext context, Widget child) {
-  final isDark = _isStreakDark(context);
-  return Container(
-    // In light mode, avoid an extra opaque backdrop behind the card.
-    // That contrast was reading as a "white border/frame" around the content.
-    // Keep an opaque background only for dark mode (and for share readability).
-    color: isDark ? const Color(0xFF1E1408) : Colors.transparent,
-    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-    child: _streakStepContentBox(context, child),
-  );
-}
-
 /// Share card with app branding (matches home Verse of the Day footer).
 Widget _streakShareCardForCapture(BuildContext context, Widget content) {
   final isDark = _isStreakDark(context);
@@ -258,28 +271,31 @@ Widget _streakShareCardForCapture(BuildContext context, Widget content) {
         mainAxisSize: MainAxisSize.min,
         children: [
           _streakStepContentBox(context, content),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Image.asset(
-                'assets/Icon-1024.png',
-                height: 28,
-                width: 28,
-              ),
-              const SizedBox(width: 10),
-              Text(
-                BibleInfo.bible_shortName,
-                style: TextStyle(
-                  color: labelColor,
-                  letterSpacing: BibleInfo.letterSpacing,
-                  fontSize: BibleInfo.fontSizeScale * 15,
-                  fontWeight: FontWeight.w700,
-                  height: 1.2,
+          const SizedBox(height: 14),
+          Opacity(
+            opacity: 0.55,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(
+                  'assets/Icon-1024.png',
+                  height: 22,
+                  width: 22,
                 ),
-                textAlign: TextAlign.center,
-              ),
-            ],
+                const SizedBox(width: 8),
+                Text(
+                  BibleInfo.bible_shortName,
+                  style: TextStyle(
+                    color: labelColor,
+                    letterSpacing: BibleInfo.letterSpacing,
+                    fontSize: BibleInfo.fontSizeScale * 12,
+                    fontWeight: FontWeight.w600,
+                    height: 1.2,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -598,8 +614,16 @@ void _goToHome(BuildContext context) {
   );
 }
 
-Widget _buildStepIndicator(BuildContext context, int step) {
-  final textColor = _streakTextColor(context);
+Widget _buildStepIndicator(
+  BuildContext context,
+  int step, {
+  bool onPhotoBackground = false,
+}) {
+  final textColor = onPhotoBackground
+      ? _streakHeaderOnPhotoColor(context)
+      : _streakTextColor(context);
+  final shadows =
+      onPhotoBackground ? _streakHeaderOnPhotoShadows(context) : null;
   return Column(
     mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: CrossAxisAlignment.center,
@@ -610,8 +634,9 @@ Widget _buildStepIndicator(BuildContext context, int step) {
         style: TextStyle(
           fontSize: MediaQuery.of(context).size.width > 450 ? 15 : 13,
           fontWeight: FontWeight.w600,
-          color: textColor.withOpacity(0.9),
+          color: textColor.withOpacity(0.95),
           fontFamily: 'Georgia',
+          shadows: shadows,
         ),
       ),
       const SizedBox(height: 6),
@@ -1788,11 +1813,13 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                     ),
                     Expanded(
                       child: Center(
-                        child: _buildStepIndicator(context, 2),
+                        child: _buildStepIndicator(context, 2,
+                            onPhotoBackground: true),
                       ),
                     ),
                     IconButton(
-                      icon: Icon(Icons.close, color: _streakTextColor(context)),
+                      icon: Icon(Icons.close,
+                          color: _streakHeaderOnPhotoColor(context)),
                       onPressed: () => _goToHome(context),
                       tooltip: 'Close',
                     ),
@@ -1804,7 +1831,7 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.menu_book,
-                      color: _streakTextColor(context), size: 32),
+                      color: _streakHeaderOnPhotoColor(context), size: 32),
                   const SizedBox(width: 8),
                   Text(
                     'Verse of the Day',
@@ -1812,8 +1839,9 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                       fontSize:
                           MediaQuery.of(context).size.width > 450 ? 26 : 22,
                       fontWeight: FontWeight.w600,
-                      color: _streakTextColor(context),
+                      color: _streakHeaderOnPhotoColor(context),
                       fontFamily: 'Georgia',
+                      shadows: _streakHeaderOnPhotoShadows(context),
                     ),
                   ),
                 ],
@@ -1830,7 +1858,7 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                         child: Center(
                           child: Screenshot(
                             controller: _screenshotController,
-                            child: _streakShareScreenshotChild(
+                            child: _streakStepContentBox(
                               context,
                               Column(
                                 mainAxisSize: MainAxisSize.min,
@@ -2011,10 +2039,12 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       _loadSaved();
-      _loadMusicMuted();
-      _StreakFlowBgMusic.play();
+      await _loadMusicMuted();
+      if (!_isAudioMuted) {
+        await _StreakFlowBgMusic.play();
+      }
     });
   }
 
@@ -2076,20 +2106,22 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                     const SizedBox(width: 96),
                     Expanded(
                       child: Center(
-                        child: _buildStepIndicator(context, 3),
+                        child: _buildStepIndicator(context, 3,
+                            onPhotoBackground: true),
                       ),
                     ),
                     IconButton(
                       onPressed: _toggleAudio,
                       icon: Icon(
                         _isAudioMuted ? Icons.music_off : Icons.music_note,
-                        color: _streakTextColor(context),
+                        color: _streakHeaderOnPhotoColor(context),
                         size: 26,
                       ),
                       tooltip: _isAudioMuted ? 'Audio Off' : 'Audio On',
                     ),
                     IconButton(
-                      icon: Icon(Icons.close, color: _streakTextColor(context)),
+                      icon: Icon(Icons.close,
+                          color: _streakHeaderOnPhotoColor(context)),
                       onPressed: () async {
                         await _StreakFlowBgMusic.stop();
                         if (context.mounted) _goToHome(context);
@@ -2105,9 +2137,10 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                 style: TextStyle(
                   fontSize:
                       MediaQuery.of(context).size.width > 450 ? 26 : 22,
-                  color: _streakTextColor(context).withOpacity(0.9),
+                  color: _streakHeaderOnPhotoColor(context),
                   fontFamily: 'Georgia',
                   fontWeight: FontWeight.w600,
+                  shadows: _streakHeaderOnPhotoShadows(context),
                 ),
               ),
               const SizedBox(height: 24),
@@ -2122,7 +2155,7 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                         child: Center(
                           child: Screenshot(
                             controller: _screenshotController,
-                            child: _streakShareScreenshotChild(
+                            child: _streakStepContentBox(
                               context,
                               Text(
                                 item.devotionalText,
@@ -2266,10 +2299,12 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       _loadSaved();
-      _loadMusicMuted();
-      _StreakFlowBgMusic.play();
+      await _loadMusicMuted();
+      if (!_isAudioMuted) {
+        await _StreakFlowBgMusic.play();
+      }
     });
   }
 
@@ -2331,20 +2366,22 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                     const SizedBox(width: 96),
                     Expanded(
                       child: Center(
-                        child: _buildStepIndicator(context, 4),
+                        child: _buildStepIndicator(context, 4,
+                            onPhotoBackground: true),
                       ),
                     ),
                     IconButton(
                       onPressed: _toggleAudio,
                       icon: Icon(
                         _isAudioMuted ? Icons.music_off : Icons.music_note,
-                        color: _streakTextColor(context),
+                        color: _streakHeaderOnPhotoColor(context),
                         size: 26,
                       ),
                       tooltip: _isAudioMuted ? 'Audio Off' : 'Audio On',
                     ),
                     IconButton(
-                      icon: Icon(Icons.close, color: _streakTextColor(context)),
+                      icon: Icon(Icons.close,
+                          color: _streakHeaderOnPhotoColor(context)),
                       onPressed: () async {
                         await _StreakFlowBgMusic.stop();
                         if (context.mounted) _goToHome(context);
@@ -2361,8 +2398,9 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                   fontSize:
                       MediaQuery.of(context).size.width > 450 ? 26 : 22,
                   fontWeight: FontWeight.w600,
-                  color: _streakTextColor(context),
+                  color: _streakHeaderOnPhotoColor(context),
                   fontFamily: 'Georgia',
+                  shadows: _streakHeaderOnPhotoShadows(context),
                 ),
               ),
               const SizedBox(height: 24),
@@ -2377,7 +2415,7 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                         child: Center(
                           child: Screenshot(
                             controller: _screenshotController,
-                            child: _streakShareScreenshotChild(
+                            child: _streakStepContentBox(
                               context,
                               Text(
                                 item.prayerText,

@@ -96,27 +96,60 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
     final offColor = isDark ? const Color(0xFFFFB4AB) : Colors.red.shade700;
 
     return Scaffold(
-      backgroundColor: cream,
-      body: SafeArea(
-        top: true,
-        child: Stack(
-          children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 48, 20, 28),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white : brown,
-                      height: 1.2,
+      backgroundColor: Colors.white,
+      body: Stack(
+        children: [
+          Column(
+            children: [
+              SizedBox(
+                height: 200,
+                width: double.infinity,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.asset(
+                      'assets/paywall-bg.png',
+                      fit: BoxFit.cover,
+                      alignment: Alignment.topCenter,
                     ),
-                  ),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.08),
+                            Colors.white,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ColoredBox(
+                  color: cream,
+                  child: SafeArea(
+                    top: false,
+                    child: Stack(
+                      children: [
+                        SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                title,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontFamily: 'Georgia',
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? Colors.white : brown,
+                                  height: 1.2,
+                                ),
+                              ),
                   const SizedBox(height: 12),
                   Text.rich(
                     TextSpan(
@@ -311,27 +344,34 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
                       color: isDark ? Colors.white54 : Colors.grey.shade700,
                     ),
                   ),
-                ],
-              ),
-            ),
-            Positioned(
-              top: 4,
-              right: 4,
-              child: IconButton(
-                icon: Icon(
-                  Icons.close,
-                  color: isDark ? Colors.white70 : brown,
+                            ],
+                          ),
+                        ),
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: IconButton(
+                            icon: Icon(
+                              Icons.close,
+                              color: isDark ? Colors.white70 : brown,
+                            ),
+                            style: IconButton.styleFrom(
+                              minimumSize: const Size(48, 48),
+                              padding: const EdgeInsets.all(10),
+                            ),
+                            onPressed: () =>
+                                Navigator.of(context).maybePop(),
+                            tooltip: 'Close',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                style: IconButton.styleFrom(
-                  minimumSize: const Size(48, 48),
-                  padding: const EdgeInsets.all(10),
-                ),
-                onPressed: () => Navigator.of(context).maybePop(),
-                tooltip: 'Close',
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }

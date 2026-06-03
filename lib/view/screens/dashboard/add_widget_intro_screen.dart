@@ -5,8 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 
-/// Shows the 5 home-widget images one by one with swipe; user taps "Add Widget"
-/// to advance or on last screen close and return to Home.
+/// Walkthrough for adding home-screen widgets. Advance with the Next button only.
 /// Opened from Home Screen drawer -> Add Widget.
 class AddWidgetIntroScreen extends StatefulWidget {
   const AddWidgetIntroScreen({super.key});
@@ -24,19 +23,19 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
     'assets/home-widgets/home-5.png',
   ];
 
-  final PageController _pageController = PageController();
-  int _currentPage = 0;
+  static const List<String> _stepHints = [
+    'Long-press an empty area on your Home Screen.',
+    'Tap the + button, then search for this app.',
+    'Choose a widget size you like.',
+    'Drag the widget where you want it on your Home Screen.',
+    'You\'re all set — enjoy your Bible widget!',
+  ];
 
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
+  int _currentPage = 0;
 
   bool get _isLastPage => _currentPage >= _imagePaths.length - 1;
 
-  /// The onboarding images already contain their own dot indicator baked in.
-  /// We crop a small strip from the top so users only see the app indicator.
+  /// Images include a baked-in dot row at the top; crop it so only app dots show.
   Widget _buildCroppedSlideImage(String path) {
     return ClipRect(
       child: Align(
@@ -51,12 +50,9 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
     );
   }
 
-  void _onAddWidgetTap() {
+  void _onNextTap() {
     if (!_isLastPage) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
+      setState(() => _currentPage++);
     } else {
       Get.back();
     }
@@ -126,6 +122,19 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: isTablet ? 28 : 20),
+                child: Text(
+                  _stepHints[_currentPage],
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: isTablet ? 15 : 13,
+                    height: 1.35,
+                    color: CommanColor.whiteBlack(context).withOpacity(0.85),
+                  ),
+                ),
+              ),
               const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -170,17 +179,17 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(16),
-                      child: PageView.builder(
-                        controller: _pageController,
-                        onPageChanged: (index) =>
-                            setState(() => _currentPage = index),
-                        itemCount: _imagePaths.length,
-                        itemBuilder: (context, index) {
-                          return Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: _buildCroppedSlideImage(_imagePaths[index]),
-                          );
-                        },
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 250),
+                          child: KeyedSubtree(
+                            key: ValueKey<int>(_currentPage),
+                            child: _buildCroppedSlideImage(
+                              _imagePaths[_currentPage],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -226,7 +235,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
                       Expanded(
                         flex: 2,
                         child: ElevatedButton.icon(
-                          onPressed: _onAddWidgetTap,
+                          onPressed: _onNextTap,
                           icon: Icon(
                             _isLastPage
                                 ? Icons.check_rounded

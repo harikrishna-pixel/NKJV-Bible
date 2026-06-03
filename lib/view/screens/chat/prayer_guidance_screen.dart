@@ -725,7 +725,6 @@ ${category.prompt}
           final milestoneDoneAfter =
               prefs.getBool(milestoneDoneKey) ?? false;
           if (milestoneDoneBefore || !milestoneDoneAfter) {
-            _isAudioMuted = false;
             await _playBackgroundMusic();
           }
         }
@@ -1154,7 +1153,6 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
           final milestoneDoneAfter =
               prefs.getBool(milestoneDoneKey) ?? false;
           if (milestoneDoneBefore || !milestoneDoneAfter) {
-            _isAudioMuted = false;
             await _playBackgroundMusic();
           }
         }
@@ -1518,6 +1516,20 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     // Show shared answer-length intro if needed (same behaviour as Chat).
     _showPrayerIntroIfNeeded();
     _refreshCommunityLiveIndicator();
+    _loadPersistedMusicMuted();
+  }
+
+  Future<void> _loadPersistedMusicMuted() async {
+    final muted = await SharPreferences.getBoolean(
+            SharPreferences.streakFlowMusicMuted) ??
+        false;
+    if (!mounted) return;
+    setState(() => _isAudioMuted = muted);
+    if (muted) {
+      try {
+        await _audioPlayer.pause();
+      } catch (_) {}
+    }
   }
 
   Future<void> _refreshCommunityLiveIndicator() async {
@@ -2134,6 +2146,9 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
       _isAudioMuted = true;
       await _audioPlayer.pause();
     }
+
+    await SharPreferences.setBoolean(
+        SharPreferences.streakFlowMusicMuted, _isAudioMuted);
 
     if (mounted) {
       setState(() {});

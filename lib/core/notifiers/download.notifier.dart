@@ -324,16 +324,82 @@ class DownloadProvider with ChangeNotifier {
         await dbClient.rawQuery("SELECT * FROM dailyVersesMainList");
 
     // 3. Filter data in background isolate
+    final categories = selectedCategories.toSet().toList();
     final filteredData = await compute(_filterVerses, {
       'data': rawData,
-      'selectedCategories': selectedCategories.toSet().toList(),
+      'selectedCategories': categories,
     });
 
-    // 4. Clear old entries
-    await dbClient.execute("DELETE FROM dailyVersesnew");
+    final existingRows =
+        await dbClient.rawQuery("SELECT * FROM dailyVersesnew");
 
-    // 5. Insert new entries
-    DateTime currentDate = DateTime.now();
+    if (existingRows.isNotEmpty) {
+      // Keep previously received verses; drop only deselected topics.
+      if (categories.isEmpty) {
+        await dbClient.execute("DELETE FROM dailyVersesnew");
+      } else {
+        final placeholders = List.filled(categories.length, '?').join(',');
+        await dbClient.rawDelete(
+          'DELETE FROM dailyVersesnew WHERE Category_Name NOT IN ($placeholders)',
+          categories,
+        );
+      }
+
+      final survivingRows =
+          await dbClient.rawQuery("SELECT * FROM dailyVersesnew");
+      final survivingCategories = survivingRows
+          .map<String>((r) => r['Category_Name']?.toString() ?? '')
+          .where((String name) => name.isNotEmpty)
+          .toSet();
+      final addedCategories = categories
+          .where((String c) => !survivingCategories.contains(c))
+          .toList();
+
+      if (addedCategories.isNotEmpty) {
+        final newCategoryData = _interleaveDailyVersesByCategory(
+          filteredData
+              .where((e) =>
+                  addedCategories.contains(e['Category_Name']?.toString()))
+              .toList(),
+          addedCategories,
+        );
+        DateTime currentDate = DateTime.now();
+        for (final row in survivingRows) {
+          try {
+            final parsed = DateTime.parse(row['Date'].toString());
+            if (parsed.isAfter(currentDate)) currentDate = parsed;
+          } catch (_) {}
+        }
+        currentDate = currentDate.add(const Duration(days: 1));
+        await _insertDailyVersesFromMainList(
+          dbClient: dbClient,
+          data: newCategoryData,
+          startDate: currentDate,
+        );
+      }
+    } else {
+      // First-time setup: build the full schedule from scratch.
+      await dbClient.execute("DELETE FROM dailyVersesnew");
+      final interleaved =
+          _interleaveDailyVersesByCategory(filteredData, categories);
+      await _insertDailyVersesFromMainList(
+        dbClient: dbClient,
+        data: interleaved,
+        startDate: DateTime.now(),
+      );
+    }
+
+    debugPrint("dailyVersesnew is sucess");
+    isLoading = false;
+    notifyListeners();
+  }
+
+  Future<void> _insertDailyVersesFromMainList({
+    required dynamic dbClient,
+    required List<Map<String, dynamic>> data,
+    required DateTime startDate,
+  }) async {
+    DateTime currentDate = startDate;
     // for (final data in filteredData) {
     //   final bookId = int.parse(data["Book_Id"].toString());
     //   final chapter = int.parse(data["Chapter"].toString());
@@ -369,11 +435,11 @@ class DownloadProvider with ChangeNotifier {
     //     currentDate = currentDate.add(const Duration(days: 1));
     //   }
     // }
-    for (final data in filteredData) {
-      final bookId = int.tryParse(data["Book_Id"].toString());
+    for (final row in data) {
+      final bookId = int.tryParse(row["Book_Id"].toString());
 
-      final chapterStr = data["Chapter"]?.toString().trim();
-      final verseStr = data["Verse"]?.toString().trim();
+      final chapterStr = row["Chapter"]?.toString().trim();
+      final verseStr = row["Verse"]?.toString().trim();
 
       // ✅ Skip if Chapter or Verse is null/empty
       if (chapterStr == null ||
@@ -400,9 +466,9 @@ class DownloadProvider with ChangeNotifier {
 
       if (verseResult.isNotEmpty) {
         final insertData = {
-          "Category_Name": data["Category_Name"],
-          "Category_Id": data["Category_Id"],
-          "Book": data["Book"],
+          "Category_Name": row["Category_Name"],
+          "Category_Id": row["Category_Id"],
+          "Book": row["Book"],
           "Book_Id": bookId,
           "Chapter": chapter,
           "Verse": verseResult[0]["content"],
@@ -419,10 +485,6 @@ class DownloadProvider with ChangeNotifier {
         currentDate = currentDate.add(const Duration(days: 1));
       }
     }
-
-    debugPrint("dailyVersesnew is sucess");
-    isLoading = false;
-    notifyListeners();
   }
 
 // download limit
@@ -940,6 +1002,43 @@ class DownloadProvider with ChangeNotifier {
 
     notifyListeners();
   }
+}
+
+/// One verse per selected topic per day (round-robin), not all from one category.
+List<Map<String, dynamic>> _interleaveDailyVersesByCategory(
+  List<Map<String, dynamic>> data,
+  List<String> categoryOrder,
+) {
+  final byCategory = <String, List<Map<String, dynamic>>>{};
+  for (final row in data) {
+    final cat = row['Category_Name']?.toString() ?? '';
+    if (cat.isEmpty) continue;
+    byCategory.putIfAbsent(cat, () => []).add(row);
+  }
+
+  final orderedCats = <String>[];
+  for (final cat in categoryOrder) {
+    if (byCategory.containsKey(cat)) orderedCats.add(cat);
+  }
+  for (final cat in byCategory.keys) {
+    if (!orderedCats.contains(cat)) orderedCats.add(cat);
+  }
+
+  final result = <Map<String, dynamic>>[];
+  var round = 0;
+  var hasMore = true;
+  while (hasMore) {
+    hasMore = false;
+    for (final cat in orderedCats) {
+      final list = byCategory[cat]!;
+      if (round < list.length) {
+        result.add(list[round]);
+        hasMore = true;
+      }
+    }
+    round++;
+  }
+  return result;
 }
 
 // Background selectedCategories

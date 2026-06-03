@@ -273,21 +273,26 @@ class BibleProgressCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const ringBrown = Color(0xFF7B5842);
+    const ringGold = Color(0xFFC9A227);
+    const labelBrown = Color(0xFF4B3423);
+
     return SizedBox(
       width: progressSize,
       height: progressSize,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Background Image
-          Image.asset(
-            'assets/progr2.png', // ✅ ensure this path is correct
+          SizedBox(
             width: progressSize,
             height: progressSize,
-            fit: BoxFit.contain,
+            child: CircularProgressIndicator(
+              value: 0.72,
+              strokeWidth: progressSize * 0.09,
+              backgroundColor: ringBrown.withOpacity(0.18),
+              valueColor: const AlwaysStoppedAnimation<Color>(ringGold),
+            ),
           ),
-
-          // Center content
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -297,14 +302,14 @@ class BibleProgressCircle extends StatelessWidget {
                 style: TextStyle(
                   fontSize: fontSize,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white,
+                  color: labelBrown,
                 ),
               ),
               const SizedBox(height: 4),
               Icon(
                 Icons.check,
                 size: fontSize + 4,
-                color: Colors.white,
+                color: ringGold,
               ),
             ],
           ),

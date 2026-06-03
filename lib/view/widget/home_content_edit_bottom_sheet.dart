@@ -3973,135 +3973,247 @@ Future<void> showGiftDialog(BuildContext context, GetBookOfferData data) async {
 class PremiumAccessDialog extends StatelessWidget {
   const PremiumAccessDialog({super.key});
 
+  static const Color _gold = Color(0xFFC9A227);
+  static const Color _ink = Color(0xFF2D2D3A);
+
+  Future<void> _dismissOffer(BuildContext context) async {
+    await SharPreferences.setString('premium', 'yes');
+    if (context.mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  Future<void> _openPaywall(BuildContext context) async {
+    await SharPreferences.setString('premium', 'yes');
+    final countprovider =
+        Provider.of<DownloadProvider>(context, listen: false);
+    await countprovider.resetCount();
+    final sixMonthPlan =
+        await SharPreferences.getString('sixMonthPlan') ??
+            BibleInfo.sixMonthPlanid;
+    final oneYearPlan =
+        await SharPreferences.getString('oneYearPlan') ??
+            BibleInfo.oneYearPlanid;
+    final lifeTimePlan =
+        await SharPreferences.getString('lifeTimePlan') ??
+            BibleInfo.lifeTimePlanid;
+    if (context.mounted) {
+      Navigator.of(context).pop();
+    }
+    Get.to(
+      () => SubscriptionScreen(
+        sixMonthPlan: sixMonthPlan,
+        oneYearPlan: oneYearPlan,
+        lifeTimePlan: lifeTimePlan,
+        checkad: 'onboard',
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    double screenWidth = MediaQuery.of(context).size.width;
-    Sizecf().init(context);
-    final countprovider = Provider.of<DownloadProvider>(context, listen: false);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final heroH = screenWidth > 450 ? 200.0 : 168.0;
+
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      backgroundColor: CommanColor.white,
-      insetPadding: screenWidth > 450
-          ? EdgeInsets.symmetric(horizontal: 150)
-          : null, // Approximate background
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            GestureDetector(
-              onTap: () async {
-                //  await countprovider.resetCount();
-                await SharPreferences.setString("premium", 'yes');
-                if (context.mounted) {
-                  Get.back();
-                }
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: screenWidth > 450 ? 80 : 18,
+        vertical: 24,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Material(
+          color: Colors.white,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: heroH,
+                width: double.infinity,
+                child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    Text(
-                      " X ",
-                      style: TextStyle(
-                          fontSize: Sizecf.blockSizeVertical! * 1.7,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black54),
+                    Image.asset(
+                      'assets/paywall-bg.png',
+                      fit: BoxFit.cover,
+                      alignment: Alignment.topCenter,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: const Color(0xFFE8D5C4),
+                      ),
+                    ),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.06),
+                            Colors.white.withValues(alpha: 0.85),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 8,
+                      left: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF4E342E),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.workspace_premium,
+                                color: _gold, size: 14),
+                            SizedBox(width: 5),
+                            Text(
+                              'PREMIUM',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.6,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Material(
+                        color: Colors.white,
+                        shape: const CircleBorder(),
+                        elevation: 2,
+                        child: IconButton(
+                          icon: const Icon(Icons.close,
+                              size: 18, color: Color(0xFF5A5A5A)),
+                          onPressed: () => _dismissOffer(context),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: 14,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          RichText(
+                            text: const TextSpan(
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: _ink,
+                                height: 1.1,
+                              ),
+                              children: [
+                                TextSpan(text: 'Grow Closer '),
+                                TextSpan(
+                                  text: 'to God',
+                                  style: TextStyle(color: _gold),
+                                ),
+                                TextSpan(text: ' Daily'),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Guidance, prayer, and encouragement whenever you need it.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              height: 1.3,
+                              color: _ink.withValues(alpha: 0.72),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
-            ),
-            Image.asset(
-              "assets/dove.png",
-              height: screenWidth > 450 ? 90 : 65,
-              width: screenWidth > 450 ? 90 : 65,
-            ),
-            const SizedBox(height: 25),
-            Text(
-              "ONE-TIME\nPREMIUM ACCESS",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  fontSize: screenWidth > 450 ? 25 : 20,
-                  fontWeight: FontWeight.bold,
-                  height: 1.4,
-                  color: Colors.black),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              "Enjoy a distraction-free Bible journey with no ads and full access to all features.",
-              textAlign: TextAlign.left,
-              style: TextStyle(
-                fontSize: screenWidth > 450 ? 20 : 16,
-                color: Colors.black,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              "One secure payment — yours forever.",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: screenWidth > 450 ? 20 : 16,
-                color: Colors.black,
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () async {
-                await SharPreferences.setString("premium", 'yes');
-                final countprovider =
-                    Provider.of<DownloadProvider>(context, listen: false);
-                await countprovider.resetCount();
-                // Use constants as fallback when SharedPreferences are empty (first time loading)
-                final sixMonthPlan =
-                    await SharPreferences.getString('sixMonthPlan') ??
-                        BibleInfo.sixMonthPlanid;
-                final oneYearPlan =
-                    await SharPreferences.getString('oneYearPlan') ??
-                        BibleInfo.oneYearPlanid;
-                final lifeTimePlan =
-                    await SharPreferences.getString('lifeTimePlan') ??
-                        BibleInfo.lifeTimePlanid;
-                if (context.mounted) {
-                  Navigator.pop(context);
-                }
-
-                Get.to(() => SubscriptionScreen(
-                      sixMonthPlan: sixMonthPlan,
-                      oneYearPlan: oneYearPlan,
-                      lifeTimePlan: lifeTimePlan,
-                      checkad: 'onboard',
-                    ));
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: CommanColor.lightModePrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                child: Column(
+                  children: [
+                    Text(
+                      'Choose a plan that fits your spiritual journey.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: screenWidth > 450 ? 15 : 14,
+                        height: 1.4,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => _openPaywall(context),
+                        style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(28),
+                          ),
+                        ),
+                        child: Ink(
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0xFFE07A3A),
+                                Color(0xFFC45A1F),
+                                Color(0xFF9E4A18),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(28),
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            alignment: Alignment.center,
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'Start Growing Today',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                SizedBox(width: 4),
+                                Icon(Icons.chevron_right,
+                                    color: Colors.white, size: 20),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => _dismissOffer(context),
+                      child: const Text(
+                        'Continue with Limited Access',
+                        style: TextStyle(
+                          color: Color(0xFF757575),
+                          fontSize: 13,
+                          decoration: TextDecoration.underline,
+                          decorationColor: Color(0xFF757575),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               ),
-              child: Text(
-                'ACTIVATE PREMIUM ACCESS',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    fontSize: screenWidth > 450 ? 19 : 14,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              "No subscriptions. No renewals.\nLifetime access for current users.",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: screenWidth > 450 ? 19 : 14,
-                color: CommanColor.black,
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -6212,6 +6324,22 @@ class ImageBottomSheet extends StatelessWidget {
                                         fit: BoxFit.cover,
                                       ),
                                     ),
+                                    Positioned.fill(
+                                      child: DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                            colors: [
+                                              Colors.black
+                                                  .withOpacity(0.38),
+                                              Colors.black
+                                                  .withOpacity(0.58),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                     Positioned(
                                       left: 10,
                                       right: 10,
@@ -6248,6 +6376,7 @@ class ImageBottomSheet extends StatelessWidget {
                                               minFontSize: screenWidth < 380
                                                   ? 11.5
                                                   : 10.9,
+                                              color: Colors.white,
                                             ),
                                           ),
                                           const SizedBox(height: 10),
@@ -6258,7 +6387,8 @@ class ImageBottomSheet extends StatelessWidget {
                                               Text(
                                                 "${controller.selectedBook.value} ${controller.selectedChapter.value}:${controller.selectedVerseView.value + 1}",
                                                 style: TextStyle(
-                                                  color: Colors.black,
+                                                  color: Colors.white
+                                                      .withOpacity(0.92),
                                                   letterSpacing:
                                                       BibleInfo.letterSpacing,
                                                   fontSize: screenWidth > 450
@@ -6286,74 +6416,77 @@ class ImageBottomSheet extends StatelessWidget {
                                       right: 0,
                                       bottom: 7,
                                       child: Center(
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 8,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color:
-                                                Colors.white.withOpacity(0.94),
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                            boxShadow: const [
-                                              BoxShadow(
-                                                color: Colors.black26,
-                                                blurRadius: 6,
-                                                offset: Offset(0, 2),
+                                        child: Opacity(
+                                          opacity: 0.72,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.black
+                                                  .withOpacity(0.45),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: Colors.white
+                                                    .withOpacity(0.18),
                                               ),
-                                            ],
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Image.asset(
-                                                "assets/Icon-1024.png",
-                                                height: 30,
-                                                width: 30,
-                                              ),
-                                              const SizedBox(width: 10),
-                                              Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Text(
-                                                    bibleName,
-                                                    style: const TextStyle(
-                                                      color: Color(0xFF2C2C2C),
-                                                      letterSpacing:
-                                                          BibleInfo
-                                                              .letterSpacing,
-                                                      fontSize: BibleInfo
-                                                              .fontSizeScale *
-                                                          16,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      height: 1.2,
-                                                    ),
-                                                  ),
-                                                  if (Platform.isAndroid)
-                                                    const Text(
-                                                      'Search in Playstore',
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Image.asset(
+                                                  "assets/Icon-1024.png",
+                                                  height: 22,
+                                                  width: 22,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Text(
+                                                      bibleName,
                                                       style: TextStyle(
-                                                        color:
-                                                            Color(0xFF5A5A5A),
-                                                        fontSize: 12,
-                                                      ),
-                                                    )
-                                                  else if (Platform.isIOS)
-                                                    const Text(
-                                                      'Search in Appstore',
-                                                      style: TextStyle(
-                                                        color:
-                                                            Color(0xFF5A5A5A),
-                                                        fontSize: 12,
+                                                        color: Colors.white
+                                                            .withOpacity(0.95),
+                                                        letterSpacing: BibleInfo
+                                                            .letterSpacing,
+                                                        fontSize: BibleInfo
+                                                                .fontSizeScale *
+                                                            12,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        height: 1.2,
                                                       ),
                                                     ),
-                                                ],
-                                              ),
-                                            ],
+                                                    if (Platform.isAndroid)
+                                                      Text(
+                                                        'Search in Playstore',
+                                                        style: TextStyle(
+                                                          color: Colors.white
+                                                              .withOpacity(
+                                                                  0.75),
+                                                          fontSize: 10,
+                                                        ),
+                                                      )
+                                                    else if (Platform.isIOS)
+                                                      Text(
+                                                        'Search in Appstore',
+                                                        style: TextStyle(
+                                                          color: Colors.white
+                                                              .withOpacity(
+                                                                  0.75),
+                                                          fontSize: 10,
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                         ),
                                       ),

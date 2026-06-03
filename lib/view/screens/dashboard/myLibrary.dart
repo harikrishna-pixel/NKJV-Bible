@@ -18,6 +18,7 @@ import 'package:biblebookapp/view/screens/dashboard/wallpaper_library_widget.dar
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../constants/colors.dart';
 import 'bookMarkScreen.dart';
@@ -182,6 +183,27 @@ class _LibraryScreenState extends State<LibraryScreen>
       isLoading = val;
       message = mess;
     });
+  }
+
+  /// Selected tab: white icon on brown chip. Unselected: contrast on white chip.
+  Color _libraryTabIconColor(BuildContext context, int tabIndex) {
+    if (selectedTap == tabIndex) return Colors.white;
+    return CommanColor.isDarkTheme(context)
+        ? CommanColor.lightDarkPrimary(context)
+        : Colors.white;
+  }
+
+  Widget _libraryBackupHeaderIcon(BuildContext context, double size) {
+    final image = Image.asset(
+      "assets/home icons/Frame 3631.png",
+      height: size,
+      width: size,
+    );
+    if (!CommanColor.isDarkTheme(context)) return image;
+    return ColorFiltered(
+      colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+      child: image,
+    );
   }
 
   @override
@@ -379,10 +401,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                       },
                       child: Padding(
                         padding: const EdgeInsets.only(right: 12.0),
-                        child: Image.asset(
-                          "assets/home icons/Frame 3631.png",
-                          height: screenWidth > 450 ? 28 : 22,
-                          width: screenWidth > 450 ? 28 : 22,
+                        child: _libraryBackupHeaderIcon(
+                          context,
+                          screenWidth > 450 ? 28 : 22,
                         ),
                       ),
                     ),
@@ -626,8 +647,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                                         children: [
                                           Image.asset(
                                             "assets/Library icons/Bookmark.png",
-                                            color: CommanColor.whiteAndDark(
-                                                context),
+                                            color: _libraryTabIconColor(
+                                                context, 0),
                                             width: 20,
                                             height: 15,
                                           ),
@@ -698,8 +719,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                                         children: [
                                           Image.asset(
                                             "assets/Library icons/Highlights.png",
-                                            color: CommanColor.whiteAndDark(
-                                                context),
+                                            color: _libraryTabIconColor(
+                                                context, 1),
                                             width: 20,
                                             height: 15,
                                           ),
@@ -769,8 +790,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                                         children: [
                                           Image.asset(
                                             "assets/Library icons/underline.png",
-                                            color: CommanColor.whiteAndDark(
-                                                context),
+                                            color: _libraryTabIconColor(
+                                                context, 2),
                                             width: 20,
                                             height: 15,
                                           ),
@@ -840,8 +861,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                                         children: [
                                           Image.asset(
                                               "assets/Library icons/notes.png",
-                                              color: CommanColor.whiteAndDark(
-                                                  context),
+                                              color: _libraryTabIconColor(
+                                                  context, 3),
                                               width:
                                                   screenWidth > 450 ? 22 : 18),
                                           // Icon(
@@ -912,10 +933,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                                           // Image.asset("assets/bookmark_1.png",color: CommanColor.whiteAndDark(context),width: 20,height: 15,),
                                           Icon(
                                             Icons.image_rounded,
-                                            color: selectedTap == 4
-                                                ? Colors.white
-                                                : CommanColor.whiteAndDark(
-                                                    context),
+                                            color: _libraryTabIconColor(
+                                                context, 4),
                                             size: screenWidth > 450 ? 22 : 18,
                                           ),
 
@@ -1222,199 +1241,540 @@ class MainBackupDialog extends StatefulWidget {
 }
 
 class _MainBackupDialogState extends State<MainBackupDialog> {
-  String? message;
+  static const Color _cream = Color(0xFFFDF8F5);
+  static const Color _brown = Color(0xFF4E342E);
+  static const Color _brownMuted = Color(0xFF6D4C41);
+  static const Color _greenBox = Color(0xFFE8F5E9);
+  static const Color _greenText = Color(0xFF2E7D32);
+  static const Color _tanBox = Color(0xFFF5EDE4);
+  static const Color _iconGrey = Color(0xFF6B5B54);
+
+  String? _userId;
+  DateTime? _lastBackup;
+  bool _loadingMeta = true;
+
   void updateLoading(bool val, {String? mess}) {
     if (val) {
       EasyLoading.show(status: mess);
     } else {
       EasyLoading.dismiss();
     }
+  }
 
-    if (mounted) {
-      setState(() {
-        message = mess;
-      });
+  @override
+  void initState() {
+    super.initState();
+    _loadBackupMeta();
+  }
+
+  Future<void> _loadBackupMeta() async {
+    final id = await CacheNotifier().readCache(key: 'userid');
+    final cloudRaw = await SharPreferences.getString(
+        SharPreferences.lastCloudBackupDate);
+    final exportRaw =
+        await SharPreferences.getString(SharPreferences.lastExportedDate);
+    final parsed = DateTime.tryParse(cloudRaw ?? '') ??
+        DateTime.tryParse(exportRaw ?? '');
+    if (!mounted) return;
+    setState(() {
+      final trimmed = id?.toString().trim();
+      _userId = (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+      _lastBackup = parsed;
+      _loadingMeta = false;
+    });
+  }
+
+  bool get _isSignedIn => _userId != null;
+
+  String _formatLastBackup() {
+    if (_lastBackup == null) return 'Not yet';
+    final dt = _lastBackup!.toLocal();
+    final now = DateTime.now();
+    final isToday =
+        dt.year == now.year && dt.month == now.month && dt.day == now.day;
+    final dayPart =
+        isToday ? 'Today' : DateFormat('MMM d').format(dt);
+    return '$dayPart, ${DateFormat('h:mm a').format(dt)}';
+  }
+
+  void _closeDialog() => Navigator.of(context).pop();
+
+  void _goToLogin() {
+    _closeDialog();
+    Get.to(
+      () => LoginScreen(hasSkip: false),
+      transition: Transition.cupertinoDialog,
+      duration: const Duration(milliseconds: 300),
+    );
+  }
+
+  Future<void> _onRestoreFromCloud() async {
+    if (!_isSignedIn) {
+      _goToLogin();
+      return;
     }
+    _closeDialog();
+    await SharPreferences.setString('OpenAd', '1');
+    updateLoading(true, mess: 'Downloading backup...');
+    final ok = await LibraryBackupUploadService.downloadAndImportFromCloud();
+    updateLoading(false);
+    await SharPreferences.setString('OpenAd', '1');
+    if (ok) {
+      Get.offAll(() => HomeScreen(
+            From: "splash",
+            selectedVerseNumForRead: "",
+            selectedBookForRead: "",
+            selectedChapterForRead: "",
+            selectedBookNameForRead: "",
+            selectedVerseForRead: ""));
+    }
+  }
+
+  void _onExportLibrary() {
+    _closeDialog();
+    SharPreferences.setString('OpenAd', '1');
+    if (!context.mounted) return;
+    showDialog(
+      context: context,
+      builder: (c) => BackupDialog(
+        type: "export",
+        onPrimaryPressed: () async {
+          await SharPreferences.setString('OpenAd', '1');
+          if (c.mounted) {
+            ExportDb.getAllDataToExport(c);
+          }
+          await SharPreferences.setString('OpenAd', '1');
+        },
+        onSecondaryPressed: () => Get.back(),
+      ),
+    );
+  }
+
+  void _onImportBackupFile() {
+    _closeDialog();
+    showDialog(
+      context: context,
+      builder: (_) => BackupDialog(
+        type: "import",
+        onPrimaryPressed: () async {
+          await SharPreferences.setString('OpenAd', '1');
+          updateLoading(true, mess: 'Please wait...');
+          await ExportDb.importData().then((v) {
+            updateLoading(false);
+            if (v == "File is not selected") {
+              Constants.showToast("File is not selected");
+            }
+          });
+          await SharPreferences.setString('OpenAd', '1');
+          Get.offAll(() => HomeScreen(
+                From: "splash",
+                selectedVerseNumForRead: "",
+                selectedBookForRead: "",
+                selectedChapterForRead: "",
+                selectedBookNameForRead: "",
+                selectedVerseForRead: ""));
+        },
+        onSecondaryPressed: () => Get.back(),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width >= 600;
+    final maxW = isTablet ? 420.0 : 360.0;
 
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
-        // Prevent automatic dismissal on iPad - only allow manual close via X button
         if (didPop) return;
       },
       child: Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.transparent,
         insetPadding: EdgeInsets.symmetric(
-          horizontal: isTablet ? 150 : 24,
-          vertical: isTablet ? 26 : 24,
+          horizontal: isTablet ? 80 : 20,
+          vertical: isTablet ? 32 : 24,
         ),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: CommanColor.white,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Stack(
-                children: [
-                  Align(
-                    alignment: Alignment.center,
-                    child: Text(
-                      "Backup",
-                      style: TextStyle(
-                          fontSize: isTablet ? 22 : 17.9,
-                          fontWeight: FontWeight.w500,
-                          color: CommanColor.black),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxW),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: _cream,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: _loadingMeta
+                ? const Padding(
+                    padding: EdgeInsets.all(48),
+                    child: Center(
+                      child: CircularProgressIndicator(color: _brown),
+                    ),
+                  )
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(22, 18, 22, 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Text(
+                              'Library Backup',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: isTablet ? 22 : 20,
+                                fontWeight: FontWeight.w700,
+                                color: _brown,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: IconButton(
+                                onPressed: _closeDialog,
+                                icon: Icon(Icons.close,
+                                    size: 22,
+                                    color: _brown.withValues(alpha: 0.55)),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 36,
+                                  minHeight: 36,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _isSignedIn
+                              ? 'Keep your notes, highlights & bookmarks safe'
+                              : 'Protect your notes, bookmarks & highlights',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: isTablet ? 14 : 13,
+                            height: 1.35,
+                            color: _brownMuted.withValues(alpha: 0.9),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        _cloudIllustration(signedIn: _isSignedIn),
+                        const SizedBox(height: 18),
+                        if (_isSignedIn)
+                          _signedInStatusBox()
+                        else
+                          _signedOutStatusBox(),
+                        const SizedBox(height: 16),
+                        if (_isSignedIn) ...[
+                          _primaryActionTile(
+                            icon: Icons.cloud_download_outlined,
+                            title: 'Restore from Cloud',
+                            subtitle:
+                                'Get your library from the latest backup',
+                            onTap: _onRestoreFromCloud,
+                          ),
+                          const SizedBox(height: 12),
+                        ] else ...[
+                          const _OrDivider(),
+                          const SizedBox(height: 12),
+                        ],
+                        _secondaryActionTile(
+                          icon: Icons.file_upload_outlined,
+                          title: 'Export Library',
+                          subtitle: 'Save backup file to your device',
+                          onTap: _onExportLibrary,
+                        ),
+                        const SizedBox(height: 10),
+                        _secondaryActionTile(
+                          icon: Icons.file_download_outlined,
+                          title: 'Import Backup File',
+                          subtitle: 'Restore from a saved backup file',
+                          onTap: _onImportBackupFile,
+                        ),
+                        const SizedBox(height: 18),
+                        _privacyFooter(signedIn: _isSignedIn),
+                      ],
                     ),
                   ),
-                  Align(
-                    alignment: Alignment.topRight,
-                    child: GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: CircleAvatar(
-                        backgroundColor: Colors.white,
-                        radius: isTablet ? 20 : 14,
-                        child: Icon(Icons.close,
-                            size: isTablet ? 22 : 17, color: Colors.black),
-                      ),
-                    ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _cloudIllustration({required bool signedIn}) {
+    const circleSize = 96.0;
+    const cloudSize = 52.0;
+    return Center(
+      child: SizedBox(
+        width: 118,
+        height: 108,
+        child: Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: circleSize,
+              height: circleSize,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.85),
+                border: Border.all(
+                  color: _brown.withValues(alpha: 0.28),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Text(
-                  BibleInfo.autoCloudBackupText,
-                  textAlign: TextAlign.center,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Transform.translate(
+                    offset: const Offset(0, 2),
+                    child: Icon(
+                      Icons.cloud,
+                      size: cloudSize,
+                      color: Colors.grey.shade400.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  Icon(
+                    Icons.cloud,
+                    size: cloudSize - 2,
+                    color: const Color(0xFFF0EBE6),
+                  ),
+                  Icon(
+                    Icons.cloud,
+                    size: cloudSize - 4,
+                    color: Colors.white,
+                  ),
+                  if (signedIn)
+                    Icon(
+                      Icons.sync_rounded,
+                      size: 22,
+                      color: _brown.withValues(alpha: 0.4),
+                    ),
+                ],
+              ),
+            ),
+            Positioned(
+              right: 4,
+              bottom: 2,
+              child: Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: signedIn ? _greenText : _brown,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: _cream, width: 2.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  signedIn ? Icons.check_rounded : Icons.lock_rounded,
+                  size: signedIn ? 20 : 18,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _signedInStatusBox() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      decoration: BoxDecoration(
+        color: _greenBox,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _greenText.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.shield_outlined, color: _greenText, size: 30),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Automatic backup is enabled',
                   style: TextStyle(
-                    fontSize: isTablet ? 15 : 13,
-                    height: 1.45,
-                    color: CommanColor.black.withValues(alpha: 0.75),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: _greenText,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Your library is synced securely to the cloud because you\'re signed in.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.4,
+                    color: _brownMuted.withValues(alpha: 0.85),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.schedule,
+                        size: 14, color: _brownMuted.withValues(alpha: 0.7)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Last backup: ${_formatLastBackup()}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _brownMuted.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _signedOutStatusBox() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: _tanBox,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _brown.withValues(alpha: 0.12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.shield_outlined, color: _iconGrey, size: 30),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Enable Automatic Backup',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: _brown,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Sign in to sync your library securely across devices and restore anytime.',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.4,
+                        color: _brownMuted.withValues(alpha: 0.85),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: Material(
+              color: _brown,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                onTap: _goToLogin,
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(Icons.person_outline, color: Colors.white, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Sign In to Enable Backup',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
-              _buildActionButton(
-                context,
-                label: "EXPORT (Manual)",
-                icon: 'assets/sd.png',
-                onTap: () async {
-                  Get.back();
-                  // Implement export logic
-                  await SharPreferences.setString('OpenAd', '1');
-                  // Constants.showToast(
-                  //     "Save your Verse markings in My Library");
-                  if (context.mounted) {
-                    showDialog(
-                      context: context,
-                      builder: (c) => BackupDialog(
-                        type: "export",
-                        onPrimaryPressed: () async {
-                          await SharPreferences.setString('OpenAd', '1');
-                          // final permission =
-                          //     await ExportDb.requestStoragePermission();
-                          // if (permission) {
-                          debugPrint("clicked");
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-                          // updateLoading(true, mess: 'Please wait...');
-
-                          if (c.mounted) {
-                            ExportDb.getAllDataToExport(c);
-                          }
-                          await SharPreferences.setString('OpenAd', '1');
-
-                          //  updateLoading(false);
-                          //Get.back();
-                          // Navigator.of(context).pop();
-                          // Navigator.of(context).pop();
-                          // } else {
-                          //   await SharPreferences.setString('OpenAd', '1');
-                          //   Constants.showToast(
-                          //       "Permission is required to export the data.");
-                          // }
-                        },
-                        onSecondaryPressed: () {
-                          Get.back();
-                          // Navigator.of(context).pop();
-                        },
+  Widget _primaryActionTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: _brown,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Icon(icon, color: Colors.white, size: 28),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
                       ),
-                    );
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-              _buildActionButton(
-                context,
-                label: "IMPORT (Manual)",
-                icon: 'assets/rd.png',
-                onTap: () {
-                  Get.back();
-                  //    Navigator.of(context).pop();
-                  // Implement import logic
-                  showDialog(
-                    context: context,
-                    builder: (_) => BackupDialog(
-                      type: "import",
-                      onPrimaryPressed: () async {
-                        await SharPreferences.setString('OpenAd', '1');
-                        updateLoading(true, mess: 'Please wait...');
-
-                        await ExportDb.importData().then((v) {
-                          updateLoading(false);
-                          if (v == "File is not selected") {
-                            Constants.showToast("File is not selected");
-                          }
-                        });
-                        await SharPreferences.setString('OpenAd', '1');
-
-                        Get.offAll(() => HomeScreen(
-                            From: "splash",
-                            selectedVerseNumForRead: "",
-                            selectedBookForRead: "",
-                            selectedChapterForRead: "",
-                            selectedBookNameForRead: "",
-                            selectedVerseForRead: ""));
-                      },
-                      onSecondaryPressed: () {
-                        // Navigator.of(context).pop();
-                        Get.back();
-                      },
                     ),
-                  );
-                },
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withValues(alpha: 0.82),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 16),
-              _buildActionButton(
-                context,
-                label: "IMPORT FROM CLOUD",
-                icon: 'assets/rd.png',
-                onTap: () async {
-                  Get.back();
-                  await SharPreferences.setString('OpenAd', '1');
-                  updateLoading(true, mess: 'Downloading backup...');
-                  final ok =
-                      await LibraryBackupUploadService.downloadAndImportFromCloud();
-                  updateLoading(false);
-                  await SharPreferences.setString('OpenAd', '1');
-                  if (ok) {
-                    Get.offAll(() => HomeScreen(
-                        From: "splash",
-                        selectedVerseNumForRead: "",
-                        selectedBookForRead: "",
-                        selectedChapterForRead: "",
-                        selectedBookNameForRead: "",
-                        selectedVerseForRead: ""));
-                  }
-                },
-              ),
+              Icon(Icons.chevron_right,
+                  color: Colors.white.withValues(alpha: 0.9)),
             ],
           ),
         ),
@@ -1422,32 +1782,107 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
     );
   }
 
-  Widget _buildActionButton(BuildContext context,
-      {required String label,
-      required String icon,
-      required VoidCallback onTap}) {
-    final isTablet = MediaQuery.of(context).size.width >= 600;
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.brown,
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+  Widget _secondaryActionTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Icon(icon, color: _iconGrey, size: 28),
+                const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: _brown,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _brownMuted.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right,
+                  color: _brownMuted.withValues(alpha: 0.65), size: 22),
+              ],
+            ),
           ),
         ),
-        icon: Image.asset(
-          icon,
-          height: isTablet ? 27 : 20,
-          width: isTablet ? 27 : 20,
-        ),
-        label: Text(
-          label,
-          style: TextStyle(color: Colors.white, fontSize: isTablet ? 19 : 15),
-        ),
       ),
+    );
+  }
+
+  Widget _privacyFooter({required bool signedIn}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.lock_outline, size: 16, color: _iconGrey),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            signedIn
+                ? 'Your data is private and secure. We never share your personal content.'
+                : 'Your data is private and secure. Sign in to keep your library protected.',
+            style: TextStyle(
+              fontSize: 11.5,
+              height: 1.4,
+              color: _brownMuted.withValues(alpha: 0.7),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _OrDivider extends StatelessWidget {
+  const _OrDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: Divider(color: Colors.grey.shade400, height: 1)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            'OR',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade600,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+        Expanded(child: Divider(color: Colors.grey.shade400, height: 1)),
+      ],
     );
   }
 }

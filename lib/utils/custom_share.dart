@@ -220,6 +220,20 @@ class ImageBottomSheets extends StatelessWidget {
                                   ),
                                 ),
                               ),
+                              Positioned.fill(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Colors.black.withOpacity(0.38),
+                                        Colors.black.withOpacity(0.58),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
                               Positioned(
                                 left: 10,
                                 right: 10,
@@ -242,6 +256,7 @@ class ImageBottomSheets extends StatelessWidget {
                                                     0.9,
                                         minFontSize:
                                             screenWidth < 380 ? 11.5 : 10.9,
+                                        color: Colors.white,
                                       ),
                                     ),
                                     const SizedBox(height: 10),
@@ -251,7 +266,8 @@ class ImageBottomSheets extends StatelessWidget {
                                         Text(
                                           "$selectedBook ${int.parse(selectedChapter.toString())}:${int.parse(selectedVerseView.toString())}",
                                           style: TextStyle(
-                                            color: Colors.black,
+                                            color:
+                                                Colors.white.withOpacity(0.92),
                                             letterSpacing:
                                                 BibleInfo.letterSpacing,
                                             fontSize: screenWidth > 450
@@ -273,30 +289,46 @@ class ImageBottomSheets extends StatelessWidget {
                                 left: 0,
                                 right: 0,
                                 bottom: 0,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                                  color: Colors.transparent,
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Image.asset(
-                                        "assets/Icon-1024.png",
-                                        height: 28,
-                                        width: 28,
+                                child: Opacity(
+                                  opacity: 0.72,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 8, horizontal: 10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.45),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color:
+                                            Colors.white.withOpacity(0.18),
                                       ),
-                                      const SizedBox(width: 10),
-                                      Text(
-                                        BibleInfo.bible_shortName,
-                                        style: TextStyle(
-                                          color: const Color(0xFF3E2723),
-                                          letterSpacing: BibleInfo.letterSpacing,
-                                          fontSize: BibleInfo.fontSizeScale * 15,
-                                          fontWeight: FontWeight.w700,
-                                          height: 1.2,
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Image.asset(
+                                          "assets/Icon-1024.png",
+                                          height: 22,
+                                          width: 22,
                                         ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ],
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          BibleInfo.bible_shortName,
+                                          style: TextStyle(
+                                            color:
+                                                Colors.white.withOpacity(0.95),
+                                            letterSpacing:
+                                                BibleInfo.letterSpacing,
+                                            fontSize:
+                                                BibleInfo.fontSizeScale * 12,
+                                            fontWeight: FontWeight.w600,
+                                            height: 1.2,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),

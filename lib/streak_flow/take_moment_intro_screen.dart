@@ -19,16 +19,20 @@ class TakeMomentIntroScreen extends StatelessWidget {
         ThemeMode.dark;
     final Color textColor = isDark ? Colors.white : _brown;
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage(TakeMomentRestScreen.doveBackground),
-            fit: BoxFit.cover,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage(TakeMomentRestScreen.doveBackground),
+                fit: BoxFit.cover,
+              ),
+            ),
           ),
-        ),
-        child: SafeArea(
+          if (isDark)
+            Container(color: Colors.black.withOpacity(0.58)),
+          SafeArea(
           child: Column(
             children: [
               const SizedBox(height: 16),
@@ -91,6 +95,7 @@ class TakeMomentIntroScreen extends StatelessWidget {
             ],
           ),
         ),
+        ],
       ),
     );
   }
@@ -169,10 +174,13 @@ class TakeMomentIntroScreen extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
             decoration: BoxDecoration(
-              color: isDark ? Colors.white.withOpacity(0.2) : lightBtnColor,
+              color: isDark
+                  ? Colors.black.withOpacity(0.35)
+                  : lightBtnColor,
               borderRadius: BorderRadius.circular(28),
               border: Border.all(
-                color: (isDark ? Colors.white : _cream).withOpacity(0.6),
+                color: (isDark ? const Color(0xFFC9A227) : _cream)
+                    .withOpacity(0.75),
                 width: 2,
               ),
               boxShadow: const [

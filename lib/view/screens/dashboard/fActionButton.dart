@@ -333,6 +333,14 @@ class floatingButtonState extends State<floatingButton>
   get isStopped => ttsState == TtsState.stopped;
   get isPaused => ttsState == TtsState.paused;
   get isContinued => ttsState == TtsState.continued;
+
+  /// Keep verse highlight visible while playing, paused, or resuming after pause.
+  bool get _showTtsWordHighlight =>
+      allText.isNotEmpty &&
+      (ttsState == TtsState.playing ||
+          ttsState == TtsState.paused ||
+          ttsState == TtsState.continued);
+
   int start = 0;
   int end = 0;
   String allText = "";
@@ -380,7 +388,8 @@ class floatingButtonState extends State<floatingButton>
     flutterTts.setContinueHandler(() {
       if (mounted) {
         setState(() {
-          ttsState = TtsState.continued;
+          ttsState = TtsState.playing;
+          isSpeech = true;
         });
       }
     });
@@ -609,6 +618,25 @@ class floatingButtonState extends State<floatingButton>
 
   Future _setAwaitOptions() async {
     await flutterTts.awaitSpeakCompletion(true);
+  }
+
+  /// Pause at current position (resume with [_speak] / play — uses flutter_tts pause).
+  Future<void> _pauseTts() async {
+    if (!mounted || !_isTtsInitialized) return;
+    try {
+      await flutterTts.pause();
+      debugPrint('_pauseTts() called - TTS paused');
+    } catch (e) {
+      debugPrint("TTS pause error in _pauseTts(): $e");
+    }
+    if (mounted) {
+      setState(() {
+        ttsState = TtsState.paused;
+        isSpeech = false;
+        isManuallyPaused = true;
+        shouldAutoAdvance = false;
+      });
+    }
   }
 
   Future _stop() async {
@@ -3303,7 +3331,7 @@ class floatingButtonState extends State<floatingButton>
                       const SizedBox(height: 25),
                       SizedBox(
                           width: MediaQuery.of(context).size.width * 0.86,
-                          child: ttsState == TtsState.playing
+                          child: _showTtsWordHighlight
                               ? _textFromInput(start, end, allText)
                               : Text(
                                   selectedChapterContent.length > curretNo
@@ -3531,9 +3559,15 @@ class floatingButtonState extends State<floatingButton>
                                       });
                                     }
                                   }
-                                  _speak();
+                                  await _speak();
+                                  if (context.mounted) {
+                                    setState(() {});
+                                  }
                                 } else {
-                                  _stop();
+                                  await _pauseTts();
+                                  if (context.mounted) {
+                                    setState(() {});
+                                  }
                                 }
                                 if (isInitialTime == true && mounted) {
                                   setState(() {

@@ -1125,7 +1125,6 @@ class _HomeScreenState extends State<HomeScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) async {
 //  await _checkAndShowVerse();
       await _handleAppLaunchCount();
-      await _checkAndShowHighlightFeedback();
       await checkUserLoggedIn();
       await _checkAndShowDailyWelcomeToast();
       await _handlePendingNotificationAction();
@@ -1148,16 +1147,6 @@ class _HomeScreenState extends State<HomeScreen>
 
     // _initializeAds();
     loadAds();
-  }
-
-  Future<void> _checkAndShowHighlightFeedback() async {
-    final prefs = await SharedPreferences.getInstance();
-    final pending = prefs.getBool('highlight_feedback_pending') ?? false;
-    if (!pending || !mounted) return;
-    await prefs.setBool('highlight_feedback_pending', false);
-    await prefs.setBool('highlight_feedback_shown', true);
-    if (!mounted) return;
-    showMainFeedbackDialog(context);
   }
 
   Future<void> _showStreakCompleteCelebrationIfNeeded() async {
@@ -1259,29 +1248,25 @@ class _HomeScreenState extends State<HomeScreen>
   //   if (mounted) setState(() => _exitOfferCooldownActive = show);
   // }
 
+  /// "How are you feeling" — once on the 2nd app open (launchCount == 2 after splash).
   Future<void> _handleAppLaunchCount() async {
     final prefs = await SharedPreferences.getInstance();
     appLaunchCount = prefs.getInt('launchCount') ?? 0;
 
     debugPrint("launchCount is - $appLaunchCount");
 
-    if (appLaunchCount == 2) {
-      final data = prefs.getString("review") ?? "1";
-      if (data == '1') {
-        Future.delayed(Duration(minutes: 1), () async {
-          if (mounted) {
-            await prefs.setInt('launchCount', 3);
-            await prefs.setString('review', '2');
-            appLaunchCount = prefs.getInt('launchCount') ?? 0;
-            debugPrint("launchCount 3 is - $appLaunchCount");
-            // await requestReview(result);
-          }
-          if (mounted) {
-            return showMainFeedbackDialog(context);
-          }
-        });
-      }
-    }
+    if (appLaunchCount != 2) return;
+
+    final data = prefs.getString("review") ?? "1";
+    if (data != '1' || !mounted) return;
+
+    await prefs.setInt('launchCount', 3);
+    await prefs.setString('review', '2');
+    appLaunchCount = prefs.getInt('launchCount') ?? 0;
+    debugPrint("launchCount 3 is - $appLaunchCount");
+
+    if (!mounted) return;
+    showMainFeedbackDialog(context);
   }
 
   Future<void> _checkAndShowDailyWelcomeToast() async {
@@ -1837,30 +1822,35 @@ class _HomeScreenState extends State<HomeScreen>
                             left: 0,
                             right: 0,
                             bottom: 0,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 10, horizontal: 12),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Image.asset(
-                                    "assets/Icon-1024.png",
-                                    height: 28,
-                                    width: 28,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    BibleInfo.bible_shortName,
-                                    style: TextStyle(
-                                      color: const Color(0xFF3E2723),
-                                      letterSpacing: BibleInfo.letterSpacing,
-                                      fontSize: BibleInfo.fontSizeScale * 15,
-                                      fontWeight: FontWeight.w700,
-                                      height: 1.2,
+                            child: Opacity(
+                              opacity: 0.52,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 6, horizontal: 10),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Image.asset(
+                                      "assets/Icon-1024.png",
+                                      height: 22,
+                                      width: 22,
                                     ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      BibleInfo.bible_shortName,
+                                      style: TextStyle(
+                                        color: const Color(0xFF3E2723),
+                                        letterSpacing:
+                                            BibleInfo.letterSpacing,
+                                        fontSize:
+                                            BibleInfo.fontSizeScale * 12,
+                                        fontWeight: FontWeight.w600,
+                                        height: 1.2,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -4595,9 +4585,15 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ),
             ),
-            floatingActionButton: controller.isFetchContent.value || !_showUI
+            floatingActionButton: controller.isFetchContent.value
                 ? const SizedBox()
-                : Row(
+                : Visibility(
+                    visible: _showUI,
+                    maintainState: true,
+                    maintainAnimation: true,
+                    child: IgnorePointer(
+                      ignoring: !_showUI,
+                      child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -4716,9 +4712,8 @@ class _HomeScreenState extends State<HomeScreen>
                             },
                             borderRadius: BorderRadius.circular(24),
                             child: Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: screenWidth > 450 ? 14 : 12,
-                                vertical: screenWidth > 450 ? 10 : 8,
+                              padding: EdgeInsets.all(
+                                screenWidth > 450 ? 12 : 10,
                               ),
                               decoration: BoxDecoration(
                                 color: CommanColor.whiteLightModePrimary(
@@ -4732,26 +4727,11 @@ class _HomeScreenState extends State<HomeScreen>
                                   ),
                                 ],
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.keyboard_arrow_up_rounded,
-                                    size: screenWidth > 450 ? 22 : 20,
-                                    color: CommanColor.darkModePrimaryWhite(
-                                        context),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Top',
-                                    style: TextStyle(
-                                      color: CommanColor.darkModePrimaryWhite(
-                                          context),
-                                      fontSize: screenWidth > 450 ? 14 : 13,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
+                              child: Icon(
+                                Icons.keyboard_arrow_up_rounded,
+                                size: screenWidth > 450 ? 24 : 22,
+                                color: CommanColor.darkModePrimaryWhite(
+                                    context),
                               ),
                             ),
                           ),
@@ -4768,6 +4748,8 @@ class _HomeScreenState extends State<HomeScreen>
                         audioPlayer: audioPlayer,
                       ),
                     ],
+                      ),
+                    ),
                   ),
             drawer: controller.isFetchContent.value
                 ? const SizedBox()
@@ -6660,7 +6642,16 @@ class _HomeScreenState extends State<HomeScreen>
           final direction = scrollController.position.userScrollDirection;
           final currentOffset = scrollController.position.pixels;
 
-          final showBackToTop = currentOffset > 320;
+          // Show scroll-to-top when scrolling down (into content); hide when scrolling up.
+          const backToTopThreshold = 320.0;
+          var showBackToTop = _showBackToTop;
+          if (currentOffset <= backToTopThreshold) {
+            showBackToTop = false;
+          } else if (direction == ScrollDirection.forward) {
+            showBackToTop = true;
+          } else if (direction == ScrollDirection.reverse) {
+            showBackToTop = false;
+          }
           if (_showBackToTop != showBackToTop && mounted) {
             setState(() => _showBackToTop = showBackToTop);
           }

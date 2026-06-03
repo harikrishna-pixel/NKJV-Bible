@@ -216,7 +216,7 @@ class _DailyVerseState extends State<DailyVerse> {
     //   return dateB.compareTo(dateA);
     // });
 
-    // if (mounted) setState(() {});
+    if (mounted) setState(() {});
   }
 
   void _showOverlay(BuildContext buttonContext, category) {
@@ -673,11 +673,12 @@ class _DailyVerseState extends State<DailyVerse> {
                       padding: const EdgeInsets.only(right: 12),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(14),
-                        onTap: () {
-                          Get.to(() => PreferenceSelectionScreen(
+                        onTap: () async {
+                          await Get.to(() => PreferenceSelectionScreen(
                                 isSetting: true,
                                 from: true,
                               ));
+                          if (mounted) loaddata();
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
@@ -922,11 +923,13 @@ class _DailyVerseState extends State<DailyVerse> {
                                     height: 15,
                                   ),
                                   GestureDetector(
-                                    onTap: () {
-                                      Get.to(() => PreferenceSelectionScreen(
+                                    onTap: () async {
+                                      await Get.to(() =>
+                                          PreferenceSelectionScreen(
                                             isSetting: true,
                                             from: true,
                                           ));
+                                      if (mounted) loaddata();
                                     },
                                     child: Container(
                                       width: screenWidth > 600 ? 130 : 100,

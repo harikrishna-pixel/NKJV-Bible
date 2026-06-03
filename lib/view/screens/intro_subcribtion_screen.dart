@@ -2184,377 +2184,620 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         _navigateAwayFromPaywall();
       },
       child: Scaffold(
-        body: Container(
-          width: size.width,
-          height: size.height,
-          decoration: BoxDecoration(
-            image: DecorationImage(
-              image: AssetImage(Images.bgImage(context)), // background texture
-              fit: BoxFit.cover,
-            ),
-          ),
-          child: Stack(
-            clipBehavior: Clip.none, // keep overlay elements fixed/visible
-            children: [
-              SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                ),
-                child: SafeArea(
-                  child: Column(
-                    children: [
-                      // Top bar
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Back button when coming from wallpaper
-                          widget.checkad == 'image'
-                              ? SafeArea(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: IconButton(
-                                      icon: Icon(Icons.arrow_back,
-                                          color:
-                                              CommanColor.whiteBlack(context),
-                                          size: 24),
-                                      iconSize: 24,
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
-                                      onPressed: () {
-                                        // Directly go back when coming from wallpaper (skip exit offer)
-                                        Navigator.of(context).pop();
-                                      },
-                                    ),
-                                  ),
-                                )
-                              : const SizedBox(),
-                          // Jesus Image
-                          // Image.asset(
-                          //   "assets/offer/jesus.png", // Replace with your image
-                          //   height: size.height * 0.19,
-                          //   fit: BoxFit.contain,
-                          // ),
-                          SizedBox(width: 15), // Space for fixed close button
-                        ],
-                      ),
-
-                      SizedBox(height: size.height * 0.002),
-
-                      // // Jesus Image
-                      // Image.asset(
-                      //   "assets/offer/jesus.png", // Replace with your image
-                      //   height: size.height * 0.14,
-                      //   fit: BoxFit.contain,
-                      // ),
-
-                      const SizedBox(height: 10),
-
-                      // Title
-                      Text(
-                        "GROW CLOSER TO GOD",
-                        textAlign: TextAlign.left,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: CommanColor.whiteBlack(context),
+        backgroundColor: const Color(0xFFFDFBF7),
+        body: Stack(
+          children: [
+            SingleChildScrollView(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.paddingOf(context).bottom + 24,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildPaywallHeroWithCard(context, size),
+                  const SizedBox(height: 12),
+                  if (widget.checkad == 'image')
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: IconButton(
+                          icon: const Icon(Icons.arrow_back,
+                              color: Color(0xFF2D2D3A), size: 24),
+                          onPressed: () => Navigator.of(context).pop(),
                         ),
                       ),
-
-                      const SizedBox(height: 12),
-
-                      // Features list
-                      _buildFeatureItem(
-                          "assets/offer/fe1.png", "Focus on God’s Word",
-                          highlightWords: ["God’s Word"]),
-                      _buildFeatureItem("assets/offer/fe2.png",
-                          "Daily Guidance From Scripture",
-                          highlightWords: ["Daily Guidance"]),
-                      _buildFeatureItem("assets/offer/fe3.png",
-                          "Understand God’s Word Clearly",
-                          highlightWords: ["God’s Word"]),
-                      _buildFeatureItem(
-                          "assets/offer/fe4.png", "Your Bible, Always With You",
-                          highlightWords: ["Your Bible"]),
-                      // _buildFeatureItem("assets/guidance.png",
-                      //     "Scripture Explanations & Answers",
-                      //     highlightWords: ["Explanations & Answers"]),
-                      // _buildFeatureItem("assets/coins.png", _currentBonusLabel,
-                      //     highlightWords: [_currentBonusHighlight]),
-
-                      const SizedBox(height: 15),
-                      Text(
-                          "Build a deeper, stronger relationship with God every day",
-                          style: TextStyle(
-                              color: CommanColor.whiteBlack(context),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500)),
-                      SizedBox(
-                        height: 15,
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          Image.asset(
-                            "assets/Line 217.png",
-                            height: 20,
-                            width: 20,
-                            fit: BoxFit.fitWidth,
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            "CHOOSE YOUR PREMIUM PLAN",
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.2,
-                                color: CommanColor.whiteBlack(context)),
-                          ),
-                          const SizedBox(width: 10),
-                          Image.asset("assets/Line 216.png",
-                              height: 20, width: 20),
-                        ],
-                      ),
-                      // Choose plan text
-                      // const Text(
-                      //   "Unlock Premium Access",
-                      //   style: TextStyle(color: Colors.black54),
-                      // ),
-                      // const Text(
-                      //   "Try All Features Free for 3 Days",
-                      //   style: TextStyle(color: Colors.black54),
-                      // ),
-                      const SizedBox(height: 12),
-
-                      // Six months plan
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 200),
-                        child: isPurchaseLoading
-                            ? Padding(
-                                padding: const EdgeInsets.only(top: 12),
-                                child: SizedBox(
-                                    height: 100,
-                                    width: 200,
-                                    child: Center(
-                                        child: Column(
-                                      children: [
-                                        const CircularProgressIndicator
-                                            .adaptive(),
-                                        Padding(
-                                          padding: const EdgeInsets.all(8.0),
-                                          child: Text('Please wait...',
-                                              style: CommanStyle.appBarStyle(
-                                                      context)
-                                                  .copyWith(fontSize: 12)),
-                                        )
-                                      ],
-                                    ))),
-                              )
-                            : Column(
+                    ),
+                  _buildPaywallSectionTitle(),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: isPurchaseLoading
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 24),
+                              child: Column(
                                 children: [
-                                  // First row: Two plans side by side
-                                  if (_products.length >= 2)
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: _buildPlanCard(0, controller),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: _buildPlanCard(1, controller),
-                                        ),
-                                      ],
+                                  const CircularProgressIndicator.adaptive(),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'Please wait...',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade700,
                                     ),
-                                  const SizedBox(height: 15),
-                                  // Second row: One plan full width
-                                  if (_products.length >= 3)
-                                    _buildPlanCard(2, controller),
-                                  // Handle case with less than 3 products
-                                  if (_products.length == 1)
-                                    _buildPlanCard(2, controller),
+                                  ),
                                 ],
                               ),
-                      ),
-
-                      const SizedBox(height: 15),
-                      Text("No Risk. No hidden charges",
-                          style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: CommanColor.whiteBlack(context)
-                                  .withOpacity(0.7))),
-                      const SizedBox(height: 15),
-
-                      // One Year plan
-
-                      // const Text(
-                      //   "Auto renewal, cancel anytime",
-                      //   style: TextStyle(
-                      //     fontSize: 12,
-                      //     color: Colors.black54,
-                      //   ),
-                      // ),
-                      // const SizedBox(height: 12),
-
-                      // Free trial button
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () async {
-                              await SharPreferences.setString('OpenAd', '1');
-                              await SharPreferences.setBoolean(
-                                  'startpurches', true);
-                              _buyProduct(_products[selectedindex]);
-                            },
-                            style: ElevatedButton.styleFrom(
-                              padding: EdgeInsets.zero, // REQUIRED for gradient
-                              backgroundColor: Colors.transparent,
-                              shadowColor: Colors.transparent,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                            )
+                          : _buildPaywallPlanRow(controller),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _products.isEmpty
+                            ? null
+                            : () async {
+                                await SharPreferences.setString('OpenAd', '1');
+                                await SharPreferences.setBoolean(
+                                    'startpurches', true);
+                                _buyProduct(_products[selectedindex]);
+                              },
+                        style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          disabledBackgroundColor: Colors.grey.shade300,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(28),
+                          ),
+                        ),
+                        child: Ink(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: _products.isEmpty
+                                  ? [Colors.grey, Colors.grey]
+                                  : const [
+                                      Color(0xFFD4894A),
+                                      Color(0xFFB86B2E),
+                                      Color(0xFF8B4E1F),
+                                    ],
                             ),
-                            child: Ink(
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    Color(0xFF763201),
-                                    Color(0xFFD5821F),
-                                    Color(0xFF763201),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(30),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFC45A1F)
+                                    .withValues(alpha: 0.35),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
                               ),
-                              child: Container(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 15),
-                                alignment: Alignment.center,
-                                child: const Text(
-                                  'Get Full Access',
+                            ],
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            alignment: Alignment.center,
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'Start Growing Today',
                                   style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
                                     color: Colors.white,
                                   ),
                                 ),
-                              ),
+                                SizedBox(width: 6),
+                                Icon(Icons.chevron_right,
+                                    color: Colors.white, size: 22),
+                              ],
                             ),
                           ),
                         ),
                       ),
-
-                      const SizedBox(height: 5),
-                      TextButton(
-                        onPressed: () async {
-                          // Exit offer commented out
-                          // await _checkAndShowExitOfferBeforeClose(controller);
-                          _navigateAwayFromPaywall();
-                        },
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.favorite,
+                          size: 14, color: Colors.amber.shade700),
+                      const SizedBox(width: 6),
+                      Flexible(
                         child: Text(
-                          "Continue Free Version",
+                          'Join thousands of believers growing closer to God every day',
+                          textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: CommanColor.whiteBlack(context),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            // decoration: TextDecoration.underline,
+                            fontSize: 12,
+                            color: Colors.brown.shade400,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
-
-                      // Footer links
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          TextButton(
-                            onPressed: () => _openLegalUrl(
-                                'https://bibleoffice.com/terms_conditions.html'),
-                            style: TextButton.styleFrom(
-                              minimumSize: const Size(48, 48),
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: Text(
-                              "Terms of Use",
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: CommanColor.whiteBlack(context),
-                              ),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () async {
-                              await SharPreferences.setBoolean(
-                                  'restorepurches', true);
-                              await _restorePurchases(controller);
-                            },
-                            style: TextButton.styleFrom(
-                              minimumSize: const Size(48, 48),
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: Text(
-                              "Restore",
-                              style: TextStyle(
-                                color: CommanColor.whiteBlack(context),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () => _openLegalUrl(
-                                'https://bibleoffice.com/privacy_policy.html'),
-                            style: TextButton.styleFrom(
-                              minimumSize: const Size(48, 48),
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: Text(
-                              "Privacy Policy",
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: CommanColor.whiteBlack(context),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
                     ],
                   ),
-                ),
-              ),
-              // Fixed Close Button - Always visible in top right corner
-              Positioned(
-                top: 0,
-                right: 0,
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: IconButton(
-                      icon: Icon(Icons.close,
-                          color: CommanColor.whiteBlack(context), size: 22),
-                      iconSize: 22,
-                      style: IconButton.styleFrom(
-                        minimumSize: const Size(48, 48),
-                        padding: const EdgeInsets.all(10),
+                  const SizedBox(height: 16),
+                  _buildPaywallTrustRow(),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () async {
+                      _navigateAwayFromPaywall();
+                    },
+                    child: const Text(
+                      'Continue with Limited Access',
+                      style: TextStyle(
+                        color: Color(0xFF757575),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        decoration: TextDecoration.underline,
+                        decorationColor: Color(0xFF757575),
                       ),
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton(
+                        onPressed: () => _openLegalUrl(
+                            'https://bibleoffice.com/terms_conditions.html'),
+                        child: const Text(
+                          'Terms of Use',
+                          style: TextStyle(
+                              fontSize: 11, color: Color(0xFF757575)),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          await SharPreferences.setBoolean(
+                              'restorepurches', true);
+                          await _restorePurchases(controller);
+                        },
+                        child: const Text(
+                          'Restore',
+                          style: TextStyle(
+                              fontSize: 11, color: Color(0xFF757575)),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => _openLegalUrl(
+                            'https://bibleoffice.com/privacy_policy.html'),
+                        child: const Text(
+                          'Privacy Policy',
+                          style: TextStyle(
+                              fontSize: 11, color: Color(0xFF757575)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Material(
+                    color: Colors.white,
+                    shape: const CircleBorder(),
+                    elevation: 2,
+                    child: IconButton(
+                      icon: const Icon(Icons.close,
+                          color: Color(0xFF5A5A5A), size: 20),
                       onPressed: () async {
-                        // Exit offer commented out
-                        // await _checkAndShowExitOfferBeforeClose(controller);
                         _navigateAwayFromPaywall();
                       },
                     ),
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  static const Color _paywallGold = Color(0xFFC5A059);
+  static const Color _paywallInk = Color(0xFF2D2D3A);
+
+  Widget _buildPaywallHeroWithCard(BuildContext context, Size size) {
+    final imageHeight = (size.height * 0.40).clamp(280.0, 360.0);
+    const cardTopFactor = 0.68;
+    const valueCardHeightEstimate = 140.0;
+    final cardTop = imageHeight * cardTopFactor;
+
+    return SizedBox(
+      height: cardTop + valueCardHeightEstimate + 6,
+      width: double.infinity,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: imageHeight,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.asset(
+                  'assets/paywall-bg.png',
+                  fit: BoxFit.cover,
+                  alignment: Alignment.center,
+                  filterQuality: FilterQuality.high,
+                  gaplessPlayback: true,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: const Color(0xFFE8D5C4),
+                  ),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: imageHeight * 0.55,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.white.withValues(alpha: 0.25),
+                          Colors.white.withValues(alpha: 0.82),
+                          Colors.white,
+                        ],
+                        stops: const [0.0, 0.4, 0.78, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+                SafeArea(
+                  bottom: false,
+                  child: Align(
+                    alignment: Alignment.topLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 16, top: 6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF4E342E),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.workspace_premium,
+                                color: _paywallGold, size: 16),
+                            SizedBox(width: 6),
+                            Text(
+                              'PREMIUM',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  top: 0,
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 48),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Grow Closer',
+                            textAlign: TextAlign.left,
+                            style: TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                              color: _paywallInk,
+                              height: 1.1,
+                            ),
+                          ),
+                          RichText(
+                            textAlign: TextAlign.left,
+                            text: const TextSpan(
+                              style: TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w800,
+                                color: _paywallInk,
+                                height: 1.1,
+                                shadows: [
+                                  Shadow(
+                                    color: Color(0x40000000),
+                                    blurRadius: 6,
+                                    offset: Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                              children: [
+                                TextSpan(text: 'to '),
+                                TextSpan(
+                                  text: 'God',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    shadows: [
+                                      Shadow(
+                                        color: Color(0x66000000),
+                                        blurRadius: 8,
+                                        offset: Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                TextSpan(text: ' daily'),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Guidance, prayer and encouragement\nwhen you need it',
+                            textAlign: TextAlign.left,
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.45,
+                              color: _paywallInk.withValues(alpha: 0.6),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
+            top: cardTop,
+            child: _buildPaywallValueCard(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaywallValueCard(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: _paywallValueColumn(
+                'assets/offer/fe1.png',
+                'Pray With Confidence',
+                'Support during difficult moments',
+              ),
+            ),
+            VerticalDivider(
+              width: 1,
+              thickness: 1,
+              color: Colors.grey.shade300,
+            ),
+            Expanded(
+              child: _paywallValueColumn(
+                'assets/offer/fe2.png',
+                'Understand Scripture Better',
+                'Make God\'s Word easier to apply',
+              ),
+            ),
+            VerticalDivider(
+              width: 1,
+              thickness: 1,
+              color: Colors.grey.shade300,
+            ),
+            Expanded(
+              child: _paywallValueColumn(
+                'assets/offer/fe3.png',
+                'Find Peace Every Day',
+                'Find hope during challenging times',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _paywallValueColumn(
+    String iconAsset,
+    String title,
+    String subtitle,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Column(
+        children: [
+          Image.asset(
+            iconAsset,
+            width: 40,
+            height: 40,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => Icon(
+              Icons.auto_awesome,
+              color: _paywallGold,
+              size: 34,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: _paywallInk,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            maxLines: 3,
+            style: TextStyle(
+              fontSize: 9,
+              height: 1.3,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaywallSectionTitle() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: Image.asset(
+              'assets/Line 217.png',
+              height: 14,
+              fit: BoxFit.fitWidth,
+              errorBuilder: (_, __, ___) => Divider(color: Colors.grey.shade400),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              'Choose How You Want to Grow',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: _paywallInk,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Image.asset(
+              'assets/Line 216.png',
+              height: 14,
+              fit: BoxFit.fitWidth,
+              errorBuilder: (_, __, ___) => Divider(color: Colors.grey.shade400),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaywallPlanRow(DashBoardController controller) {
+    if (_products.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    if (_products.length == 1) {
+      return _buildPlanCard(0, controller);
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (int i = 0; i < _products.length; i++) ...[
+              if (i > 0) const SizedBox(width: 8),
+              Expanded(child: _buildPlanCard(i, controller)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaywallTrustRow() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: _paywallTrustItem(
+              Icons.verified_user_outlined,
+              'Cancel anytime',
+              'No commitment',
+            ),
+          ),
+          Expanded(
+            child: _paywallTrustItem(
+              Icons.lock_outline,
+              'Secure payment',
+              '100% safe & trusted',
+            ),
+          ),
+          Expanded(
+            child: _paywallTrustItem(
+              Icons.sync,
+              'Restore anytime',
+              'Access on all devices',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _paywallTrustItem(IconData icon, String title, String subtitle) {
+    return Column(
+      children: [
+        Icon(icon, size: 22, color: Colors.grey.shade600),
+        const SizedBox(height: 6),
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: _paywallInk,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          subtitle,
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 9, color: Colors.grey.shade600),
+        ),
+      ],
     );
   }
 
@@ -2590,10 +2833,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   String _getPlanSubtitle(int index) {
-    if (_products[index].id == widget.sixMonthPlan) return 'Daily Habit Plan';
-    if (_products[index].id == widget.oneYearPlan) return 'Best Yearly Plan';
-    if (_products[index].id == widget.lifeTimePlan)
-      return 'Pay once, Grow forever';
+    if (_products[index].id == widget.sixMonthPlan) {
+      return 'Build Your Faith Habit';
+    }
+    if (_products[index].id == widget.oneYearPlan) {
+      return 'Best for Daily Spiritual Growth';
+    }
+    if (_products[index].id == widget.lifeTimePlan) {
+      return 'Long-term Spiritual Companion';
+    }
     return '';
   }
 
@@ -2646,11 +2894,93 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     return null;
   }
 
+  String _planBadgeLabel(int index, String? badgeText) {
+    if (_products[index].id == widget.oneYearPlan) {
+      return '★ MOST POPULAR';
+    }
+    if (_products[index].id == widget.lifeTimePlan) {
+      return '💎 BEST VALUE';
+    }
+    return badgeText ?? '';
+  }
+
+  IconData _planCenterIcon(int index) {
+    if (_products[index].id == widget.sixMonthPlan) {
+      return Icons.eco_outlined;
+    }
+    if (_products[index].id == widget.oneYearPlan) {
+      return Icons.workspace_premium_outlined;
+    }
+    return Icons.favorite_border;
+  }
+
   Widget _buildPlanCard(int index, DashBoardController controller) {
     final isSelected = selectedindex == index;
     final discountedPrice = _getDiscountedPrice(_products[index], controller);
     final badgeText = _getBadgeText(index, controller);
+    final badgeLabel = _planBadgeLabel(index, badgeText);
+    final isSixMonth = _products[index].id == widget.sixMonthPlan;
+    final isOneYear = _products[index].id == widget.oneYearPlan;
     final isLifetime = _products[index].id == widget.lifeTimePlan;
+
+    Color accent;
+    Color bg;
+    Color border;
+    if (isOneYear) {
+      accent = const Color(0xFF7B1FA2);
+      bg = const Color(0xFFFAF5FC);
+      border = const Color(0xFFAB47BC);
+    } else if (isLifetime) {
+      accent = const Color(0xFF388E3C);
+      bg = const Color(0xFFF5FBF6);
+      border = const Color(0xFF66BB6A);
+    } else {
+      accent = const Color(0xFF5D4037);
+      bg = Colors.white;
+      border = Colors.grey.shade300;
+    }
+    if (isSelected) {
+      border = accent;
+    }
+
+    String? bottomBanner;
+    if (isOneYear && badgeText != null) {
+      bottomBanner = badgeText.toUpperCase().contains('SAVE')
+          ? badgeText.toUpperCase()
+          : 'SAVE 50%';
+    } else if (isLifetime) {
+      bottomBanner = 'LOWEST COST';
+    }
+
+    final borderWidth = isOneYear || isLifetime || isSelected ? 2.0 : 1.0;
+    final hasBadge = badgeLabel.isNotEmpty;
+
+    Widget? badgeWidget;
+    if (hasBadge) {
+      badgeWidget = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: accent,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: accent.withValues(alpha: 0.35),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Text(
+          badgeLabel,
+          style: const TextStyle(
+            fontSize: 8,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+            letterSpacing: 0.3,
+          ),
+        ),
+      );
+    }
 
     return InkWell(
       onTap: () {
@@ -2658,160 +2988,132 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           selectedindex = index;
         });
       },
-      child: Stack(
-        clipBehavior: Clip.none,
+      borderRadius: BorderRadius.circular(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            margin: const EdgeInsets.only(top: 12),
-            padding: EdgeInsets.symmetric(
-              horizontal: isLifetime ? 12 : 16,
-              vertical: 16,
-            ),
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: isSelected
-                    ? (CommanColor.isDarkTheme(context)
-                        ? Colors.white
-                        : const Color(0xFF6B5642))
-                    : (CommanColor.isDarkTheme(context)
-                        ? const Color(0xFFC4B5A0).withOpacity(0.3)
-                        : const Color(0xFFC4B5A0)),
-                width: isSelected ? 2 : 1,
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: isLifetime
-                ? Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      // Title on left
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _getPlanTitle(index),
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: CommanColor.whiteBlack(context),
-                            ),
+          SizedBox(
+            height: 24,
+            child: hasBadge ? Center(child: badgeWidget) : null,
+          ),
+          Expanded(
+            child: Container(
+                decoration: BoxDecoration(
+                  color: bg,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: border, width: borderWidth),
+                  boxShadow: isOneYear || isSelected
+                      ? [
+                          BoxShadow(
+                            color: accent.withValues(alpha: 0.18),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
                           ),
-                          Text("One Time Payment",
+                        ]
+                      : null,
+                ),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 14),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              _getPlanTitle(index),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: isSixMonth ? 14 : 15,
+                                fontWeight: FontWeight.w800,
+                                color: isSixMonth ? _paywallInk : accent,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _getPlanSubtitle(index),
+                              textAlign: TextAlign.center,
+                              maxLines: 3,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                  color: CommanColor.whiteBlack(context)))
-                        ],
-                      ),
-                      // Prices on right
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          // Strikethrough price (if exists)
-                          if (discountedPrice.isNotEmpty) ...[
-                            Text(
-                              discountedPrice,
-                              style: TextStyle(
-                                fontSize: 16,
+                                fontSize: 9,
+                                height: 1.2,
+                                color: isSixMonth
+                                    ? Colors.grey.shade600
+                                    : accent.withValues(alpha: 0.8),
                                 fontWeight: FontWeight.w500,
-                                color: CommanColor.whiteBlack(context)
-                                    .withOpacity(0.6),
-                                decoration: TextDecoration.lineThrough,
-                                decorationThickness: 2,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                          ],
-                          // Actual price
-                          Text(
-                            _products[index].price,
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: CommanColor.whiteBlack(context),
+                            const SizedBox(height: 10),
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white,
+                                border: Border.all(
+                                  color: accent.withValues(alpha: 0.4),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Icon(
+                                _planCenterIcon(index),
+                                color: accent,
+                                size: 22,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Title
-                      Text(
-                        _getPlanTitle(index),
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: CommanColor.whiteBlack(context),
+                            const SizedBox(height: 10),
+                            if (discountedPrice.isNotEmpty)
+                              Text(
+                                discountedPrice,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: accent.withValues(alpha: 0.65),
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                              ),
+                            Text(
+                              _products[index].price,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: isSixMonth ? 16 : 18,
+                                fontWeight: FontWeight.w800,
+                                color: isSixMonth ? _paywallInk : accent,
+                              ),
+                            ),
+                          ],
                         ),
-                        textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 5),
-                      // Price Section
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          // Strikethrough price (if exists)
-                          if (discountedPrice.isNotEmpty) ...[
-                            Text(
-                              discountedPrice,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: CommanColor.whiteBlack(context)
-                                    .withOpacity(0.6),
-                                decoration: TextDecoration.lineThrough,
-                                decorationThickness: 2,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          // Actual price
-                          Text(
-                            _products[index].price,
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: CommanColor.whiteBlack(context),
-                            ),
+                    ),
+                    if (bottomBanner != null)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 7),
+                        decoration: BoxDecoration(
+                          color: isOneYear
+                              ? accent
+                              : accent.withValues(alpha: 0.14),
+                          borderRadius: const BorderRadius.only(
+                            bottomLeft: Radius.circular(12),
+                            bottomRight: Radius.circular(12),
                           ),
-                        ],
+                        ),
+                        child: Text(
+                          bottomBanner,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: isOneYear ? Colors.white : accent,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
                       ),
-                    ],
-                  ),
-          ),
-          // Badge
-          if (badgeText != null)
-            Positioned(
-              right: 10,
-              top: -6,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                decoration: BoxDecoration(
-                  color: CommanColor.isDarkTheme(context)
-                      ? const Color(0xFFD4C5B0)
-                      : const Color(0xFFA37030),
-                  borderRadius: BorderRadius.circular(24),
+                  ],
                 ),
-                child: Text(
-                  badgeText,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: CommanColor.isDarkTheme(context)
-                        ? Colors.black
-                        : Colors.white,
-                  ),
-                ),
-              ),
             ),
+          ),
         ],
       ),
     );
@@ -2973,133 +3275,153 @@ class _ExitOfferBottomSheetContentState
       canPop:
           false, // Prevent back button dismissal on iPad - user must take action
       child: Container(
-        decoration: BoxDecoration(
-          color: CommanColor.white,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
           ),
         ),
         child: SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Close button (X) at top right
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(24),
+                  topRight: Radius.circular(24),
+                ),
+                child: SizedBox(
+                  height: widget.screenWidth > 450 ? 140 : 120,
+                  width: double.infinity,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.asset(
+                        'assets/paywall-bg.png',
+                        fit: BoxFit.cover,
+                        alignment: Alignment.topCenter,
+                      ),
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.black.withValues(alpha: 0.05),
+                              Colors.white,
+                            ],
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF4E342E),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Text(
+                                'LIMITED TIME OFFER',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            const Text(
+                              'Lifetime Premium',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF2D2D3A),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    SizedBox(height: 10),
-                    // Red "LIMITED TIME OFFER" banner
-                    Container(
-                      width: 220,
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text(
-                        "Special Faith Offer",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const SizedBox(height: 12),
-                    // Description
                     RichText(
                       textAlign: TextAlign.center,
                       text: TextSpan(
                         style: TextStyle(
-                          fontSize: widget.screenWidth > 450 ? 16 : 18,
-                          color: Colors.black87,
+                          fontSize: widget.screenWidth > 450 ? 15 : 14,
+                          color: const Color(0xFF2D2D3A),
                           height: 1.4,
                         ),
                         children: [
                           const TextSpan(
-                            text: "Unlock every Premium Bible feature. Now ",
+                            text: 'Unlock every Premium Bible feature. ',
                           ),
-                          const TextSpan(
-                            text: "30% Off",
-                            style: TextStyle(fontWeight: FontWeight.bold),
+                          TextSpan(
+                            text: widget.exitOffer.item_2?.contains('%') ==
+                                    true
+                                ? widget.exitOffer.item_2!
+                                : '30% Off',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF7B1FA2),
+                            ),
                           ),
-                          const TextSpan(
-                            text: " for the next 10 minutes",
-                          ),
+                          const TextSpan(text: ' for a limited time.'),
                         ],
                       ),
                     ),
-
-                    const SizedBox(height: 20),
-                    // Purple offer box
+                    const SizedBox(height: 16),
                     Container(
-                      width: 300,
+                      width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Color(0XFFF1F1F1), // Light purple
-                        borderRadius: BorderRadius.circular(12),
+                        color: const Color(0xFFF3E5F5),
+                        borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: const Color(0xFFCDCDCD),
-                          width: 1.5,
+                          color: const Color(0xFFCE93D8),
                         ),
                       ),
                       child: Column(
                         children: [
-                          const Text(
-                            "Lifetime Premium",
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          // Original price with strike-through (if different from discounted price)
                           if (widget.originalLifetimePrice !=
                                   widget.lifetimePrice &&
-                              widget.originalLifetimePrice.isNotEmpty) ...[
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  widget.originalLifetimePrice,
-                                  style: TextStyle(
-                                    fontSize:
-                                        widget.screenWidth > 450 ? 20 : 18,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.black87.withOpacity(0.6),
-                                    decoration: TextDecoration.lineThrough,
-                                    decorationThickness: 2,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  widget.lifetimePrice,
-                                  style: TextStyle(
-                                    fontSize:
-                                        widget.screenWidth > 450 ? 32 : 28,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                              ],
-                            )
-                          ],
-                          // Discounted price
-
-                          const SizedBox(height: 8),
-                          const Text(
-                            "One-Time Blessing. Lifetime Access.",
+                              widget.originalLifetimePrice.isNotEmpty)
+                            Text(
+                              widget.originalLifetimePrice,
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey.shade600,
+                                decoration: TextDecoration.lineThrough,
+                              ),
+                            ),
+                          Text(
+                            widget.lifetimePrice,
                             style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.blue,
+                              fontSize: widget.screenWidth > 450 ? 32 : 28,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF7B1FA2),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'One-Time Blessing. Lifetime Access.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF5D4037),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -3107,17 +3429,14 @@ class _ExitOfferBottomSheetContentState
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(
-                                Icons.access_time,
-                                size: 16,
-                                color: Colors.red,
-                              ),
-                              const SizedBox(width: 4),
+                              Icon(Icons.access_time,
+                                  size: 15, color: Colors.red.shade700),
+                              const SizedBox(width: 6),
                               Text(
-                                "Offer ends in ${_countdownMinutes.toString().padLeft(2, '0')}:${_countdownSeconds.toString().padLeft(2, '0')}",
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.red,
+                                'Offer ends in ${_countdownMinutes.toString().padLeft(2, '0')}:${_countdownSeconds.toString().padLeft(2, '0')}',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.red.shade700,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -3126,63 +3445,68 @@ class _ExitOfferBottomSheetContentState
                         ],
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    // Unlock Bible Premium button (purple)
+                    const SizedBox(height: 20),
                     SizedBox(
-                      width: 250,
+                      width: double.infinity,
                       child: ElevatedButton(
                         onPressed: () {
                           _countdownTimer?.cancel();
                           widget.onUnlockPremium();
                         },
                         style: ElevatedButton.styleFrom(
-                          padding: EdgeInsets.zero, // REQUIRED for gradient
+                          padding: EdgeInsets.zero,
                           backgroundColor: Colors.transparent,
                           shadowColor: Colors.transparent,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(28),
                           ),
-                          elevation: 2,
                         ),
                         child: Ink(
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
                               colors: [
-                                Color(0xFF763201),
-                                Color(0xFFD5821F),
-                                Color(0xFF763201),
+                                Color(0xFFE07A3A),
+                                Color(0xFFC45A1F),
+                                Color(0xFF9E4A18),
                               ],
                             ),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(28),
                           ),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            padding: const EdgeInsets.symmetric(vertical: 15),
                             alignment: Alignment.center,
-                            child: Text(
-                              'Unlock Bible Premium',
-                              style: TextStyle(
-                                fontSize: widget.screenWidth > 450 ? 18 : 18,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'Start Growing Today',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                SizedBox(width: 4),
+                                Icon(Icons.chevron_right,
+                                    color: Colors.white, size: 20),
+                              ],
                             ),
                           ),
                         ),
                       ),
                     ),
-
-                    const SizedBox(height: 12),
-                    // Maybe Later text
                     TextButton(
                       onPressed: () {
                         _countdownTimer?.cancel();
                         widget.onMaybeLater();
                       },
-                      child: Text(
-                        "Maybe later",
+                      child: const Text(
+                        'Continue with Limited Access',
                         style: TextStyle(
-                          fontSize: widget.screenWidth > 450 ? 16 : 14,
-                          color: Colors.grey.shade600,
+                          fontSize: 14,
+                          color: Color(0xFF757575),
+                          decoration: TextDecoration.underline,
+                          decorationColor: Color(0xFF757575),
                         ),
                       ),
                     ),

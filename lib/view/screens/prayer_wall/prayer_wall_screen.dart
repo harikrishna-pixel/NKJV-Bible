@@ -1285,7 +1285,9 @@ class _PrayerCard extends StatelessWidget {
                               'Read more',
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
-                                color: brown,
+                                color: isDark
+                                    ? const Color(0xFFE8C9A0)
+                                    : brown,
                               ),
                             ),
                           ),
@@ -1372,7 +1374,9 @@ class _PrayerCard extends StatelessWidget {
                                 'Read more',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  color: brown,
+                                  color: isDark
+                                      ? const Color(0xFFE8C9A0)
+                                      : brown,
                                 ),
                               ),
                             ),
@@ -1406,7 +1410,9 @@ class _PrayerCard extends StatelessWidget {
                                   height: 18,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: brown,
+                                    color: isDark
+                                        ? const Color(0xFFF5EDE3)
+                                        : brown,
                                   ),
                                 )
                               else
@@ -1416,7 +1422,9 @@ class _PrayerCard extends StatelessWidget {
                                       : Icons.favorite_border,
                                   color: liked
                                       ? Colors.red.shade400
-                                      : brown,
+                                      : (isDark
+                                          ? const Color(0xFFF5EDE3)
+                                          : brown),
                                   size: 20,
                                 ),
                               const SizedBox(width: 8),

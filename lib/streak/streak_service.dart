@@ -58,6 +58,14 @@ class StreakService {
     }
   }
 
+  /// Total distinct days the user completed a streak (never reset by weekly UI).
+  static Future<int> getTotalCompletedDays() async {
+    final dates =
+        await SharPreferences.getStringList(SharPreferences.streakCompletedDates) ??
+            <String>[];
+    return dates.length;
+  }
+
   /// Current streak (consecutive days). 0 if never or broken.
   static Future<int> getCurrentStreak() async {
     final lastStr =
