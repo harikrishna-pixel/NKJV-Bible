@@ -30,7 +30,6 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   int selectedChapter = 0;
   int selectedChangeChapter = 0;
   List<VerseBookContentModel> selectedVersesContent = [];
-  late String chapterRead;
   bool loader = false;
   // var allChapterlist = {};
   @override
@@ -140,13 +139,20 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                       scrollDirection: Axis.vertical,
                       physics: const ClampingScrollPhysics(),
                       itemBuilder: (context, index) {
+                        var chapterRead = 'no';
                         for (var i = 0; i < selectedVersesContent.length; i++) {
                           if (index == selectedVersesContent[i].chapterNum) {
                             chapterRead =
                                 selectedVersesContent[i].isRead.toString();
-                            print(chapterRead);
+                            break;
                           }
                         }
+                        final isChapterRead = chapterRead != 'no';
+                        final isSelected = selectedChapter == index;
+                        final progressColor =
+                            CommanColor.progressFillColor(context);
+                        final trackColor =
+                            CommanColor.progressUnFillColor(context);
                         return GestureDetector(
                           onTap: () {
                             setState(() {
@@ -188,29 +194,36 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                             height: 20,
                             width: 20,
                             decoration: BoxDecoration(
-                                color: selectedChapter == index
-                                    ? CommanColor.whiteLightModePrimary(context)
-                                    : Colors.transparent,
-                                border: Border.all(
-                                    width: 1.5,
-                                    color: chapterRead == "no"
-                                        ? CommanColor.whiteBlack(context)
-                                        : CommanColor.yellowAndLightPrimary(
-                                            context)),
-                                borderRadius: BorderRadius.circular(8)),
+                              color: isChapterRead
+                                  ? progressColor.withOpacity(0.28)
+                                  : (isSelected
+                                      ? trackColor.withOpacity(0.35)
+                                      : Colors.transparent),
+                              border: Border.all(
+                                width: isSelected ? 2 : 1.5,
+                                color: isChapterRead
+                                    ? progressColor
+                                    : (isSelected
+                                        ? CommanColor
+                                            .inDarkWhiteAndInLightPrimary(
+                                                context)
+                                        : CommanColor.whiteBlack(context)),
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                             child: Center(
                               child: Text(
                                 "${index + 1}",
                                 style: TextStyle(
-                                    color: selectedChapter == index
-                                        ? CommanColor.Blackwhite(context)
-                                        : chapterRead == "no"
-                                            ? CommanColor.whiteBlack(context)
-                                            : CommanColor.whiteLightModePrimary(
-                                                context),
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: BibleInfo.letterSpacing,
-                                    fontSize: BibleInfo.fontSizeScale * 16),
+                                  color: isChapterRead
+                                      ? progressColor
+                                      : CommanColor.whiteBlack(context),
+                                  fontWeight: isSelected || isChapterRead
+                                      ? FontWeight.w700
+                                      : FontWeight.w600,
+                                  letterSpacing: BibleInfo.letterSpacing,
+                                  fontSize: BibleInfo.fontSizeScale * 16,
+                                ),
                               ),
                             ),
                           ),

@@ -42,7 +42,8 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
   final _nameCtrl = TextEditingController();
   String _category = 'Others';
   int _durationDays = 7;
-  bool _isAnonymous = true;
+  // Anonymous posting UI disabled for now; posts use author name when provided.
+  bool _isAnonymous = false;
   bool _submitting = false;
 
   @override
@@ -403,33 +404,34 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                     //   ),
                     // ),
                     const SizedBox(height: 12),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        'Post anonymously',
-                        style: TextStyle(
-                          color: isDark ? Colors.white : brown,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      value: _isAnonymous,
-                      activeThumbColor: Colors.white,
-                      activeTrackColor:
-                          isDark ? const Color(0xFFB8956A) : brown,
-                      inactiveThumbColor:
-                          isDark ? Colors.white54 : Colors.grey.shade400,
-                      inactiveTrackColor: isDark
-                          ? Colors.white.withOpacity(0.18)
-                          : Colors.grey.shade300,
-                      trackOutlineColor: WidgetStateProperty.resolveWith(
-                        (states) => states.contains(WidgetState.selected)
-                            ? Colors.transparent
-                            : (isDark
-                                ? Colors.white.withOpacity(0.35)
-                                : Colors.grey.shade400),
-                      ),
-                      onChanged: (v) => setState(() => _isAnonymous = v),
-                    ),
+                    // CMD: Post-as-anonymous option disabled for now.
+                    // SwitchListTile(
+                    //   contentPadding: EdgeInsets.zero,
+                    //   title: Text(
+                    //     'Post anonymously',
+                    //     style: TextStyle(
+                    //       color: isDark ? Colors.white : brown,
+                    //       fontWeight: FontWeight.w600,
+                    //     ),
+                    //   ),
+                    //   value: _isAnonymous,
+                    //   activeThumbColor: Colors.white,
+                    //   activeTrackColor:
+                    //       isDark ? const Color(0xFFB8956A) : brown,
+                    //   inactiveThumbColor:
+                    //       isDark ? Colors.white54 : Colors.grey.shade400,
+                    //   inactiveTrackColor: isDark
+                    //       ? Colors.white.withOpacity(0.18)
+                    //       : Colors.grey.shade300,
+                    //   trackOutlineColor: WidgetStateProperty.resolveWith(
+                    //     (states) => states.contains(WidgetState.selected)
+                    //         ? Colors.transparent
+                    //         : (isDark
+                    //             ? Colors.white.withOpacity(0.35)
+                    //             : Colors.grey.shade400),
+                    //   ),
+                    //   onChanged: (v) => setState(() => _isAnonymous = v),
+                    // ),
                     const SizedBox(height: 24),
                     Row(
                       children: [

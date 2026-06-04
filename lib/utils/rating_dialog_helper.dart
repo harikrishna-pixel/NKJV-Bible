@@ -1,3 +1,4 @@
+import 'package:biblebookapp/utils/emoji_text_style.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
@@ -90,13 +91,15 @@ class RatingDialogHelper {
                     ],
                   ),
                 ),
-                const Text("😍", style: TextStyle(fontSize: 40)),
+                emojiText('😍', fontSize: 40),
                 const SizedBox(height: 15),
-                Text(
-                  "Thanks for Sharing!💛",
-                  style: TextStyle(
+                textWithTrailingEmoji(
+                  prefix: 'Thanks for Sharing!',
+                  emoji: '💛',
+                  emojiFontSize: isTablet ? 26 : 22,
+                  prefixStyle: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: isTablet ? 26 : 22, // Increased font size
+                    fontSize: isTablet ? 26 : 22,
                     color: CommanColor.black,
                   ),
                 ),

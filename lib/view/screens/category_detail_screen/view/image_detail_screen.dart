@@ -703,6 +703,23 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
       await image.writeAsBytes(response.bodyBytes);
       isShareImageLoading.value = false;
 
+      final shareOrigin =
+          Rect.fromPoints(const Offset(2, 2), const Offset(3, 3));
+
+      if (isWallpaper) {
+        await Share.shareXFiles(
+          [
+            XFile(
+              image.path,
+              mimeType: 'image/png',
+              name: 'Jesus Wallpaper.png',
+            ),
+          ],
+          sharePositionOrigin: shareOrigin,
+        );
+        return;
+      }
+
       final appPackageName = (await PackageInfo.fromPlatform()).packageName;
       String appid = BibleInfo.apple_AppId;
       String appLink = "";
@@ -714,11 +731,12 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
         appLink = " \n Read More at: https://itunes.apple.com/app/id$appid";
       }
 
-      await Share.shareXFiles([XFile(image.path)],
-          subject: BibleInfo.bible_shortName,
-          text: appLink,
-          sharePositionOrigin:
-              Rect.fromPoints(const Offset(2, 2), const Offset(3, 3)));
+      await Share.shareXFiles(
+        [XFile(image.path, mimeType: 'image/png')],
+        subject: BibleInfo.bible_shortName,
+        text: appLink,
+        sharePositionOrigin: shareOrigin,
+      );
     } catch (e) {
       isShareImageLoading.value = false;
       Constants.showToast("Unable to share at the moment");

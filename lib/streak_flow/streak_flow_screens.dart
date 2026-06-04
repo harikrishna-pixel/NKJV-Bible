@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:screenshot/screenshot.dart';
@@ -215,45 +216,493 @@ List<Shadow> _streakHeaderOnPhotoShadows(BuildContext context) {
 Color _streakPanelColor(BuildContext context) =>
     _isStreakDark(context) ? Colors.white.withOpacity(0.12) : _kStreakCream;
 
-/// Shared frosted panel used on Verse / Devotional / Prayer streak steps.
-BoxDecoration _streakStepContentBoxDecoration(BuildContext context) {
-  final isDark = _isStreakDark(context);
-  // The previous border looked like a harsh "white frame" on top of the
-  // background image. Keep a soft manuscript feel with an inner tint and a
-  // very subtle outline only when needed (dark mode).
-  return BoxDecoration(
-    // Keep the card more "floating" over the background (less solid white).
-    color: _streakPanelColor(context).withOpacity(isDark ? 0.18 : 0.74),
-    borderRadius: BorderRadius.circular(12),
-    border: isDark
-        ? Border.all(
-            color: Colors.white.withOpacity(0.10),
-            width: 1,
-          )
-        : null,
-    boxShadow: [
-      BoxShadow(
-        color: Colors.black.withOpacity(isDark ? 0.18 : 0.10),
-        blurRadius: 18,
-        offset: const Offset(0, 8),
-      ),
-      // Subtle warm glow so the card blends with vintage backgrounds.
-      if (!isDark)
-        BoxShadow(
-          color: const Color(0xFFD4A574).withOpacity(0.12),
-          blurRadius: 14,
-          spreadRadius: -6,
-          offset: const Offset(0, 6),
+/// Verse / Devotional / Prayer streak content — plain on background (no card box).
+Widget _streakStepContentBox(BuildContext context, Widget child) {
+  return child;
+}
+
+/// ~10% lower contrast on rocky foreground photos so verse text reads easier.
+const ColorFilter _streakPhotoContrastFilter = ColorFilter.matrix(<double>[
+  0.9, 0, 0, 0, 12.75,
+  0, 0.9, 0, 0, 12.75,
+  0, 0, 0.9, 0, 12.75,
+  0, 0, 0, 1, 0,
+]);
+
+Widget _streakPhotoBackgroundImage(String assetPath) {
+  return Positioned.fill(
+    child: ColorFiltered(
+      colorFilter: _streakPhotoContrastFilter,
+      child: Image.asset(assetPath, fit: BoxFit.cover),
+    ),
+  );
+}
+
+/// Top/bottom vignette + soft blur behind central verse text (UI only).
+Widget _streakPhotoReadabilityOverlays(BuildContext context) {
+  final h = MediaQuery.sizeOf(context).height;
+  final topH = h * 0.12;
+  final bottomH = h * 0.40;
+  final textBlurH = h * 0.44;
+
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        height: topH,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withOpacity(0.42),
+                Colors.black.withOpacity(0.14),
+                Colors.transparent,
+              ],
+              stops: const [0.0, 0.6, 1.0],
+            ),
+          ),
         ),
+      ),
+      Positioned(
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: bottomH,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+              colors: [
+                Colors.black.withOpacity(0.50),
+                Colors.black.withOpacity(0.26),
+                Colors.transparent,
+              ],
+              stops: const [0.0, 0.5, 1.0],
+            ),
+          ),
+        ),
+      ),
+      Align(
+        alignment: Alignment.center,
+        child: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 2.0, sigmaY: 2.0),
+            child: Container(
+              width: double.infinity,
+              height: textBlurH,
+              color: Colors.black.withOpacity(0.05),
+            ),
+          ),
+        ),
+      ),
     ],
   );
 }
 
-Widget _streakStepContentBox(BuildContext context, Widget child) {
-  return Container(
-    padding: const EdgeInsets.all(24),
-    decoration: _streakStepContentBoxDecoration(context),
-    child: child,
+Widget _streakPhotoBackgroundStack({
+  required BuildContext context,
+  required String assetPath,
+  required Widget child,
+}) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      _streakPhotoBackgroundImage(assetPath),
+      _streakPhotoReadabilityOverlays(context),
+      child,
+    ],
+  );
+}
+
+const Color _kStreakPhotoGold = Color(0xFFC59434);
+
+TextStyle _streakPhotoTitleStyle(BuildContext context) => TextStyle(
+      fontSize: MediaQuery.of(context).size.width > 450 ? 28 : 24,
+      fontWeight: FontWeight.w700,
+      color: Colors.white,
+      fontFamily: 'Georgia',
+      shadows: const [
+        Shadow(color: Colors.black38, blurRadius: 8, offset: Offset(0, 2)),
+      ],
+    );
+
+TextStyle _streakPhotoSubtitleStyle(BuildContext context) => TextStyle(
+      fontSize: MediaQuery.of(context).size.width > 450 ? 15 : 13,
+      fontWeight: FontWeight.w400,
+      color: _kStreakPhotoGold.withOpacity(0.95),
+      fontFamily: 'Georgia',
+      height: 1.35,
+    );
+
+TextStyle _streakPhotoBodyStyle(BuildContext context) => TextStyle(
+      fontSize: MediaQuery.of(context).size.width > 450 ? 22 : 19,
+      height: 1.55,
+      color: Colors.white,
+      fontFamily: 'Georgia',
+      fontWeight: FontWeight.w400,
+      shadows: const [
+        Shadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 1)),
+      ],
+    );
+
+Widget _streakProgressDots(
+  BuildContext context,
+  int currentStep, {
+  bool onPhotoBackground = false,
+}) {
+  final inactive = onPhotoBackground
+      ? Colors.white.withOpacity(0.38)
+      : _streakTextColor(context).withOpacity(0.35);
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: List.generate(4, (i) {
+      final step = i + 1;
+      final active = step == currentStep;
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        width: active ? 8 : 6,
+        height: active ? 8 : 6,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: active ? _kStreakPhotoGold : inactive,
+        ),
+      );
+    }),
+  );
+}
+
+/// Step label + dots centered on screen; side actions do not shift alignment.
+Widget _streakCenteredStepHeader({
+  required BuildContext context,
+  required int step,
+  required Widget leftActions,
+  required Widget rightActions,
+  bool onPhotoBackground = false,
+}) {
+  final textColor = onPhotoBackground
+      ? Colors.white.withOpacity(0.92)
+      : _streakTextColor(context).withOpacity(0.95);
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 4),
+    child: Stack(
+      alignment: Alignment.center,
+      children: [
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Step $step of 4',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: MediaQuery.of(context).size.width > 450 ? 14 : 12,
+                fontWeight: FontWeight.w500,
+                color: textColor,
+                fontFamily: 'Georgia',
+              ),
+            ),
+            const SizedBox(height: 6),
+            _streakProgressDots(context, step,
+                onPhotoBackground: onPhotoBackground),
+          ],
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            leftActions,
+            rightActions,
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _streakPhotoTopBar({
+  required BuildContext context,
+  required int step,
+  required VoidCallback onBack,
+  required VoidCallback onClose,
+  VoidCallback? onMusicToggle,
+  bool isMusicMuted = false,
+  bool showMusic = false,
+}) {
+  return _streakCenteredStepHeader(
+    context: context,
+    step: step,
+    onPhotoBackground: true,
+    leftActions: IconButton(
+      icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+      onPressed: onBack,
+      tooltip: 'Back',
+    ),
+    rightActions: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (showMusic)
+          IconButton(
+            onPressed: onMusicToggle,
+            icon: Icon(
+              isMusicMuted ? Icons.music_off : Icons.music_note,
+              color: Colors.white,
+              size: 24,
+            ),
+            tooltip: isMusicMuted ? 'Audio Off' : 'Audio On',
+          ),
+        IconButton(
+          icon: const Icon(Icons.close, color: Colors.white, size: 24),
+          onPressed: onClose,
+          tooltip: 'Close',
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _streakPhotoHeaderIcon(IconData icon) {
+  return Stack(
+    alignment: Alignment.center,
+    children: [
+      Container(
+        width: 72,
+        height: 72,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withOpacity(0.12),
+          boxShadow: [
+            BoxShadow(
+              color: _kStreakPhotoGold.withOpacity(0.35),
+              blurRadius: 24,
+              spreadRadius: 4,
+            ),
+          ],
+        ),
+      ),
+      Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withOpacity(0.9),
+          border: Border.all(color: _kStreakPhotoGold.withOpacity(0.5), width: 1),
+        ),
+        child: Icon(icon, color: _kStreakPhotoGold, size: 28),
+      ),
+    ],
+  );
+}
+
+Widget _streakPhotoStepHeader({
+  required BuildContext context,
+  required IconData icon,
+  required String title,
+  required String subtitle,
+}) {
+  return Column(
+    children: [
+      _streakPhotoHeaderIcon(icon),
+      const SizedBox(height: 14),
+      Text(title, textAlign: TextAlign.center, style: _streakPhotoTitleStyle(context)),
+      const SizedBox(height: 10),
+      _streakGoldDivider(),
+      const SizedBox(height: 10),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Text(
+          subtitle,
+          textAlign: TextAlign.center,
+          style: _streakPhotoSubtitleStyle(context),
+        ),
+      ),
+      const SizedBox(height: 20),
+    ],
+  );
+}
+
+/// Small gold heart for verse divider (avoids emoji / icon-font tofu boxes).
+Widget _streakDividerHeart({double size = 14}) {
+  return CustomPaint(
+    size: Size(size, size),
+    painter: _StreakGoldHeartPainter(color: _kStreakPhotoGold),
+  );
+}
+
+class _StreakGoldHeartPainter extends CustomPainter {
+  _StreakGoldHeartPainter({required this.color});
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final w = size.width;
+    final h = size.height;
+    final path = Path()
+      ..moveTo(w * 0.5, h * 0.88)
+      ..cubicTo(w * 0.08, h * 0.52, 0, h * 0.28, w * 0.22, h * 0.08)
+      ..cubicTo(w * 0.38, -h * 0.02, w * 0.5, h * 0.12, w * 0.5, h * 0.24)
+      ..cubicTo(w * 0.5, h * 0.12, w * 0.62, -h * 0.02, w * 0.78, h * 0.08)
+      ..cubicTo(w, h * 0.28, w * 0.92, h * 0.52, w * 0.5, h * 0.88)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _StreakGoldHeartPainter oldDelegate) =>
+      oldDelegate.color != color;
+}
+
+Widget _streakGoldDivider({Widget? center}) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 40),
+    child: Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 1,
+            color: _kStreakPhotoGold.withOpacity(0.75),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: center ??
+              Transform.rotate(
+                angle: 0.785398,
+                child: Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: _kStreakPhotoGold,
+                    border: Border.all(color: _kStreakPhotoGold.withOpacity(0.8)),
+                  ),
+                ),
+              ),
+        ),
+        Expanded(
+          child: Container(
+            height: 1,
+            color: _kStreakPhotoGold.withOpacity(0.75),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _streakPhotoSaveShareRow({
+  required bool saved,
+  required String saveLabel,
+  required VoidCallback onSave,
+  required VoidCallback onShare,
+}) {
+  Widget action({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white.withOpacity(0.9), size: 18),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                fontFamily: 'Georgia',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      action(
+        icon: saved ? Icons.bookmark : Icons.bookmark_border,
+        label: saveLabel,
+        onTap: onSave,
+      ),
+      Container(
+        width: 1,
+        height: 18,
+        margin: const EdgeInsets.symmetric(horizontal: 8),
+        color: Colors.white.withOpacity(0.35),
+      ),
+      action(
+        icon: Icons.share,
+        label: 'Share',
+        onTap: onShare,
+      ),
+    ],
+  );
+}
+
+Widget _streakPhotoPrimaryButton({
+  required BuildContext context,
+  required String label,
+  required VoidCallback onPressed,
+  IconData? leadingIcon,
+}) {
+  return Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(30),
+      child: Ink(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 15),
+        decoration: BoxDecoration(
+          color: const Color(0xFF4B3621),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: _kCandleGold, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.22),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (leadingIcon != null) ...[
+              Icon(leadingIcon, color: _kParchmentLight, size: 20),
+              const SizedBox(width: 8),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: MediaQuery.of(context).size.width > 450 ? 20 : 18,
+                fontWeight: FontWeight.w700,
+                color: _kParchmentLight,
+                fontFamily: 'Georgia',
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.arrow_forward, color: _kParchmentLight, size: 20),
+          ],
+        ),
+      ),
+    ),
   );
 }
 
@@ -611,52 +1060,6 @@ void _goToHome(BuildContext context) {
     ),
     transition: Transition.cupertino,
     duration: const Duration(milliseconds: 350),
-  );
-}
-
-Widget _buildStepIndicator(
-  BuildContext context,
-  int step, {
-  bool onPhotoBackground = false,
-}) {
-  final textColor = onPhotoBackground
-      ? _streakHeaderOnPhotoColor(context)
-      : _streakTextColor(context);
-  final shadows =
-      onPhotoBackground ? _streakHeaderOnPhotoShadows(context) : null;
-  return Column(
-    mainAxisSize: MainAxisSize.min,
-    crossAxisAlignment: CrossAxisAlignment.center,
-    children: [
-      Text(
-        'Step $step of 4',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: MediaQuery.of(context).size.width > 450 ? 15 : 13,
-          fontWeight: FontWeight.w600,
-          color: textColor.withOpacity(0.95),
-          fontFamily: 'Georgia',
-          shadows: shadows,
-        ),
-      ),
-      const SizedBox(height: 6),
-      Center(
-        child: Transform.rotate(
-          angle: 0.785398, // 45 degrees for diamond
-          child: Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: _kStreakGold,
-              border: Border.all(
-                color: _kStreakGold.withOpacity(0.8),
-                width: 1,
-              ),
-            ),
-          ),
-        ),
-      ),
-    ],
   );
 }
 
@@ -1277,35 +1680,27 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Row(
-                  children: [
-                    widget.viewOnly
-                        ? IconButton(
-                            icon: Icon(Icons.arrow_back_ios,
-                                color: _streakTextColor(context)),
-                            onPressed: () async {
-                              if (context.mounted &&
-                                  Navigator.of(context).canPop()) {
-                                Navigator.of(context).pop();
-                              } else {
-                                Get.back();
-                              }
-                            },
-                          )
-                        : const SizedBox(width: 48),
-                    Expanded(
-                      child: Center(
-                        child: _buildStepIndicator(context, 1),
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.close, color: _streakTextColor(context)),
-                      onPressed: () => _goToHome(context),
-                      tooltip: 'Close',
-                    ),
-                  ],
+              _streakCenteredStepHeader(
+                context: context,
+                step: 1,
+                leftActions: widget.viewOnly
+                    ? IconButton(
+                        icon: Icon(Icons.arrow_back_ios,
+                            color: _streakTextColor(context)),
+                        onPressed: () async {
+                          if (context.mounted &&
+                              Navigator.of(context).canPop()) {
+                            Navigator.of(context).pop();
+                          } else {
+                            Get.back();
+                          }
+                        },
+                      )
+                    : const SizedBox(width: 48, height: 48),
+                rightActions: IconButton(
+                  icon: Icon(Icons.close, color: _streakTextColor(context)),
+                  onPressed: () => _goToHome(context),
+                  tooltip: 'Close',
                 ),
               ),
               Expanded(
@@ -1777,81 +2172,29 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
   Widget build(BuildContext context) {
     final item = widget.item;
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/back1.png'),
-            fit: BoxFit.cover,
-          ),
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              _streakTextColor(context).withOpacity(0.08),
-              _streakTextColor(context).withOpacity(0.12),
-            ],
-            stops: const [0.0, 1.0],
-          ),
-        ),
+      body: _streakPhotoBackgroundStack(
+        context: context,
+        assetPath: 'assets/back1.png',
         child: SafeArea(
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Row(
-                  children: [
-                    IgnorePointer(
-                      child: Opacity(
-                        opacity: 0,
-                        child: IconButton(
-                          icon: const Icon(Icons.close, size: 24),
-                          onPressed: () {},
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: _buildStepIndicator(context, 2,
-                            onPhotoBackground: true),
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.close,
-                          color: _streakHeaderOnPhotoColor(context)),
-                      onPressed: () => _goToHome(context),
-                      tooltip: 'Close',
-                    ),
-                  ],
-                ),
+              _streakPhotoTopBar(
+                context: context,
+                step: 2,
+                onBack: () => Get.back(),
+                onClose: () => _goToHome(context),
               ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.menu_book,
-                      color: _streakHeaderOnPhotoColor(context), size: 32),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Verse of the Day',
-                    style: TextStyle(
-                      fontSize:
-                          MediaQuery.of(context).size.width > 450 ? 26 : 22,
-                      fontWeight: FontWeight.w600,
-                      color: _streakHeaderOnPhotoColor(context),
-                      fontFamily: 'Georgia',
-                      shadows: _streakHeaderOnPhotoShadows(context),
-                    ),
-                  ),
-                ],
+              _streakPhotoStepHeader(
+                context: context,
+                icon: Icons.menu_book_rounded,
+                title: 'Verse of the Day',
+                subtitle: 'God\'s Word for your heart today.',
               ),
-              const SizedBox(height: 24),
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     return SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      padding: const EdgeInsets.symmetric(horizontal: 28),
                       child: ConstrainedBox(
                         constraints:
                             BoxConstraints(minHeight: constraints.maxHeight),
@@ -1864,30 +2207,32 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                                 mainAxisSize: MainAxisSize.min,
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
+                                  Icon(
+                                    Icons.format_quote_rounded,
+                                    color: _kStreakPhotoGold,
+                                    size: 36,
+                                  ),
+                                  const SizedBox(height: 12),
                                   Text(
                                     '"${item.verseText}"',
                                     textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize:
-                                          MediaQuery.of(context).size.width >
-                                                  450
-                                              ? 26
-                                              : 22,
-                                      height: 1.5,
-                                      color: _streakTextColor(context),
-                                      fontFamily: 'Georgia',
-                                    ),
+                                    style: _streakPhotoBodyStyle(context),
                                   ),
                                   const SizedBox(height: 16),
                                   Text(
-                                    '- ${item.verseReference}',
+                                    item.verseReference,
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      fontSize: 18,
+                                      fontSize: 17,
                                       fontStyle: FontStyle.italic,
-                                      color: _streakTextColor(context),
+                                      color: _kStreakPhotoGold,
                                       fontFamily: 'Georgia',
+                                      fontWeight: FontWeight.w600,
                                     ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  _streakGoldDivider(
+                                    center: _streakDividerHeart(),
                                   ),
                                 ],
                               ),
@@ -1901,24 +2246,21 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
               ),
               if (!widget.viewOnly)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(
-                        icon: Icon(
-                          _saved ? Icons.bookmark : Icons.bookmark_border,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                        onPressed: () async {
-                          final item = widget.item;
+                      _streakPhotoSaveShareRow(
+                        saved: _saved,
+                        saveLabel: 'Save',
+                        onSave: () async {
                           if (_saved) {
                             await StreakSavedStorage.remove(
                                 'verse', item.verseReference, item.verseText);
                             if (mounted) setState(() => _saved = false);
-                            if (context.mounted)
+                            if (context.mounted) {
                               _showSavedToast(context, saved: false);
+                            }
                           } else {
                             await StreakSavedStorage.add(StreakSavedItem(
                               type: 'verse',
@@ -1927,81 +2269,72 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                               savedAt: DateTime.now().toIso8601String(),
                             ));
                             if (mounted) setState(() => _saved = true);
-                            if (context.mounted)
+                            if (context.mounted) {
                               _showSavedToast(context, saved: true);
+                            }
+                          }
+                        },
+                        onShare: () async {
+                          final shareContext = context;
+                          final image = await _captureStreakShareImage(
+                            shareContext,
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '"${item.verseText}"',
+                                  textAlign: TextAlign.center,
+                                  style: _streakPhotoBodyStyle(shareContext),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  item.verseReference,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontStyle: FontStyle.italic,
+                                    color: _kStreakPhotoGold,
+                                    fontFamily: 'Georgia',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (shareContext.mounted) {
+                            await _shareAsImage(
+                              shareContext,
+                              imageBytes: image,
+                              fallbackText:
+                                  '${item.verseText}\n- ${item.verseReference}',
+                            );
                           }
                         },
                       ),
-                      Flexible(
-                        child: _parchmentButton(
-                          context,
-                          label: 'Read Devotional',
-                          onPressed: () async {
-                            await SharPreferences.setInt(
-                                SharPreferences.streakFlowStepsCompletedToday,
-                                2);
-                            await _storeActiveStreakFlowSteps(2);
-                            if (!mounted) return;
-                            Get.to(() => StreakDevotionalScreen(
-                                  item: item,
-                                  viewOnly: widget.viewOnly,
-                                ));
-                          },
-                        ),
+                      const SizedBox(height: 16),
+                      _streakPhotoPrimaryButton(
+                        context: context,
+                        label: 'Read Devotional',
+                        onPressed: () async {
+                          await SharPreferences.setInt(
+                              SharPreferences.streakFlowStepsCompletedToday, 2);
+                          await _storeActiveStreakFlowSteps(2);
+                          if (!mounted) return;
+                          Get.to(() => StreakDevotionalScreen(
+                                item: item,
+                                viewOnly: widget.viewOnly,
+                              ));
+                        },
                       ),
-                      Builder(
-                        builder: (shareContext) => IconButton(
-                          icon: Icon(
-                            Icons.share,
-                            color: Colors.white,
-                            size: 28,
-                          ),
-                          onPressed: () async {
-                            final item = widget.item;
-                            final image = await _captureStreakShareImage(
-                              shareContext,
-                              content: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    '"${item.verseText}"',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: MediaQuery.of(shareContext)
-                                                  .size
-                                                  .width >
-                                              450
-                                          ? 26
-                                          : 22,
-                                      height: 1.5,
-                                      color: _streakTextColor(shareContext),
-                                      fontFamily: 'Georgia',
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    '- ${item.verseReference}',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontStyle: FontStyle.italic,
-                                      color: _streakTextColor(shareContext),
-                                      fontFamily: 'Georgia',
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (shareContext.mounted) {
-                              await _shareAsImage(
-                                shareContext,
-                                imageBytes: image,
-                                fallbackText:
-                                    '${item.verseText}\n- ${item.verseReference}',
-                              );
-                            }
-                          },
+                      const SizedBox(height: 12),
+                      Text(
+                        'Explore deeper insights and grow in your faith.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withOpacity(0.75),
+                          fontFamily: 'Georgia',
+                          height: 1.35,
                         ),
                       ),
                     ],
@@ -2076,79 +2409,38 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
   Widget build(BuildContext context) {
     final item = widget.item;
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/back2.png'),
-            fit: BoxFit.cover,
-          ),
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              _streakTextColor(context).withOpacity(0.08),
-              _streakTextColor(context).withOpacity(0.12),
-            ],
-            stops: const [0.0, 1.0],
-          ),
-        ),
+      body: _streakPhotoBackgroundStack(
+        context: context,
+        assetPath: 'assets/back2.png',
         child: SafeArea(
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Row(
-                  children: [
-                    // Placeholder to balance the audio+close icons on the right
-                    // so the step indicator remains centered on screen.
-                    const SizedBox(width: 96),
-                    Expanded(
-                      child: Center(
-                        child: _buildStepIndicator(context, 3,
-                            onPhotoBackground: true),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _toggleAudio,
-                      icon: Icon(
-                        _isAudioMuted ? Icons.music_off : Icons.music_note,
-                        color: _streakHeaderOnPhotoColor(context),
-                        size: 26,
-                      ),
-                      tooltip: _isAudioMuted ? 'Audio Off' : 'Audio On',
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.close,
-                          color: _streakHeaderOnPhotoColor(context)),
-                      onPressed: () async {
-                        await _StreakFlowBgMusic.stop();
-                        if (context.mounted) _goToHome(context);
-                      },
-                      tooltip: 'Close',
-                    ),
-                  ],
-                ),
+              _streakPhotoTopBar(
+                context: context,
+                step: 3,
+                showMusic: true,
+                isMusicMuted: _isAudioMuted,
+                onMusicToggle: _toggleAudio,
+                onBack: () async {
+                  await _StreakFlowBgMusic.stop();
+                  if (context.mounted) Get.back();
+                },
+                onClose: () async {
+                  await _StreakFlowBgMusic.stop();
+                  if (context.mounted) _goToHome(context);
+                },
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Devotional Moment',
-                style: TextStyle(
-                  fontSize:
-                      MediaQuery.of(context).size.width > 450 ? 26 : 22,
-                  color: _streakHeaderOnPhotoColor(context),
-                  fontFamily: 'Georgia',
-                  fontWeight: FontWeight.w600,
-                  shadows: _streakHeaderOnPhotoShadows(context),
-                ),
+              _streakPhotoStepHeader(
+                context: context,
+                icon: Icons.local_fire_department_rounded,
+                title: 'Devotional Moment',
+                subtitle: 'A short reflection to encourage your heart today.',
               ),
-              const SizedBox(height: 24),
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     return SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      padding: const EdgeInsets.symmetric(horizontal: 28),
                       child: ConstrainedBox(
                         constraints:
                             BoxConstraints(minHeight: constraints.maxHeight),
@@ -2157,18 +2449,19 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                             controller: _screenshotController,
                             child: _streakStepContentBox(
                               context,
-                              Text(
-                                item.devotionalText,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize:
-                                      MediaQuery.of(context).size.width > 450
-                                          ? 22
-                                          : 20,
-                                  height: 1.6,
-                                  color: _streakTextColor(context),
-                                  fontFamily: 'Georgia',
-                                ),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    item.devotionalText,
+                                    textAlign: TextAlign.center,
+                                    style: _streakPhotoBodyStyle(context),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  _streakGoldDivider(
+                                    center: _streakDividerHeart(),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -2180,25 +2473,37 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
               ),
               if (!widget.viewOnly)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(
-                        icon: Icon(
-                          _saved ? Icons.bookmark : Icons.bookmark_border,
-                          color: Colors.white,
-                          size: 28,
-                        ),
+                      _streakPhotoPrimaryButton(
+                        context: context,
+                        label: 'Continue to Prayer',
                         onPressed: () async {
-                          final item = widget.item;
-                          const title = "Devotional Moment";
+                          await SharPreferences.setInt(
+                              SharPreferences.streakFlowStepsCompletedToday, 3);
+                          await _storeActiveStreakFlowSteps(3);
+                          if (!mounted) return;
+                          Get.to(() => StreakPrayerScreen(
+                                item: item,
+                                viewOnly: widget.viewOnly,
+                              ));
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                      _streakPhotoSaveShareRow(
+                        saved: _saved,
+                        saveLabel: 'Save',
+                        onSave: () async {
+                          const title = 'Devotional Moment';
                           if (_saved) {
                             await StreakSavedStorage.remove(
                                 'devotional', title, item.devotionalText);
                             if (mounted) setState(() => _saved = false);
-                            if (context.mounted)
+                            if (context.mounted) {
                               _showSavedToast(context, saved: false);
+                            }
                           } else {
                             await StreakSavedStorage.add(StreakSavedItem(
                               type: 'devotional',
@@ -2207,62 +2512,29 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                               savedAt: DateTime.now().toIso8601String(),
                             ));
                             if (mounted) setState(() => _saved = true);
-                            if (context.mounted)
+                            if (context.mounted) {
                               _showSavedToast(context, saved: true);
+                            }
                           }
                         },
-                      ),
-                      Flexible(
-                        child: _parchmentButton(
-                          context,
-                          label: 'Continue to Prayer',
-                          onPressed: () async {
-                            await SharPreferences.setInt(
-                                SharPreferences.streakFlowStepsCompletedToday,
-                                3);
-                            await _storeActiveStreakFlowSteps(3);
-                            if (!mounted) return;
-                            // Keep music continuous into Prayer; do not stop/restart.
-                            Get.to(() => StreakPrayerScreen(
-                                  item: item,
-                                  viewOnly: widget.viewOnly,
-                                ));
-                          },
-                        ),
-                      ),
-                      Builder(
-                        builder: (shareContext) => IconButton(
-                          icon: Icon(Icons.share,
-                              color: Colors.white, size: 28),
-                          onPressed: () async {
-                            final item = widget.item;
-                            final image = await _captureStreakShareImage(
+                        onShare: () async {
+                          final shareContext = context;
+                          final image = await _captureStreakShareImage(
+                            shareContext,
+                            content: Text(
+                              item.devotionalText,
+                              textAlign: TextAlign.center,
+                              style: _streakPhotoBodyStyle(shareContext),
+                            ),
+                          );
+                          if (shareContext.mounted) {
+                            await _shareAsImage(
                               shareContext,
-                              content: Text(
-                                item.devotionalText,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: MediaQuery.of(shareContext)
-                                              .size
-                                              .width >
-                                          450
-                                      ? 22
-                                      : 20,
-                                  height: 1.6,
-                                  color: _streakTextColor(shareContext),
-                                  fontFamily: 'Georgia',
-                                ),
-                              ),
+                              imageBytes: image,
+                              fallbackText: item.devotionalText,
                             );
-                            if (shareContext.mounted) {
-                              await _shareAsImage(
-                                shareContext,
-                                imageBytes: image,
-                                fallbackText: item.devotionalText,
-                              );
-                            }
-                          },
-                        ),
+                          }
+                        },
                       ),
                     ],
                   ),
@@ -2336,79 +2608,38 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
   Widget build(BuildContext context) {
     final item = widget.item;
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/back3.jpeg'),
-            fit: BoxFit.cover,
-          ),
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              _streakTextColor(context).withOpacity(0.08),
-              _streakTextColor(context).withOpacity(0.12),
-            ],
-            stops: const [0.0, 1.0],
-          ),
-        ),
+      body: _streakPhotoBackgroundStack(
+        context: context,
+        assetPath: 'assets/back1.png',
         child: SafeArea(
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Row(
-                  children: [
-                    // Placeholder to balance the audio+close icons on the right
-                    // so the step indicator remains centered on screen.
-                    const SizedBox(width: 96),
-                    Expanded(
-                      child: Center(
-                        child: _buildStepIndicator(context, 4,
-                            onPhotoBackground: true),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _toggleAudio,
-                      icon: Icon(
-                        _isAudioMuted ? Icons.music_off : Icons.music_note,
-                        color: _streakHeaderOnPhotoColor(context),
-                        size: 26,
-                      ),
-                      tooltip: _isAudioMuted ? 'Audio Off' : 'Audio On',
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.close,
-                          color: _streakHeaderOnPhotoColor(context)),
-                      onPressed: () async {
-                        await _StreakFlowBgMusic.stop();
-                        if (context.mounted) _goToHome(context);
-                      },
-                      tooltip: 'Close',
-                    ),
-                  ],
-                ),
+              _streakPhotoTopBar(
+                context: context,
+                step: 4,
+                showMusic: true,
+                isMusicMuted: _isAudioMuted,
+                onMusicToggle: _toggleAudio,
+                onBack: () async {
+                  await _StreakFlowBgMusic.stop();
+                  if (context.mounted) Get.back();
+                },
+                onClose: () async {
+                  await _StreakFlowBgMusic.stop();
+                  if (context.mounted) _goToHome(context);
+                },
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Prayer Moment',
-                style: TextStyle(
-                  fontSize:
-                      MediaQuery.of(context).size.width > 450 ? 26 : 22,
-                  fontWeight: FontWeight.w600,
-                  color: _streakHeaderOnPhotoColor(context),
-                  fontFamily: 'Georgia',
-                  shadows: _streakHeaderOnPhotoShadows(context),
-                ),
+              _streakPhotoStepHeader(
+                context: context,
+                icon: Icons.volunteer_activism_rounded,
+                title: 'Prayer Moment',
+                subtitle: 'Talk to God and pour out your heart.',
               ),
-              const SizedBox(height: 24),
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     return SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      padding: const EdgeInsets.symmetric(horizontal: 28),
                       child: ConstrainedBox(
                         constraints:
                             BoxConstraints(minHeight: constraints.maxHeight),
@@ -2417,18 +2648,19 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                             controller: _screenshotController,
                             child: _streakStepContentBox(
                               context,
-                              Text(
-                                item.prayerText,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize:
-                                      MediaQuery.of(context).size.width > 450
-                                          ? 22
-                                          : 20,
-                                  height: 1.7,
-                                  color: _streakTextColor(context),
-                                  fontFamily: 'Georgia',
-                                ),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    item.prayerText,
+                                    textAlign: TextAlign.center,
+                                    style: _streakPhotoBodyStyle(context),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  _streakGoldDivider(
+                                    center: _streakDividerHeart(),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -2440,43 +2672,15 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
               ),
               if (!widget.viewOnly)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(
-                        icon: Icon(
-                          _saved ? Icons.bookmark : Icons.bookmark_border,
-                          color: Colors.white,
-                          size: 28,
-                        ),
+                      _streakPhotoPrimaryButton(
+                        context: context,
+                        label: 'Amen',
+                        leadingIcon: Icons.favorite_border,
                         onPressed: () async {
-                          final item = widget.item;
-                          const title = 'Today\'s Prayer';
-                          if (_saved) {
-                            await StreakSavedStorage.remove(
-                                'prayer', title, item.prayerText);
-                            if (mounted) setState(() => _saved = false);
-                            if (context.mounted)
-                              _showSavedToast(context, saved: false);
-                          } else {
-                            await StreakSavedStorage.add(StreakSavedItem(
-                              type: 'prayer',
-                              title: title,
-                              body: item.prayerText,
-                              savedAt: DateTime.now().toIso8601String(),
-                            ));
-                            if (mounted) setState(() => _saved = true);
-                            if (context.mounted)
-                              _showSavedToast(context, saved: true);
-                          }
-                        },
-                      ),
-                      Flexible(
-                        child: _parchmentButton(
-                          context,
-                          label: 'Amen',
-                          onPressed: () async {
                             await StreakService.recordActivity();
                             final today =
                                 DateTime.now().toIso8601String().split('T')[0];
@@ -2690,41 +2894,51 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                             }
                             Get.offAll(() => const StreakCompletedScreen());
                           },
-                        ),
                       ),
-                      Builder(
-                        builder: (shareContext) => IconButton(
-                          icon: Icon(Icons.share,
-                              color: Colors.white, size: 28),
-                          onPressed: () async {
-                            final item = widget.item;
-                            final image = await _captureStreakShareImage(
-                              shareContext,
-                              content: Text(
-                                item.prayerText,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: MediaQuery.of(shareContext)
-                                              .size
-                                              .width >
-                                          450
-                                      ? 22
-                                      : 20,
-                                  height: 1.7,
-                                  color: _streakTextColor(shareContext),
-                                  fontFamily: 'Georgia',
-                                ),
-                              ),
-                            );
-                            if (shareContext.mounted) {
-                              await _shareAsImage(
-                                shareContext,
-                                imageBytes: image,
-                                fallbackText: item.prayerText,
-                              );
+                      const SizedBox(height: 14),
+                      _streakPhotoSaveShareRow(
+                        saved: _saved,
+                        saveLabel: 'Save Prayer',
+                        onSave: () async {
+                          const title = 'Today\'s Prayer';
+                          if (_saved) {
+                            await StreakSavedStorage.remove(
+                                'prayer', title, item.prayerText);
+                            if (mounted) setState(() => _saved = false);
+                            if (context.mounted) {
+                              _showSavedToast(context, saved: false);
                             }
-                          },
-                        ),
+                          } else {
+                            await StreakSavedStorage.add(StreakSavedItem(
+                              type: 'prayer',
+                              title: title,
+                              body: item.prayerText,
+                              savedAt: DateTime.now().toIso8601String(),
+                            ));
+                            if (mounted) setState(() => _saved = true);
+                            if (context.mounted) {
+                              _showSavedToast(context, saved: true);
+                            }
+                          }
+                        },
+                        onShare: () async {
+                          final shareContext = context;
+                          final image = await _captureStreakShareImage(
+                            shareContext,
+                            content: Text(
+                              item.prayerText,
+                              textAlign: TextAlign.center,
+                              style: _streakPhotoBodyStyle(shareContext),
+                            ),
+                          );
+                          if (shareContext.mounted) {
+                            await _shareAsImage(
+                              shareContext,
+                              imageBytes: image,
+                              fallbackText: item.prayerText,
+                            );
+                          }
+                        },
                       ),
                     ],
                   ),

@@ -14,6 +14,7 @@ import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/main.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
+import 'package:biblebookapp/utils/emoji_text_style.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
@@ -3362,33 +3363,31 @@ class _HomeScreenState extends State<HomeScreen>
                             transition: Transition.cupertinoDialog,
                             duration: const Duration(milliseconds: 300));
                       },
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Text(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Flexible(
+                            child: Text(
                               "${selectedBookname ?? controller.selectedBook}",
                               maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
                               style: CommanStyle.appBarStyle(context).copyWith(
                                 fontSize: screenWidth > 450
                                     ? BibleInfo.fontSizeScale * 26
                                     : BibleInfo.fontSizeScale * 18,
-                                overflow: TextOverflow.visible,
                               ),
                             ),
-                            Padding(
-                              padding: const EdgeInsets.only(top: 3.0, left: 4),
-                              child: Icon(
-                                Icons.keyboard_arrow_down_rounded,
-                                color: CommanColor.whiteBlack(context),
-                                size: screenWidth > 450 ? 39 : 24,
-                              ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 3.0, left: 4),
+                            child: Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: CommanColor.whiteBlack(context),
+                              size: screenWidth > 450 ? 39 : 24,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                     bottom: PreferredSize(
@@ -6160,7 +6159,7 @@ class _HomeScreenState extends State<HomeScreen>
         ),
         child: Row(
           children: [
-            Text(emoji, style: const TextStyle(fontSize: 22)),
+            Text(emoji, style: emojiTextStyle(fontSize: 22)),
             const SizedBox(width: 10),
             Text(text,
                 style: const TextStyle(fontSize: 16, color: CommanColor.black)),
@@ -6205,11 +6204,13 @@ class _HomeScreenState extends State<HomeScreen>
                     ],
                   ),
                 ),
-                const Text("😍", style: TextStyle(fontSize: 40)),
+                emojiText('😍', fontSize: 40),
                 const SizedBox(height: 15),
-                Text(
-                  "Thanks for the love! 💛",
-                  style: TextStyle(
+                textWithTrailingEmoji(
+                  prefix: 'Thanks for the love! ',
+                  emoji: '💛',
+                  emojiFontSize: isTablet ? 19 : 16,
+                  prefixStyle: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: isTablet ? 19 : 16,
                     color: CommanColor.black,
@@ -6323,7 +6324,7 @@ class _HomeScreenState extends State<HomeScreen>
                     ],
                   ),
                 ),
-                Text(emoji, style: const TextStyle(fontSize: 40)),
+                emojiText(emoji, fontSize: 40),
                 const SizedBox(height: 15),
                 const Text(
                   "Thanks! We'd love to hear your thoughts..",

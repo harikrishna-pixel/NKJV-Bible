@@ -2,7 +2,6 @@ import 'package:biblebookapp/controller/api_service.dart';
 import 'package:biblebookapp/utils/book_apps_helper.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/screens/books/model/book_model.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -15,16 +14,41 @@ class BookBloc extends ChangeNotifier {
   int currentPage = 1;
   bool isLastPage = false;
   bool isLoading = false;
+  bool loadTimedOut = false;
+  String? loadStatusMessage;
   List<BookModel> books = [];
+  int _loadToken = 0;
+
+  void cancelLoading({required String message}) {
+    if (!isLoading) return;
+    _loadToken++;
+    isLoading = false;
+    loadTimedOut = true;
+    loadStatusMessage = message;
+    customNotifyListeners();
+  }
+
+  void retryLoad(int id) {
+    if (isLoading) return;
+    loadTimedOut = false;
+    loadStatusMessage = null;
+    isLastPage = false;
+    getBooks(id);
+  }
 
   Future getBooks(int id) async {
+    int? token;
     try {
       if (!isLoading && !isLastPage) {
         // Don't check connectivity upfront - it can be unreliable on first time
         // Proceed with API call and handle errors if they occur
+        token = ++_loadToken;
+        loadTimedOut = false;
+        loadStatusMessage = null;
         isLoading = true;
         customNotifyListeners();
         final data = await getBookCategories(id);
+        if (token != _loadToken) return;
         if (data.isEmpty) {
           isLastPage = true;
         }
@@ -36,6 +60,7 @@ class BookBloc extends ChangeNotifier {
         customNotifyListeners();
       }
     } catch (e, _) {
+      if (token != null && token != _loadToken) return;
       isLoading = false;
       customNotifyListeners();
       // Check if error is related to internet connection

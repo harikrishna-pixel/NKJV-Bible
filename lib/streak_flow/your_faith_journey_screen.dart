@@ -360,7 +360,6 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
   }) {
     final double size = compact ? 18 : 22;
     final double iconSize = compact ? 11 : 14;
-    final double dotSize = compact ? 4 : 5;
 
     if (isCompleted) {
       return Container(
@@ -388,20 +387,23 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
       );
     }
     if (isToday) {
+      final double borderW = compact ? 1.0 : 1.2;
+      final double innerDot = compact ? 8 : 10;
       return Container(
         width: size,
         height: size,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          border: Border.all(color: textColor.withOpacity(0.45), width: 1.5),
+          color: Colors.white,
+          border: Border.all(color: _brown, width: borderW),
         ),
         child: Container(
-          width: dotSize,
-          height: dotSize,
-          decoration: BoxDecoration(
+          width: innerDot,
+          height: innerDot,
+          decoration: const BoxDecoration(
             shape: BoxShape.circle,
-            color: textColor.withOpacity(0.7),
+            color: _brown,
           ),
         ),
       );

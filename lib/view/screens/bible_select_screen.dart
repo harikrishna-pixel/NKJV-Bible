@@ -8,6 +8,7 @@ import 'package:biblebookapp/Model/verseBookContentModel.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/main.dart';
+import 'package:biblebookapp/utils/emoji_text_style.dart';
 import 'package:biblebookapp/view/constants/assets_constants.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
@@ -600,7 +601,7 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
         ),
         child: Row(
           children: [
-            Text(emoji, style: const TextStyle(fontSize: 22)),
+            Text(emoji, style: emojiTextStyle(fontSize: 22)),
             const SizedBox(width: 10),
             Text(text,
                 style: const TextStyle(fontSize: 16, color: CommanColor.black)),
@@ -645,11 +646,13 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                     ],
                   ),
                 ),
-                const Text("😍", style: TextStyle(fontSize: 40)),
+                emojiText('😍', fontSize: 40),
                 const SizedBox(height: 15),
-                Text(
-                  "Thanks for the love! 💛",
-                  style: TextStyle(
+                textWithTrailingEmoji(
+                  prefix: 'Thanks for the love! ',
+                  emoji: '💛',
+                  emojiFontSize: isTablet ? 19 : 16,
+                  prefixStyle: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: isTablet ? 19 : 16,
                     color: CommanColor.black,
@@ -1018,7 +1021,7 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                     ],
                   ),
                 ),
-                Text(emoji, style: const TextStyle(fontSize: 40)),
+                emojiText(emoji, fontSize: 40),
                 const SizedBox(height: 15),
                 const Text(
                   "Thanks! We'd love to hear your thoughts..",

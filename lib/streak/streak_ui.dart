@@ -36,31 +36,55 @@ class StreakIconButton extends StatelessWidget {
       initialData: 0,
       builder: (context, snapshot) {
         final streak = snapshot.data ?? 0;
+        final hasStreak = streak > 0;
         return InkWell(
           onTap: () => Get.to(() => const DailyJourneyScreen()),
+          borderRadius: BorderRadius.circular(20),
           child: Padding(
             padding: const EdgeInsets.all(4),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.local_fire_department_rounded,
-                  size: iconSize,
-                  color: streak > 0 ? const Color(0xFFE65100) : color,
-                ),
-                if (streak > 0) ...[
-                  const SizedBox(width: 4),
-                  Text(
-                    '$streak',
-                    style: TextStyle(
-                      fontSize: iconSize * 0.75,
-                      fontWeight: FontWeight.w700,
-                      color: streak > 0 ? const Color(0xFFE65100) : color,
+            child: hasStreak
+                ? Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: iconSize * 0.45,
+                      vertical: iconSize * 0.12,
                     ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE65100),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFE65100).withOpacity(0.35),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.local_fire_department_rounded,
+                          size: iconSize * 0.85,
+                          color: Colors.white,
+                        ),
+                        SizedBox(width: iconSize * 0.15),
+                        Text(
+                          '$streak',
+                          style: TextStyle(
+                            fontSize: iconSize * 0.7,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            height: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : Icon(
+                    Icons.local_fire_department_rounded,
+                    size: iconSize,
+                    color: color,
                   ),
-                ],
-              ],
-            ),
           ),
         );
       },

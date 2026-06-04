@@ -21,39 +21,34 @@ class BooksScreen extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final bookState = ref.watch(bookBloc);
-    final hasShownToast = useRef(false);
-    
+
     useMemoized(() {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(bookBloc).getBooks(bookAdId);
-        // Track Books event
         AnalyticsService.trackBooks();
-        // Reset toast flag when starting to load
-        hasShownToast.value = false;
       });
     });
-    
-    // Monitor loading state and show toast if loading takes too long
+
     useEffect(() {
-      if (bookState.isLoading && bookState.books.isEmpty && !hasShownToast.value) {
-        bool cancelled = false;
-        Future.delayed(const Duration(seconds: 3), () async {
-          if (!cancelled && bookState.isLoading && bookState.books.isEmpty && !hasShownToast.value) {
-            final hasInternet = await InternetConnection().hasInternetAccess;
-            if (!hasInternet) {
-              Constants.showToast('No Internet Connection');
-            } else {
-              Constants.showToast('Check Your Internet Connection');
-            }
-            hasShownToast.value = true;
-          }
-        });
-        return () {
-          cancelled = true;
-        };
+      if (!bookState.isLoading || bookState.books.isNotEmpty) {
+        return null;
       }
-      return null;
-    }, [bookState.isLoading, bookState.books.isEmpty]);
+      var cancelled = false;
+      Future.delayed(const Duration(seconds: 12), () async {
+        if (cancelled) return;
+        final bloc = ref.read(bookBloc);
+        if (!bloc.isLoading || bloc.books.isNotEmpty) return;
+        final hasInternet = await InternetConnection().hasInternetAccess;
+        final message = hasInternet
+            ? 'Unable to load books right now. Please try again later.'
+            : 'No internet connection. Please check your network and try again.';
+        bloc.cancelLoading(message: message);
+        Constants.showToast(message);
+      });
+      return () {
+        cancelled = true;
+      };
+    }, [bookState.isLoading]);
     double screenWidth = MediaQuery.of(context).size.width;
     debugPrint("sz current width - $screenWidth ");
 
@@ -111,8 +106,50 @@ class BooksScreen extends HookConsumerWidget {
               height: 15,
             ),
             bookState.isLoading && bookState.books.isEmpty
-                ? const CircularProgressIndicator.adaptive()
-                : Expanded(
+                ? Expanded(
+                    child: Center(
+                      child: const CircularProgressIndicator.adaptive(),
+                    ),
+                  )
+                : bookState.loadTimedOut && bookState.books.isEmpty
+                    ? Expanded(
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 28),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.cloud_off_outlined,
+                                  size: screenWidth > 450 ? 56 : 48,
+                                  color: CommanColor.lightDarkPrimary(context),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  bookState.loadStatusMessage ??
+                                      'Unable to load books. Please try again.',
+                                  textAlign: TextAlign.center,
+                                  style: CommanStyle.placeholderText(context),
+                                ),
+                                const SizedBox(height: 20),
+                                TextButton(
+                                  onPressed: () =>
+                                      ref.read(bookBloc).retryLoad(bookAdId),
+                                  child: Text(
+                                    'Try Again',
+                                    style: TextStyle(
+                                      color:
+                                          CommanColor.lightDarkPrimary(context),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )
+                    : Expanded(
                     child: GridView.builder(
                       physics: const BouncingScrollPhysics(),
                       itemCount: bookState.books.length,

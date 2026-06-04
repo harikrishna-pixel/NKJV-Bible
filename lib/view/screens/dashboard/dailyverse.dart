@@ -713,7 +713,7 @@ class _DailyVerseState extends State<DailyVerse> {
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                'Choose a feeling',
+                                'Choose Verse Topics',
                                 style: TextStyle(
                                   fontSize: screenWidth > 450 ? 14 : 12,
                                   fontWeight: FontWeight.w600,

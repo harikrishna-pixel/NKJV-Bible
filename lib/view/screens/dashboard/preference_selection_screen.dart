@@ -599,16 +599,10 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
               ] else ...[
                 const SizedBox(height: 8),
                 Center(
-                  child: ColorFiltered(
-                    colorFilter: const ColorFilter.mode(
-                      Color(0xFF805531),
-                      BlendMode.srcIn,
-                    ),
-                    child: Image.asset(
-                      'assets/biblebook.png',
-                      height: screenWidth > 600 ? 88 : 72,
-                      fit: BoxFit.contain,
-                    ),
+                  child: Image.asset(
+                    'assets/complete_image.png',
+                    height: screenWidth > 600 ? 88 : 72,
+                    fit: BoxFit.contain,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -1247,74 +1241,13 @@ Future<List<VerseBookContentModel>> _parseVerseContent(
 }
 
 class FaithJourneyDialog {
-  static const Color _paperIconBrown = Color(0xFF805531);
-  static const Color _paperIconCream = Color(0xFFF3E5C2);
-
   static Widget _themedCompletionIcon({required bool isTablet}) {
-    final outer = isTablet ? 108.0 : 92.0;
-    final inner = isTablet ? 88.0 : 74.0;
-    return SizedBox(
-      width: outer,
-      height: outer,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: inner,
-            height: inner,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFFF8F4EB),
-                  _paperIconCream,
-                ],
-              ),
-              border: Border.all(color: _paperIconBrown, width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: _paperIconBrown.withValues(alpha: 0.2),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: EdgeInsets.all(isTablet ? 14 : 12),
-              child: ColorFiltered(
-                colorFilter: const ColorFilter.mode(
-                  _paperIconBrown,
-                  BlendMode.srcIn,
-                ),
-                child: Image.asset(
-                  'assets/biblebook.png',
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            right: isTablet ? 6 : 4,
-            bottom: isTablet ? 6 : 4,
-            child: Container(
-              width: isTablet ? 30 : 26,
-              height: isTablet ? 30 : 26,
-              decoration: BoxDecoration(
-                color: const Color(0xFF763201),
-                shape: BoxShape.circle,
-                border: Border.all(color: _paperIconCream, width: 2),
-              ),
-              child: Icon(
-                Icons.check_rounded,
-                color: _paperIconCream,
-                size: isTablet ? 18 : 16,
-              ),
-            ),
-          ),
-        ],
-      ),
+    final size = isTablet ? 108.0 : 92.0;
+    return Image.asset(
+      'assets/complete_image.png',
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
     );
   }
 

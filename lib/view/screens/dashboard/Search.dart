@@ -237,6 +237,11 @@ class _SearchScreenState extends State<SearchScreen> {
     final isDark = CommanColor.isDarkTheme(context);
     final isSelected = selectedValueFilterIndex == index;
     final primary = CommanColor.lightDarkPrimary(context);
+    final selectedFill =
+        isDark ? Colors.white.withOpacity(0.2) : primary;
+    final selectedBorder = isDark ? Colors.white : primary;
+    final unselectedBorder =
+        isDark ? Colors.white.withOpacity(0.35) : primary.withOpacity(0.45);
     return GestureDetector(
       onTap: () => _onFilterSelected(index),
       child: Padding(
@@ -247,14 +252,10 @@ class _SearchScreenState extends State<SearchScreen> {
             vertical: screenWidth > 450 ? 8 : 6,
           ),
           decoration: BoxDecoration(
-            color: isSelected
-                ? (isDark ? primary : primary)
-                : Colors.transparent,
+            color: isSelected ? selectedFill : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isSelected
-                  ? primary
-                  : (isDark ? Colors.white70 : primary.withOpacity(0.45)),
+              color: isSelected ? selectedBorder : unselectedBorder,
               width: isSelected ? 1.5 : 1,
             ),
           ),
@@ -264,8 +265,8 @@ class _SearchScreenState extends State<SearchScreen> {
               fontSize: screenWidth > 450 ? 16 : 13,
               fontWeight: FontWeight.w600,
               color: isSelected
-                  ? Colors.white
-                  : (isDark ? Colors.white : primary),
+                  ? (isDark ? Colors.white : Colors.white)
+                  : (isDark ? Colors.white70 : primary),
             ),
           ),
         ),
@@ -749,16 +750,6 @@ class _SearchScreenState extends State<SearchScreen> {
                             ),
                             child: Row(
                               children: [
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12),
-                                  child: Icon(
-                                    Icons.search,
-                                    size: screenWidth > 450 ? 24 : 20,
-                                    color:
-                                        CommanColor.lightDarkPrimary(context),
-                                  ),
-                                ),
                                 Expanded(
                                   child: TextFormField(
                                     style: CommanStyle.black16500.copyWith(
@@ -773,7 +764,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                     decoration: InputDecoration(
                                       contentPadding: EdgeInsets.symmetric(
                                         vertical: screenWidth > 450 ? 14 : 12,
-                                        horizontal: 4,
+                                        horizontal: 12,
                                       ),
                                       hintText: 'Search',
                                       hintStyle: CommanStyle.grey13400,

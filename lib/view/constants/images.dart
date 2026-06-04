@@ -135,8 +135,8 @@ class Images {
 
   static String searchPlaceHolder(BuildContext context) {
     return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? 'assets/dark_modes/new_search.png'
-        : 'assets/light_modes/Union.png';
+        ? 'assets/light_modes/Union.png'
+        : 'assets/dark_modes/new_search.png';
   }
 
   static String aboutPlaceHolder(BuildContext context) {

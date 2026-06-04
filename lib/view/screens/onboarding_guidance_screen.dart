@@ -29,47 +29,55 @@ class OnboardingGuidanceScreen extends StatelessWidget {
             ),
             child: Column(
               children: [
-                const SizedBox(height: 50),
-                Image.asset(
-                  'assets/chat.png',
-                  height: isTablet ? 140 : 120,
-                  fit: BoxFit.contain,
-                ),
-                const SizedBox(height: 28),
-                const Text(
-                  'Get Biblical Guidance',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black,
+                Expanded(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(height: isTablet ? 0 : 50),
+                          Image.asset(
+                            'assets/chat.png',
+                            height: isTablet ? 140 : 120,
+                            fit: BoxFit.contain,
+                          ),
+                          const SizedBox(height: 28),
+                          Text(
+                            'Get Biblical Guidance',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: isTablet ? 28 : 24,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            'Whenever questions arise, find calm,\nScripture-based guidance to help you\nreflect and move forward',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: isTablet ? 17 : 15,
+                              fontWeight: FontWeight.w400,
+                              height: 1.4,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              _Bullet(text: 'Ask without hesitation'),
+                              SizedBox(height: 12),
+                              _Bullet(text: 'Understand scripture deeply'),
+                              SizedBox(height: 12),
+                              _Bullet(text: 'Find peace in your decisions'),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 14),
-                const Text(
-                  'Whenever questions arise, find calm,\nScripture-based guidance to help you\nreflect and move forward',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w400,
-                    height: 1.4,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Center(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: const [
-                      _Bullet(text: 'Ask without hesitation'),
-                      SizedBox(height: 12),
-                      _Bullet(text: 'Understand scripture deeply'),
-                      SizedBox(height: 12),
-                      _Bullet(text: 'Find peace in your decisions'),
-                    ],
-                  ),
-                ),
-                const Spacer(),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 65),
                   child: SizedBox(
