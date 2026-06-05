@@ -38,7 +38,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final calendarBloc = ref.watch(calendarDataBloc);
     Widget cellWidget(DateTime day, {bool isOutside = false}) {
       final bool isWeekend = day.weekday == 7;
-      bool isSelected = isSameDay(day, calendarBloc.focusDate);
+      bool isSelected = isSameDay(day, calendarBloc.selectedDay);
       return GestureDetector(
         onTap: () {
           calendarBloc.onDaySelected(day, day);

@@ -3242,14 +3242,17 @@ Future saveAndShare(Uint8List bytes, String imgname, String mesage,
   final directory = await getApplicationDocumentsDirectory();
   final image = File("${directory.path}/$imgname.png");
   image.writeAsBytesSync(bytes);
-  // Share the image using XFile
-  final xFile = XFile(image.path);
-  //await Share.shareXFiles([xFile]);
-  await Share.shareXFiles([xFile],
-      subject: 'Bible Book app',
-      text: mesage,
-      sharePositionOrigin:
-          Rect.fromPoints(const Offset(2, 2), const Offset(3, 3)));
+  await Share.shareXFiles(
+    [
+      XFile(
+        image.path,
+        mimeType: 'image/png',
+        name: '$imgname.png',
+      ),
+    ],
+    sharePositionOrigin:
+        Rect.fromPoints(const Offset(2, 2), const Offset(3, 3)),
+  );
 }
 
 Future<bool> requestPermission([context]) async {
@@ -4226,6 +4229,10 @@ class AutoSizeHtmlWidget extends StatefulWidget {
   final double maxFontSize;
   final double minFontSize;
   final Color? color;
+  final String? fontFamily;
+  final TextAlign textAlign;
+  final double? height;
+  final FontWeight? fontWeight;
 
   const AutoSizeHtmlWidget(
       {super.key,
@@ -4233,7 +4240,11 @@ class AutoSizeHtmlWidget extends StatefulWidget {
       this.maxLines = 3,
       this.maxFontSize = 31,
       this.minFontSize = 14,
-      this.color});
+      this.color,
+      this.fontFamily,
+      this.textAlign = TextAlign.start,
+      this.height,
+      this.fontWeight});
 
   @override
   AutoSizeHtmlWidgetState createState() => AutoSizeHtmlWidgetState();
@@ -4256,11 +4267,18 @@ class AutoSizeHtmlWidgetState extends State<AutoSizeHtmlWidget> {
           widget.minFontSize,
         );
 
+        final displayHtml = widget.textAlign == TextAlign.center
+            ? '<div style="text-align:center">${widget.html}</div>'
+            : widget.html;
+
         return HtmlWidget(
-          widget.html,
+          displayHtml,
           textStyle: TextStyle(
             color: widget.color ?? Colors.black,
             fontSize: _currentFontSize,
+            fontFamily: widget.fontFamily,
+            height: widget.height,
+            fontWeight: widget.fontWeight,
           ),
         );
       },
@@ -4277,7 +4295,12 @@ class AutoSizeHtmlWidgetState extends State<AutoSizeHtmlWidget> {
   ) {
     final textSpan = TextSpan(
       text: _stripHtmlTags(text), // Helper to get plain text for measurement
-      style: TextStyle(fontSize: maxFontSize),
+      style: TextStyle(
+        fontSize: maxFontSize,
+        fontFamily: widget.fontFamily,
+        height: widget.height,
+        fontWeight: widget.fontWeight,
+      ),
     );
 
     final textPainter = TextPainter(
@@ -4301,7 +4324,12 @@ class AutoSizeHtmlWidgetState extends State<AutoSizeHtmlWidget> {
 
       final testSpan = TextSpan(
         text: _stripHtmlTags(text),
-        style: TextStyle(fontSize: currentSize),
+        style: TextStyle(
+          fontSize: currentSize,
+          fontFamily: widget.fontFamily,
+          height: widget.height,
+          fontWeight: widget.fontWeight,
+        ),
       );
 
       final testPainter = TextPainter(
@@ -6249,8 +6277,6 @@ class ImageBottomSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
-    String bibleName = BibleInfo.bible_shortName;
-
     return Consumer<HomeContentEditProvider>(
       builder: (context, bookmarkProvider, child) {
         return SizedBox(
@@ -6313,185 +6339,24 @@ class ImageBottomSheet extends StatelessWidget {
                                     : controller.selectedBgImage.value += 1;
                               },
                               child: Obx(
-                                () => Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    Positioned.fill(
-                                      child: Image(
-                                        image: AssetImage(controller
-                                                .bgImagesList[
-                                            controller.selectedBgImage.value]),
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ),
-                                    Positioned.fill(
-                                      child: DecoratedBox(
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            begin: Alignment.topCenter,
-                                            end: Alignment.bottomCenter,
-                                            colors: [
-                                              Colors.black
-                                                  .withOpacity(0.38),
-                                              Colors.black
-                                                  .withOpacity(0.58),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    Positioned(
-                                      left: 10,
-                                      right: 10,
-                                      bottom: 0,
-                                      top: 0,
-                                      child:
-                                          // Obx(
-                                          //   () =>
-                                          Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 10),
-                                            child: AutoSizeHtmlWidget(
-                                              html: controller
-                                                  .selectedBookContent[
-                                                      controller
-                                                          .selectedVerseView
-                                                          .value]
-                                                  .content,
-                                              maxLines: 16,
-                                              maxFontSize: screenWidth < 380
-                                                  ? BibleInfo.fontSizeScale *
-                                                      14.5
-                                                  : screenWidth > 450
-                                                      ? BibleInfo
-                                                              .fontSizeScale *
-                                                          31
-                                                      : controller
-                                                              .fontSize.value -
-                                                          0.9,
-                                              minFontSize: screenWidth < 380
-                                                  ? 11.5
-                                                  : 10.9,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 10),
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.end,
-                                            children: [
-                                              Text(
-                                                "${controller.selectedBook.value} ${controller.selectedChapter.value}:${controller.selectedVerseView.value + 1}",
-                                                style: TextStyle(
-                                                  color: Colors.white
-                                                      .withOpacity(0.92),
-                                                  letterSpacing:
-                                                      BibleInfo.letterSpacing,
-                                                  fontSize: screenWidth > 450
-                                                      ? BibleInfo
-                                                              .fontSizeScale *
-                                                          28
-                                                      : BibleInfo
-                                                              .fontSizeScale *
-                                                          15,
-                                                  fontWeight: FontWeight.w500,
-                                                  height: 1.2,
-                                                  fontStyle: FontStyle.italic,
-                                                ),
-                                                textAlign: TextAlign.center,
-                                              ),
-                                              const SizedBox(width: 10),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    // ),
-                                    Positioned(
-                                      left: 0,
-                                      right: 0,
-                                      bottom: 7,
-                                      child: Center(
-                                        child: Opacity(
-                                          opacity: 0.72,
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 10,
-                                              vertical: 6,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: Colors.black
-                                                  .withOpacity(0.45),
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                              border: Border.all(
-                                                color: Colors.white
-                                                    .withOpacity(0.18),
-                                              ),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Image.asset(
-                                                  "assets/Icon-1024.png",
-                                                  height: 22,
-                                                  width: 22,
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    Text(
-                                                      bibleName,
-                                                      style: TextStyle(
-                                                        color: Colors.white
-                                                            .withOpacity(0.95),
-                                                        letterSpacing: BibleInfo
-                                                            .letterSpacing,
-                                                        fontSize: BibleInfo
-                                                                .fontSizeScale *
-                                                            12,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                        height: 1.2,
-                                                      ),
-                                                    ),
-                                                    if (Platform.isAndroid)
-                                                      Text(
-                                                        'Search in Playstore',
-                                                        style: TextStyle(
-                                                          color: Colors.white
-                                                              .withOpacity(
-                                                                  0.75),
-                                                          fontSize: 10,
-                                                        ),
-                                                      )
-                                                    else if (Platform.isIOS)
-                                                      Text(
-                                                        'Search in Appstore',
-                                                        style: TextStyle(
-                                                          color: Colors.white
-                                                              .withOpacity(
-                                                                  0.75),
-                                                          fontSize: 10,
-                                                        ),
-                                                      ),
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                () => VerseShareImageCard(
+                                  backgroundImagePath: controller
+                                      .bgImagesList[
+                                          controller.selectedBgImage.value],
+                                  verseHtml: controller
+                                      .selectedBookContent[
+                                          controller.selectedVerseView.value]
+                                      .content,
+                                  verseReference:
+                                      "${controller.selectedBook.value} ${controller.selectedChapter.value}:${controller.selectedVerseView.value + 1}",
+                                  screenWidth: screenWidth,
+                                  maxVerseFontSize: screenWidth < 380
+                                      ? BibleInfo.fontSizeScale * 18
+                                      : screenWidth > 450
+                                          ? BibleInfo.fontSizeScale * 30
+                                          : BibleInfo.fontSizeScale * 24,
+                                  minVerseFontSize:
+                                      screenWidth < 380 ? 14 : 16,
                                 ),
                               ),
                             ),
@@ -7038,3 +6903,216 @@ class ImageBottomSheet extends StatelessWidget {
 //     );
 //   }
 // }
+
+const Color _kVerseRose = Color(0xFFC28E8F);
+const Color _kVerseInk = Color(0xFF3E2723);
+
+/// Decorative verse share card used when capturing verse wallpaper images.
+class VerseShareImageCard extends StatelessWidget {
+  const VerseShareImageCard({
+    super.key,
+    required this.backgroundImagePath,
+    required this.verseHtml,
+    required this.verseReference,
+    required this.screenWidth,
+    required this.maxVerseFontSize,
+    required this.minVerseFontSize,
+  });
+
+  final String backgroundImagePath;
+  final String verseHtml;
+  final String verseReference;
+  final double screenWidth;
+  final double maxVerseFontSize;
+  final double minVerseFontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final iconSize =
+        screenWidth < 380 ? 34.0 : screenWidth > 450 ? 48.0 : 40.0;
+    final referenceSize = screenWidth < 380
+        ? BibleInfo.fontSizeScale * 9
+        : screenWidth > 450
+            ? BibleInfo.fontSizeScale * 12
+            : BibleInfo.fontSizeScale * 10;
+    final verseMaxSize = maxVerseFontSize - 2;
+    final verseMinSize = (minVerseFontSize - 2).clamp(10.0, verseMaxSize);
+    final footerReserve = screenWidth < 380 ? 62.0 : 70.0;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          backgroundImagePath,
+          fit: BoxFit.cover,
+        ),
+        Positioned(
+          left: 10,
+          right: 10,
+          top: 8,
+          bottom: footerReserve,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight,
+                    maxWidth: constraints.maxWidth,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Image.asset(
+                        'assets/complete_image.png',
+                        height: iconSize,
+                        width: iconSize,
+                        fit: BoxFit.contain,
+                      ),
+                      SizedBox(height: screenWidth < 380 ? 6 : 8),
+                      Text(
+                        verseReference.toUpperCase(),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Georgia',
+                          color: _kVerseInk,
+                          fontSize: referenceSize,
+                          letterSpacing: 2.2,
+                          fontWeight: FontWeight.w600,
+                          height: 1.2,
+                        ),
+                      ),
+                      SizedBox(height: screenWidth < 380 ? 6 : 8),
+                      _verseRoseDivider(center: _verseDiamond()),
+                      SizedBox(height: screenWidth < 380 ? 8 : 12),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: AutoSizeHtmlWidget(
+                          html: verseHtml,
+                          maxLines: 16,
+                          maxFontSize: verseMaxSize,
+                          minFontSize: verseMinSize,
+                          color: _kVerseInk,
+                          fontFamily: 'Georgia',
+                          textAlign: TextAlign.center,
+                          height: 1.45,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      SizedBox(height: screenWidth < 380 ? 8 : 12),
+                      _verseRoseDivider(center: _verseLeaf()),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 7,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    'assets/Icon-1024.png',
+                    height: 22,
+                    width: 22,
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        BibleInfo.bible_shortName,
+                        style: TextStyle(
+                          color: _kVerseInk,
+                          letterSpacing: BibleInfo.letterSpacing,
+                          fontSize: BibleInfo.fontSizeScale * 12,
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
+                        ),
+                      ),
+                      if (Platform.isAndroid)
+                        Text(
+                          'Search in Playstore',
+                          style: TextStyle(
+                            color: _kVerseInk.withOpacity(0.78),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        )
+                      else if (Platform.isIOS)
+                        Text(
+                          'Search in Appstore',
+                          style: TextStyle(
+                            color: _kVerseInk.withOpacity(0.78),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+Widget _verseRoseDivider({required Widget center}) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 18),
+    child: Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 1,
+            color: _kVerseRose.withOpacity(0.75),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: center,
+        ),
+        Expanded(
+          child: Container(
+            height: 1,
+            color: _kVerseRose.withOpacity(0.75),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _verseDiamond() {
+  return Transform.rotate(
+    angle: 0.785398,
+    child: Container(
+      width: 6,
+      height: 6,
+      decoration: BoxDecoration(
+        color: _kVerseRose,
+        border: Border.all(color: _kVerseRose.withOpacity(0.8)),
+      ),
+    ),
+  );
+}
+
+Widget _verseLeaf() {
+  return Icon(
+    Icons.eco_outlined,
+    size: 13,
+    color: _kVerseRose,
+  );
+}

@@ -581,9 +581,19 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                   ],
                 ),
               if (widget.isSetting) ...[
-                const SizedBox(height: 20),
+                const SizedBox(height: 8),
+                Center(
+                  child: Image.asset(
+                    Images.searchPlaceHolder(context),
+                    height: screenWidth > 600 ? 88 : 72,
+                    width: screenWidth > 600 ? 88 : 72,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Text(
                   "Jesus Will Guide You!",
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                       color: CommanColor.whiteBlack(context),
                       fontSize: screenWidth > 600 ? 25 : 22,
@@ -592,6 +602,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                 const SizedBox(height: 8),
                 Text(
                   "Choose your preferred verse topics",
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                       color: CommanColor.whiteBlack(context),
                       fontSize: screenWidth > 600 ? 22 : 16),
@@ -600,8 +611,9 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                 const SizedBox(height: 8),
                 Center(
                   child: Image.asset(
-                    'assets/complete_image.png',
+                    Images.searchPlaceHolder(context),
                     height: screenWidth > 600 ? 88 : 72,
+                    width: screenWidth > 600 ? 88 : 72,
                     fit: BoxFit.contain,
                   ),
                 ),

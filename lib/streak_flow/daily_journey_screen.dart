@@ -235,6 +235,8 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
     }
     final item = await _resolveDayItem(todayKey);
     if (!mounted || item == null) return;
+    await precacheStreakPhotoBackgrounds(context);
+    if (!mounted) return;
     switch (step) {
       case 2:
         Get.to(() => StreakVerseScreen(item: item, viewOnly: true));
@@ -677,8 +679,12 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                                 SharPreferences.streakFlowStepsCompletedToday,
                                 2);
                             await _storeTodaySteps(2);
-                            if (mounted)
-                              Get.to(() => StreakVerseScreen(item: item));
+                            if (mounted) {
+                              await precacheStreakPhotoBackgrounds(context);
+                              if (mounted) {
+                                Get.to(() => StreakVerseScreen(item: item));
+                              }
+                            }
                           }
                         },
                         textColor: textColor,
@@ -703,8 +709,13 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                                 SharPreferences.streakFlowStepsCompletedToday,
                                 2);
                             await _storeTodaySteps(2);
-                            if (mounted)
-                              Get.to(() => StreakDevotionalScreen(item: item));
+                            if (mounted) {
+                              await precacheStreakPhotoBackgrounds(context);
+                              if (mounted) {
+                                Get.to(
+                                    () => StreakDevotionalScreen(item: item));
+                              }
+                            }
                           }
                         },
                         textColor: textColor,

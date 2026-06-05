@@ -229,11 +229,38 @@ const ColorFilter _streakPhotoContrastFilter = ColorFilter.matrix(<double>[
   0, 0, 0, 1, 0,
 ]);
 
+const List<String> _streakPhotoBackgroundAssets = [
+  'assets/back1.png',
+  'assets/back2.png',
+];
+
+/// Warm placeholder shown until photo assets are decoded (UI only).
+const Color _kStreakPhotoPlaceholder = Color(0xFF4A3528);
+
+Future<void> precacheStreakPhotoBackgrounds(BuildContext context) {
+  return Future.wait(
+    _streakPhotoBackgroundAssets.map(
+      (path) => precacheImage(AssetImage(path), context),
+    ),
+  );
+}
+
 Widget _streakPhotoBackgroundImage(String assetPath) {
   return Positioned.fill(
-    child: ColorFiltered(
-      colorFilter: _streakPhotoContrastFilter,
-      child: Image.asset(assetPath, fit: BoxFit.cover),
+    child: Stack(
+      fit: StackFit.expand,
+      children: [
+        const ColoredBox(color: _kStreakPhotoPlaceholder),
+        ColorFiltered(
+          colorFilter: _streakPhotoContrastFilter,
+          child: Image.asset(
+            assetPath,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            filterQuality: FilterQuality.medium,
+          ),
+        ),
+      ],
     ),
   );
 }
@@ -241,9 +268,9 @@ Widget _streakPhotoBackgroundImage(String assetPath) {
 /// Top/bottom vignette + soft blur behind central verse text (UI only).
 Widget _streakPhotoReadabilityOverlays(BuildContext context) {
   final h = MediaQuery.sizeOf(context).height;
-  final topH = h * 0.12;
-  final bottomH = h * 0.40;
-  final textBlurH = h * 0.44;
+  final topH = h * 0.16;
+  final bottomH = h * 0.48;
+  final textBlurH = h * 0.40;
 
   return Stack(
     fit: StackFit.expand,
@@ -259,11 +286,11 @@ Widget _streakPhotoReadabilityOverlays(BuildContext context) {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Colors.black.withOpacity(0.42),
-                Colors.black.withOpacity(0.14),
+                Colors.black.withOpacity(0.55),
+                Colors.black.withOpacity(0.28),
                 Colors.transparent,
               ],
-              stops: const [0.0, 0.6, 1.0],
+              stops: const [0.0, 0.55, 1.0],
             ),
           ),
         ),
@@ -279,11 +306,11 @@ Widget _streakPhotoReadabilityOverlays(BuildContext context) {
               begin: Alignment.bottomCenter,
               end: Alignment.topCenter,
               colors: [
-                Colors.black.withOpacity(0.50),
-                Colors.black.withOpacity(0.26),
+                Colors.black.withOpacity(0.62),
+                Colors.black.withOpacity(0.34),
                 Colors.transparent,
               ],
-              stops: const [0.0, 0.5, 1.0],
+              stops: const [0.0, 0.52, 1.0],
             ),
           ),
         ),
@@ -292,11 +319,11 @@ Widget _streakPhotoReadabilityOverlays(BuildContext context) {
         alignment: Alignment.center,
         child: ClipRect(
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 2.0, sigmaY: 2.0),
+            filter: ImageFilter.blur(sigmaX: 1.2, sigmaY: 1.2),
             child: Container(
               width: double.infinity,
               height: textBlurH,
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withOpacity(0.08),
             ),
           ),
         ),
@@ -328,16 +355,20 @@ TextStyle _streakPhotoTitleStyle(BuildContext context) => TextStyle(
       color: Colors.white,
       fontFamily: 'Georgia',
       shadows: const [
-        Shadow(color: Colors.black38, blurRadius: 8, offset: Offset(0, 2)),
+        Shadow(color: Colors.black87, blurRadius: 10, offset: Offset(0, 2)),
+        Shadow(color: Colors.black45, blurRadius: 4, offset: Offset(0, 1)),
       ],
     );
 
 TextStyle _streakPhotoSubtitleStyle(BuildContext context) => TextStyle(
       fontSize: MediaQuery.of(context).size.width > 450 ? 15 : 13,
-      fontWeight: FontWeight.w400,
-      color: _kStreakPhotoGold.withOpacity(0.95),
+      fontWeight: FontWeight.w500,
+      color: Colors.white,
       fontFamily: 'Georgia',
       height: 1.35,
+      shadows: const [
+        Shadow(color: Colors.black87, blurRadius: 8, offset: Offset(0, 1)),
+      ],
     );
 
 TextStyle _streakPhotoBodyStyle(BuildContext context) => TextStyle(
@@ -345,11 +376,44 @@ TextStyle _streakPhotoBodyStyle(BuildContext context) => TextStyle(
       height: 1.55,
       color: Colors.white,
       fontFamily: 'Georgia',
-      fontWeight: FontWeight.w400,
+      fontWeight: FontWeight.w500,
       shadows: const [
-        Shadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 1)),
+        Shadow(color: Colors.black87, blurRadius: 12, offset: Offset(0, 2)),
+        Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 1)),
       ],
     );
+
+TextStyle _streakPhotoReferenceStyle(BuildContext context) => TextStyle(
+      fontSize: 17,
+      fontStyle: FontStyle.italic,
+      color: _kStreakPhotoGold,
+      fontFamily: 'Georgia',
+      fontWeight: FontWeight.w600,
+      shadows: const [
+        Shadow(color: Colors.black87, blurRadius: 10, offset: Offset(0, 2)),
+      ],
+    );
+
+Widget _streakPhotoSubtitleBanner(BuildContext context, String subtitle) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.48),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withOpacity(0.14)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        child: Text(
+          subtitle,
+          textAlign: TextAlign.center,
+          style: _streakPhotoSubtitleStyle(context),
+        ),
+      ),
+    ),
+  );
+}
 
 Widget _streakProgressDots(
   BuildContext context,
@@ -438,7 +502,14 @@ Widget _streakPhotoTopBar({
     step: step,
     onPhotoBackground: true,
     leftActions: IconButton(
-      icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+      icon: Icon(
+        Icons.arrow_back_ios_new,
+        color: Colors.white,
+        size: 20,
+        shadows: const [
+          Shadow(color: Colors.black87, blurRadius: 6, offset: Offset(0, 1)),
+        ],
+      ),
       onPressed: onBack,
       tooltip: 'Back',
     ),
@@ -452,11 +523,21 @@ Widget _streakPhotoTopBar({
               isMusicMuted ? Icons.music_off : Icons.music_note,
               color: Colors.white,
               size: 24,
+              shadows: const [
+                Shadow(color: Colors.black87, blurRadius: 6, offset: Offset(0, 1)),
+              ],
             ),
             tooltip: isMusicMuted ? 'Audio Off' : 'Audio On',
           ),
         IconButton(
-          icon: const Icon(Icons.close, color: Colors.white, size: 24),
+          icon: Icon(
+            Icons.close,
+            color: Colors.white,
+            size: 24,
+            shadows: const [
+              Shadow(color: Colors.black87, blurRadius: 6, offset: Offset(0, 1)),
+            ],
+          ),
           onPressed: onClose,
           tooltip: 'Close',
         ),
@@ -512,14 +593,7 @@ Widget _streakPhotoStepHeader({
       const SizedBox(height: 10),
       _streakGoldDivider(),
       const SizedBox(height: 10),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28),
-        child: Text(
-          subtitle,
-          textAlign: TextAlign.center,
-          style: _streakPhotoSubtitleStyle(context),
-        ),
-      ),
+      _streakPhotoSubtitleBanner(context, subtitle),
       const SizedBox(height: 20),
     ],
   );
@@ -615,15 +689,25 @@ Widget _streakPhotoSaveShareRow({
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: Colors.white.withOpacity(0.9), size: 18),
+            Icon(
+              icon,
+              color: Colors.white,
+              size: 18,
+              shadows: const [
+                Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1)),
+              ],
+            ),
             const SizedBox(width: 6),
             Text(
               label,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.9),
+              style: const TextStyle(
+                color: Colors.white,
                 fontSize: 14,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
                 fontFamily: 'Georgia',
+                shadows: [
+                  Shadow(color: Colors.black87, blurRadius: 6, offset: Offset(0, 1)),
+                ],
               ),
             ),
           ],
@@ -632,26 +716,37 @@ Widget _streakPhotoSaveShareRow({
     );
   }
 
-  return Row(
-    mainAxisAlignment: MainAxisAlignment.center,
-    children: [
-      action(
-        icon: saved ? Icons.bookmark : Icons.bookmark_border,
-        label: saveLabel,
-        onTap: onSave,
+  return DecoratedBox(
+    decoration: BoxDecoration(
+      color: Colors.black.withOpacity(0.42),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: Colors.white.withOpacity(0.12)),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          action(
+            icon: saved ? Icons.bookmark : Icons.bookmark_border,
+            label: saveLabel,
+            onTap: onSave,
+          ),
+          Container(
+            width: 1,
+            height: 18,
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            color: Colors.white.withOpacity(0.35),
+          ),
+          action(
+            icon: Icons.share,
+            label: 'Share',
+            onTap: onShare,
+          ),
+        ],
       ),
-      Container(
-        width: 1,
-        height: 18,
-        margin: const EdgeInsets.symmetric(horizontal: 8),
-        color: Colors.white.withOpacity(0.35),
-      ),
-      action(
-        icon: Icons.share,
-        label: 'Share',
-        onTap: onShare,
-      ),
-    ],
+    ),
   );
 }
 
@@ -1915,6 +2010,8 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                                   1);
                               await _storeActiveStreakFlowSteps(1);
                               if (!mounted) return;
+                              await precacheStreakPhotoBackgrounds(context);
+                              if (!mounted) return;
                               Get.to(() => StreakVerseScreen(item: item!));
                             },
                           ),
@@ -2158,7 +2255,10 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSaved());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      precacheStreakPhotoBackgrounds(context);
+      _loadSaved();
+    });
   }
 
   Future<void> _loadSaved() async {
@@ -2222,13 +2322,7 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                                   Text(
                                     item.verseReference,
                                     textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 17,
-                                      fontStyle: FontStyle.italic,
-                                      color: _kStreakPhotoGold,
-                                      fontFamily: 'Georgia',
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                    style: _streakPhotoReferenceStyle(context),
                                   ),
                                   const SizedBox(height: 20),
                                   _streakGoldDivider(
@@ -2320,6 +2414,8 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                               SharPreferences.streakFlowStepsCompletedToday, 2);
                           await _storeActiveStreakFlowSteps(2);
                           if (!mounted) return;
+                          await precacheStreakPhotoBackgrounds(context);
+                          if (!mounted) return;
                           Get.to(() => StreakDevotionalScreen(
                                 item: item,
                                 viewOnly: widget.viewOnly,
@@ -2332,9 +2428,16 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.white.withOpacity(0.75),
+                          color: Colors.white.withOpacity(0.92),
                           fontFamily: 'Georgia',
                           height: 1.35,
+                          shadows: const [
+                            Shadow(
+                              color: Colors.black87,
+                              blurRadius: 8,
+                              offset: Offset(0, 1),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -2373,6 +2476,7 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      precacheStreakPhotoBackgrounds(context);
       _loadSaved();
       await _loadMusicMuted();
       if (!_isAudioMuted) {
@@ -2485,6 +2589,8 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                               SharPreferences.streakFlowStepsCompletedToday, 3);
                           await _storeActiveStreakFlowSteps(3);
                           if (!mounted) return;
+                          await precacheStreakPhotoBackgrounds(context);
+                          if (!mounted) return;
                           Get.to(() => StreakPrayerScreen(
                                 item: item,
                                 viewOnly: widget.viewOnly,
@@ -2572,6 +2678,7 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      precacheStreakPhotoBackgrounds(context);
       _loadSaved();
       await _loadMusicMuted();
       if (!_isAudioMuted) {

@@ -510,6 +510,37 @@ class _SettingScreenState extends State<SettingScreen>
     return time.replaceAll(':', '.');
   }
 
+  Color _settingsSectionBarColor(BuildContext context) {
+    final isDark =
+        Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark;
+    if (isDark) return Colors.black45;
+    return CommanColor.lightDarkPrimary200(context).withOpacity(0.62);
+  }
+
+  TextStyle _settingsSectionBarTextStyle(BuildContext context) {
+    final isDark =
+        Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark;
+    return CommanStyle.white14500.copyWith(
+      fontWeight: FontWeight.w600,
+      letterSpacing: BibleInfo.letterSpacing,
+      color: isDark ? Colors.white : CommanColor.lightDarkPrimary(context),
+    );
+  }
+
+  Widget _buildSettingsSectionHeader(String title, double screenWidth) {
+    return Container(
+      height: screenWidth < 380 ? 32 : 36,
+      color: _settingsSectionBarColor(context),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      width: MediaQuery.of(context).size.width,
+      alignment: Alignment.centerLeft,
+      child: Text(
+        title,
+        style: _settingsSectionBarTextStyle(context),
+      ),
+    );
+  }
+
   Widget _buildNotificationScheduleRow({
     required String label,
     required NotificationTime notificationTime,
@@ -540,8 +571,11 @@ class _SettingScreenState extends State<SettingScreen>
       rowBorder = primary.withOpacity(0.5);
       iconRingColor = primary.withOpacity(0.85);
     }
-    const timePillFill = Color(0xFF3D2914);
-    const timePillTextColor = Colors.white;
+    final timePillFill =
+        isDark ? const Color(0xFF3D2914) : primary.withOpacity(0.82);
+    final timePillTextColor = Colors.white;
+    final timePillBorderColor =
+        isDark ? rowBorder : primary.withOpacity(0.38);
     final switchInactiveColor =
         isDark ? const Color(0xFF6B6B6B) : const Color(0xFF9E9E9E);
     final iconSize = screenWidth < 380 ? 30.0 : 34.0;
@@ -608,7 +642,8 @@ class _SettingScreenState extends State<SettingScreen>
                         decoration: BoxDecoration(
                           color: timePillFill,
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: rowBorder, width: 1),
+                          border:
+                              Border.all(color: timePillBorderColor, width: 1),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1172,23 +1207,7 @@ class _SettingScreenState extends State<SettingScreen>
                 SizedBox(
                   height: screenWidth < 380 ? 12 : 20,
                 ),
-                Container(
-                  height: screenWidth < 380 ? 32 : 36,
-                  color: Provider.of<ThemeProvider>(context).themeMode ==
-                          ThemeMode.dark
-                      ? Colors.black45
-                      : const Color(0xFF4A342B).withOpacity(0.92),
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  width: MediaQuery.of(context).size.width,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Notification',
-                    style: CommanStyle.white14500.copyWith(
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: BibleInfo.letterSpacing,
-                    ),
-                  ),
-                ),
+                _buildSettingsSectionHeader('Notification', screenWidth),
                 SizedBox(height: screenWidth < 380 ? 8 : 10),
                 _buildNotificationScheduleRow(
                   label: 'Morning',
@@ -1206,23 +1225,7 @@ class _SettingScreenState extends State<SettingScreen>
                   screenWidth: screenWidth,
                 ),
                 SizedBox(height: screenWidth < 380 ? 10 : 12),
-                Container(
-                  height: screenWidth < 380 ? 32 : 36,
-                  color: Provider.of<ThemeProvider>(context).themeMode ==
-                          ThemeMode.dark
-                      ? Colors.black45
-                      : const Color(0xFF4A342B).withOpacity(0.92),
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  width: MediaQuery.of(context).size.width,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Verse of the Day',
-                    style: CommanStyle.white14500.copyWith(
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: BibleInfo.letterSpacing,
-                    ),
-                  ),
-                ),
+                _buildSettingsSectionHeader('Verse of the Day', screenWidth),
                 const SizedBox(
                   height: 5,
                 ),
@@ -1260,23 +1263,7 @@ class _SettingScreenState extends State<SettingScreen>
                 const SizedBox(
                   height: 5,
                 ),
-                Container(
-                  height: screenWidth < 380 ? 32 : 36,
-                  color: Provider.of<ThemeProvider>(context).themeMode ==
-                          ThemeMode.dark
-                      ? Colors.black45
-                      : const Color(0xFF4A342B).withOpacity(0.92),
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  width: MediaQuery.of(context).size.width,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Appearance',
-                    style: CommanStyle.white14500.copyWith(
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: BibleInfo.letterSpacing,
-                    ),
-                  ),
-                ),
+                _buildSettingsSectionHeader('Appearance', screenWidth),
                 const SizedBox(
                   height: 5,
                 ),
@@ -1410,23 +1397,7 @@ class _SettingScreenState extends State<SettingScreen>
                 const SizedBox(
                   height: 5,
                 ),
-                Container(
-                  height: screenWidth < 380 ? 32 : 36,
-                  color: Provider.of<ThemeProvider>(context).themeMode ==
-                          ThemeMode.dark
-                      ? Colors.black45
-                      : const Color(0xFF4A342B).withOpacity(0.92),
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  width: MediaQuery.of(context).size.width,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Support',
-                    style: CommanStyle.white14500.copyWith(
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: BibleInfo.letterSpacing,
-                    ),
-                  ),
-                ),
+                _buildSettingsSectionHeader('Support', screenWidth),
                 const SizedBox(
                   height: 5,
                 ),
@@ -1599,23 +1570,7 @@ class _SettingScreenState extends State<SettingScreen>
                 const SizedBox(
                   height: 5,
                 ),
-                Container(
-                  height: screenWidth < 380 ? 32 : 36,
-                  color: Provider.of<ThemeProvider>(context).themeMode ==
-                          ThemeMode.dark
-                      ? Colors.black45
-                      : const Color(0xFF4A342B).withOpacity(0.92),
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  width: MediaQuery.of(context).size.width,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'About',
-                    style: CommanStyle.white14500.copyWith(
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: BibleInfo.letterSpacing,
-                    ),
-                  ),
-                ),
+                _buildSettingsSectionHeader('About', screenWidth),
                 const SizedBox(
                   height: 5,
                 ),
@@ -1651,54 +1606,39 @@ class _SettingScreenState extends State<SettingScreen>
                   height: 5,
                 ),
                 Padding(
-                  padding: const EdgeInsets.only(left: 9, right: 20, top: 1),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      TextButton(
-                        onPressed: () async {
-                          await SharPreferences.setString('OpenAd', '1');
-                          if (Platform.isAndroid) {
-                            launchUrl(
-                                Uri.parse(
-                                    "https://play.google.com/store/apps/dev?id=8519850462019154979"),
-                                mode: LaunchMode.externalApplication);
-                          } else if (Platform.isIOS) {
-                            launchUrl(
-                                Uri.parse(
-                                    "https://apps.apple.com/us/developer/balasubramaniyan-thambusamy/id1701606111"),
-                                mode: LaunchMode.externalApplication);
-                          }
-                        },
-                        child: Text(
+                  padding: EdgeInsets.symmetric(
+                      horizontal: 20, vertical: screenWidth < 380 ? 5 : 10),
+                  child: InkWell(
+                    onTap: () async {
+                      await SharPreferences.setString('OpenAd', '1');
+                      if (Platform.isAndroid) {
+                        launchUrl(
+                            Uri.parse(
+                                "https://play.google.com/store/apps/dev?id=8519850462019154979"),
+                            mode: LaunchMode.externalApplication);
+                      } else if (Platform.isIOS) {
+                        launchUrl(
+                            Uri.parse(
+                                "https://apps.apple.com/us/developer/balasubramaniyan-thambusamy/id1701606111"),
+                            mode: LaunchMode.externalApplication);
+                      }
+                    },
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        Text(
                           "More Apps",
                           style: CommanStyle.bw16500(context),
                         ),
-                      ),
-                      const Spacer(),
-                      InkWell(
-                        onTap: () async {
-                          await SharPreferences.setString('OpenAd', '1');
-                          if (Platform.isAndroid) {
-                            launchUrl(
-                                Uri.parse(
-                                    "https://play.google.com/store/apps/dev?id=8519850462019154979"),
-                                mode: LaunchMode.externalApplication);
-                          } else if (Platform.isIOS) {
-                            launchUrl(
-                                Uri.parse(
-                                    "https://apps.apple.com/us/developer/balasubramaniyan-thambusamy/id1701606111"),
-                                mode: LaunchMode.externalApplication);
-                          }
-                        },
-                        child: Icon(
+                        const Spacer(),
+                        Icon(
                           Icons.navigate_next,
                           color: CommanColor.whiteBlack(context),
                           size: 24,
                         ),
-                      )
-                    ],
+                      ],
+                    ),
                   ),
                 ),
 

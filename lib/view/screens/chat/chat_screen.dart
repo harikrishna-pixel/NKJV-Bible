@@ -581,21 +581,21 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         decoration: BoxDecoration(
           color: isSelected
               ? (isDark
-                  ? CommanColor.lightDarkPrimary(context).withOpacity(0.15)
+                  ? Colors.white.withOpacity(0.14)
                   : CommanColor.lightDarkPrimary(context).withOpacity(0.08))
               : (isDark
-                  ? const Color(0xFF4A342B)
+                  ? Colors.black.withOpacity(0.22)
                   : Colors.grey.shade50),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
                 ? (isDark
-                    ? Colors.white
+                    ? const Color(0xFFFFD54F)
                     : CommanColor.lightDarkPrimary(context))
                 : (isDark
-                    ? Colors.white.withOpacity(0.45)
+                    ? Colors.white.withOpacity(0.22)
                     : Colors.grey.shade200),
-            width: isSelected ? 2 : 1.5,
+            width: isSelected ? 2 : 1,
           ),
         ),
         child: Row(
@@ -608,14 +608,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: isSelected
-                      ? CommanColor.lightDarkPrimary(context)
+                      ? (isDark
+                          ? Colors.white
+                          : CommanColor.lightDarkPrimary(context))
                       : (isDark
-                          ? Colors.white.withOpacity(0.4)
+                          ? Colors.white.withOpacity(0.35)
                           : Colors.grey.shade400),
                   width: 2,
                 ),
                 color: isSelected
-                    ? CommanColor.lightDarkPrimary(context)
+                    ? (isDark
+                        ? Colors.white
+                        : CommanColor.lightDarkPrimary(context))
                     : Colors.transparent,
               ),
               child: isSelected
@@ -623,9 +627,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       child: Container(
                         width: 10,
                         height: 10,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.white,
+                          color: isDark
+                              ? const Color(0xFF3D2914)
+                              : Colors.white,
                         ),
                       ),
                     )
@@ -662,7 +668,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? CommanColor.lightDarkPrimary(context)
+                    ? (isDark
+                        ? const Color(0xFFFFD54F)
+                        : CommanColor.lightDarkPrimary(context))
                     : (isDark
                         ? Colors.white.withOpacity(0.1)
                         : CommanColor.lightDarkPrimary(context)
@@ -670,11 +678,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                '$cost',
+                cost,
                 style: TextStyle(
                   color: isSelected
-                      ? Colors.white
-                      : CommanColor.lightDarkPrimary(context),
+                      ? (isDark
+                          ? const Color(0xFF3D2914)
+                          : Colors.white)
+                      : (isDark
+                          ? Colors.white.withOpacity(0.88)
+                          : CommanColor.lightDarkPrimary(context)),
                   fontSize: screenWidth > 450 ? 14 : 13,
                   fontWeight: FontWeight.bold,
                 ),

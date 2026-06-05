@@ -664,6 +664,8 @@ ${category.prompt}
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'prompt': prompt}),
       );
+      print(response.body);
+      print(response.statusCode);
 
       String responseText = 'Sorry, I could not generate a response.';
       if (response.statusCode == 200) {
@@ -1958,21 +1960,21 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
         decoration: BoxDecoration(
           color: isSelected
               ? (isDark
-                  ? CommanColor.lightDarkPrimary(context).withOpacity(0.15)
+                  ? Colors.white.withOpacity(0.14)
                   : CommanColor.lightDarkPrimary(context).withOpacity(0.08))
               : (isDark
-                  ? const Color(0xFF4A342B)
+                  ? Colors.black.withOpacity(0.22)
                   : Colors.grey.shade50),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
                 ? (isDark
-                    ? Colors.white
+                    ? const Color(0xFFFFD54F)
                     : CommanColor.lightDarkPrimary(context))
                 : (isDark
-                    ? Colors.white.withOpacity(0.45)
+                    ? Colors.white.withOpacity(0.22)
                     : Colors.grey.shade200),
-            width: isSelected ? 2 : 1.5,
+            width: isSelected ? 2 : 1,
           ),
         ),
         child: Row(
@@ -1984,14 +1986,18 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: isSelected
-                      ? CommanColor.lightDarkPrimary(context)
+                      ? (isDark
+                          ? Colors.white
+                          : CommanColor.lightDarkPrimary(context))
                       : (isDark
-                          ? Colors.white.withOpacity(0.4)
+                          ? Colors.white.withOpacity(0.35)
                           : Colors.grey.shade400),
                   width: 2,
                 ),
                 color: isSelected
-                    ? CommanColor.lightDarkPrimary(context)
+                    ? (isDark
+                        ? Colors.white
+                        : CommanColor.lightDarkPrimary(context))
                     : Colors.transparent,
               ),
               child: isSelected
@@ -1999,9 +2005,11 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                       child: Container(
                         width: 10,
                         height: 10,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.white,
+                          color: isDark
+                              ? const Color(0xFF3D2914)
+                              : Colors.white,
                         ),
                       ),
                     )
@@ -2041,21 +2049,27 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
               ),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? CommanColor.lightDarkPrimary(context)
-                        .withOpacity(0.15)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: CommanColor.lightDarkPrimary(context)
-                      .withOpacity(0.6),
-                ),
+                    ? (isDark
+                        ? const Color(0xFFFFD54F)
+                        : CommanColor.lightDarkPrimary(context))
+                    : (isDark
+                        ? Colors.white.withOpacity(0.1)
+                        : CommanColor.lightDarkPrimary(context)
+                            .withOpacity(0.1)),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 cost,
                 style: TextStyle(
-                  color: CommanColor.lightDarkPrimary(context),
-                  fontSize: screenWidth > 450 ? 13 : 12,
-                  fontWeight: FontWeight.w600,
+                  color: isSelected
+                      ? (isDark
+                          ? const Color(0xFF3D2914)
+                          : Colors.white)
+                      : (isDark
+                          ? Colors.white.withOpacity(0.88)
+                          : CommanColor.lightDarkPrimary(context)),
+                  fontSize: screenWidth > 450 ? 14 : 13,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
@@ -2381,10 +2395,22 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
   bool _prayerGuidanceHasAiResponse() =>
       _messages.any((message) => !message.isUser);
 
+  bool _isPrayerGenerationError(String text) {
+    final lower = text.trim().toLowerCase();
+    return lower.contains('sorry, i could not generate') ||
+        lower.contains('could not generate a prayer') ||
+        lower.startsWith('error:');
+  }
+
+  bool _prayerGuidanceHasValidPrayerContent() => _messages.any(
+        (message) =>
+            !message.isUser && !_isPrayerGenerationError(message.text),
+      );
+
   static const Color _kPrayerGuidanceInk = Color(0xFF3D2914);
   static const Color _kPrayerGuidanceGold = Color(0xFFC59434);
   static const Color _kPrayerGuidanceCream = Color(0xFFF8F4EE);
-  static const String _kPrayerResponseTopBg = 'assets/payment_bg.png';
+  static const String _kPrayerResponseTopBg = 'assets/back3.png';
 
   String _prayerInstructionalSubtitle(String title) {
     final index = _categories.indexWhere((category) => category.title == title);
@@ -2396,6 +2422,38 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
 
   Color _guidanceResponseTextColor(BuildContext context, bool isDark) {
     return _kPrayerGuidanceInk;
+  }
+
+  Widget _prayerGuidanceResponseSubtitleBanner(String subtitle, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: isDark
+              ? Colors.black.withOpacity(0.48)
+              : Colors.black.withOpacity(0.32),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.white.withOpacity(0.14)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.35,
+              color: Colors.white,
+              fontFamily: 'Georgia',
+              fontWeight: FontWeight.w500,
+              shadows: const [
+                Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 1)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _prayerGuidanceGoldDivider() {
@@ -2695,12 +2753,68 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     );
   }
 
+  BoxDecoration _prayerModeSelectorDecoration({
+    required bool isSelected,
+    required bool isDark,
+    required bool isWhiteLight,
+    required Color accentFill,
+  }) {
+    return BoxDecoration(
+      color: isSelected
+          ? accentFill
+          : (isDark ? Colors.black.withOpacity(0.38) : Colors.white),
+      borderRadius: BorderRadius.circular(28),
+      border: Border.all(
+        color: isSelected
+            ? Colors.transparent
+            : (isDark
+                ? Colors.white.withOpacity(0.55)
+                : (isWhiteLight
+                    ? Colors.grey.shade300
+                    : const Color(0xFFD4C4B0))),
+        width: isDark && !isSelected ? 1.2 : 1,
+      ),
+      boxShadow: isDark && !isSelected
+          ? [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ]
+          : null,
+    );
+  }
+
+  TextStyle _prayerModeSelectorTextStyle({
+    required bool isSelected,
+    required bool isDark,
+    required Color titleInk,
+    FontWeight fontWeight = FontWeight.w600,
+  }) {
+    return TextStyle(
+      color: isSelected
+          ? Colors.white
+          : (isDark ? Colors.white.withOpacity(0.96) : titleInk),
+      fontWeight: isSelected ? FontWeight.w700 : fontWeight,
+      shadows: isDark && !isSelected
+          ? const [
+              Shadow(
+                color: Colors.black54,
+                blurRadius: 5,
+                offset: Offset(0, 1),
+              ),
+            ]
+          : null,
+    );
+  }
+
   Widget _prayerGuidanceResponseHeaderIcon(Size size, {bool compact = false}) {
     final iconSize = compact
-        ? (size.width > 450 ? 64.0 : 56.0)
-        : (size.width > 450 ? 84.0 : 72.0);
+        ? (size.width > 450 ? 128.0 : 112.0)
+        : (size.width > 450 ? 140.0 : 124.0);
     return Image.asset(
-      'assets/complete_image.png',
+      'assets/welcome_prayer.png',
       width: iconSize,
       height: iconSize,
       fit: BoxFit.contain,
@@ -3027,7 +3141,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
         break;
       }
     }
-    final textColor = _guidanceResponseTextColor(context, isDark);
+    final headerColor = isDark ? Colors.white : _kPrayerGuidanceInk;
 
     if (_isLoading && aiText == null) {
       return _buildPrayerCreatingView(context, size, isDark);
@@ -3038,6 +3152,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
         : 'Words of hope from God\'s Word for your heart.';
 
     final horizontalPad = size.width > 450 ? 22.0 : 16.0;
+    final titleSidePad = size.width > 450 ? 56.0 : 48.0;
 
     return SingleChildScrollView(
       controller: _scrollController,
@@ -3058,33 +3173,32 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
               child: _prayerGuidanceResponseHeaderIcon(size, compact: true),
             ),
             const SizedBox(height: 4),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: size.width > 450 ? 26 : 24,
-                fontWeight: FontWeight.w700,
-                color: textColor,
-                fontFamily: 'Georgia',
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: titleSidePad),
+              child: Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: size.width > 450 ? 26 : 24,
+                  fontWeight: FontWeight.w700,
+                  color: headerColor,
+                  fontFamily: 'Georgia',
+                  shadows: isDark
+                      ? const [
+                          Shadow(
+                            color: Colors.black87,
+                            blurRadius: 10,
+                            offset: Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
               ),
             ),
             const SizedBox(height: 6),
             _prayerGuidanceGoldDivider(),
             const SizedBox(height: 6),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                instructional,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: size.width > 450 ? 15 : 14,
-                  height: 1.35,
-                  color: textColor.withOpacity(0.82),
-                  fontFamily: 'Georgia',
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
+            _prayerGuidanceResponseSubtitleBanner(instructional, isDark),
             const SizedBox(height: 12),
             if (aiText != null) ...[
               _buildPrayerResponseCard(aiText, size, isDark),
@@ -3159,7 +3273,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                             Icons.arrow_back_ios,
                             color: _prayerGuidanceIsMainScreen()
                                 ? CommanColor.whiteBlack(context)
-                                : _kPrayerGuidanceInk,
+                                : (isDark ? Colors.white : _kPrayerGuidanceInk),
                             size: 18,
                           ),
                         ),
@@ -3177,15 +3291,17 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                               color: Provider.of<ThemeProvider>(context)
                                           .themeMode ==
                                       ThemeMode.dark
-                                  ? CommanColor.darkPrimaryColor
-                                      .withOpacity(0.35)
+                                  ? (_prayerGuidanceHasAiResponse()
+                                      ? Colors.black.withOpacity(0.55)
+                                      : CommanColor.darkPrimaryColor
+                                          .withOpacity(0.55))
                                   : const Color(0xFFF6F1E9).withOpacity(0.65),
                               borderRadius: BorderRadius.circular(22),
                               border: Border.all(
                                 color: Provider.of<ThemeProvider>(context)
                                             .themeMode ==
                                         ThemeMode.dark
-                                    ? Colors.white.withOpacity(0.18)
+                                    ? Colors.white.withOpacity(0.28)
                                     : const Color(0xFF8D6E63)
                                         .withOpacity(0.18),
                               ),
@@ -3214,7 +3330,9 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                                 ThemeMode.dark
                                             ? Colors.white
                                             : const Color(0xFF8D6E63))
-                                        : _kPrayerGuidanceInk,
+                                        : (isDark
+                                            ? Colors.white
+                                            : _kPrayerGuidanceInk),
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
@@ -3227,7 +3345,9 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                               ThemeMode.dark
                                               ? Colors.white
                                               : const Color(0xFF8D6E63))
-                                          : _kPrayerGuidanceInk,
+                                          : (isDark
+                                              ? Colors.white
+                                              : _kPrayerGuidanceInk),
                                       fontSize:
                                           size.width > 450 ? 14 : 13,
                                       fontWeight: FontWeight.w700,
@@ -3288,7 +3408,16 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                   Icon(
                                     Icons.volunteer_activism,
                                     size: size.width > 450 ? 56 : 48,
-                                    color: isDark ? Colors.white70 : accentFill,
+                                    color: isDark ? Colors.white : accentFill,
+                                    shadows: isDark
+                                        ? const [
+                                            Shadow(
+                                              color: Colors.black54,
+                                              blurRadius: 8,
+                                              offset: Offset(0, 2),
+                                            ),
+                                          ]
+                                        : null,
                                   ),
                                   const SizedBox(height: 12),
                                   Text(
@@ -3297,9 +3426,18 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      color: titleInk,
+                                      color: isDark ? Colors.white : titleInk,
                                       fontSize: size.width > 450 ? 24 : 22,
                                       fontFamily: 'Georgia',
+                                      shadows: isDark
+                                          ? const [
+                                              Shadow(
+                                                color: Colors.black87,
+                                                blurRadius: 10,
+                                                offset: Offset(0, 2),
+                                              ),
+                                            ]
+                                          : null,
                                     ),
                                   ),
                                   const SizedBox(height: 6),
@@ -3308,9 +3446,26 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       color: isDark
-                                          ? Colors.white70
+                                          ? Colors.white
                                           : const Color(0xFF6D6D6D),
                                       fontSize: size.width > 450 ? 15 : 14,
+                                      fontWeight:
+                                          isDark ? FontWeight.w500 : FontWeight.w400,
+                                      height: 1.35,
+                                      shadows: isDark
+                                          ? const [
+                                              Shadow(
+                                                color: Colors.black87,
+                                                blurRadius: 12,
+                                                offset: Offset(0, 2),
+                                              ),
+                                              Shadow(
+                                                color: Colors.black54,
+                                                blurRadius: 4,
+                                                offset: Offset(0, 1),
+                                              ),
+                                            ]
+                                          : null,
                                     ),
                                   ),
                                   const SizedBox(height: 16),
@@ -3332,35 +3487,23 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                           },
                                           borderRadius: BorderRadius.circular(28),
                                           child: Container(
-                                            padding: const EdgeInsets.symmetric(vertical: 10),
-                                            decoration: BoxDecoration(
-                                              color: _isPrayForMeMode
-                                                  ? accentFill
-                                                  : (isDark
-                                                      ? Colors.transparent
-                                                      : Colors.white),
-                                              borderRadius: BorderRadius.circular(28),
-                                              border: Border.all(
-                                                color: _isPrayForMeMode
-                                                    ? Colors.transparent
-                                                    : (isDark
-                                                        ? Colors.white24
-                                                        : (isWhiteLight
-                                                            ? Colors.grey
-                                                                .shade300
-                                                            : const Color(
-                                                                0xFFD4C4B0))),
-                                              ),
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 10),
+                                            decoration:
+                                                _prayerModeSelectorDecoration(
+                                              isSelected: _isPrayForMeMode,
+                                              isDark: isDark,
+                                              isWhiteLight: isWhiteLight,
+                                              accentFill: accentFill,
                                             ),
                                             child: Center(
                                               child: Text(
                                                 'Pray for Me',
-                                                style: TextStyle(
-                                                  color: _isPrayForMeMode
-                                                      ? Colors.white
-                                                      : (isDark
-                                                          ? Colors.white70
-                                                          : titleInk),
+                                                style:
+                                                    _prayerModeSelectorTextStyle(
+                                                  isSelected: _isPrayForMeMode,
+                                                  isDark: isDark,
+                                                  titleInk: titleInk,
                                                   fontWeight: FontWeight.w700,
                                                 ),
                                               ),
@@ -3395,25 +3538,14 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                           },
                                           borderRadius: BorderRadius.circular(28),
                                           child: Container(
-                                            padding: const EdgeInsets.symmetric(vertical: 10),
-                                            decoration: BoxDecoration(
-                                              color: !_isPrayForMeMode
-                                                  ? accentFill
-                                                  : (isDark
-                                                      ? Colors.transparent
-                                                      : Colors.white),
-                                              borderRadius: BorderRadius.circular(28),
-                                              border: Border.all(
-                                                color: !_isPrayForMeMode
-                                                    ? Colors.transparent
-                                                    : (isDark
-                                                        ? Colors.white24
-                                                        : (isWhiteLight
-                                                            ? Colors.grey
-                                                                .shade300
-                                                            : const Color(
-                                                                0xFFD4C4B0))),
-                                              ),
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 10),
+                                            decoration:
+                                                _prayerModeSelectorDecoration(
+                                              isSelected: !_isPrayForMeMode,
+                                              isDark: isDark,
+                                              isWhiteLight: isWhiteLight,
+                                              accentFill: accentFill,
                                             ),
                                             child: Stack(
                                               clipBehavior: Clip.none,
@@ -3422,13 +3554,12 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                                 Center(
                                                   child: Text(
                                                     'Community Prayers',
-                                                    style: TextStyle(
-                                                      color: !_isPrayForMeMode
-                                                          ? Colors.white
-                                                          : (isDark
-                                                              ? Colors.white70
-                                                              : titleInk),
-                                                      fontWeight: FontWeight.w600,
+                                                    style:
+                                                        _prayerModeSelectorTextStyle(
+                                                      isSelected:
+                                                          !_isPrayForMeMode,
+                                                      isDark: isDark,
+                                                      titleInk: titleInk,
                                                     ),
                                                   ),
                                                 ),
@@ -3443,7 +3574,11 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                                         color: Colors.red,
                                                         shape: BoxShape.circle,
                                                         border: Border.all(
-                                                          color: Colors.white,
+                                                          color: isDark
+                                                              ? Colors.white
+                                                                  .withOpacity(
+                                                                      0.9)
+                                                              : Colors.white,
                                                           width: 1.5,
                                                         ),
                                                         boxShadow: [
@@ -3529,13 +3664,21 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                             break;
                                         }
 
-                                        // Old paper theme: same texture as screen background
                                         final borderClr = isDark
-                                            ? Colors.white24
+                                            ? Colors.white.withOpacity(0.28)
                                             : const Color(0xFFD4C4B0);
                                         final textClr = isDark
                                             ? Colors.white
                                             : const Color(0xFF3D2914);
+                                        final textShadows = isDark
+                                            ? const [
+                                                Shadow(
+                                                  color: Colors.black54,
+                                                  blurRadius: 6,
+                                                  offset: Offset(0, 1),
+                                                ),
+                                              ]
+                                            : null;
 
                                         return InkWell(
                                           onTap: () {
@@ -3551,15 +3694,25 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                                   size.width > 450 ? 20 : 16,
                                             ),
                                             decoration: BoxDecoration(
-                                              image: DecorationImage(
-                                                image: AssetImage(Images
-                                                    .bgImage(context)),
-                                                fit: BoxFit.cover,
-                                              ),
-                                              color: (isDark
-                                                      ? Colors.black
-                                                      : Colors.white)
-                                                  .withOpacity(0.15),
+                                              image: isDark
+                                                  ? null
+                                                  : DecorationImage(
+                                                      image: AssetImage(
+                                                          Images.bgImage(
+                                                              context)),
+                                                      fit: BoxFit.cover,
+                                                      colorFilter:
+                                                          ColorFilter.mode(
+                                                        Colors.white
+                                                            .withOpacity(0.12),
+                                                        BlendMode.srcATop,
+                                                      ),
+                                                    ),
+                                              color: isDark
+                                                  ? Colors.black
+                                                      .withOpacity(0.48)
+                                                  : Colors.white
+                                                      .withOpacity(0.88),
                                               borderRadius:
                                                   BorderRadius.circular(16),
                                               border: Border.all(
@@ -3577,6 +3730,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                                       ? 30
                                                       : 26,
                                                   color: textClr,
+                                                  shadows: textShadows,
                                                 ),
                                                 const SizedBox(height: 8),
                                                 Text(
@@ -3589,6 +3743,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                                         ? 15
                                                         : 13,
                                                     color: textClr,
+                                                    shadows: textShadows,
                                                   ),
                                                 ),
                                                 const SizedBox(height: 6),
@@ -3599,8 +3754,13 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                                   textAlign: TextAlign.center,
                                                   style: TextStyle(
                                                     fontSize: size.width > 450 ? 13 : 12,
-                                                    color: textClr.withOpacity(0.85),
+                                                    color: isDark
+                                                        ? Colors.white
+                                                            .withOpacity(0.9)
+                                                        : textClr
+                                                            .withOpacity(0.85),
                                                     fontWeight: FontWeight.w400,
+                                                    shadows: textShadows,
                                                   ),
                                                 ),
                                               ],
@@ -3621,8 +3781,8 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                       : _buildPrayerResponseView(
                           context, size, isDark, accentFill),
                 ),
-                // AMEN button at the bottom - only show after prayer is generated (at least one AI response)
-                if (_messages.any((m) => !m.isUser))
+                // AMEN button at the bottom - only show after valid prayer content is generated
+                if (_prayerGuidanceHasValidPrayerContent())
                   Padding(
                     padding: EdgeInsets.fromLTRB(
                       size.width > 450 ? 20 : 16,

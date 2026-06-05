@@ -110,7 +110,11 @@ class MoreAppsScreen extends HookConsumerWidget {
               height: 15,
             ),
             appState.isLoading && appState.apps.isEmpty
-                ? const CircularProgressIndicator.adaptive()
+                ? const Expanded(
+                    child: Center(
+                      child: CircularProgressIndicator.adaptive(),
+                    ),
+                  )
                 : Expanded(
                     child: GridView.builder(
                       physics: const BouncingScrollPhysics(),

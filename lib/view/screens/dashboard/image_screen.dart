@@ -427,25 +427,15 @@ class _ImageScreenState extends State<ImageScreen> {
 
                                             // Share the temporary file
                                             // Share.share([tempFile.path]);
-                                            // Share the image using XFile
-                                            final appPackageName =
-                                                (await PackageInfo.fromPlatform()).packageName;
-                                            String appid = BibleInfo.apple_AppId;
-                                            String appLink = "";
-                                            
-                                            if (Platform.isAndroid) {
-                                              appLink =
-                                                  " \n Read More at: https://play.google.com/store/apps/details?id=$appPackageName";
-                                            } else if (Platform.isIOS) {
-                                              appLink =
-                                                  " \n Read More at: https://itunes.apple.com/app/id$appid";
-                                            }
-                                            
-                                            final xFile = XFile(tempFile.path);
-                                            await Share.shareXFiles([xFile],
-                                                text: appLink,
-                                                sharePositionOrigin:
-                                                    centerRect);
+                                            final xFile = XFile(
+                                              tempFile.path,
+                                              mimeType: 'image/png',
+                                              name: 'Bible Verse.png',
+                                            );
+                                            await Share.shareXFiles(
+                                              [xFile],
+                                              sharePositionOrigin: centerRect,
+                                            );
                                           },
                                           style: ButtonStyle(
                                             backgroundColor:

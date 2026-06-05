@@ -2170,12 +2170,16 @@ class _HomeScreenState extends State<HomeScreen>
       final imageFile = File("${directory.path}/dailyverse.png");
       await imageFile.writeAsBytes(pngBytes);
 
-      final xFile = XFile(imageFile.path);
-      await Share.shareXFiles([xFile],
-          subject: '${BibleInfo.bible_shortName} app',
-          text: "",
-          sharePositionOrigin:
-              Rect.fromPoints(const Offset(2, 2), const Offset(3, 3)));
+      final xFile = XFile(
+        imageFile.path,
+        mimeType: 'image/png',
+        name: 'Daily Verse.png',
+      );
+      await Share.shareXFiles(
+        [xFile],
+        sharePositionOrigin:
+            Rect.fromPoints(const Offset(2, 2), const Offset(3, 3)),
+      );
     } catch (e) {
       debugPrint('Error sharing verse: $e');
       if (mounted) {
@@ -7148,10 +7152,8 @@ Future<bool> isTrackingAllowed() async {
     // 1. Platform-specific tracking (iOS ATT)
     bool platformTrackingAllowed = true;
     if (Platform.isIOS) {
-      var status = await AppTrackingTransparency.trackingAuthorizationStatus;
-      if (status == TrackingStatus.notDetermined) {
-        status = await AppTrackingTransparency.requestTrackingAuthorization();
-      }
+      final status =
+          await AppTrackingTransparency.trackingAuthorizationStatus;
       platformTrackingAllowed = status == TrackingStatus.authorized;
     }
 

@@ -264,10 +264,6 @@ class _WalletScreenState extends State<WalletScreen> {
     // Initialize max ads check
     _checkMaxAdsWatched();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _showWalletIntroIfNeeded();
-    });
   }
 
   Future<void> _checkConnectivityAndShowToast() async {

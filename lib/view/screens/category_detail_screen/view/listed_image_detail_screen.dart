@@ -204,23 +204,14 @@ class ListedImageDetailScreen extends HookConsumerWidget {
           return;
         }
 
-        final appPackageName =
-            (await PackageInfo.fromPlatform()).packageName;
-        String appid = BibleInfo.apple_AppId;
-        String appLink = "";
-
-        if (Platform.isAndroid) {
-          appLink =
-              " \n Read More at: https://play.google.com/store/apps/details?id=$appPackageName";
-        } else if (Platform.isIOS) {
-          appLink =
-              " \n Read More at: https://itunes.apple.com/app/id$appid";
-        }
-
         await Share.shareXFiles(
-          [XFile(image.path, mimeType: 'image/png')],
-          subject: 'Bible Book app',
-          text: appLink,
+          [
+            XFile(
+              image.path,
+              mimeType: 'image/png',
+              name: 'Bible Quote.png',
+            ),
+          ],
           sharePositionOrigin: shareOrigin,
         );
       } catch (e) {

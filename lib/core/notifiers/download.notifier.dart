@@ -354,27 +354,17 @@ class DownloadProvider with ChangeNotifier {
       final addedCategories = categories
           .where((String c) => !survivingCategories.contains(c))
           .toList();
+      final missingFromRotation = _categoriesMissingFromPastSchedule(
+        survivingRows,
+        categories,
+      );
 
-      if (addedCategories.isNotEmpty) {
-        final newCategoryData = _interleaveDailyVersesByCategory(
-          filteredData
-              .where((e) =>
-                  addedCategories.contains(e['Category_Name']?.toString()))
-              .toList(),
-          addedCategories,
-        );
-        DateTime currentDate = DateTime.now();
-        for (final row in survivingRows) {
-          try {
-            final parsed = DateTime.parse(row['Date'].toString());
-            if (parsed.isAfter(currentDate)) currentDate = parsed;
-          } catch (_) {}
-        }
-        currentDate = currentDate.add(const Duration(days: 1));
-        await _insertDailyVersesFromMainList(
+      if (addedCategories.isNotEmpty || missingFromRotation) {
+        await _rebalanceFutureDailyVerseSchedule(
           dbClient: dbClient,
-          data: newCategoryData,
-          startDate: currentDate,
+          filteredData: filteredData,
+          categories: categories,
+          survivingRows: survivingRows,
         );
       }
     } else {
@@ -485,6 +475,83 @@ class DownloadProvider with ChangeNotifier {
         currentDate = currentDate.add(const Duration(days: 1));
       }
     }
+  }
+
+  String _dailyVerseScheduleKeyFromMain(Map<String, dynamic> row) {
+    final verseRaw = row['Verse']?.toString() ?? '';
+    final verseNum =
+        verseRaw.contains('-') ? verseRaw.split('-').first : verseRaw;
+    return '${row['Category_Name']}|${row['Book_Id']}|${row['Chapter']}|$verseNum';
+  }
+
+  String _dailyVerseScheduleKeyFromInserted(Map<String, dynamic> row) {
+    return '${row['Category_Name']}|${row['Book_Id']}|${row['Chapter']}|${row['Verse_Num']}';
+  }
+
+  DateTime _dailyVerseDateOnly(DateTime value) =>
+      DateTime(value.year, value.month, value.day);
+
+  bool _categoriesMissingFromPastSchedule(
+    List<Map<String, dynamic>> rows,
+    List<String> categories,
+  ) {
+    final today = _dailyVerseDateOnly(DateTime.now());
+    final represented = <String>{};
+    for (final row in rows) {
+      try {
+        final day = _dailyVerseDateOnly(DateTime.parse(row['Date'].toString()));
+        if (!day.isAfter(today)) {
+          final cat = row['Category_Name']?.toString() ?? '';
+          if (cat.isNotEmpty) represented.add(cat);
+        }
+      } catch (_) {}
+    }
+    return categories.any((c) => !represented.contains(c));
+  }
+
+  /// Rebuilds today-and-future rows so every selected topic (including newly added)
+  /// shares the same round-robin rotation from today onward.
+  Future<void> _rebalanceFutureDailyVerseSchedule({
+    required dynamic dbClient,
+    required List<Map<String, dynamic>> filteredData,
+    required List<String> categories,
+    required List<Map<String, dynamic>> survivingRows,
+  }) async {
+    final today = _dailyVerseDateOnly(DateTime.now());
+    final idsToDelete = <int>[];
+    final pastKeys = <String>{};
+
+    for (final row in survivingRows) {
+      try {
+        final day = _dailyVerseDateOnly(DateTime.parse(row['Date'].toString()));
+        if (day.isBefore(today)) {
+          pastKeys.add(_dailyVerseScheduleKeyFromInserted(row));
+        } else {
+          final id = row['id'];
+          if (id is int) idsToDelete.add(id);
+        }
+      } catch (_) {}
+    }
+
+    if (idsToDelete.isNotEmpty) {
+      final placeholders = List.filled(idsToDelete.length, '?').join(',');
+      await dbClient.rawDelete(
+        'DELETE FROM dailyVersesnew WHERE id IN ($placeholders)',
+        idsToDelete,
+      );
+    }
+
+    final interleaved =
+        _interleaveDailyVersesByCategory(filteredData, categories);
+    final toSchedule = interleaved
+        .where((row) => !pastKeys.contains(_dailyVerseScheduleKeyFromMain(row)))
+        .toList();
+
+    await _insertDailyVersesFromMainList(
+      dbClient: dbClient,
+      data: toSchedule,
+      startDate: today,
+    );
   }
 
 // download limit
@@ -842,16 +909,38 @@ class DownloadProvider with ChangeNotifier {
     final String? cachedJson = prefs.getString('cachedDailyVerseList');
 
     if (!dataIsChanged && cachedJson != null) {
-      // Load from cache
-      final List<dynamic> decoded = jsonDecode(cachedJson);
-      dailyVerseList = decoded
-          .map((e) => DailyVerseList.fromJson(e as Map<String, dynamic>))
-          .toSet()
-          .toList();
-      debugPrint("dailyVerseList is ${dailyVerseList.length}");
-      isLoadingDailyVerse = false;
-      notifyListeners();
-      return;
+      final selectedForCache =
+          prefs.getStringList('selected_categories') ?? [];
+      if (selectedForCache.isNotEmpty) {
+        final dbClient = await DBHelper().db;
+        if (dbClient != null) {
+          final rows =
+              await dbClient.rawQuery("SELECT * FROM dailyVersesnew");
+          if (_categoriesMissingFromPastSchedule(rows, selectedForCache)) {
+            await prefs.setBool('dataIsChanged', true);
+          } else {
+            final List<dynamic> decoded = jsonDecode(cachedJson);
+            dailyVerseList = decoded
+                .map((e) => DailyVerseList.fromJson(e as Map<String, dynamic>))
+                .toSet()
+                .toList();
+            debugPrint("dailyVerseList is ${dailyVerseList.length}");
+            isLoadingDailyVerse = false;
+            notifyListeners();
+            return;
+          }
+        }
+      } else {
+        final List<dynamic> decoded = jsonDecode(cachedJson);
+        dailyVerseList = decoded
+            .map((e) => DailyVerseList.fromJson(e as Map<String, dynamic>))
+            .toSet()
+            .toList();
+        debugPrint("dailyVerseList is ${dailyVerseList.length}");
+        isLoadingDailyVerse = false;
+        notifyListeners();
+        return;
+      }
     }
 
     // Continue loading from DB
@@ -862,7 +951,25 @@ class DownloadProvider with ChangeNotifier {
     if (dbClient == null) return;
 
     final table = selectedCategories.isEmpty ? "dailyVerses" : "dailyVersesnew";
-    final dailyVerses = await dbClient.rawQuery("SELECT * FROM $table");
+    var dailyVerses = await dbClient.rawQuery("SELECT * FROM $table");
+
+    if (table == 'dailyVersesnew' &&
+        selectedCategories.isNotEmpty &&
+        _categoriesMissingFromPastSchedule(dailyVerses, selectedCategories)) {
+      final rawData =
+          await dbClient.rawQuery("SELECT * FROM dailyVersesMainList");
+      final filteredData = await compute(_filterVerses, {
+        'data': rawData,
+        'selectedCategories': selectedCategories,
+      });
+      await _rebalanceFutureDailyVerseSchedule(
+        dbClient: dbClient,
+        filteredData: filteredData,
+        categories: selectedCategories,
+        survivingRows: dailyVerses,
+      );
+      dailyVerses = await dbClient.rawQuery("SELECT * FROM $table");
+    }
 
     final today = DateTime.now();
     final todayString = DateFormat('yyyy-MM-dd').format(today);

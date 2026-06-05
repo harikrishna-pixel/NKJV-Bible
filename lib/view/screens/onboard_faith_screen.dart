@@ -994,23 +994,16 @@ class _OnboardingThemeSelectionScreenState
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const SizedBox(height: 12),
+                            SizedBox(height: isTablet ? 12 : 6),
                             _buildThemeSelectionCard(isTablet, themes),
-                            const SizedBox(height: 20),
+                            SizedBox(height: isTablet ? 20 : 12),
                             _buildPreviewDivider(isTablet),
-                            const SizedBox(height: 12),
-                            if (isTablet)
-                              _buildThemePreviewCard(context, compact: true)
-                            else
-                              Expanded(
-                                child: _buildThemePreviewCard(
-                                  context,
-                                  compact: false,
-                                ),
-                              ),
+                            SizedBox(height: isTablet ? 12 : 8),
+                            _buildThemePreviewCard(context, compact: true),
                             Padding(
                               padding: EdgeInsets.fromLTRB(
-                                  16, 12, 16, 20 + mq.padding.bottom),
+                                  16, isTablet ? 12 : 8, 16,
+                                  isTablet ? 20 + mq.padding.bottom : 12 + mq.padding.bottom),
                               child: SizedBox(
                                 width: double.infinity,
                                 height: isTablet ? 64 : 56,

@@ -102,8 +102,13 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     _initialize();
-    // Request app tracking permission after splash screen is visible for 1-2 seconds
-    _requestTrackingPermission();
+  }
+
+  void _schedulePostSplashAtt() {
+    // Wait for splash navigation + home to mount before ATT pre-dialog.
+    Future.delayed(const Duration(seconds: 3), () {
+      AdConsentManager.showAttFlowIfNeeded();
+    });
   }
 
   loadOpenAd() async {
@@ -225,9 +230,6 @@ class _SplashScreenState extends State<SplashScreen> {
         
         // Debug: Check what DB files exist
         await DBHelper.debugPrintDatabaseFiles();
-        
-        // Essential: Ad consent (non-blocking, can run in background)
-        AdConsentManager.initAppFlow(); // Don't await - let it run in background
         
         // Essential: Reset purchase flags
         await SharPreferences.setBoolean('restorepurches', false);
@@ -471,6 +473,7 @@ class _SplashScreenState extends State<SplashScreen> {
       if (db == null) {
         debugPrint('testapp Core bible check: DB null → Bible restore flow');
         if (BibleInfo.folders.length <= 1) {
+          _schedulePostSplashAtt();
           Get.offAll(() => PreferenceSelectionScreen(
                 isSetting: false,
                 selectedbible: BibleInfo.folders.isNotEmpty
@@ -478,6 +481,7 @@ class _SplashScreenState extends State<SplashScreen> {
                     : '',
               ));
         } else {
+          _schedulePostSplashAtt();
           Get.offAll(() => const BibleVersionsScreen(from: 'onboard'));
         }
         return;
@@ -492,6 +496,7 @@ class _SplashScreenState extends State<SplashScreen> {
           bookCountRows.isNotEmpty ? (bookCountRows.first["c"] as int?) ?? 0 : 0;
       if (verseCount == 0 || bookCount == 0) {
         if (BibleInfo.folders.length <= 1) {
+          _schedulePostSplashAtt();
           Get.offAll(() => PreferenceSelectionScreen(
                 isSetting: false,
                 selectedbible: BibleInfo.folders.isNotEmpty
@@ -499,6 +504,7 @@ class _SplashScreenState extends State<SplashScreen> {
                     : '',
               ));
         } else {
+          _schedulePostSplashAtt();
           Get.offAll(() => const BibleVersionsScreen(from: 'onboard'));
         }
         return;
@@ -507,6 +513,7 @@ class _SplashScreenState extends State<SplashScreen> {
       debugPrint('testapp Core bible data check failed: $e → Bible restore flow');
       try {
         if (BibleInfo.folders.length <= 1) {
+          _schedulePostSplashAtt();
           Get.offAll(() => PreferenceSelectionScreen(
                 isSetting: false,
                 selectedbible: BibleInfo.folders.isNotEmpty
@@ -514,6 +521,7 @@ class _SplashScreenState extends State<SplashScreen> {
                     : '',
               ));
         } else {
+          _schedulePostSplashAtt();
           Get.offAll(() => const BibleVersionsScreen(from: 'onboard'));
         }
       } catch (_) {}
@@ -522,8 +530,10 @@ class _SplashScreenState extends State<SplashScreen> {
 
     // First launch: show welcome -> onboarding questions
     if (isOnboardingCompleted == null || !isOnboardingCompleted) {
+      _schedulePostSplashAtt();
       Get.offAll(() => const WelcomeScreen());
     } else {
+      _schedulePostSplashAtt();
       Future.delayed(
         const Duration(seconds: 1),
         () async {
@@ -1334,32 +1344,45 @@ class SupportDialogContent extends StatelessWidget {
 class AdConsentManager {
   static bool _canRequestAds = false;
   static bool _privacyOptionsRequired = false;
+  static bool _attFlowCompleted = false;
   static const String _prefsDontTrack = "user_dont_track_ads";
   static final _initializationHelper = InitializationHelper();
+
+  /// Requests the system ATT prompt once after splash (no custom pre-dialog).
+  static Future<void> showAttFlowIfNeeded() async {
+    if (_attFlowCompleted) return;
+    _attFlowCompleted = true;
+
+    final prefs = await SharedPreferences.getInstance();
+
+    if (Platform.isIOS) {
+      var status =
+          await AppTrackingTransparency.trackingAuthorizationStatus;
+      if (status == TrackingStatus.notDetermined) {
+        try {
+          status =
+              await AppTrackingTransparency.requestTrackingAuthorization();
+          debugPrint('ATT Status: $status');
+        } on PlatformException catch (e) {
+          debugPrint('ATT Error: ${e.message}');
+        }
+      }
+
+      if (status == TrackingStatus.denied) {
+        await prefs.setBool(_prefsDontTrack, true);
+        debugPrint("ATT denied — storing 'Don't track' and skipping");
+      } else if (status == TrackingStatus.authorized) {
+        await prefs.setBool(_prefsDontTrack, false);
+      }
+    }
+
+    await initAppFlow();
+  }
 
   /// Main initialization flow
   static Future<bool> initAppFlow() async {
     final prefs = await SharedPreferences.getInstance();
-    
-    // Wait a few seconds after splash screen before showing ATT
-    await Future.delayed(const Duration(seconds: 3));
-    
-    try {
-      final status1 =
-          await AppTrackingTransparency.requestTrackingAuthorization();
-      debugPrint('ATT Status: $status1');
-      if (status1 == TrackingStatus.denied) {
-        // User refused — store flag and exit
-        await prefs.setBool(_prefsDontTrack, true);
-        debugPrint("ATT denied 1 — storing 'Don't track' and skipping");
-      } else {
-        await prefs.setBool(_prefsDontTrack, false);
-      }
-      // Notification initialization will be called after notification info screen
-      // await NotificationsServices().initialiseNotifications();
-    } on PlatformException catch (e) {
-      debugPrint('ATT Error: ${e.message}');
-    }
+
     debugPrint("ATT denied 2 — storing 'Don't track' and skipping");
     //  Early exit if "Don't track" flag already set
     if (prefs.getBool(_prefsDontTrack) ?? true) {
@@ -1527,7 +1550,8 @@ class AdConsentManager {
     final prefs = await SharedPreferences.getInstance();
     if (prefs.getBool(_prefsDontTrack) ?? false) return false;
 
-    final status = await AppTrackingTransparency.requestTrackingAuthorization();
+    final status =
+        await AppTrackingTransparency.trackingAuthorizationStatus;
     if (status == TrackingStatus.denied) return false;
 
     final consentStatus = await ConsentInformation.instance.getConsentStatus();

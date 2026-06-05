@@ -153,6 +153,16 @@ flutter:
     - assets/music/
     - assets/study_plan_images/
     - assets/home-widgets/
+    - assets/home-widgets/light-home_1.png
+    - assets/home-widgets/light-home2.png
+    - assets/home-widgets/light-home3.png
+    - assets/home-widgets/light-home4.png
+    - assets/home-widgets/light-home-5.png
+    - assets/home-widgets/dark-home_1.png
+    - assets/home-widgets/dark-home2.png
+    - assets/home-widgets/dark-home3.png
+    - assets/home-widgets/dark-home-4.png
+    - assets/home-widgets/dark-home-5.png
     - .env
 
   fonts:

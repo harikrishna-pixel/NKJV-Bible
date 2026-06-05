@@ -26,6 +26,33 @@ class _BookListScreenState extends State<BookListScreen> {
   List<MainBookListModel> newTestmentBookList = [];
   // final  newTestmentBookList = <MainBookListModel>[].obs ;
   bool loader = false;
+  Future<void> _openChapterListForBook(MainBookListModel data) async {
+    await SharPreferences.setString('OpenAd', '1');
+    final previousBookNum =
+        await SharPreferences.getString(SharPreferences.selectedBookNum);
+    final savedChapter =
+        await SharPreferences.getString(SharPreferences.selectedChapter);
+
+    await SharPreferences.setString(
+        SharPreferences.selectedBookNum, data.bookNum.toString());
+    await SharPreferences.setString(
+        SharPreferences.selectedBook, data.title.toString());
+
+    final sameBook = previousBookNum == data.bookNum.toString();
+    final chapterArg =
+        sameBook ? (int.tryParse(savedChapter ?? '') ?? 1) : 1;
+
+    Get.to(
+      () => ChapterListScreen(
+        chapterCount: data.chapterCount,
+        book_num: data.bookNum,
+        selectedChapter: chapterArg,
+      ),
+      transition: Transition.cupertinoDialog,
+      duration: const Duration(milliseconds: 300),
+    );
+  }
+
   readBookJson() {
     DBHelper().db.then((value) {
       value!.rawQuery("SELECT * From book").then((bookResponse) {
@@ -214,28 +241,7 @@ class _BookListScreenState extends State<BookListScreen> {
                                       padding: const EdgeInsets.only(
                                           top: 20.0, bottom: 2),
                                       child: InkWell(
-                                        onTap: () async {
-                                          await SharPreferences.setString(
-                                              'OpenAd', '1');
-                                          SharPreferences.setString(
-                                              SharPreferences.selectedBookNum,
-                                              data.bookNum.toString());
-                                          SharPreferences.setString(
-                                              SharPreferences.selectedBook,
-                                              data.title.toString());
-
-                                          Get.to(
-                                              () => ChapterListScreen(
-                                                    chapterCount:
-                                                        data.chapterCount,
-                                                    book_num: data.bookNum,
-                                                    selectedChapter: 1,
-                                                  ),
-                                              transition:
-                                                  Transition.cupertinoDialog,
-                                              duration: const Duration(
-                                                  milliseconds: 300));
-                                        },
+                                        onTap: () => _openChapterListForBook(data),
                                         child: Row(
                                           mainAxisAlignment:
                                               MainAxisAlignment.start,
@@ -349,27 +355,7 @@ class _BookListScreenState extends State<BookListScreen> {
                                     return Padding(
                                       padding: const EdgeInsets.only(top: 20.0),
                                       child: InkWell(
-                                        onTap: () async {
-                                          await SharPreferences.setString(
-                                              'OpenAd', '1');
-                                          SharPreferences.setString(
-                                              SharPreferences.selectedBookNum,
-                                              data.bookNum.toString());
-                                          SharPreferences.setString(
-                                              SharPreferences.selectedBook,
-                                              data.title.toString());
-                                          Get.to(
-                                              () => ChapterListScreen(
-                                                    chapterCount:
-                                                        data.chapterCount,
-                                                    book_num: data.bookNum,
-                                                    selectedChapter: 1,
-                                                  ),
-                                              transition:
-                                                  Transition.cupertinoDialog,
-                                              duration: const Duration(
-                                                  milliseconds: 300));
-                                        },
+                                        onTap: () => _openChapterListForBook(data),
                                         child: Row(
                                           mainAxisAlignment:
                                               MainAxisAlignment.start,

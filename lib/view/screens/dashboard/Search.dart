@@ -851,6 +851,15 @@ class _SearchScreenState extends State<SearchScreen> {
                                                 _allChapterItem.title ??
                                                     'All Chapter',
                                                 overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize:
+                                                      screenWidth > 450
+                                                          ? 14
+                                                          : 12,
+                                                  color: CommanColor
+                                                      .whiteBlack(context),
+                                                  fontWeight: FontWeight.w600,
+                                                ),
                                               ),
                                             ),
                                             ...bookList
@@ -863,6 +872,17 @@ class _SearchScreenState extends State<SearchScreen> {
                                                       item.title.toString(),
                                                       overflow:
                                                           TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        fontSize:
+                                                            screenWidth > 450
+                                                                ? 14
+                                                                : 12,
+                                                        color: CommanColor
+                                                            .whiteBlack(
+                                                                context),
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
                                                     ),
                                                   ),
                                                 ),
@@ -877,6 +897,17 @@ class _SearchScreenState extends State<SearchScreen> {
                                                       item.title.toString(),
                                                       overflow:
                                                           TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        fontSize:
+                                                            screenWidth > 450
+                                                                ? 14
+                                                                : 12,
+                                                        color: CommanColor
+                                                            .whiteBlack(
+                                                                context),
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
                                                     ),
                                                   ),
                                                 )
@@ -890,6 +921,17 @@ class _SearchScreenState extends State<SearchScreen> {
                                                       item.title.toString(),
                                                       overflow:
                                                           TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        fontSize:
+                                                            screenWidth > 450
+                                                                ? 14
+                                                                : 12,
+                                                        color: CommanColor
+                                                            .whiteBlack(
+                                                                context),
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
                                                     ),
                                                   ),
                                                 )
@@ -943,7 +985,13 @@ class _SearchScreenState extends State<SearchScreen> {
                                       width: screenWidth > 450 ? 220 : 180,
                                       decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(8),
-                                        color: Colors.white,
+                                        color:
+                                            CommanColor.whiteAndDark(context),
+                                        border: Border.all(
+                                          color: CommanColor
+                                              .lightDarkPrimary(context)
+                                              .withOpacity(0.35),
+                                        ),
                                       ),
                                     ),
                                     style: TextStyle(
@@ -1123,7 +1171,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                     "assets/Bookmark icons/Frame 3630.png",
                                                                     height: 28,
                                                                     color: CommanColor
-                                                                        .whiteBlack(
+                                                                        .lightDarkPrimary(
                                                                             context)))),
                                                         const SizedBox(
                                                           height: 15,
@@ -1224,7 +1272,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                 height: 25,
                                                                 width: 15,
                                                                 color: CommanColor
-                                                                    .whiteBlack(
+                                                                    .lightDarkPrimary(
                                                                         context),
                                                               )),
                                                           const SizedBox(
@@ -1332,7 +1380,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                 "assets/share.png",
                                                                 height: 40,
                                                                 color: CommanColor
-                                                                    .whiteBlack(
+                                                                    .lightDarkPrimary(
                                                                         context))),
                                                         const SizedBox(
                                                           height: 15,
@@ -1635,7 +1683,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                               width: 1.4,
                                                                             ),
                                                                           ),
-                                                                          child: Image.asset("assets/Bookmark icons/Frame 3630.png", height: 25, width: 25, color: CommanColor.whiteBlack(context)))),
+                                                                          child: Image.asset("assets/Bookmark icons/Frame 3630.png", height: 25, width: 25, color: CommanColor.lightDarkPrimary(context)))),
                                                                   const SizedBox(
                                                                     height: 15,
                                                                   ),
@@ -1732,7 +1780,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                           width:
                                                                               15,
                                                                           color:
-                                                                              CommanColor.whiteBlack(context),
+                                                                              CommanColor.lightDarkPrimary(context),
                                                                         )),
                                                                     const SizedBox(
                                                                       height:
@@ -1809,7 +1857,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                           height:
                                                                               40,
                                                                           color:
-                                                                              CommanColor.whiteBlack(context))),
+                                                                              CommanColor.lightDarkPrimary(context))),
                                                                   const SizedBox(
                                                                     height: 15,
                                                                   ),

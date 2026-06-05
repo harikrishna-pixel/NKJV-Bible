@@ -16,6 +16,7 @@ final calendarDataBloc =
 class CalendarDataBloc extends ChangeNotifier {
   List<CalendarModel> overAllCalendarData = [];
   late DateTime focusDate;
+  late DateTime selectedDay;
   late DateTime todayDate;
   late bool isTodaySelected;
   late TextEditingController fieldCon;
@@ -46,6 +47,7 @@ class CalendarDataBloc extends ChangeNotifier {
     });
     todayDate = DateTime.now();
     focusDate = DateTime.now();
+    selectedDay = DateTime.now();
   }
 
   LinkedHashMap<DateTime, List<CalendarModel>> kEvents =
@@ -67,6 +69,7 @@ class CalendarDataBloc extends ChangeNotifier {
 
   void onDaySelected(DateTime selectedDay, DateTime focusedDay) {
     isTodaySelected = isSameDay(focusedDay, todayDate);
+    this.selectedDay = selectedDay;
     focusDate = focusedDay;
     notifyListeners();
   }
