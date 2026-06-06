@@ -147,6 +147,7 @@ class SmartNotificationHelper {
     if (await userHasManualNotificationEnabled()) return;
     final time = await getNotificationTime30MinBefore();
     if (time == null) return;
+    await NotificationsServices.ensureInitialized();
     final content = await getSmartNotificationContent();
     await NotificationsServices().showNotification(
       smartNotificationId,

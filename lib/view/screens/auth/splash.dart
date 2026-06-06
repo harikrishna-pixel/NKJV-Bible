@@ -1427,7 +1427,6 @@ class AdConsentManager {
         debugPrint("ATT denied 5 — storing 'Don't track' and skipping");
         status = await AppTrackingTransparency.requestTrackingAuthorization();
         debugPrint('ATT Status: $status');
-        await NotificationsServices().initialiseNotifications();
       } on PlatformException catch (e) {
         debugPrint('ATT Error: ${e.message}');
       }

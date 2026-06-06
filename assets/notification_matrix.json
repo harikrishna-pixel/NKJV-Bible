@@ -1,0 +1,262 @@
+[
+  {
+    "id": 1,
+    "segment": "NEW_USER",
+    "status": "Installed today",
+    "schedule": {
+      "morning": "VERSE",
+      "afternoon": "AI_CHAT",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 2,
+    "segment": "NEW_USER",
+    "status": "Installed but never opened",
+    "schedule": {
+      "morning": "VERSE",
+      "afternoon": "CHECK_CONNECTION",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 3,
+    "segment": "NEW_USER",
+    "status": "Opened app once",
+    "schedule": {
+      "morning": "DAILY_SCRIPTURE",
+      "afternoon": "AI_CHAT",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 4,
+    "segment": "NEW_USER",
+    "status": "Completed onboarding",
+    "schedule": {
+      "morning": "VERSE",
+      "afternoon": "DAILY_SCRIPTURE",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 5,
+    "segment": "NEW_USER",
+    "status": "Read one chapter",
+    "schedule": {
+      "morning": "DAILY_SCRIPTURE",
+      "afternoon": "DEVOTIONAL",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 6,
+    "segment": "NEW_USER",
+    "status": "Used AI Chat",
+    "schedule": {
+      "morning": "VERSE",
+      "afternoon": "AI_CHAT",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 7,
+    "segment": "NEW_USER",
+    "status": "Read + prayed",
+    "schedule": {
+      "morning": "VERSE",
+      "afternoon": "DEVOTIONAL",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 8,
+    "segment": "NEW_USER",
+    "status": "First streak started",
+    "schedule": {
+      "morning": "STREAKS",
+      "afternoon": "DEVOTIONAL",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 9,
+    "segment": "ACTIVE_USER",
+    "status": "Opened yesterday",
+    "schedule": {
+      "morning": "VERSE",
+      "afternoon": "DAILY_SCRIPTURE",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 10,
+    "segment": "ACTIVE_USER",
+    "status": "Read Bible yesterday",
+    "schedule": {
+      "morning": "VERSE",
+      "afternoon": "DEVOTIONAL",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 11,
+    "segment": "ACTIVE_USER",
+    "status": "Read today already",
+    "schedule": {
+      "morning": "AI_CHAT",
+      "afternoon": "DEVOTIONAL",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 12,
+    "segment": "ACTIVE_USER",
+    "status": "Prayer completed today",
+    "schedule": {
+      "morning": "VERSE",
+      "afternoon": "DAILY_SCRIPTURE",
+      "evening": "DEVOTIONAL"
+    }
+  },
+  {
+    "id": 13,
+    "segment": "ACTIVE_USER",
+    "status": "Opened app today",
+    "schedule": {
+      "morning": "AI_CHAT",
+      "afternoon": "DAILY_SCRIPTURE",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 14,
+    "segment": "ACTIVE_USER",
+    "status": "Opened but no reading",
+    "schedule": {
+      "morning": "DAILY_SCRIPTURE",
+      "afternoon": "CHECK_CONNECTION",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 15,
+    "segment": "ACTIVE_USER",
+    "status": "Active 7 days",
+    "schedule": {
+      "morning": "STREAKS",
+      "afternoon": "DEVOTIONAL",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 16,
+    "segment": "ACTIVE_USER",
+    "status": "Active 30 days",
+    "schedule": {
+      "morning": "STREAKS",
+      "afternoon": "DEVOTIONAL",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 17,
+    "segment": "DORMANT_USER",
+    "status": "3 days inactive",
+    "schedule": {
+      "morning": "VERSE",
+      "afternoon": "CHECK_CONNECTION",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 18,
+    "segment": "DORMANT_USER",
+    "status": "5 days inactive",
+    "schedule": {
+      "morning": "VERSE",
+      "afternoon": "AI_CHAT",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 19,
+    "segment": "DORMANT_USER",
+    "status": "7 days inactive",
+    "schedule": {
+      "morning": "VERSE",
+      "afternoon": "CHECK_CONNECTION",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 20,
+    "segment": "DORMANT_USER",
+    "status": "10 days inactive",
+    "schedule": {
+      "morning": "DAILY_SCRIPTURE",
+      "afternoon": "AI_CHAT",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 21,
+    "segment": "DORMANT_USER",
+    "status": "14 days inactive",
+    "schedule": {
+      "morning": "DEVOTIONAL",
+      "afternoon": "AI_CHAT",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 22,
+    "segment": "DORMANT_USER",
+    "status": "21 days inactive",
+    "schedule": {
+      "morning": "VERSE",
+      "afternoon": "CHECK_CONNECTION",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 23,
+    "segment": "DORMANT_USER",
+    "status": "30 days inactive",
+    "schedule": {
+      "morning": "DEVOTIONAL",
+      "afternoon": "AI_CHAT",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 24,
+    "segment": "DORMANT_USER",
+    "status": "Previously heavy reader",
+    "schedule": {
+      "morning": "DAILY_SCRIPTURE",
+      "afternoon": "DEVOTIONAL",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 25,
+    "segment": "DORMANT_USER",
+    "status": "Previously prayer user",
+    "schedule": {
+      "morning": "VERSE",
+      "afternoon": "CHECK_CONNECTION",
+      "evening": "PRAYER"
+    }
+  },
+  {
+    "id": 26,
+    "segment": "DORMANT_USER",
+    "status": "Previously AI user",
+    "schedule": {
+      "morning": "VERSE",
+      "afternoon": "AI_CHAT",
+      "evening": "PRAYER"
+    }
+  }
+]

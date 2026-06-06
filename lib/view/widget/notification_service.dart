@@ -10,33 +10,47 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 
 class NotificationsServices {
-  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
+  /// Single plugin instance — scheduling must use the same instance that was initialized.
+  static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
+  static bool _initialized = false;
 
-  // final AndroidInitializationSettings _androidInitializationSettings = const AndroidInitializationSettings("logo");
+  /// Plugin init only — no permission dialog. Safe to call at splash / app open.
+  static Future<void> ensureInitialized() async {
+    if (_initialized) return;
 
-  Future<void> initialiseNotifications() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings("@mipmap/ic_launcher");
+        AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    InitializationSettings initializationSettings =
-        const InitializationSettings(
-            android: initializationSettingsAndroid,
-            iOS: DarwinInitializationSettings());
+    // Do not request iOS notification permission here — onboarding screen 4 handles that.
+    const InitializationSettings initializationSettings =
+        InitializationSettings(
+      android: initializationSettingsAndroid,
+      iOS: DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
+      ),
+    );
 
-    await _flutterLocalNotificationsPlugin.initialize(
+    await _plugin.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: _onNotificationTap,
     );
+    _initialized = true;
+  }
 
-    // Request permissions on iOS and Android 13+
+  /// Full init + system permission prompt. Used by onboarding screen 4 only.
+  Future<void> initialiseNotifications() async {
+    await ensureInitialized();
+
     if (Platform.isAndroid) {
-      await _flutterLocalNotificationsPlugin
+      await _plugin
           .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>()
           ?.requestNotificationsPermission();
     } else if (Platform.isIOS) {
-      await _flutterLocalNotificationsPlugin
+      await _plugin
           .resolvePlatformSpecificImplementation<
               IOSFlutterLocalNotificationsPlugin>()
           ?.requestPermissions(
@@ -49,10 +63,9 @@ class NotificationsServices {
 
   /// Call at app startup (e.g. from splash) to store notification payload when app was launched from a notification tap.
   static Future<void> storeLaunchPayloadIfFromNotification() async {
-    final FlutterLocalNotificationsPlugin plugin =
-        FlutterLocalNotificationsPlugin();
+    await ensureInitialized();
     final NotificationAppLaunchDetails? details =
-        await plugin.getNotificationAppLaunchDetails();
+        await _plugin.getNotificationAppLaunchDetails();
     if (details?.didNotificationLaunchApp ?? false) {
       final String? payload = details?.notificationResponse?.payload;
       if (payload != null && payload.isNotEmpty) {
@@ -62,26 +75,32 @@ class NotificationsServices {
     }
   }
 
-  Future<bool> requestNotificationPermissions() async {
-    // Request permission for iOS (automatically done for Android by flutter_local_notifications)
-    final NotificationAppLaunchDetails? notificationAppLaunchDetails =
-        await _flutterLocalNotificationsPlugin
-            .getNotificationAppLaunchDetails();
+  Future<bool> isNotificationPermissionGranted() async {
+    await ensureInitialized();
+    return await Permission.notification.isGranted;
+  }
 
-    if (Platform.isAndroid) {
-      int sdkInt = int.parse(
-          (await Process.run('getprop', ['ro.build.version.sdk']))
-              .stdout
-              .trim());
-      debugPrint("Settime sdk - $sdkInt");
-      if (sdkInt >= 31) {
-        // Only request for Android 12+ (API 31+)
-        if (await Permission.scheduleExactAlarm.isDenied) {
-          await Permission.scheduleExactAlarm.request();
-          debugPrint("Settime sdk - request acess");
-        }
+  Future<void> _ensureExactAlarmIfNeeded() async {
+    if (!Platform.isAndroid) return;
+    try {
+      final result = await Process.run('getprop', ['ro.build.version.sdk']);
+      final sdkInt = int.tryParse(result.stdout.toString().trim()) ?? 0;
+      if (sdkInt >= 31 && await Permission.scheduleExactAlarm.isDenied) {
+        await Permission.scheduleExactAlarm.request();
       }
+    } catch (e) {
+      debugPrint('scheduleExactAlarm check failed: $e');
     }
+  }
+
+  /// Explicit permission request — for Settings / onboarding, not background schedule.
+  Future<bool> requestNotificationPermissions() async {
+    await ensureInitialized();
+
+    final NotificationAppLaunchDetails? notificationAppLaunchDetails =
+        await _plugin.getNotificationAppLaunchDetails();
+
+    await _ensureExactAlarmIfNeeded();
 
     if (notificationAppLaunchDetails?.didNotificationLaunchApp ?? false) {
       final String? payload =
@@ -98,7 +117,6 @@ class NotificationsServices {
     }
 
     final PermissionStatus status = await Permission.notification.request();
-
     return status.isGranted;
   }
 
@@ -107,7 +125,6 @@ class NotificationsServices {
     if (payload != null && payload.isNotEmpty) {
       SharPreferences.setString(
           SharPreferences.pendingNotificationAction, payload);
-      // Navigate to Home so pending action is handled (e.g. open verse, chat, streak).
       Get.offAll(() => HomeScreen(
             From: 'splash',
             selectedVerseNumForRead: '',
@@ -119,17 +136,40 @@ class NotificationsServices {
     }
   }
 
+  /// Next daily fire time in UTC (avoids wrong tz.local defaulting to UTC wall-clock).
+  tz.TZDateTime _nextDailySchedule(int hh, int mm) {
+    tz.initializeTimeZones();
+    final now = DateTime.now();
+    var local = DateTime(now.year, now.month, now.day, hh, mm);
+    if (local.isBefore(now)) {
+      local = local.add(const Duration(days: 1));
+    }
+    final utc = local.toUtc();
+    return tz.TZDateTime.utc(
+      utc.year,
+      utc.month,
+      utc.day,
+      utc.hour,
+      utc.minute,
+      utc.second,
+    );
+  }
+
   /// Schedules a daily notification at hh:mm with optional payload for tap handling.
   Future<void> showNotification(
       int id, String title, String body, int hh, int mm,
       {String? payload}) async {
-    log('Set Notification: $id, $title,$body, $hh,$mm, payload: $payload');
-    var dateTime = DateTime(DateTime.now().year, DateTime.now().month,
-        DateTime.now().day, hh, mm, 0);
-    tz.initializeTimeZones();
-    final setTime = tz.TZDateTime.from(dateTime, tz.local);
-    log('Set Time: $setTime');
-    await _flutterLocalNotificationsPlugin.zonedSchedule(
+    await ensureInitialized();
+    if (!await isNotificationPermissionGranted()) {
+      log('Notification permission not granted — skipped id $id');
+      return;
+    }
+    await _ensureExactAlarmIfNeeded();
+
+    final setTime = _nextDailySchedule(hh, mm);
+    log('Set Notification: $id, $title, $body, $hh:$mm → $setTime, payload: $payload');
+
+    await _plugin.zonedSchedule(
       id,
       title,
       body,
@@ -141,7 +181,52 @@ class NotificationsServices {
           channelDescription: 'Notifications for daily Bible verses',
           importance: Importance.max,
           priority: Priority.max,
-          icon: "@mipmap/ic_launcher",
+          icon: '@mipmap/ic_launcher',
+          sound: const RawResourceAndroidNotificationSound('bell'),
+          playSound: true,
+          enableVibration: true,
+        ),
+        iOS: const DarwinNotificationDetails(
+          sound: 'bell.mp3',
+          presentSound: true,
+        ),
+      ),
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      androidScheduleMode: AndroidScheduleMode.alarmClock,
+      matchDateTimeComponents: DateTimeComponents.time,
+      payload: payload,
+    );
+  }
+
+  /// Scenario notifications — separate channel/IDs from streak (1/2/3) and smart (0).
+  Future<void> showScenarioNotification(
+      int id, String title, String body, int hh, int mm,
+      {String? payload}) async {
+    await ensureInitialized();
+    if (!await isNotificationPermissionGranted()) {
+      log('Notification permission not granted — skipped scenario id $id');
+      return;
+    }
+    await _ensureExactAlarmIfNeeded();
+
+    final setTime = _nextDailySchedule(hh, mm);
+    log('Set Scenario Notification: $id, $title, $body, $hh:$mm → $setTime');
+
+    await _plugin.zonedSchedule(
+      id,
+      title,
+      body,
+      setTime,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          'scenario_notification_channel',
+          'Scenario Notifications',
+          channelDescription:
+              'Personalized Bible reminders based on your journey',
+          importance: Importance.max,
+          priority: Priority.max,
+          icon: '@mipmap/ic_launcher',
           sound: const RawResourceAndroidNotificationSound('bell'),
           playSound: true,
           enableVibration: true,
@@ -160,6 +245,6 @@ class NotificationsServices {
   }
 
   void stopNotification(int id) async {
-    await _flutterLocalNotificationsPlugin.cancel(id);
+    await _plugin.cancel(id);
   }
 }

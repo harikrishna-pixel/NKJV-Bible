@@ -42,8 +42,8 @@ import 'package:biblebookapp/view/screens/chat/chat_screen.dart';
 import 'package:biblebookapp/view/screens/chat/prayer_guidance_screen.dart';
 import 'package:biblebookapp/streak/streak_ui.dart';
 import 'package:biblebookapp/services/smart_notification_helper.dart';
+import 'package:biblebookapp/services/scenario_notification_helper.dart';
 import 'package:biblebookapp/services/streak_notification_helper.dart';
-import 'package:biblebookapp/streak_flow/streak_complete_celebration_dialog.dart';
 import 'package:biblebookapp/streak_flow/streak_flow_screens.dart' hide SharPreferences;
 import '../../constants/share_preferences.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
@@ -1132,6 +1132,7 @@ class _HomeScreenState extends State<HomeScreen>
       await _showStreakCompleteCelebrationIfNeeded();
       SmartNotificationHelper.recordAppOpen();
       await StreakNotificationHelper.rescheduleStreakNotificationsIfEnabled();
+      await ScenarioNotificationHelper.rescheduleScenarioNotificationsIfEnabled();
       SmartNotificationHelper.scheduleSmartNotificationIfNeeded();
       // iOS Home Widgets: update launcher widgets and handle widget tap
       await updateAllLauncherWidgets();
@@ -1166,14 +1167,6 @@ class _HomeScreenState extends State<HomeScreen>
         SharPreferences.streakCelebrationShownDate, today);
     await SharPreferences.setInt(
         SharPreferences.pendingStreakCompleteCelebration, 0);
-    if (!mounted) return;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => StreakCompleteCelebrationDialog(
-        streakCount: count,
-      ),
-    );
   }
 
   Future<void> _handlePendingNotificationAction() async {

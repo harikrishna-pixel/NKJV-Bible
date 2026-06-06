@@ -28,6 +28,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:biblebookapp/services/scenario_notification_helper.dart';
 import 'package:biblebookapp/services/smart_notification_helper.dart';
 import 'package:biblebookapp/services/streak_notification_helper.dart';
 import '../../constants/colors.dart';
@@ -805,13 +806,15 @@ class _SettingScreenState extends State<SettingScreen>
             ? await StreakNotificationHelper.getAfternoonContent()
             : await StreakNotificationHelper.getNightContent();
     await NotificationsServices().showNotification(
-        id, 'Bible', content.message, hh, mm,
+        id, content.title, content.message, hh, mm,
         payload: content.action);
+    await ScenarioNotificationHelper.rescheduleScenarioNotificationsIfEnabled();
   }
 
   disableNotification(NotificationTime notificationTime) {
     NotificationsServices()
         .stopNotification(getNotificationId(notificationTime));
+    ScenarioNotificationHelper.rescheduleScenarioNotificationsIfEnabled();
   }
 
   Future<void> _setNotificationSlotEnabled(

@@ -1,5 +1,4 @@
 import 'package:biblebookapp/view/constants/colors.dart';
-import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -31,6 +30,9 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
     'assets/home-widgets/dark-home-5.png',
   ];
 
+  /// Shifts cover downward to hide baked-in dots/title baked into slide PNGs.
+  static const Alignment _slideAlignment = Alignment(0, 0.18);
+
   int _currentPage = 0;
 
   List<String> _imagePathsForTheme(bool isDark) =>
@@ -39,11 +41,40 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
   bool _isLastPage(bool isDark) =>
       _currentPage >= _imagePathsForTheme(isDark).length - 1;
 
-  Widget _buildSlideImage(String path) {
+  Widget _buildFullScreenSlide(String path) {
     return Image.asset(
       path,
-      fit: BoxFit.contain,
+      fit: BoxFit.cover,
       width: double.infinity,
+      height: double.infinity,
+      alignment: _slideAlignment,
+      gaplessPlayback: true,
+    );
+  }
+
+  Widget _buildPageDots(BuildContext context, int count) {
+    const slotWidth = 28.0;
+    final dotColor = CommanColor.lightDarkPrimary(context);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(count, (index) {
+        final active = index == _currentPage;
+        return SizedBox(
+          width: slotWidth,
+          child: Center(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: active ? 22 : 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: active ? dotColor : dotColor.withOpacity(0.35),
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        );
+      }),
     );
   }
 
@@ -61,43 +92,36 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
     final isTablet = size.width > 600;
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
-    final isVintage =
-        themeProvider.currentCustomTheme == AppCustomTheme.vintage;
     final imagePaths = _imagePathsForTheme(isDark);
     final isLastPage = _isLastPage(isDark);
 
     return Scaffold(
-      backgroundColor:
-          (isVintage && !isDark) ? null : themeProvider.backgroundColor,
-      body: Container(
-        decoration: (isVintage && !isDark)
-            ? BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage(Images.bgImage(context)),
-                  fit: BoxFit.cover,
-                ),
-              )
-            : BoxDecoration(color: themeProvider.backgroundColor),
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isTablet ? 16 : 8,
-                    vertical: 8,
-                  ),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 250),
-                    child: KeyedSubtree(
-                      key: ValueKey<int>(_currentPage),
-                      child: _buildSlideImage(imagePaths[_currentPage]),
-                    ),
-                  ),
-                ),
+      backgroundColor: themeProvider.backgroundColor,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: KeyedSubtree(
+              key: ValueKey<int>(_currentPage),
+              child: _buildFullScreenSlide(imagePaths[_currentPage]),
+            ),
+          ),
+          SafeArea(
+            bottom: false,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: _buildPageDots(context, imagePaths.length),
               ),
-              Padding(
+            ),
+          ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: SafeArea(
+              top: false,
+              child: Padding(
                 padding: EdgeInsets.fromLTRB(
                   isTablet ? 28 : 20,
                   12,
@@ -165,9 +189,9 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
                   ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
