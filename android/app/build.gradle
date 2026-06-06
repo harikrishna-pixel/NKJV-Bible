@@ -46,7 +46,7 @@ android {
 
     defaultConfig {
         applicationId = "com.whitebibles.amplifiedbible"
-        minSdkVersion = 23
+        minSdkVersion = flutter.minSdkVersion
         targetSdkVersion = flutter.compileSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
