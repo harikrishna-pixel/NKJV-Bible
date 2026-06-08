@@ -3202,8 +3202,10 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
             const SizedBox(height: 12),
             if (aiText != null) ...[
               _buildPrayerResponseCard(aiText, size, isDark),
-              const SizedBox(height: 12),
-              _buildPrayerResponseCopyShareRow(aiText, size),
+              if (!_isPrayerGenerationError(aiText)) ...[
+                const SizedBox(height: 12),
+                _buildPrayerResponseCopyShareRow(aiText, size),
+              ],
             ],
           ],
         ),

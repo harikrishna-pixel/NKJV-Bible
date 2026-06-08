@@ -13,7 +13,8 @@ import 'package:biblebookapp/services/paywall_preload_service.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
-import 'package:biblebookapp/streak_flow/streak_flow_screens.dart' hide SharPreferences;
+import 'package:biblebookapp/streak_flow/streak_flow_screens.dart'
+    hide SharPreferences;
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/remove_add-screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -39,12 +40,15 @@ class SubscriptionScreen extends StatefulWidget {
   final String lifeTimePlan;
   final String checkad;
   final bool fromHomeExitOffer;
+
   /// When set after products load, selects 0=six month, 1=one year, 2=lifetime.
   /// Used by milestone Lifetime flows only; default keeps existing behavior.
   final int? initialSelectedPlanIndex;
+
   /// When true, triggers the same existing purchase flow automatically
   /// after products are ready (used by milestone screens).
   final bool autoStartSelectedPlanPurchase;
+
   /// Transparent host: runs IAP (e.g. milestone Unlock) without showing paywall UI.
   final bool invisiblePurchaseHost;
 
@@ -2234,15 +2238,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                           : _buildPaywallPlanRow(controller),
                     ),
                   ),
+                  if (!isPurchaseLoading && _products.isNotEmpty) ...[
                   const SizedBox(height: 20),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _products.isEmpty
-                            ? null
-                            : () async {
+                        onPressed: () async {
                                 await SharPreferences.setString('OpenAd', '1');
                                 await SharPreferences.setBoolean(
                                     'startpurches', true);
@@ -2259,14 +2262,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         ),
                         child: Ink(
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: _products.isEmpty
-                                  ? [Colors.grey, Colors.grey]
-                                  : const [
-                                      Color(0xFFD4894A),
-                                      Color(0xFFB86B2E),
-                                      Color(0xFF8B4E1F),
-                                    ],
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0xFFD4894A),
+                                Color(0xFFB86B2E),
+                                Color(0xFF8B4E1F),
+                              ],
                             ),
                             borderRadius: BorderRadius.circular(30),
                             boxShadow: [
@@ -2302,6 +2303,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       ),
                     ),
                   ),
+                  ],
                   const SizedBox(height: 10),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -2348,8 +2350,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                             'https://bibleoffice.com/terms_conditions.html'),
                         child: const Text(
                           'Terms of Use',
-                          style: TextStyle(
-                              fontSize: 11, color: Color(0xFF757575)),
+                          style:
+                              TextStyle(fontSize: 11, color: Color(0xFF757575)),
                         ),
                       ),
                       TextButton(
@@ -2360,8 +2362,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         },
                         child: const Text(
                           'Restore',
-                          style: TextStyle(
-                              fontSize: 11, color: Color(0xFF757575)),
+                          style:
+                              TextStyle(fontSize: 11, color: Color(0xFF757575)),
                         ),
                       ),
                       TextButton(
@@ -2369,8 +2371,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                             'https://bibleoffice.com/privacy_policy.html'),
                         child: const Text(
                           'Privacy Policy',
-                          style: TextStyle(
-                              fontSize: 11, color: Color(0xFF757575)),
+                          style:
+                              TextStyle(fontSize: 11, color: Color(0xFF757575)),
                         ),
                       ),
                     ],
@@ -2384,17 +2386,27 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               right: 0,
               child: SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Material(
-                    color: Colors.white,
-                    shape: const CircleBorder(),
-                    elevation: 2,
-                    child: IconButton(
-                      icon: const Icon(Icons.close,
-                          color: Color(0xFF5A5A5A), size: 20),
-                      onPressed: () async {
-                        _navigateAwayFromPaywall();
-                      },
+                  padding: const EdgeInsets.all(8),
+                  child: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: Material(
+                      color: Colors.white,
+                      shape: const CircleBorder(),
+                      elevation: 2,
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () async {
+                          _navigateAwayFromPaywall();
+                        },
+                        child: const Center(
+                          child: Icon(
+                            Icons.close,
+                            size: 14,
+                            color: Color(0xFF5A5A5A),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -2409,10 +2421,29 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   static const Color _paywallGold = Color(0xFFC5A059);
   static const Color _paywallInk = Color(0xFF2D2D3A);
 
+  static const String _paywallIconPremium = 'assets/paywall_icons/premium.png';
+  static const String _paywallIconPray =
+      'assets/paywall_icons/praywithguidance.png';
+  static const String _paywallIconScripture =
+      'assets/paywall_icons/read_scripture.png';
+  static const String _paywallIconPeace = 'assets/paywall_icons/finepaeace.png';
+  static const String _paywallIconPlant = 'assets/paywall_icons/plant.png';
+  static const String _paywallIconCrown = 'assets/paywall_icons/crown.png';
+  static const String _paywallIconLowerCost =
+      'assets/paywall_icons/lower_cost.png';
+
+  static const double _kPaywallPremiumBadgeHeight = 52;
+  static const double _kPaywallValueIconSize = 72;
+  static const double _kPaywallPlanIconSize = 64;
+  static const double _kPaywallTrustIconSize = 28;
+  static const double _kPlanBottomBannerHeight = 30;
+  static const double _kPlanSubtitleBlockHeight = 33;
+  static const double _kPlanPriceBlockHeight = 40;
+
   Widget _buildPaywallHeroWithCard(BuildContext context, Size size) {
     final imageHeight = (size.height * 0.40).clamp(280.0, 360.0);
     const cardTopFactor = 0.68;
-    const valueCardHeightEstimate = 140.0;
+    const valueCardHeightEstimate = 188.0;
     final cardTop = imageHeight * cardTopFactor;
 
     return SizedBox(
@@ -2466,30 +2497,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     alignment: Alignment.topLeft,
                     child: Padding(
                       padding: const EdgeInsets.only(left: 16, top: 6),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF4E342E),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.workspace_premium,
-                                color: _paywallGold, size: 16),
-                            SizedBox(width: 6),
-                            Text(
-                              'PREMIUM',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
-                          ],
-                        ),
+                      child: Image.asset(
+                        _paywallIconPremium,
+                        height: _kPaywallPremiumBadgeHeight,
+                        fit: BoxFit.contain,
                       ),
                     ),
                   ),
@@ -2510,8 +2521,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                             'Grow Closer',
                             textAlign: TextAlign.left,
                             style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w800,
+                              fontSize: 34,
+                              fontWeight: FontWeight.w700,
                               color: _paywallInk,
                               height: 1.1,
                             ),
@@ -2520,40 +2531,23 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                             textAlign: TextAlign.left,
                             text: const TextSpan(
                               style: TextStyle(
-                                fontSize: 26,
-                                fontWeight: FontWeight.w800,
+                                fontSize: 34,
+                                fontWeight: FontWeight.w700,
                                 color: _paywallInk,
                                 height: 1.1,
-                                shadows: [
-                                  Shadow(
-                                    color: Color(0x40000000),
-                                    blurRadius: 6,
-                                    offset: Offset(0, 1),
-                                  ),
-                                ],
                               ),
                               children: [
                                 TextSpan(text: 'to '),
                                 TextSpan(
-                                  text: 'God',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    shadows: [
-                                      Shadow(
-                                        color: Color(0x66000000),
-                                        blurRadius: 8,
-                                        offset: Offset(0, 1),
-                                      ),
-                                    ],
-                                  ),
+                                  text: 'God Daily',
+                                  style: TextStyle(color: Colors.brown),
                                 ),
-                                TextSpan(text: ' daily'),
                               ],
                             ),
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Guidance, prayer and encouragement\nwhen you need it',
+                            'Guidance, prayer, and encouragement \n whenever you need it.',
                             textAlign: TextAlign.left,
                             style: TextStyle(
                               fontSize: 14,
@@ -2583,7 +2577,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   Widget _buildPaywallValueCard(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 6),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -2602,7 +2596,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           children: [
             Expanded(
               child: _paywallValueColumn(
-                'assets/offer/fe1.png',
+                _paywallIconPray,
                 'Pray With Confidence',
                 'Support during difficult moments',
               ),
@@ -2614,7 +2608,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             ),
             Expanded(
               child: _paywallValueColumn(
-                'assets/offer/fe2.png',
+                _paywallIconScripture,
                 'Understand Scripture Better',
                 'Make God\'s Word easier to apply',
               ),
@@ -2626,7 +2620,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             ),
             Expanded(
               child: _paywallValueColumn(
-                'assets/offer/fe3.png',
+                _paywallIconPeace,
                 'Find Peace Every Day',
                 'Find hope during challenging times',
               ),
@@ -2646,18 +2640,22 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Column(
         children: [
-          Image.asset(
-            iconAsset,
-            width: 40,
-            height: 40,
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => Icon(
-              Icons.auto_awesome,
-              color: _paywallGold,
-              size: 34,
+          SizedBox(
+            width: _kPaywallValueIconSize,
+            height: _kPaywallValueIconSize,
+            child: Image.asset(
+              iconAsset,
+              width: _kPaywallValueIconSize,
+              height: _kPaywallValueIconSize,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => Icon(
+                Icons.auto_awesome,
+                color: _paywallGold,
+                size: _kPaywallValueIconSize - 8,
+              ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Text(
             title,
             textAlign: TextAlign.center,
@@ -2695,7 +2693,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               'assets/Line 217.png',
               height: 14,
               fit: BoxFit.fitWidth,
-              errorBuilder: (_, __, ___) => Divider(color: Colors.grey.shade400),
+              errorBuilder: (_, __, ___) =>
+                  Divider(color: Colors.grey.shade400),
             ),
           ),
           const Padding(
@@ -2715,7 +2714,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               'assets/Line 216.png',
               height: 14,
               fit: BoxFit.fitWidth,
-              errorBuilder: (_, __, ___) => Divider(color: Colors.grey.shade400),
+              errorBuilder: (_, __, ___) =>
+                  Divider(color: Colors.grey.shade400),
             ),
           ),
         ],
@@ -2780,7 +2780,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   Widget _paywallTrustItem(IconData icon, String title, String subtitle) {
     return Column(
       children: [
-        Icon(icon, size: 22, color: Colors.grey.shade600),
+        Icon(icon, size: _kPaywallTrustIconSize, color: Colors.grey.shade600),
         const SizedBox(height: 6),
         Text(
           title,
@@ -2904,14 +2904,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     return badgeText ?? '';
   }
 
-  IconData _planCenterIcon(int index) {
+  String _planCenterIconAsset(int index) {
     if (_products[index].id == widget.sixMonthPlan) {
-      return Icons.eco_outlined;
+      return _paywallIconPlant;
     }
     if (_products[index].id == widget.oneYearPlan) {
-      return Icons.workspace_premium_outlined;
+      return _paywallIconCrown;
     }
-    return Icons.favorite_border;
+    return _paywallIconLowerCost;
   }
 
   Widget _buildPlanCard(int index, DashBoardController controller) {
@@ -2998,40 +2998,41 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           ),
           Expanded(
             child: Container(
-                decoration: BoxDecoration(
-                  color: bg,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: border, width: borderWidth),
-                  boxShadow: isOneYear || isSelected
-                      ? [
-                          BoxShadow(
-                            color: accent.withValues(alpha: 0.18),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 14),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              _getPlanTitle(index),
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: isSixMonth ? 14 : 15,
-                                fontWeight: FontWeight.w800,
-                                color: isSixMonth ? _paywallInk : accent,
-                              ),
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: border, width: borderWidth),
+                boxShadow: isOneYear || isSelected
+                    ? [
+                        BoxShadow(
+                          color: accent.withValues(alpha: 0.18),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 14),
+                      child: Column(
+                        children: [
+                          Text(
+                            _getPlanTitle(index),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: isSixMonth ? 14 : 15,
+                              fontWeight: FontWeight.w800,
+                              color: isSixMonth ? _paywallInk : accent,
                             ),
-                            const SizedBox(height: 4),
-                            Text(
+                          ),
+                          const SizedBox(height: 4),
+                          SizedBox(
+                            height: _kPlanSubtitleBlockHeight,
+                            child: Text(
                               _getPlanSubtitle(index),
                               textAlign: TextAlign.center,
                               maxLines: 3,
@@ -3045,73 +3046,99 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                            const SizedBox(height: 10),
-                            Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white,
-                                border: Border.all(
-                                  color: accent.withValues(alpha: 0.4),
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: Icon(
-                                _planCenterIcon(index),
-                                color: accent,
-                                size: 22,
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            width: _kPaywallPlanIconSize,
+                            height: _kPaywallPlanIconSize,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white,
+                              border: Border.all(
+                                color: accent.withValues(alpha: 0.4),
+                                width: 1.5,
                               ),
                             ),
-                            const SizedBox(height: 10),
-                            if (discountedPrice.isNotEmpty)
-                              Text(
-                                discountedPrice,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: accent.withValues(alpha: 0.65),
-                                  decoration: TextDecoration.lineThrough,
-                                ),
-                              ),
-                            Text(
-                              _products[index].price,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: isSixMonth ? 16 : 18,
-                                fontWeight: FontWeight.w800,
-                                color: isSixMonth ? _paywallInk : accent,
-                              ),
+                            padding: const EdgeInsets.all(8),
+                            child: Image.asset(
+                              _planCenterIconAsset(index),
+                              width: _kPaywallPlanIconSize - 16,
+                              height: _kPaywallPlanIconSize - 16,
+                              fit: BoxFit.contain,
                             ),
-                          ],
-                        ),
+                          ),
+                          const Spacer(),
+                          SizedBox(
+                            height: _kPlanPriceBlockHeight,
+                            width: double.infinity,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                SizedBox(
+                                  height: 14,
+                                  child: discountedPrice.isNotEmpty
+                                      ? Text(
+                                          discountedPrice,
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            height: 1.1,
+                                            color:
+                                                accent.withValues(alpha: 0.65),
+                                            decoration:
+                                                TextDecoration.lineThrough,
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                                Text(
+                                  _products[index].price,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    height: 1.1,
+                                    fontWeight: FontWeight.w800,
+                                    color: isSixMonth ? _paywallInk : accent,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    if (bottomBanner != null)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 7),
-                        decoration: BoxDecoration(
-                          color: isOneYear
-                              ? accent
-                              : accent.withValues(alpha: 0.14),
-                          borderRadius: const BorderRadius.only(
-                            bottomLeft: Radius.circular(12),
-                            bottomRight: Radius.circular(12),
-                          ),
-                        ),
-                        child: Text(
-                          bottomBanner,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: isOneYear ? Colors.white : accent,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+                  ),
+                  SizedBox(
+                    height: _kPlanBottomBannerHeight,
+                    width: double.infinity,
+                    child: bottomBanner != null
+                        ? DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: isOneYear
+                                  ? accent
+                                  : accent.withValues(alpha: 0.14),
+                              borderRadius: const BorderRadius.only(
+                                bottomLeft: Radius.circular(12),
+                                bottomRight: Radius.circular(12),
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                bottomBanner,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: isOneYear ? Colors.white : accent,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          )
+                        : null,
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -3371,8 +3398,7 @@ class _ExitOfferBottomSheetContentState
                             text: 'Unlock every Premium Bible feature. ',
                           ),
                           TextSpan(
-                            text: widget.exitOffer.item_2?.contains('%') ==
-                                    true
+                            text: widget.exitOffer.item_2?.contains('%') == true
                                 ? widget.exitOffer.item_2!
                                 : '30% Off',
                             style: const TextStyle(

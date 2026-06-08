@@ -1247,7 +1247,34 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
   static const Color _greenBox = Color(0xFFE8F5E9);
   static const Color _greenText = Color(0xFF2E7D32);
   static const Color _tanBox = Color(0xFFF5EDE4);
-  static const Color _iconGrey = Color(0xFF6B5B54);
+
+  static const String _assetRefresh =
+      'assets/export_backup/refresh.png';
+  static const String _assetLockCloud = 'assets/export_backup/lock.png';
+  static const String _assetEncryption =
+      'assets/export_backup/encryption.png';
+  static const String _assetEncryptionSign =
+      'assets/export_backup/encryption-sign.png';
+  static const String _assetDownload =
+      'assets/export_backup/download.png';
+  static const String _assetUpload = 'assets/export_backup/upload.png';
+  static const String _assetPrivacyLock =
+      'assets/export_backup/lock_sigin.png';
+
+  static const double _kStatusIconSize = 56;
+  static const double _kActionIconSize = 56;
+  static const double _kCloudWidth = 140;
+  static const double _kCloudHeight = 128;
+  static const double _kFooterIconSize = 24;
+
+  Widget _backupIcon(String asset, {double size = 28}) {
+    return Image.asset(
+      asset,
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+    );
+  }
 
   String? _userId;
   DateTime? _lastBackup;
@@ -1473,7 +1500,7 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
                         const SizedBox(height: 16),
                         if (_isSignedIn) ...[
                           _primaryActionTile(
-                            icon: Icons.cloud_download_outlined,
+                            iconAsset: _assetDownload,
                             title: 'Restore from Cloud',
                             subtitle:
                                 'Get your library from the latest backup',
@@ -1485,14 +1512,14 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
                           const SizedBox(height: 12),
                         ],
                         _secondaryActionTile(
-                          icon: Icons.file_upload_outlined,
+                          iconAsset: _assetUpload,
                           title: 'Export Library',
                           subtitle: 'Save backup file to your device',
                           onTap: _onExportLibrary,
                         ),
                         const SizedBox(height: 10),
                         _secondaryActionTile(
-                          icon: Icons.file_download_outlined,
+                          iconAsset: _assetDownload,
                           title: 'Import Backup File',
                           subtitle: 'Restore from a saved backup file',
                           onTap: _onImportBackupFile,
@@ -1509,91 +1536,12 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
   }
 
   Widget _cloudIllustration({required bool signedIn}) {
-    const circleSize = 96.0;
-    const cloudSize = 52.0;
     return Center(
-      child: SizedBox(
-        width: 118,
-        height: 108,
-        child: Stack(
-          alignment: Alignment.center,
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              width: circleSize,
-              height: circleSize,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.85),
-                border: Border.all(
-                  color: _brown.withValues(alpha: 0.28),
-                  width: 1.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Transform.translate(
-                    offset: const Offset(0, 2),
-                    child: Icon(
-                      Icons.cloud,
-                      size: cloudSize,
-                      color: Colors.grey.shade400.withValues(alpha: 0.5),
-                    ),
-                  ),
-                  Icon(
-                    Icons.cloud,
-                    size: cloudSize - 2,
-                    color: const Color(0xFFF0EBE6),
-                  ),
-                  Icon(
-                    Icons.cloud,
-                    size: cloudSize - 4,
-                    color: Colors.white,
-                  ),
-                  if (signedIn)
-                    Icon(
-                      Icons.sync_rounded,
-                      size: 22,
-                      color: _brown.withValues(alpha: 0.4),
-                    ),
-                ],
-              ),
-            ),
-            Positioned(
-              right: 4,
-              bottom: 2,
-              child: Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: signedIn ? _greenText : _brown,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: _cream, width: 2.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.15),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  signedIn ? Icons.check_rounded : Icons.lock_rounded,
-                  size: signedIn ? 20 : 18,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ],
-        ),
+      child: Image.asset(
+        signedIn ? _assetRefresh : _assetLockCloud,
+        width: _kCloudWidth,
+        height: _kCloudHeight,
+        fit: BoxFit.contain,
       ),
     );
   }
@@ -1609,7 +1557,7 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.shield_outlined, color: _greenText, size: 30),
+          _backupIcon(_assetEncryption, size: _kStatusIconSize),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -1669,7 +1617,7 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.shield_outlined, color: _iconGrey, size: 30),
+              _backupIcon(_assetEncryptionSign, size: _kStatusIconSize),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -1711,7 +1659,8 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: const [
-                      Icon(Icons.person_outline, color: Colors.white, size: 20),
+                      Icon(Icons.person_outline,
+                          color: Colors.white, size: 20),
                       SizedBox(width: 8),
                       Text(
                         'Sign In to Enable Backup',
@@ -1733,7 +1682,7 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
   }
 
   Widget _primaryActionTile({
-    required IconData icon,
+    required String iconAsset,
     required String title,
     required String subtitle,
     required VoidCallback onTap,
@@ -1748,7 +1697,11 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             children: [
-              Icon(icon, color: Colors.white, size: 28),
+              SizedBox(
+                width: _kActionIconSize,
+                height: _kActionIconSize,
+                child: _backupIcon(iconAsset, size: _kActionIconSize),
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -1783,7 +1736,7 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
   }
 
   Widget _secondaryActionTile({
-    required IconData icon,
+    required String iconAsset,
     required String title,
     required String subtitle,
     required VoidCallback onTap,
@@ -1803,7 +1756,11 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
-                Icon(icon, color: _iconGrey, size: 28),
+                SizedBox(
+                  width: _kActionIconSize,
+                  height: _kActionIconSize,
+                  child: _backupIcon(iconAsset, size: _kActionIconSize),
+                ),
                 const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -1842,7 +1799,7 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(Icons.lock_outline, size: 16, color: _iconGrey),
+        _backupIcon(_assetPrivacyLock, size: _kFooterIconSize),
         const SizedBox(width: 8),
         Expanded(
           child: Text(

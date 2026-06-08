@@ -16,18 +16,18 @@ class AddWidgetIntroScreen extends StatefulWidget {
 class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
   static const List<String> _lightImagePaths = [
     'assets/home-widgets/light-home_1.png',
-    'assets/home-widgets/light-home2.png',
-    'assets/home-widgets/light-home3.png',
-    'assets/home-widgets/light-home4.png',
-    'assets/home-widgets/light-home-5.png',
+    'assets/home-widgets/light-home_2.png',
+    'assets/home-widgets/light-home_3.png',
+    'assets/home-widgets/light-home_4.png',
+    'assets/home-widgets/light-home_5.png',
   ];
 
   static const List<String> _darkImagePaths = [
-    'assets/home-widgets/dark-home_1.png',
-    'assets/home-widgets/dark-home2.png',
-    'assets/home-widgets/dark-home3.png',
-    'assets/home-widgets/dark-home-4.png',
-    'assets/home-widgets/dark-home-5.png',
+    'assets/home-widgets/Dark-home_1.png',
+    'assets/home-widgets/Dark-home_2.png',
+    'assets/home-widgets/Dark-home_3.png',
+    'assets/home-widgets/Dark-home_4.png',
+    'assets/home-widgets/Dark-home_5.png',
   ];
 
   /// Shifts cover downward to hide baked-in dots/title baked into slide PNGs.
@@ -52,29 +52,36 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
     );
   }
 
-  Widget _buildPageDots(BuildContext context, int count) {
+  /// Top indicator — matches baked center-dot style (pill + gold dots).
+  Widget _buildPageDots(BuildContext context, int count, bool isDark) {
     const slotWidth = 28.0;
-    final dotColor = CommanColor.lightDarkPrimary(context);
+    final activeColor = CommanColor.lightDarkPrimary(context);
+    final inactiveColor =
+    isDark ? activeColor.withOpacity(0.35) : const Color(0xFFE5B889);
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(count, (index) {
-        final active = index == _currentPage;
-        return SizedBox(
-          width: slotWidth,
-          child: Center(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: active ? 22 : 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: active ? dotColor : dotColor.withOpacity(0.35),
-                borderRadius: BorderRadius.circular(8),
+    // Directionality ensures dots always render left-to-right (index 0 → last)
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(count, (index) {
+          final active = index == _currentPage;
+          return SizedBox(
+            width: slotWidth,
+            child: Center(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: active ? 22 : 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: active ? activeColor : inactiveColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
-          ),
-        );
-      }),
+          );
+        }),
+      ),
     );
   }
 
@@ -100,6 +107,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
+          // Slide image
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 250),
             child: KeyedSubtree(
@@ -107,16 +115,17 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
               child: _buildFullScreenSlide(imagePaths[_currentPage]),
             ),
           ),
-          SafeArea(
-            bottom: false,
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: _buildPageDots(context, imagePaths.length),
-              ),
+
+          // Top page dots indicator
+          Align(
+            alignment: Alignment.topCenter,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 700),
+              child: _buildPageDots(context, imagePaths.length, isDark),
             ),
           ),
+
+          // Bottom buttons
           Align(
             alignment: Alignment.bottomCenter,
             child: SafeArea(
@@ -175,7 +184,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor:
-                              CommanColor.lightDarkPrimary(context),
+                          CommanColor.lightDarkPrimary(context),
                           foregroundColor: Colors.white,
                           padding: EdgeInsets.symmetric(
                             vertical: isTablet ? 14 : 12,

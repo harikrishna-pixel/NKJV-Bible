@@ -3,7 +3,7 @@ description: A new Flutter project.
 
 publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
-version: 1.0.69+69
+version: 1.0.104+104
 
 environment:
   sdk: ">=3.5.4 <4.0.0"
@@ -153,16 +153,18 @@ flutter:
     - assets/music/
     - assets/study_plan_images/
     - assets/home-widgets/
+    - assets/export_backup/
+    - assets/paywall_icons/
     - assets/home-widgets/light-home_1.png
-    - assets/home-widgets/light-home2.png
-    - assets/home-widgets/light-home3.png
-    - assets/home-widgets/light-home4.png
-    - assets/home-widgets/light-home-5.png
-    - assets/home-widgets/dark-home_1.png
-    - assets/home-widgets/dark-home2.png
-    - assets/home-widgets/dark-home3.png
-    - assets/home-widgets/dark-home-4.png
-    - assets/home-widgets/dark-home-5.png
+    - assets/home-widgets/light-home_2.png
+    - assets/home-widgets/light-home_3.png
+    - assets/home-widgets/light-home_4.png
+    - assets/home-widgets/light-home_5.png
+    - assets/home-widgets/Dark-home_1.png
+    - assets/home-widgets/Dark-home_2.png
+    - assets/home-widgets/Dark-home_3.png
+    - assets/home-widgets/Dark-home_4.png
+    - assets/home-widgets/Dark-home_5.png
     - .env
 
   fonts:

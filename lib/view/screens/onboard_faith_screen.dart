@@ -953,97 +953,124 @@ class _OnboardingThemeSelectionScreenState
             ),
           ),
           SafeArea(
-            child: CustomScrollView(
-              physics: const NeverScrollableScrollPhysics(),
-              slivers: [
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(6, isTablet ? 8 : 4, 6, 0),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          onPressed: () => Get.back(),
-                          icon: const Icon(Icons.arrow_back_ios_new,
-                              size: 20, color: Color(0xFF2E2C2B)),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            "Choose Your Theme",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: isTablet ? 28 : 19,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF2E2C2B),
-                            ),
-                          ),
-                        ),
-                        const Opacity(opacity: 0, child: SizedBox(width: 40)),
-                      ],
-                    ),
-                  ),
-                ),
-                SliverFillRemaining(
-                  hasScrollBody: true,
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: maxContentWidth),
+            child: Stack(
+              children: [
+                CustomScrollView(
+                  physics: const NeverScrollableScrollPhysics(),
+                  slivers: [
+                    SliverToBoxAdapter(
                       child: Padding(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: 16, vertical: isTablet ? 8 : 4),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                        padding:
+                            EdgeInsets.fromLTRB(6, isTablet ? 8 : 4, 6, 0),
+                        child: Row(
                           children: [
-                            SizedBox(height: isTablet ? 12 : 6),
-                            _buildThemeSelectionCard(isTablet, themes),
-                            SizedBox(height: isTablet ? 20 : 12),
-                            _buildPreviewDivider(isTablet),
-                            SizedBox(height: isTablet ? 12 : 8),
-                            _buildThemePreviewCard(context, compact: true),
-                            Padding(
-                              padding: EdgeInsets.fromLTRB(
-                                  16, isTablet ? 12 : 8, 16,
-                                  isTablet ? 20 + mq.padding.bottom : 12 + mq.padding.bottom),
-                              child: SizedBox(
-                                width: double.infinity,
-                                height: isTablet ? 64 : 56,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [
-                                        Color(0xFF763201),
-                                        Color(0xFFD5821F),
-                                        Color(0xFF763201),
-                                      ],
-                                    ),
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: ElevatedButton(
-                                    onPressed: () {
-                                      widget.onThemeSelected();
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.transparent,
-                                      disabledBackgroundColor: Colors.transparent,
-                                      shadowColor: Colors.transparent,
-                                      elevation: 0,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      'Continue',
-                                      style: TextStyle(
-                                        fontSize: isTablet ? 20 : 18,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
+                            IconButton(
+                              onPressed: () => Get.back(),
+                              icon: const Icon(Icons.arrow_back_ios_new,
+                                  size: 20, color: Color(0xFF2E2C2B)),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                "Choose Your Theme",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: isTablet ? 28 : 19,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF2E2C2B),
                                 ),
                               ),
                             ),
+                            const Opacity(
+                                opacity: 0, child: SizedBox(width: 40)),
                           ],
+                        ),
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints:
+                              BoxConstraints(maxWidth: maxContentWidth),
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(
+                                16, isTablet ? 8 : 4, 16, 0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(height: isTablet ? 12 : 6),
+                                _buildThemeSelectionCard(isTablet, themes),
+                                SizedBox(height: isTablet ? 20 : 12),
+                                _buildPreviewDivider(isTablet),
+                                SizedBox(height: isTablet ? 12 : 8),
+                                _buildThemePreviewCard(
+                                    context, compact: true),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SliverToBoxAdapter(
+                      child: SizedBox(
+                        height: (isTablet ? 64 : 56) +
+                            (isTablet ? 32 : 20),
+                      ),
+                    ),
+                  ],
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                        16,
+                        isTablet ? 12 : 8,
+                        16,
+                        isTablet ? 20 : 12),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints:
+                            BoxConstraints(maxWidth: maxContentWidth),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: isTablet ? 64 : 56,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  Color(0xFF763201),
+                                  Color(0xFFD5821F),
+                                  Color(0xFF763201),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: ElevatedButton(
+                              onPressed: () {
+                                widget.onThemeSelected();
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                disabledBackgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: Text(
+                                'Continue',
+                                style: TextStyle(
+                                  fontSize: isTablet ? 20 : 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
