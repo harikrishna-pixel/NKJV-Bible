@@ -4951,8 +4951,9 @@ Your 3 questions (exactly 3 lines):''';
                           fontSize: screenWidth > 450 ? 12 : 11,
                         ),
                       ),
-                      // Show copy and share icons only for non-user messages (results)
-                      if (!isUser)
+                      // Hide copy/share when no real AI response was generated.
+                      if (!isUser &&
+                          !_isFailedChatResponseText(message.text))
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -5060,6 +5061,15 @@ Your 3 questions (exactly 3 lines):''';
     );
   }
 
+  bool _isFailedChatResponseText(String text) {
+    final trimmed = text.trim();
+    final lower = trimmed.toLowerCase();
+    return lower.startsWith('error:') ||
+        trimmed == 'Sorry, I could not generate a response.' ||
+        trimmed == 'Sorry, I could not generate a response. Please try again.' ||
+        lower.contains('sorry, i could not generate');
+  }
+
   String _buildShareText(String text) {
     final androidLink =
         "https://play.google.com/store/apps/details?id=${BibleInfo.android_Package_Name}";
@@ -5091,39 +5101,40 @@ Your 3 questions (exactly 3 lines):''';
       ),
       color: isDark ? CommanColor.darkPrimaryColor : CommanColor.white,
       items: [
-        PopupMenuItem(
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: primaryColor, width: 1.2),
+        if (message.isUser || !_isFailedChatResponseText(message.text))
+          PopupMenuItem(
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: primaryColor, width: 1.2),
+                  ),
+                  child: Image.asset(
+                    "assets/Bookmark icons/Frame 3630.png",
+                    height: screenWidth > 450 ? 16 : 14,
+                    width: screenWidth > 450 ? 16 : 14,
+                    color: primaryColor,
+                  ),
                 ),
-                child: Image.asset(
-                  "assets/Bookmark icons/Frame 3630.png",
-                  height: screenWidth > 450 ? 16 : 14,
-                  width: screenWidth > 450 ? 16 : 14,
-                  color: primaryColor,
+                const SizedBox(width: 12),
+                Text(
+                  ChatTranslations.get('copy', _uiLang),
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: screenWidth > 450 ? 16 : 14,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                ChatTranslations.get('copy', _uiLang),
-                style: TextStyle(
-                  color: textColor,
-                  fontSize: screenWidth > 450 ? 16 : 14,
-                ),
-              ),
-            ],
+              ],
+            ),
+            onTap: () async {
+              await Clipboard.setData(ClipboardData(text: message.text));
+              Constants.showToast(
+                  ChatTranslations.get('copied', _uiLang));
+            },
           ),
-          onTap: () async {
-            await Clipboard.setData(ClipboardData(text: message.text));
-            Constants.showToast(
-                ChatTranslations.get('copied', _uiLang));
-          },
-        ),
-        if (!message.isUser) // Only show Share for reply messages
+        if (!message.isUser && !_isFailedChatResponseText(message.text))
           PopupMenuItem(
             child: Row(
               children: [

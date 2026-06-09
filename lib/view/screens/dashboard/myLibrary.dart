@@ -1258,14 +1258,12 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
   static const String _assetDownload =
       'assets/export_backup/download.png';
   static const String _assetUpload = 'assets/export_backup/upload.png';
-  static const String _assetPrivacyLock =
-      'assets/export_backup/lock_sigin.png';
 
   static const double _kStatusIconSize = 56;
   static const double _kActionIconSize = 56;
-  static const double _kCloudWidth = 140;
-  static const double _kCloudHeight = 128;
-  static const double _kFooterIconSize = 24;
+  static const double _kCloudLayoutHeight = 88;
+  static const double _kCloudImageWidth = 140;
+  static const double _kCloudImageHeight = 128;
 
   Widget _backupIcon(String asset, {double size = 28}) {
     return Image.asset(
@@ -1490,9 +1488,9 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
                             color: _brownMuted.withValues(alpha: 0.9),
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 10),
                         _cloudIllustration(signedIn: _isSignedIn),
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 12),
                         if (_isSignedIn)
                           _signedInStatusBox()
                         else
@@ -1536,12 +1534,23 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
   }
 
   Widget _cloudIllustration({required bool signedIn}) {
-    return Center(
-      child: Image.asset(
-        signedIn ? _assetRefresh : _assetLockCloud,
-        width: _kCloudWidth,
-        height: _kCloudHeight,
-        fit: BoxFit.contain,
+    return SizedBox(
+      height: _kCloudLayoutHeight,
+      width: double.infinity,
+      child: Center(
+        child: OverflowBox(
+          alignment: Alignment.center,
+          minWidth: _kCloudImageWidth,
+          maxWidth: _kCloudImageWidth,
+          minHeight: _kCloudImageHeight,
+          maxHeight: _kCloudImageHeight,
+          child: Image.asset(
+            signedIn ? _assetRefresh : _assetLockCloud,
+            width: _kCloudImageWidth,
+            height: _kCloudImageHeight,
+            fit: BoxFit.contain,
+          ),
+        ),
       ),
     );
   }
@@ -1796,24 +1805,47 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
   }
 
   Widget _privacyFooter({required bool signedIn}) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _backupIcon(_assetPrivacyLock, size: _kFooterIconSize),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            signedIn
-                ? 'Your data is private and secure. We never share your personal content.'
-                : 'Your data is private and secure. Sign in to keep your library protected.',
-            style: TextStyle(
-              fontSize: 11.5,
-              height: 1.4,
-              color: _brownMuted.withValues(alpha: 0.7),
+    final textStyle = TextStyle(
+      fontSize: 11.5,
+      height: 1.35,
+      color: _brownMuted.withValues(alpha: 0.85),
+      fontWeight: FontWeight.w500,
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: _tanBox,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.lock_outline,
+              size: 20,
+              color: _brownMuted.withValues(alpha: 0.85),
             ),
-          ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Your data is private and secure.', style: textStyle),
+                Text(
+                  signedIn
+                      ? 'We never share your personal content.'
+                      : 'Sign in to keep your library protected.',
+                  style: textStyle,
+                ),
+              ],
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

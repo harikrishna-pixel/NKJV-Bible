@@ -1,7 +1,4 @@
 import 'package:biblebookapp/controller/dpProvider.dart';
-import 'package:biblebookapp/core/export_db.dart';
-import 'package:biblebookapp/core/notifiers/download.notifier.dart';
-import 'package:biblebookapp/utils/custom_alert.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/images.dart';
@@ -11,7 +8,6 @@ import 'package:biblebookapp/view/screens/category_detail_screen/bloc/bookmark_s
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/myLibrary.dart';
-import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 import 'package:biblebookapp/view/screens/profile/bloc/user_bloc.dart';
 import 'package:biblebookapp/view/screens/profile/model/library_status_model.dart';
 import 'package:biblebookapp/view/screens/profile/view/edit_profile_screen.dart';
@@ -555,212 +551,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                     children: [
                                       InkWell(
                                         onTap: () async {
-                                      // Same logic as Library hamburger: if subscribed show Export dialog, else show Subscribe dialog
-                                      final downloadProvider =
-                                          P.Provider.of<DownloadProvider>(
-                                              context,
-                                              listen: false);
-                                      final subscriptionPlan =
-                                          await downloadProvider
-                                              .getSubscriptionPlan();
-                                      final isSubscribed =
-                                          subscriptionPlan != null &&
-                                              subscriptionPlan.isNotEmpty &&
-                                              ['platinum', 'gold', 'silver']
-                                                  .contains(subscriptionPlan
-                                                      .toLowerCase());
-                                      if (isSubscribed) {
-                                        showDialog(
-                                          context: context,
-                                          builder: (ct) => BackupDialog(
-                                            type: "export",
-                                            onPrimaryPressed: () async {
-                                              await SharPreferences.setString(
-                                                  'OpenAd', '1');
-                                              if (ct.mounted) {
-                                                await ExportDb
-                                                    .getAllDataToExport(ct)
-                                                    .then((v) async {
-                                                  lastExportedDate =
-                                                      DateTime.tryParse(
-                                                          (await SharPreferences
-                                                                  .getString(
-                                                                      SharPreferences.lastExportedDate) ??
-                                                              ''));
-                                                  setState(() {});
-                                                });
-                                              }
-                                              await SharPreferences.setString(
-                                                  'OpenAd', '1');
-                                            },
-                                            onSecondaryPressed: () {
-                                              Get.back();
-                                            },
-                                          ),
-                                        );
-                                      } else {
-                                        await SharPreferences.setString(
-                                            'OpenAd', '1');
-                                        if (!context.mounted) return;
-                                        showDialog(
-                                          context: context,
-                                          barrierDismissible: false,
-                                          builder: (ctx) {
-                                            final dlgWidth =
-                                                MediaQuery.of(ctx).size.width;
-                                            return Dialog(
-                                              backgroundColor:
-                                                  CommanColor.white,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(15),
-                                              ),
-                                              elevation: 16,
-                                              child: Padding(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 16,
-                                                        vertical: 24),
-                                                child: Column(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment
-                                                          .stretch,
-                                                  children: [
-                                                    Text(
-                                                      "You're not subscribed. Subscribe to export and import your data.",
-                                                      textAlign:
-                                                          TextAlign.center,
-                                                      style: TextStyle(
-                                                        color:
-                                                            CommanColor.black,
-                                                        fontSize: dlgWidth > 450
-                                                            ? 19
-                                                            : 15,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(
-                                                        height: 20),
-                                                    GestureDetector(
-                                                      onTap: () {
-                                                        Navigator.pop(ctx);
-                                                        Get.to(
-                                                          () =>
-                                                              SubscriptionScreen(
-                                                            sixMonthPlan:
-                                                                BibleInfo
-                                                                    .sixMonthPlanid,
-                                                            oneYearPlan:
-                                                                BibleInfo
-                                                                    .oneYearPlanid,
-                                                            lifeTimePlan:
-                                                                BibleInfo
-                                                                    .lifeTimePlanid,
-                                                            checkad: 'profile',
-                                                          ),
-                                                          transition:
-                                                              Transition
-                                                                  .cupertinoDialog,
-                                                          duration:
-                                                              const Duration(
-                                                                  milliseconds:
-                                                                      300),
-                                                        );
-                                                      },
-                                                      child: Container(
-                                                        padding:
-                                                            const EdgeInsets
-                                                                .symmetric(
-                                                                    vertical:
-                                                                        8),
-                                                        decoration:
-                                                            BoxDecoration(
-                                                          color: CommanColor
-                                                              .lightDarkPrimary(
-                                                                  ctx),
-                                                          borderRadius:
-                                                              const BorderRadius
-                                                                  .all(
-                                                                      Radius.circular(5)),
-                                                          boxShadow: const [
-                                                            BoxShadow(
-                                                                color: Colors
-                                                                    .black26,
-                                                                blurRadius: 2)
-                                                          ],
-                                                        ),
-                                                        child: Text(
-                                                          'Subscribe',
-                                                          textAlign:
-                                                              TextAlign.center,
-                                                          style: TextStyle(
-                                                            letterSpacing:
-                                                                BibleInfo
-                                                                    .letterSpacing,
-                                                            fontSize: BibleInfo
-                                                                    .fontSizeScale *
-                                                                14,
-                                                            fontWeight:
-                                                                FontWeight
-                                                                    .w500,
-                                                            color: Colors.white,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(
-                                                        height: 12),
-                                                    GestureDetector(
-                                                      onTap: () =>
-                                                          Navigator.pop(ctx),
-                                                      child: Container(
-                                                        padding:
-                                                            const EdgeInsets
-                                                                .symmetric(
-                                                                    vertical:
-                                                                        8),
-                                                        decoration:
-                                                            BoxDecoration(
-                                                          color: CommanColor
-                                                              .lightGrey1,
-                                                          borderRadius:
-                                                              const BorderRadius
-                                                                  .all(
-                                                                      Radius.circular(5)),
-                                                          boxShadow: const [
-                                                            BoxShadow(
-                                                                color: Colors
-                                                                    .black26,
-                                                                blurRadius: 2)
-                                                          ],
-                                                        ),
-                                                        child: Text(
-                                                          'Cancel',
-                                                          textAlign:
-                                                              TextAlign.center,
-                                                          style: TextStyle(
-                                                            letterSpacing:
-                                                                BibleInfo
-                                                                    .letterSpacing,
-                                                            fontSize: BibleInfo
-                                                                    .fontSizeScale *
-                                                                14,
-                                                            fontWeight:
-                                                                FontWeight
-                                                                .w500,
-                                                            color: CommanColor
-                                                                .black),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                        );
-                                      }
+                                          await SharPreferences.setString(
+                                              'OpenAd', '1');
+                                          if (!context.mounted) return;
+                                          await showDialog(
+                                            context: context,
+                                            builder: (context) =>
+                                                const MainBackupDialog(),
+                                          );
+                                          lastExportedDate =
+                                              DateTime.tryParse(
+                                            (await SharPreferences.getString(
+                                                    SharPreferences
+                                                        .lastExportedDate) ??
+                                                ''),
+                                          );
+                                          if (mounted) setState(() {});
                                         },
                                         child: Container(
                                           padding: const EdgeInsets.symmetric(

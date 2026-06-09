@@ -2199,7 +2199,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildPaywallHeroWithCard(context, size),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 18),
                   if (widget.checkad == 'image')
                     Padding(
                       padding: const EdgeInsets.only(left: 8),
@@ -2213,7 +2213,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       ),
                     ),
                   _buildPaywallSectionTitle(),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: AnimatedSwitcher(
@@ -2304,27 +2304,39 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     ),
                   ),
                   ],
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.favorite,
-                          size: 14, color: Colors.amber.shade700),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(
-                          'Join thousands of believers growing closer to God every day',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.brown.shade400,
-                            fontWeight: FontWeight.w500,
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Text.rich(
+                      textAlign: TextAlign.center,
+                      TextSpan(
+                        children: [
+                          WidgetSpan(
+                            alignment: PlaceholderAlignment.middle,
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 5),
+                              child: Icon(
+                                Icons.favorite,
+                                size: 13,
+                                color: Colors.amber.shade700,
+                              ),
+                            ),
                           ),
-                        ),
+                          TextSpan(
+                            text:
+                                'Join thousands of believers growing closer to God every day',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.brown.shade400,
+                              fontWeight: FontWeight.w500,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 18),
                   _buildPaywallTrustRow(),
                   const SizedBox(height: 8),
                   TextButton(
@@ -2433,17 +2445,18 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       'assets/paywall_icons/lower_cost.png';
 
   static const double _kPaywallPremiumBadgeHeight = 52;
-  static const double _kPaywallValueIconSize = 72;
+  static const double _kPaywallValueIconSize = 64;
   static const double _kPaywallPlanIconSize = 64;
-  static const double _kPaywallTrustIconSize = 28;
+  static const double _kPaywallTrustIconSize = 24;
+  static const Color _paywallTrustIconColor = Color(0xFF6B6B6B);
   static const double _kPlanBottomBannerHeight = 30;
   static const double _kPlanSubtitleBlockHeight = 33;
   static const double _kPlanPriceBlockHeight = 40;
 
   Widget _buildPaywallHeroWithCard(BuildContext context, Size size) {
     final imageHeight = (size.height * 0.40).clamp(280.0, 360.0);
-    const cardTopFactor = 0.68;
-    const valueCardHeightEstimate = 188.0;
+    const cardTopFactor = 0.73;
+    const valueCardHeightEstimate = 176.0;
     final cardTop = imageHeight * cardTopFactor;
 
     return SizedBox(
@@ -2512,7 +2525,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   child: SafeArea(
                     bottom: false,
                     child: Padding(
-                      padding: const EdgeInsets.only(top: 48),
+                      padding: const EdgeInsets.only(top: 54),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
@@ -2524,7 +2537,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               fontSize: 34,
                               fontWeight: FontWeight.w700,
                               color: _paywallInk,
-                              height: 1.1,
+                              height: 1.12,
                             ),
                           ),
                           RichText(
@@ -2534,7 +2547,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                 fontSize: 34,
                                 fontWeight: FontWeight.w700,
                                 color: _paywallInk,
-                                height: 1.1,
+                                height: 1.12,
                               ),
                               children: [
                                 TextSpan(text: 'to '),
@@ -2545,13 +2558,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 12),
                           Text(
                             'Guidance, prayer, and encouragement \n whenever you need it.',
                             textAlign: TextAlign.left,
                             style: TextStyle(
                               fontSize: 14,
-                              height: 1.45,
+                              height: 1.5,
                               color: _paywallInk.withValues(alpha: 0.6),
                               fontWeight: FontWeight.w500,
                             ),
@@ -2577,7 +2590,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   Widget _buildPaywallValueCard(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 6),
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -2637,7 +2650,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     String subtitle,
   ) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 2),
       child: Column(
         children: [
           SizedBox(
@@ -2655,7 +2668,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Text(
             title,
             textAlign: TextAlign.center,
@@ -2685,7 +2698,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   Widget _buildPaywallSectionTitle() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 2, 20, 0),
       child: Row(
         children: [
           Expanded(
@@ -2748,12 +2761,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   Widget _buildPaywallTrustRow() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             child: _paywallTrustItem(
-              Icons.verified_user_outlined,
+              Icons.gpp_good_outlined,
               'Cancel anytime',
               'No commitment',
             ),
@@ -2778,26 +2792,43 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Widget _paywallTrustItem(IconData icon, String title, String subtitle) {
-    return Column(
-      children: [
-        Icon(icon, size: _kPaywallTrustIconSize, color: Colors.grey.shade600),
-        const SizedBox(height: 6),
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: _paywallInk,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Column(
+        children: [
+          SizedBox(
+            height: _kPaywallTrustIconSize + 4,
+            child: Icon(
+              icon,
+              size: _kPaywallTrustIconSize,
+              color: _paywallTrustIconColor,
+            ),
           ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          subtitle,
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 9, color: Colors.grey.shade600),
-        ),
-      ],
+          const SizedBox(height: 8),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: _paywallInk,
+              height: 1.2,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            style: TextStyle(
+              fontSize: 9,
+              height: 1.25,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2923,36 +2954,33 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     final isOneYear = _products[index].id == widget.oneYearPlan;
     final isLifetime = _products[index].id == widget.lifeTimePlan;
 
-    Color accent;
-    Color bg;
-    Color border;
-    if (isOneYear) {
-      accent = const Color(0xFF7B1FA2);
-      bg = const Color(0xFFFAF5FC);
-      border = const Color(0xFFAB47BC);
-    } else if (isLifetime) {
-      accent = const Color(0xFF388E3C);
-      bg = const Color(0xFFF5FBF6);
-      border = const Color(0xFF66BB6A);
-    } else {
-      accent = const Color(0xFF5D4037);
-      bg = Colors.white;
-      border = Colors.grey.shade300;
-    }
-    if (isSelected) {
-      border = accent;
-    }
+    final themedAccent = isOneYear
+        ? const Color(0xFF7B1FA2)
+        : isLifetime
+            ? const Color(0xFF388E3C)
+            : const Color(0xFF5D4037);
+    final accent = isSelected ? themedAccent : const Color(0xFF5D4037);
+    final bg = isSelected
+        ? (isOneYear
+            ? const Color(0xFFFAF5FC)
+            : isLifetime
+                ? const Color(0xFFF5FBF6)
+                : Colors.white)
+        : Colors.white;
+    final border = isSelected ? themedAccent : Colors.grey.shade300;
 
     String? bottomBanner;
-    if (isOneYear && badgeText != null) {
-      bottomBanner = badgeText.toUpperCase().contains('SAVE')
-          ? badgeText.toUpperCase()
-          : 'SAVE 50%';
-    } else if (isLifetime) {
-      bottomBanner = 'LOWEST COST';
+    if (isSelected) {
+      if (isOneYear && badgeText != null) {
+        bottomBanner = badgeText.toUpperCase().contains('SAVE')
+            ? badgeText.toUpperCase()
+            : 'SAVE 50%';
+      } else if (isLifetime) {
+        bottomBanner = 'LOWEST COST';
+      }
     }
 
-    final borderWidth = isOneYear || isLifetime || isSelected ? 2.0 : 1.0;
+    final borderWidth = isSelected ? 2.0 : 1.0;
     final hasBadge = badgeLabel.isNotEmpty;
 
     Widget? badgeWidget;
@@ -3002,7 +3030,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 color: bg,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: border, width: borderWidth),
-                boxShadow: isOneYear || isSelected
+                boxShadow: isSelected
                     ? [
                         BoxShadow(
                           color: accent.withValues(alpha: 0.18),
@@ -3026,7 +3054,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                             style: TextStyle(
                               fontSize: isSixMonth ? 14 : 15,
                               fontWeight: FontWeight.w800,
-                              color: isSixMonth ? _paywallInk : accent,
+                              color: isSelected && !isSixMonth
+                                  ? accent
+                                  : _paywallInk,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -3040,9 +3070,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               style: TextStyle(
                                 fontSize: 9,
                                 height: 1.2,
-                                color: isSixMonth
-                                    ? Colors.grey.shade600
-                                    : accent.withValues(alpha: 0.8),
+                                color: isSelected && !isSixMonth
+                                    ? accent.withValues(alpha: 0.8)
+                                    : Colors.grey.shade600,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -3055,7 +3085,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               shape: BoxShape.circle,
                               color: Colors.white,
                               border: Border.all(
-                                color: accent.withValues(alpha: 0.4),
+                                color: isSelected
+                                    ? accent.withValues(alpha: 0.4)
+                                    : Colors.grey.shade300,
                                 width: 1.5,
                               ),
                             ),
@@ -3083,8 +3115,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                           style: TextStyle(
                                             fontSize: 10,
                                             height: 1.1,
-                                            color:
-                                                accent.withValues(alpha: 0.65),
+                                            color: isSelected
+                                                ? accent.withValues(alpha: 0.65)
+                                                : Colors.grey.shade500,
                                             decoration:
                                                 TextDecoration.lineThrough,
                                           ),
@@ -3098,7 +3131,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                     fontSize: 17,
                                     height: 1.1,
                                     fontWeight: FontWeight.w800,
-                                    color: isSixMonth ? _paywallInk : accent,
+                                    color: isSelected && !isSixMonth
+                                        ? accent
+                                        : _paywallInk,
                                   ),
                                 ),
                               ],

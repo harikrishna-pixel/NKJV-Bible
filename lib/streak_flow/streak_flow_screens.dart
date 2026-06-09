@@ -4,7 +4,6 @@ import 'dart:typed_data';
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 import 'package:audioplayers/audioplayers.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:biblebookapp/streak_flow/mood_prayer_data.dart';
 import 'package:biblebookapp/streak_flow/streak_saved_storage.dart';
@@ -801,42 +800,86 @@ Widget _streakPhotoPrimaryButton({
   );
 }
 
-/// Share card with app branding (matches home Verse of the Day footer).
-Widget _streakShareCardForCapture(BuildContext context, Widget content) {
-  final isDark = _isStreakDark(context);
-  final labelColor = isDark ? _kParchmentLight : const Color(0xFF3E2723);
+TextStyle _streakShareBodyStyle() => const TextStyle(
+      fontSize: 18,
+      height: 1.55,
+      color: Colors.white,
+      fontFamily: 'Georgia',
+      fontWeight: FontWeight.w500,
+      shadows: [
+        Shadow(color: Colors.black87, blurRadius: 12, offset: Offset(0, 2)),
+        Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 1)),
+      ],
+    );
+
+TextStyle _streakShareReferenceStyle() => const TextStyle(
+      fontSize: 17,
+      fontStyle: FontStyle.italic,
+      color: _kStreakPhotoGold,
+      fontFamily: 'Georgia',
+      shadows: [
+        Shadow(color: Colors.black87, blurRadius: 10, offset: Offset(0, 2)),
+      ],
+    );
+
+/// Share card with photo background + readable text overlay.
+Widget _streakShareCardForCapture(
+  BuildContext context,
+  Widget content, {
+  String backgroundAsset = 'assets/back2.png',
+}) {
   final screenWidth = MediaQuery.sizeOf(context).width;
+  final cardWidth = screenWidth > 450 ? 400.0 : screenWidth.clamp(300.0, 400.0);
   return SizedBox(
-    width: screenWidth > 450 ? 400 : screenWidth.clamp(300.0, 400.0),
-    child: Container(
-      color: isDark ? const Color(0xFF1E1408) : const Color(0xFFF5F0E6),
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+    width: cardWidth,
+    height: cardWidth * 1.35,
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Stack(
+        fit: StackFit.expand,
         children: [
-          _streakStepContentBox(context, content),
-          const SizedBox(height: 14),
-          Opacity(
-            opacity: 0.55,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+          Image.asset(
+            backgroundAsset,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+          ),
+          Container(color: Colors.black.withOpacity(0.42)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+            child: Column(
               children: [
-                Image.asset(
-                  'assets/Icon-1024.png',
-                  height: 22,
-                  width: 22,
+                Expanded(
+                  child: Center(child: content),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  BibleInfo.bible_shortName,
-                  style: TextStyle(
-                    color: labelColor,
-                    letterSpacing: BibleInfo.letterSpacing,
-                    fontSize: BibleInfo.fontSizeScale * 12,
-                    fontWeight: FontWeight.w600,
-                    height: 1.2,
-                  ),
-                  textAlign: TextAlign.center,
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Image.asset(
+                      'assets/Icon-1024.png',
+                      height: 22,
+                      width: 22,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      BibleInfo.bible_shortName,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.92),
+                        letterSpacing: BibleInfo.letterSpacing,
+                        fontSize: BibleInfo.fontSizeScale * 12,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                        shadows: const [
+                          Shadow(
+                            color: Colors.black87,
+                            blurRadius: 8,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -850,12 +893,17 @@ Widget _streakShareCardForCapture(BuildContext context, Widget content) {
 Future<Uint8List?> _captureStreakShareImage(
   BuildContext context, {
   required Widget content,
+  String backgroundAsset = 'assets/back2.png',
 }) async {
   final dpr = MediaQuery.of(context).devicePixelRatio;
   final controller = ScreenshotController();
   try {
     return await controller.captureFromWidget(
-      _streakShareCardForCapture(context, content),
+      _streakShareCardForCapture(
+        context,
+        content,
+        backgroundAsset: backgroundAsset,
+      ),
       delay: const Duration(milliseconds: 350),
       pixelRatio: (dpr * 2).clamp(2.5, 4.0),
       context: context,
@@ -896,16 +944,15 @@ Future<void> _shareAsImage(
 }) async {
   if (imageBytes != null && imageBytes.isNotEmpty) {
     try {
-      final dir = await getTemporaryDirectory();
-      final path =
-          '${dir.path}/streak_share_${DateTime.now().millisecondsSinceEpoch}.png';
-      final file = File(path);
-      await file.writeAsBytes(imageBytes, flush: true);
       final box = context.findRenderObject() as RenderBox?;
       await Share.shareXFiles(
-        [XFile(path, mimeType: 'image/png')],
-        subject: '${BibleInfo.bible_shortName} app',
-        text: '',
+        [
+          XFile.fromData(
+            imageBytes,
+            mimeType: 'image/png',
+            name: 'streak_share.png',
+          ),
+        ],
         sharePositionOrigin: box != null
             ? box.localToGlobal(Offset.zero) & box.size
             : null,
@@ -2346,7 +2393,7 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                     children: [
                       _streakPhotoSaveShareRow(
                         saved: _saved,
-                        saveLabel: 'Save',
+                        saveLabel: _saved ? 'Saved' : 'Save',
                         onSave: () async {
                           if (_saved) {
                             await StreakSavedStorage.remove(
@@ -2372,6 +2419,7 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                           final shareContext = context;
                           final image = await _captureStreakShareImage(
                             shareContext,
+                            backgroundAsset: 'assets/back1.png',
                             content: Column(
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.center,
@@ -2379,18 +2427,13 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                                 Text(
                                   '"${item.verseText}"',
                                   textAlign: TextAlign.center,
-                                  style: _streakPhotoBodyStyle(shareContext),
+                                  style: _streakShareBodyStyle(),
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
                                   item.verseReference,
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 17,
-                                    fontStyle: FontStyle.italic,
-                                    color: _kStreakPhotoGold,
-                                    fontFamily: 'Georgia',
-                                  ),
+                                  style: _streakShareReferenceStyle(),
                                 ),
                               ],
                             ),
@@ -2421,24 +2464,6 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                                 viewOnly: widget.viewOnly,
                               ));
                         },
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Explore deeper insights and grow in your faith.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.white.withOpacity(0.92),
-                          fontFamily: 'Georgia',
-                          height: 1.35,
-                          shadows: const [
-                            Shadow(
-                              color: Colors.black87,
-                              blurRadius: 8,
-                              offset: Offset(0, 1),
-                            ),
-                          ],
-                        ),
                       ),
                     ],
                   ),
@@ -2600,7 +2625,7 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                       const SizedBox(height: 14),
                       _streakPhotoSaveShareRow(
                         saved: _saved,
-                        saveLabel: 'Save',
+                        saveLabel: _saved ? 'Saved' : 'Save',
                         onSave: () async {
                           const title = 'Devotional Moment';
                           if (_saved) {
@@ -2627,10 +2652,11 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                           final shareContext = context;
                           final image = await _captureStreakShareImage(
                             shareContext,
+                            backgroundAsset: 'assets/back2.png',
                             content: Text(
                               item.devotionalText,
                               textAlign: TextAlign.center,
-                              style: _streakPhotoBodyStyle(shareContext),
+                              style: _streakShareBodyStyle(),
                             ),
                           );
                           if (shareContext.mounted) {
@@ -3005,7 +3031,7 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                       const SizedBox(height: 14),
                       _streakPhotoSaveShareRow(
                         saved: _saved,
-                        saveLabel: 'Save Prayer',
+                        saveLabel: _saved ? 'Saved' : 'Save',
                         onSave: () async {
                           const title = 'Today\'s Prayer';
                           if (_saved) {
@@ -3032,10 +3058,11 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                           final shareContext = context;
                           final image = await _captureStreakShareImage(
                             shareContext,
+                            backgroundAsset: 'assets/back1.png',
                             content: Text(
                               item.prayerText,
                               textAlign: TextAlign.center,
-                              style: _streakPhotoBodyStyle(shareContext),
+                              style: _streakShareBodyStyle(),
                             ),
                           );
                           if (shareContext.mounted) {

@@ -122,6 +122,10 @@ class SharPreferences {
   static const streakCompletedScreenShownDate = 'streak_completed_screen_shown_date';
   /// JSON array of saved streak items (verses, devotionals, prayers). See StreakSavedStorage.
   static const streakSavedItems = 'streak_saved_items';
+  /// Home: defer "How are you feeling" dialog until app-open ad finishes.
+  static const mainFeedbackPending = 'main_feedback_pending';
+  /// Set when app-open ad flow completes (dismissed, failed, or skipped).
+  static const openAdFlowComplete = 'open_ad_flow_complete';
 
   static Future<bool?> getBoolean(String key) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();

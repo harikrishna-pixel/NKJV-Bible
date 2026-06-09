@@ -1242,6 +1242,14 @@ class _HomeScreenState extends State<HomeScreen>
   //   if (mounted) setState(() => _exitOfferCooldownActive = show);
   // }
 
+  /// Truncate only long book names (e.g. Song of Solomon); short names stay full.
+  String _formatAppBarBookName(String name) {
+    const maxChars = 18;
+    final trimmed = name.trim();
+    if (trimmed.length <= maxChars) return trimmed;
+    return '${trimmed.substring(0, maxChars - 1)}…';
+  }
+
   /// "How are you feeling" — once on the 2nd app open (launchCount == 2 after splash).
   Future<void> _handleAppLaunchCount() async {
     final prefs = await SharedPreferences.getInstance();
@@ -1259,7 +1267,27 @@ class _HomeScreenState extends State<HomeScreen>
     appLaunchCount = prefs.getInt('launchCount') ?? 0;
     debugPrint("launchCount 3 is - $appLaunchCount");
 
+    await prefs.setBool(SharPreferences.mainFeedbackPending, true);
+    await prefs.setBool(SharPreferences.openAdFlowComplete, false);
     if (!mounted) return;
+    _tryShowPendingFeedbackDialog();
+  }
+
+  /// Shows ratings popup only after the app-open ad is dismissed or skipped.
+  Future<void> _tryShowPendingFeedbackDialog() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!(prefs.getBool(SharPreferences.mainFeedbackPending) ?? false)) return;
+
+    final deadline = DateTime.now().add(const Duration(seconds: 45));
+    while (DateTime.now().isBefore(deadline)) {
+      if (!mounted) return;
+      if (prefs.getBool(SharPreferences.openAdFlowComplete) ?? false) break;
+      await Future.delayed(const Duration(milliseconds: 300));
+    }
+
+    if (!mounted) return;
+    await prefs.setBool(SharPreferences.mainFeedbackPending, false);
+    await prefs.setBool(SharPreferences.openAdFlowComplete, false);
     showMainFeedbackDialog(context);
   }
 
@@ -3364,15 +3392,20 @@ class _HomeScreenState extends State<HomeScreen>
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Flexible(
-                            child: Text(
-                              "${selectedBookname ?? controller.selectedBook}",
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                              style: CommanStyle.appBarStyle(context).copyWith(
-                                fontSize: screenWidth > 450
-                                    ? BibleInfo.fontSizeScale * 26
-                                    : BibleInfo.fontSizeScale * 18,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                _formatAppBarBookName(
+                                  '${selectedBookname ?? controller.selectedBook}',
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.clip,
+                                textAlign: TextAlign.center,
+                                style: CommanStyle.appBarStyle(context).copyWith(
+                                  fontSize: screenWidth > 450
+                                      ? BibleInfo.fontSizeScale * 26
+                                      : BibleInfo.fontSizeScale * 18,
+                                ),
                               ),
                             ),
                           ),

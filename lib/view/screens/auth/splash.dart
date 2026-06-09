@@ -1588,6 +1588,12 @@ class UpgradeCheckWrapper extends StatefulWidget {
 class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
   bool shouldShowAd = false;
   AppOpenAd? _appOpenAd;
+
+  Future<void> _markOpenAdFlowComplete() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(SharPreferences.openAdFlowComplete, true);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1613,6 +1619,7 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
         await prefs.setString("showopenad", "false");
         // }
       } else {
+        await _markOpenAdFlowComplete();
         await Future.delayed(Duration(seconds: 7));
         debugPrint('Update is available. Skipping open ad.');
       }
@@ -1624,6 +1631,10 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
     debugPrint('ad pop loadOpenAd -  ${!trackingAllowed}');
     bool? isAdEnabledFromApi =
         await SharPreferences.getBoolean(SharPreferences.isAdsEnabledApi);
+    if (!(isAdEnabledFromApi ?? true)) {
+      await _markOpenAdFlowComplete();
+      return;
+    }
     if (isAdEnabledFromApi ?? true) {
       String? openAdUnitId =
           await SharPreferences.getString(SharPreferences.openAppId);
@@ -1639,10 +1650,12 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
               onAdDismissedFullScreenContent: (ad) {
                 ad.dispose();
                 _appOpenAd = null;
+                _markOpenAdFlowComplete();
               },
               onAdFailedToShowFullScreenContent: (ad, error) {
                 ad.dispose();
                 _appOpenAd = null;
+                _markOpenAdFlowComplete();
               },
             );
 
@@ -1657,11 +1670,15 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
           onAdFailedToLoad: (error) {
             debugPrint('AppOpenAd failed to load: $error');
             SharPreferences.setBoolean(SharPreferences.isAdsEnabled, false);
+            _markOpenAdFlowComplete();
           },
         ),
       );
     }
     await Future.delayed(const Duration(seconds: 3));
+    if (_appOpenAd == null) {
+      await _markOpenAdFlowComplete();
+    }
   }
 
   Future<void> initAppOpen() async {
@@ -1686,11 +1703,14 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
                   true;
               // debugPrint("Open ad tigger and $checkad and && $dta");
               if (data) {
-                loadOpenAd();
+                await loadOpenAd();
+              } else {
+                await _markOpenAdFlowComplete();
               }
               setState(() {});
             } else {
               SharPreferences.setBoolean(SharPreferences.isAdsEnabled, false);
+              await _markOpenAdFlowComplete();
             }
           } else {
             // bool dta = Provider.of<DownloadProvider>(context, listen: false)
@@ -1703,7 +1723,9 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
                 true;
             // debugPrint("Open ad tigger and $checkad and && $dta");
             if (data) {
-              loadOpenAd();
+              await loadOpenAd();
+            } else {
+              await _markOpenAdFlowComplete();
             }
             setState(() {});
           }
