@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:biblebookapp/streak_flow/mood_prayer_data.dart';
@@ -264,12 +263,11 @@ Widget _streakPhotoBackgroundImage(String assetPath) {
   );
 }
 
-/// Top/bottom vignette + soft blur behind central verse text (UI only).
+/// Top/bottom vignette for readable white text on photo backgrounds (UI only).
 Widget _streakPhotoReadabilityOverlays(BuildContext context) {
   final h = MediaQuery.sizeOf(context).height;
-  final topH = h * 0.16;
-  final bottomH = h * 0.48;
-  final textBlurH = h * 0.40;
+  final topH = h * 0.18;
+  final bottomH = h * 0.55;
 
   return Stack(
     fit: StackFit.expand,
@@ -285,8 +283,8 @@ Widget _streakPhotoReadabilityOverlays(BuildContext context) {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Colors.black.withOpacity(0.55),
-                Colors.black.withOpacity(0.28),
+                Colors.black.withOpacity(0.5),
+                Colors.black.withOpacity(0.22),
                 Colors.transparent,
               ],
               stops: const [0.0, 0.55, 1.0],
@@ -305,24 +303,11 @@ Widget _streakPhotoReadabilityOverlays(BuildContext context) {
               begin: Alignment.bottomCenter,
               end: Alignment.topCenter,
               colors: [
-                Colors.black.withOpacity(0.62),
-                Colors.black.withOpacity(0.34),
+                Colors.black.withOpacity(0.82),
+                Colors.black.withOpacity(0.5),
                 Colors.transparent,
               ],
-              stops: const [0.0, 0.52, 1.0],
-            ),
-          ),
-        ),
-      ),
-      Align(
-        alignment: Alignment.center,
-        child: ClipRect(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 1.2, sigmaY: 1.2),
-            child: Container(
-              width: double.infinity,
-              height: textBlurH,
-              color: Colors.black.withOpacity(0.08),
+              stops: const [0.0, 0.48, 1.0],
             ),
           ),
         ),
@@ -348,38 +333,40 @@ Widget _streakPhotoBackgroundStack({
 
 const Color _kStreakPhotoGold = Color(0xFFC59434);
 
+const List<Shadow> _kStreakPhotoTextShadows = [
+  Shadow(color: Color(0xE6000000), blurRadius: 14, offset: Offset(0, 2)),
+  Shadow(color: Color(0x99000000), blurRadius: 6, offset: Offset(0, 1)),
+];
+
+const List<Shadow> _kStreakPhotoSoftTextShadows = [
+  Shadow(color: Color(0xCC000000), blurRadius: 10, offset: Offset(0, 1)),
+  Shadow(color: Color(0x66000000), blurRadius: 4, offset: Offset(0, 1)),
+];
+
 TextStyle _streakPhotoTitleStyle(BuildContext context) => TextStyle(
       fontSize: MediaQuery.of(context).size.width > 450 ? 28 : 24,
       fontWeight: FontWeight.w700,
       color: Colors.white,
       fontFamily: 'Georgia',
-      shadows: const [
-        Shadow(color: Colors.black87, blurRadius: 10, offset: Offset(0, 2)),
-        Shadow(color: Colors.black45, blurRadius: 4, offset: Offset(0, 1)),
-      ],
+      shadows: _kStreakPhotoTextShadows,
     );
 
 TextStyle _streakPhotoSubtitleStyle(BuildContext context) => TextStyle(
       fontSize: MediaQuery.of(context).size.width > 450 ? 15 : 13,
       fontWeight: FontWeight.w500,
-      color: Colors.white,
+      color: Colors.white.withOpacity(0.95),
       fontFamily: 'Georgia',
-      height: 1.35,
-      shadows: const [
-        Shadow(color: Colors.black87, blurRadius: 8, offset: Offset(0, 1)),
-      ],
+      height: 1.4,
+      shadows: _kStreakPhotoSoftTextShadows,
     );
 
 TextStyle _streakPhotoBodyStyle(BuildContext context) => TextStyle(
-      fontSize: MediaQuery.of(context).size.width > 450 ? 22 : 19,
-      height: 1.55,
+      fontSize: MediaQuery.of(context).size.width > 450 ? 21 : 18,
+      height: 1.6,
       color: Colors.white,
       fontFamily: 'Georgia',
       fontWeight: FontWeight.w500,
-      shadows: const [
-        Shadow(color: Colors.black87, blurRadius: 12, offset: Offset(0, 2)),
-        Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 1)),
-      ],
+      shadows: _kStreakPhotoTextShadows,
     );
 
 TextStyle _streakPhotoReferenceStyle(BuildContext context) => TextStyle(
@@ -388,28 +375,106 @@ TextStyle _streakPhotoReferenceStyle(BuildContext context) => TextStyle(
       color: _kStreakPhotoGold,
       fontFamily: 'Georgia',
       fontWeight: FontWeight.w600,
-      shadows: const [
-        Shadow(color: Colors.black87, blurRadius: 10, offset: Offset(0, 2)),
+      shadows: _kStreakPhotoTextShadows,
+    );
+
+TextStyle _streakPhotoCaptionStyle(BuildContext context) => TextStyle(
+      fontSize: 12,
+      height: 1.35,
+      color: Colors.white.withOpacity(0.92),
+      fontFamily: 'Georgia',
+      fontWeight: FontWeight.w500,
+      shadows: _kStreakPhotoSoftTextShadows,
+    );
+
+Widget _streakPhotoSubtitleText(BuildContext context, String subtitle) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 24),
+    child: Text(
+      subtitle,
+      textAlign: TextAlign.center,
+      style: _streakPhotoSubtitleStyle(context),
+    ),
+  );
+}
+
+TextStyle _streakPhotoVerseTitleStyle(BuildContext context) => TextStyle(
+      fontSize: MediaQuery.of(context).size.width > 450 ? 30 : 26,
+      fontWeight: FontWeight.w700,
+      color: const Color(0xFF1A1A1A),
+      fontFamily: 'Georgia',
+      height: 1.15,
+      letterSpacing: 0.2,
+      shadows: [
+        Shadow(
+          color: Colors.white.withOpacity(0.85),
+          blurRadius: 10,
+          offset: const Offset(0, 0),
+        ),
+        Shadow(
+          color: Colors.white.withOpacity(0.45),
+          blurRadius: 4,
+          offset: const Offset(0, 1),
+        ),
       ],
     );
 
-Widget _streakPhotoSubtitleBanner(BuildContext context, String subtitle) {
+TextStyle _streakPhotoVerseSubtitleStyle(BuildContext context) => TextStyle(
+      fontSize: MediaQuery.of(context).size.width > 450 ? 15 : 14,
+      fontWeight: FontWeight.w400,
+      color: const Color(0xFF2E2E2E),
+      fontFamily: 'Georgia',
+      height: 1.35,
+      shadows: [
+        Shadow(
+          color: Colors.white.withOpacity(0.75),
+          blurRadius: 8,
+          offset: const Offset(0, 0),
+        ),
+        Shadow(
+          color: Colors.white.withOpacity(0.35),
+          blurRadius: 3,
+          offset: const Offset(0, 1),
+        ),
+      ],
+    );
+
+Widget _streakPhotoShortGoldLine({double width = 52}) {
+  return Container(
+    width: width,
+    height: 2,
+    decoration: BoxDecoration(
+      color: _kStreakPhotoGold.withOpacity(0.92),
+      borderRadius: BorderRadius.circular(1),
+    ),
+  );
+}
+
+/// Verse screen header — no icon; title, subtitle, short gold rule.
+Widget _streakPhotoVerseHeader({
+  required BuildContext context,
+  required String title,
+  required String subtitle,
+}) {
   return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16),
-    child: DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.48),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withOpacity(0.14)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        child: Text(
+    padding: const EdgeInsets.fromLTRB(24, 4, 24, 0),
+    child: Column(
+      children: [
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: _streakPhotoVerseTitleStyle(context),
+        ),
+        const SizedBox(height: 8),
+        Text(
           subtitle,
           textAlign: TextAlign.center,
-          style: _streakPhotoSubtitleStyle(context),
+          style: _streakPhotoVerseSubtitleStyle(context),
         ),
-      ),
+        const SizedBox(height: 12),
+        _streakPhotoShortGoldLine(),
+        const SizedBox(height: 18),
+      ],
     ),
   );
 }
@@ -467,6 +532,7 @@ Widget _streakCenteredStepHeader({
                 fontWeight: FontWeight.w500,
                 color: textColor,
                 fontFamily: 'Georgia',
+                shadows: onPhotoBackground ? _kStreakPhotoSoftTextShadows : null,
               ),
             ),
             const SizedBox(height: 6),
@@ -592,9 +658,66 @@ Widget _streakPhotoStepHeader({
       const SizedBox(height: 10),
       _streakGoldDivider(),
       const SizedBox(height: 10),
-      _streakPhotoSubtitleBanner(context, subtitle),
+      _streakPhotoSubtitleText(context, subtitle),
       const SizedBox(height: 20),
     ],
+  );
+}
+
+/// Small gold cross for devotional / prayer dividers.
+Widget _streakDividerCross({double size = 14}) {
+  return Icon(
+    Icons.add,
+    color: _kStreakPhotoGold,
+    size: size,
+    shadows: _kStreakPhotoSoftTextShadows,
+  );
+}
+
+Widget _streakDevotionalReflectionPrompt(BuildContext context) {
+  return Padding(
+    padding: const EdgeInsets.fromLTRB(4, 0, 4, 16),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          Icons.edit_note_rounded,
+          color: _kStreakPhotoGold,
+          size: 28,
+          shadows: _kStreakPhotoSoftTextShadows,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Take a moment',
+                style: TextStyle(
+                  fontSize: MediaQuery.of(context).size.width > 450 ? 16 : 15,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  fontFamily: 'Georgia',
+                  shadows: _kStreakPhotoTextShadows,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'How does God\'s grace strengthen you in your daily life?',
+                style: TextStyle(
+                  fontSize: MediaQuery.of(context).size.width > 450 ? 14 : 13,
+                  height: 1.35,
+                  color: Colors.white.withOpacity(0.95),
+                  fontFamily: 'Georgia',
+                  fontWeight: FontWeight.w500,
+                  shadows: _kStreakPhotoSoftTextShadows,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
   );
 }
 
@@ -690,11 +813,9 @@ Widget _streakPhotoSaveShareRow({
           children: [
             Icon(
               icon,
-              color: Colors.white,
+              color: _kStreakPhotoGold,
               size: 18,
-              shadows: const [
-                Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1)),
-              ],
+              shadows: _kStreakPhotoSoftTextShadows,
             ),
             const SizedBox(width: 6),
             Text(
@@ -704,9 +825,7 @@ Widget _streakPhotoSaveShareRow({
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 fontFamily: 'Georgia',
-                shadows: [
-                  Shadow(color: Colors.black87, blurRadius: 6, offset: Offset(0, 1)),
-                ],
+                shadows: _kStreakPhotoSoftTextShadows,
               ),
             ),
           ],
@@ -715,37 +834,27 @@ Widget _streakPhotoSaveShareRow({
     );
   }
 
-  return DecoratedBox(
-    decoration: BoxDecoration(
-      color: Colors.black.withOpacity(0.42),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: Colors.white.withOpacity(0.12)),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          action(
-            icon: saved ? Icons.bookmark : Icons.bookmark_border,
-            label: saveLabel,
-            onTap: onSave,
-          ),
-          Container(
-            width: 1,
-            height: 18,
-            margin: const EdgeInsets.symmetric(horizontal: 8),
-            color: Colors.white.withOpacity(0.35),
-          ),
-          action(
-            icon: Icons.share,
-            label: 'Share',
-            onTap: onShare,
-          ),
-        ],
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      action(
+        icon: saved ? Icons.bookmark : Icons.bookmark_border,
+        label: saveLabel,
+        onTap: onSave,
       ),
-    ),
+      Container(
+        width: 1,
+        height: 18,
+        margin: const EdgeInsets.symmetric(horizontal: 14),
+        color: Colors.white.withOpacity(0.45),
+      ),
+      action(
+        icon: Icons.share,
+        label: 'Share',
+        onTap: onShare,
+      ),
+    ],
   );
 }
 
@@ -764,12 +873,11 @@ Widget _streakPhotoPrimaryButton({
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 15),
         decoration: BoxDecoration(
-          color: const Color(0xFF4B3621),
+          color: _kStreakPhotoGold,
           borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: _kCandleGold, width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.22),
+              color: Colors.black.withOpacity(0.28),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -779,7 +887,7 @@ Widget _streakPhotoPrimaryButton({
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (leadingIcon != null) ...[
-              Icon(leadingIcon, color: _kParchmentLight, size: 20),
+              Icon(leadingIcon, color: Colors.white, size: 20),
               const SizedBox(width: 8),
             ],
             Text(
@@ -787,12 +895,12 @@ Widget _streakPhotoPrimaryButton({
               style: TextStyle(
                 fontSize: MediaQuery.of(context).size.width > 450 ? 20 : 18,
                 fontWeight: FontWeight.w700,
-                color: _kParchmentLight,
+                color: Colors.white,
                 fontFamily: 'Georgia',
               ),
             ),
             const SizedBox(width: 8),
-            const Icon(Icons.arrow_forward, color: _kParchmentLight, size: 20),
+            const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
           ],
         ),
       ),
@@ -806,10 +914,7 @@ TextStyle _streakShareBodyStyle() => const TextStyle(
       color: Colors.white,
       fontFamily: 'Georgia',
       fontWeight: FontWeight.w500,
-      shadows: [
-        Shadow(color: Colors.black87, blurRadius: 12, offset: Offset(0, 2)),
-        Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 1)),
-      ],
+      shadows: _kStreakPhotoTextShadows,
     );
 
 TextStyle _streakShareReferenceStyle() => const TextStyle(
@@ -817,9 +922,7 @@ TextStyle _streakShareReferenceStyle() => const TextStyle(
       fontStyle: FontStyle.italic,
       color: _kStreakPhotoGold,
       fontFamily: 'Georgia',
-      shadows: [
-        Shadow(color: Colors.black87, blurRadius: 10, offset: Offset(0, 2)),
-      ],
+      shadows: _kStreakPhotoTextShadows,
     );
 
 /// Share card with photo background + readable text overlay.
@@ -2331,9 +2434,8 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                 onBack: () => Get.back(),
                 onClose: () => _goToHome(context),
               ),
-              _streakPhotoStepHeader(
+              _streakPhotoVerseHeader(
                 context: context,
-                icon: Icons.menu_book_rounded,
                 title: 'Verse of the Day',
                 subtitle: 'God\'s Word for your heart today.',
               ),
@@ -2354,22 +2456,39 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                                 mainAxisSize: MainAxisSize.min,
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  Icon(
-                                    Icons.format_quote_rounded,
-                                    color: _kStreakPhotoGold,
-                                    size: 36,
-                                  ),
-                                  const SizedBox(height: 12),
                                   Text(
-                                    '"${item.verseText}"',
+                                    '“',
                                     textAlign: TextAlign.center,
-                                    style: _streakPhotoBodyStyle(context),
+                                    style: TextStyle(
+                                      fontSize: 40,
+                                      height: 1,
+                                      color: _kStreakPhotoGold,
+                                      fontFamily: 'Georgia',
+                                      fontWeight: FontWeight.w700,
+                                      shadows: _kStreakPhotoSoftTextShadows,
+                                    ),
                                   ),
-                                  const SizedBox(height: 16),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    item.verseText,
+                                    textAlign: TextAlign.center,
+                                    style: _streakPhotoBodyStyle(context).copyWith(
+                                      fontSize: MediaQuery.of(context).size.width > 450
+                                          ? 20
+                                          : 18,
+                                      height: 1.55,
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
                                   Text(
                                     item.verseReference,
                                     textAlign: TextAlign.center,
-                                    style: _streakPhotoReferenceStyle(context),
+                                    style: _streakPhotoReferenceStyle(context).copyWith(
+                                      fontSize: 16,
+                                      fontStyle: FontStyle.normal,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                   const SizedBox(height: 20),
                                   _streakGoldDivider(
@@ -2464,6 +2583,12 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                                 viewOnly: widget.viewOnly,
                               ));
                         },
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Explore deeper insights and grow in your faith.',
+                        textAlign: TextAlign.center,
+                        style: _streakPhotoCaptionStyle(context),
                       ),
                     ],
                   ),
@@ -2588,7 +2713,7 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                                   ),
                                   const SizedBox(height: 20),
                                   _streakGoldDivider(
-                                    center: _streakDividerHeart(),
+                                    center: _streakDividerCross(),
                                   ),
                                 ],
                               ),
@@ -2606,6 +2731,7 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      _streakDevotionalReflectionPrompt(context),
                       _streakPhotoPrimaryButton(
                         context: context,
                         label: 'Continue to Prayer',
@@ -2791,7 +2917,7 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                                   ),
                                   const SizedBox(height: 20),
                                   _streakGoldDivider(
-                                    center: _streakDividerHeart(),
+                                    center: _streakDividerCross(),
                                   ),
                                 ],
                               ),
@@ -3031,7 +3157,7 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                       const SizedBox(height: 14),
                       _streakPhotoSaveShareRow(
                         saved: _saved,
-                        saveLabel: _saved ? 'Saved' : 'Save',
+                        saveLabel: _saved ? 'Saved' : 'Save Prayer',
                         onSave: () async {
                           const title = 'Today\'s Prayer';
                           if (_saved) {

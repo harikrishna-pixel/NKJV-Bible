@@ -125,7 +125,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
             ),
           ),
 
-          // Bottom buttons
+          // Bottom buttons — on iPad, pin to phone-mockup width so Next does not stretch edge-to-edge.
           Align(
             alignment: Alignment.bottomCenter,
             child: SafeArea(
@@ -137,66 +137,133 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
                   isTablet ? 28 : 20,
                   12,
                 ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Get.back(),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: CommanColor.whiteBlack(context),
-                          side: BorderSide(
-                            color: CommanColor.lightDarkPrimary(context)
-                                .withOpacity(0.5),
-                          ),
-                          padding: EdgeInsets.symmetric(
-                            vertical: isTablet ? 14 : 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                child: isTablet
+                    ? SizedBox(
+                        width: size.width * 0.42,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => Get.back(),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor:
+                                      CommanColor.whiteBlack(context),
+                                  side: BorderSide(
+                                    color: CommanColor.lightDarkPrimary(context)
+                                        .withOpacity(0.5),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Not Now',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 2,
+                              child: ElevatedButton.icon(
+                                onPressed: () => _onNextTap(isDark),
+                                icon: Icon(
+                                  isLastPage
+                                      ? Icons.check_rounded
+                                      : Icons.arrow_forward_rounded,
+                                  size: 20,
+                                ),
+                                label: Text(
+                                  isLastPage ? 'Got it' : 'Next',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor:
+                                      CommanColor.lightDarkPrimary(context),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        child: Text(
-                          'Not Now',
-                          style: TextStyle(
-                            fontSize: isTablet ? 16 : 14,
-                            fontWeight: FontWeight.w600,
+                      )
+                    : Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Get.back(),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor:
+                                    CommanColor.whiteBlack(context),
+                                side: BorderSide(
+                                  color: CommanColor.lightDarkPrimary(context)
+                                      .withOpacity(0.5),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                'Not Now',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton.icon(
+                              onPressed: () => _onNextTap(isDark),
+                              icon: Icon(
+                                isLastPage
+                                    ? Icons.check_rounded
+                                    : Icons.arrow_forward_rounded,
+                                size: 18,
+                              ),
+                              label: Text(
+                                isLastPage ? 'Got it' : 'Next',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                    CommanColor.lightDarkPrimary(context),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton.icon(
-                        onPressed: () => _onNextTap(isDark),
-                        icon: Icon(
-                          isLastPage
-                              ? Icons.check_rounded
-                              : Icons.arrow_forward_rounded,
-                          size: isTablet ? 20 : 18,
-                        ),
-                        label: Text(
-                          isLastPage ? 'Got it' : 'Next',
-                          style: TextStyle(
-                            fontSize: isTablet ? 16 : 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                          CommanColor.lightDarkPrimary(context),
-                          foregroundColor: Colors.white,
-                          padding: EdgeInsets.symmetric(
-                            vertical: isTablet ? 14 : 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
           ),

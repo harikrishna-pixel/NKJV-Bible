@@ -2544,6 +2544,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   static const Color _paywallGold = Color(0xFFC5A059);
   static const Color _paywallInk = Color(0xFF2D2D3A);
+  static const Color _paywallTitleGold = Color(0xFF9E7340);
+  static const Color _paywallSubtitle = Color(0xFF5C534C);
 
   static const String _paywallIconPremium = 'assets/paywall_icons/premium.png';
   static const String _paywallIconPray =
@@ -2557,11 +2559,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       'assets/paywall_icons/lower_cost.png';
 
   static const double _kPaywallPremiumBadgeHeight = 52;
-  static const double _kPaywallValueIconSize = 64;
-  static const double _kPaywallValueIconCircleSize = 52;
-  static const double _kPaywallValueIconInnerPadding = 10;
+  static const double _kPaywallValueIconSlotSize = 56;
+  static const double _kPaywallValueIconSize = 48;
+  static const double _kPaywallValueIconCircleSize = 42;
   static const Color _paywallPrayIconCircle = Color(0xFFFFF6EB);
   static const Color _paywallScriptureIconCircle = Color(0xFFF0F7EE);
+  static const Color _paywallPeaceIconCircle = Color(0xFFFFF1ED);
   static const double _kPaywallPlanIconSize = 80;
   static const double _kPaywallPlanIconPadding = 8;
   static const double _kPaywallLowerCostIconPadding = 4;
@@ -2573,8 +2576,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   Widget _buildPaywallHeroWithCard(BuildContext context, Size size) {
     final imageHeight = (size.height * 0.40).clamp(280.0, 360.0);
-    const cardTopFactor = 0.73;
-    const valueCardHeightEstimate = 176.0;
+    const cardTopFactor = 0.70;
+    const valueCardHeightEstimate = 168.0;
     final cardTop = imageHeight * cardTopFactor;
 
     return SizedBox(
@@ -2594,7 +2597,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 Image.asset(
                   'assets/paywall_icons/img.png',
                   fit: BoxFit.cover,
-                  alignment: Alignment.center,
+                  alignment: const Alignment(0, -0.15),
                   filterQuality: FilterQuality.high,
                   gaplessPlayback: true,
                   errorBuilder: (_, __, ___) => Container(
@@ -2643,31 +2646,23 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   child: SafeArea(
                     bottom: false,
                     child: Padding(
-                      padding: const EdgeInsets.only(top: 54),
+                      padding: const EdgeInsets.only(top: 52),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
-                            'Grow Closer',
-                            textAlign: TextAlign.left,
-                            style: TextStyle(
-                              fontSize: 34,
-                              fontWeight: FontWeight.w700,
-                              color: _paywallInk,
-                              height: 1.12,
-                            ),
-                          ),
                           RichText(
                             textAlign: TextAlign.left,
                             text: const TextSpan(
                               style: TextStyle(
                                 fontSize: 34,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w800,
                                 color: _paywallInk,
-                                height: 1.12,
+                                height: 1.1,
+                                letterSpacing: -0.3,
                               ),
                               children: [
+                                TextSpan(text: 'Grow Closer\n'),
                                 TextSpan(text: 'to '),
                                 TextSpan(
                                   text: 'God Daily',
@@ -2676,15 +2671,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          Text(
+                          const SizedBox(height: 10),
+                          const Text(
                             'Guidance, prayer, and encouragement \n whenever you need it.',
                             textAlign: TextAlign.left,
                             style: TextStyle(
                               fontSize: 14,
-                              height: 1.5,
-                              color: _paywallInk,
-                              fontWeight: FontWeight.w700,
+                              height: 1.45,
+                              color: _paywallSubtitle,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
@@ -2708,7 +2703,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   Widget _buildPaywallValueCard(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 12, 8, 16),
+      padding: const EdgeInsets.fromLTRB(6, 10, 6, 14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -2756,10 +2751,49 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 _paywallIconPeace,
                 'Find Peace Every Day',
                 'Find hope during challenging times',
+                iconCircleColor: _paywallPeaceIconCircle,
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPaywallValueIcon(String iconAsset, Color circleColor) {
+    return SizedBox(
+      width: _kPaywallValueIconSlotSize,
+      height: _kPaywallValueIconSlotSize,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: _kPaywallValueIconCircleSize,
+            height: _kPaywallValueIconCircleSize,
+            decoration: BoxDecoration(
+              color: circleColor,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: circleColor.withValues(alpha: 0.85),
+                  blurRadius: 10,
+                  spreadRadius: 0.5,
+                ),
+              ],
+            ),
+          ),
+          Image.asset(
+            iconAsset,
+            width: _kPaywallValueIconSize,
+            height: _kPaywallValueIconSize,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => Icon(
+              Icons.auto_awesome,
+              color: _paywallGold,
+              size: _kPaywallValueIconSize - 6,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2770,47 +2804,23 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     String subtitle, {
     Color? iconCircleColor,
   }) {
-    final iconImage = Image.asset(
-      iconAsset,
-      width: iconCircleColor == null ? _kPaywallValueIconSize : null,
-      height: iconCircleColor == null ? _kPaywallValueIconSize : null,
-      fit: BoxFit.contain,
-      errorBuilder: (_, __, ___) => Icon(
-        Icons.auto_awesome,
-        color: _paywallGold,
-        size: iconCircleColor == null
-            ? _kPaywallValueIconSize - 8
-            : _kPaywallValueIconSize - _kPaywallValueIconInnerPadding * 2,
-      ),
-    );
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2),
       child: Column(
         children: [
-          SizedBox(
-            width: _kPaywallValueIconSize,
-            height: _kPaywallValueIconSize,
-            child: iconCircleColor == null
-                ? iconImage
-                : Center(
-                    child: SizedBox(
-                      width: _kPaywallValueIconCircleSize,
-                      height: _kPaywallValueIconCircleSize,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: iconCircleColor,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(
-                              _kPaywallValueIconInnerPadding),
-                          child: iconImage,
-                        ),
-                      ),
-                    ),
-                  ),
-          ),
+          if (iconCircleColor != null)
+            _buildPaywallValueIcon(iconAsset, iconCircleColor)
+          else
+            SizedBox(
+              width: _kPaywallValueIconSlotSize,
+              height: _kPaywallValueIconSlotSize,
+              child: Image.asset(
+                iconAsset,
+                width: _kPaywallValueIconSlotSize,
+                height: _kPaywallValueIconSlotSize,
+                fit: BoxFit.contain,
+              ),
+            ),
           const SizedBox(height: 8),
           Text(
             title,
