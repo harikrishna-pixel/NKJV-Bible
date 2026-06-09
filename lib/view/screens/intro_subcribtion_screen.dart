@@ -66,12 +66,18 @@ class SubscriptionScreen extends StatefulWidget {
 
   /// Navigate to paywall from home (direct, no exit offer).
   static Future<void> navigateToPaywallFromHome(BuildContext context) async {
-    final sixMonthPlan = await SharPreferences.getString('sixMonthPlan') ??
-        BibleInfo.sixMonthPlanid;
-    final oneYearPlan = await SharPreferences.getString('oneYearPlan') ??
-        BibleInfo.oneYearPlanid;
-    final lifeTimePlan = await SharPreferences.getString('lifeTimePlan') ??
-        BibleInfo.lifeTimePlanid;
+    final sixMonthPlan = BibleInfo.resolveSubscriptionProductId(
+      await SharPreferences.getString('sixMonthPlan'),
+      BibleInfo.sixMonthPlanid,
+    );
+    final oneYearPlan = BibleInfo.resolveSubscriptionProductId(
+      await SharPreferences.getString('oneYearPlan'),
+      BibleInfo.oneYearPlanid,
+    );
+    final lifeTimePlan = BibleInfo.resolveSubscriptionProductId(
+      await SharPreferences.getString('lifeTimePlan'),
+      BibleInfo.lifeTimePlanid,
+    );
     Get.to(
       () => SubscriptionScreen(
         sixMonthPlan: sixMonthPlan,
@@ -111,6 +117,29 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   Timer? _loadingTimeoutTimer; // Timer for 10-second loading timeout
   bool _autoPurchaseTriggered = false;
 
+  String get _twoYearPlanId => BibleInfo.twoYearPlanid;
+
+  String get _resolvedSixMonthPlanId => BibleInfo.resolveSubscriptionProductId(
+        widget.sixMonthPlan,
+        BibleInfo.sixMonthPlanid,
+      );
+
+  String get _resolvedOneYearPlanId => BibleInfo.resolveSubscriptionProductId(
+        widget.oneYearPlan,
+        BibleInfo.oneYearPlanid,
+      );
+
+  String get _resolvedLifeTimePlanId => BibleInfo.resolveSubscriptionProductId(
+        widget.lifeTimePlan,
+        BibleInfo.lifeTimePlanid,
+      );
+
+  List<String> get _expectedPaywallPlanIds => [
+        _resolvedSixMonthPlanId,
+        _resolvedOneYearPlanId,
+        _twoYearPlanId,
+      ];
+
   void _applyInitialPlanSelectionIfAny() {
     final idx = widget.initialSelectedPlanIndex;
     if (_products.isEmpty) return;
@@ -133,11 +162,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   void _sortProducts() {
     _products.sort((a, b) {
-      // Define order: 6 months (0), 1 year (1), lifetime (2)
+      // Define order: 6 months (0), 1 year (1), 2 years (2), lifetime (3)
       int getOrder(String id) {
-        if (id == widget.sixMonthPlan) return 0;
-        if (id == widget.oneYearPlan) return 1;
-        if (id == widget.lifeTimePlan) return 2;
+        if (id == _resolvedSixMonthPlanId) return 0;
+        if (id == _resolvedOneYearPlanId) return 1;
+        if (id == _twoYearPlanId) return 2;
         return 3;
       }
 
@@ -1609,8 +1638,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       _isAvailable = preloadedAvailability;
       if (mounted) {
         setState(() {
-          _products = preloadedProducts;
-          _sortProducts();
+          _products = List<ProductDetails>.from(preloadedProducts);
+          _mergeMissingFallbackPlans();
           isPurchaseLoading = false;
         });
       }
@@ -1669,6 +1698,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       });
     }
 
+    _logPaywallData(source: 'initialize');
+
     await _autoStartPurchaseIfNeeded();
 
     if (widget.fromHomeExitOffer && mounted) {
@@ -1695,11 +1726,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       // Purchase transactions will handle delegate setup separately if needed
       await iosPlatformAddition.setDelegate(null);
 
-      Set<String> ids = {
-        widget.sixMonthPlan,
-        widget.oneYearPlan,
-        widget.lifeTimePlan
-      };
+      Set<String> ids = _expectedPaywallPlanIds.toSet();
 
       debugPrint("🔍 Querying products - IDs: $ids");
       debugPrint("📦 Current products empty: ${_products.isEmpty}");
@@ -1764,8 +1791,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             );
           }).toList());
           setState(() {
-            _products = response.productDetails;
-            _sortProducts();
+            _products = List<ProductDetails>.from(response.productDetails);
+            _mergeMissingFallbackPlans();
             debugPrint("✅ Products loaded successfully: ${_products.length}");
           });
         } else {
@@ -1775,78 +1802,163 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           _createFallbackProductsFromConstants();
         }
       } else {
-        // Using cached products
-        debugPrint("💾 Loading products from cache");
-        final data = await productprovider.loadProductList();
+        final cachedIds = datafn.map((product) => product.id).toSet();
+        final missingExpectedPlans =
+            _expectedPaywallPlanIds.any((id) => !cachedIds.contains(id));
 
-        if (data.isNotEmpty) {
-          setState(() {
-            _products = data.map((data) {
-              return ProductDetails(
-                id: data.id,
-                title: data.title,
-                description: data.description,
-                price: data.price,
-                rawPrice: data.rawPrice,
-                currencyCode: data.currencyCode,
-                currencySymbol: data.currencySymbol,
-              );
-            }).toList();
-            _sortProducts();
-            debugPrint("✅ Loaded ${_products.length} products from cache");
-          });
-        } else {
+        if (missingExpectedPlans) {
           debugPrint(
-              "⚠️ Cache is empty, creating fallback products from constants");
-          // Create fallback products using constant plan IDs
-          _createFallbackProductsFromConstants();
+              '🔄 Cache missing expected plans, re-querying from App Store...');
+          final response = await _inAppPurchase.queryProductDetails(ids);
+          if (response.notFoundIDs.isNotEmpty) {
+            debugPrint(
+                '⚠️ Products not found in App Store: ${response.notFoundIDs.join(', ')}');
+          }
+
+          final merged = <String, ProductDetails>{
+            for (final product in datacheck) product.id: product,
+            for (final product in response.productDetails) product.id: product,
+          };
+
+          if (merged.isNotEmpty) {
+            await productprovider.saveProductList(merged.values.map((iapProduct) {
+              return m.ProductDetails(
+                id: iapProduct.id,
+                title: iapProduct.title,
+                description: iapProduct.description,
+                price: iapProduct.price,
+                rawPrice: iapProduct.rawPrice,
+                currencyCode: iapProduct.currencyCode,
+                currencySymbol: iapProduct.currencySymbol,
+              );
+            }).toList());
+            if (mounted) {
+              setState(() {
+                _products = merged.values.toList();
+                _mergeMissingFallbackPlans();
+                debugPrint(
+                    '✅ Merged cache + store products: ${_products.length}');
+              });
+            }
+          } else {
+            _createFallbackProductsFromConstants();
+          }
+        } else {
+          debugPrint("💾 Loading products from cache");
+          if (mounted) {
+            setState(() {
+              _products = List<ProductDetails>.from(datacheck);
+              _mergeMissingFallbackPlans();
+              debugPrint("✅ Loaded ${_products.length} products from cache");
+            });
+          }
         }
       }
     }
   }
 
+  List<ProductDetails> _buildAllFallbackProducts() {
+    final List<ProductDetails> fallbackProducts = [];
+
+    fallbackProducts.add(ProductDetails(
+      id: _resolvedSixMonthPlanId,
+      title: '6 Months Premium',
+      description: 'Get 6 months of premium access',
+      price: '\$9.99',
+      rawPrice: 9.99,
+      currencyCode: 'USD',
+      currencySymbol: '\$',
+    ));
+
+    fallbackProducts.add(ProductDetails(
+      id: _resolvedOneYearPlanId,
+      title: '1 Year Premium',
+      description: 'Get 1 year of premium access',
+      price: '\$19.99',
+      rawPrice: 19.99,
+      currencyCode: 'USD',
+      currencySymbol: '\$',
+    ));
+
+    fallbackProducts.add(ProductDetails(
+      id: _twoYearPlanId,
+      title: '2 Years Premium',
+      description: 'Get 2 years of premium access',
+      price: '\$24.99',
+      rawPrice: 24.99,
+      currencyCode: 'USD',
+      currencySymbol: '\$',
+    ));
+
+    return fallbackProducts;
+  }
+
+  void _applyPaywallProductDisplayFilter() {
+    final hadLifetime =
+        _products.any((product) => product.id == _resolvedLifeTimePlanId);
+    if (!hadLifetime) return;
+
+    _products.removeWhere((product) => product.id == _resolvedLifeTimePlanId);
+    if (selectedindex >= _products.length) {
+      selectedindex = _products.length >= 2 ? 1 : 0;
+    }
+    _sortProducts();
+  }
+
+  void _mergeMissingFallbackPlans() {
+    final existing = _products.map((product) => product.id).toSet();
+    for (final fallback in _buildAllFallbackProducts()) {
+      if (!existing.contains(fallback.id)) {
+        _products.add(fallback);
+      }
+    }
+    _sortProducts();
+    _applyPaywallProductDisplayFilter();
+  }
+
+  void _logPaywallData({required String source}) {
+    debugPrint('════════ PAYWALL DATA ($source) ════════');
+    debugPrint('IAP available: $_isAvailable');
+    debugPrint('checkad: ${widget.checkad}');
+    debugPrint('Expected plan IDs: $_expectedPaywallPlanIds');
+    debugPrint(
+      'Resolved IDs -> 6M: $_resolvedSixMonthPlanId | '
+      '1Y: $_resolvedOneYearPlanId | 2Y: $_twoYearPlanId | '
+      'LT: $_resolvedLifeTimePlanId',
+    );
+    debugPrint(
+      'Widget plan IDs -> 6M: ${widget.sixMonthPlan} | '
+      '1Y: ${widget.oneYearPlan} | LT: ${widget.lifeTimePlan}',
+    );
+    debugPrint(
+      'Products loaded: ${_products.length} | selectedIndex: $selectedindex',
+    );
+    if (_products.isEmpty) {
+      debugPrint('  (no products)');
+    } else {
+      for (var i = 0; i < _products.length; i++) {
+        final product = _products[i];
+        final planLabel = _getPlanTitle(i);
+        debugPrint(
+          '  [$i] $planLabel | id=${product.id} | price=${product.price} | '
+          'rawPrice=${product.rawPrice} | currency=${product.currencyCode}',
+        );
+      }
+      if (selectedindex >= 0 && selectedindex < _products.length) {
+        final selected = _products[selectedindex];
+        debugPrint(
+          'Selected plan -> ${_getPlanTitle(selectedindex)} | '
+          'id=${selected.id} | price=${selected.price}',
+        );
+      }
+    }
+    debugPrint('════════════════════════════════════════');
+  }
+
   /// Create fallback products using constant plan IDs when store query fails
   void _createFallbackProductsFromConstants() {
     debugPrint('📦 Creating fallback products from constants...');
-    final List<ProductDetails> fallbackProducts = [];
-
-    // Create fallback products using constant plan IDs from widget
-    // These are already constants when API data is not available
-    if (widget.sixMonthPlan.isNotEmpty) {
-      fallbackProducts.add(ProductDetails(
-        id: widget.sixMonthPlan,
-        title: '6 Months Premium',
-        description: 'Get 6 months of premium access',
-        price: '\$9.99',
-        rawPrice: 9.99,
-        currencyCode: 'USD',
-        currencySymbol: '\$',
-      ));
-    }
-
-    if (widget.oneYearPlan.isNotEmpty) {
-      fallbackProducts.add(ProductDetails(
-        id: widget.oneYearPlan,
-        title: '1 Year Premium',
-        description: 'Get 1 year of premium access',
-        price: '\$19.99',
-        rawPrice: 19.99,
-        currencyCode: 'USD',
-        currencySymbol: '\$',
-      ));
-    }
-
-    if (widget.lifeTimePlan.isNotEmpty) {
-      fallbackProducts.add(ProductDetails(
-        id: widget.lifeTimePlan,
-        title: 'Lifetime Premium',
-        description: 'Get lifetime premium access',
-        price: '\$24.99',
-        rawPrice: 24.99,
-        currencyCode: 'USD',
-        currencySymbol: '\$',
-      ));
-    }
+    final fallbackProducts = _buildAllFallbackProducts();
 
     if (fallbackProducts.isNotEmpty && mounted) {
       setState(() {
@@ -2257,7 +2369,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                           shadowColor: Colors.transparent,
                           disabledBackgroundColor: Colors.grey.shade300,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(28),
+                            borderRadius: BorderRadius.circular(10),
                           ),
                         ),
                         child: Ink(
@@ -2269,7 +2381,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                 Color(0xFF8B4E1F),
                               ],
                             ),
-                            borderRadius: BorderRadius.circular(30),
+                            borderRadius: BorderRadius.circular(10),
                             boxShadow: [
                               BoxShadow(
                                 color: const Color(0xFFC45A1F)
@@ -2439,14 +2551,20 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   static const String _paywallIconScripture =
       'assets/paywall_icons/read_scripture.png';
   static const String _paywallIconPeace = 'assets/paywall_icons/finepaeace.png';
-  static const String _paywallIconPlant = 'assets/paywall_icons/plant.png';
-  static const String _paywallIconCrown = 'assets/paywall_icons/crown.png';
+  static const String _paywallIconPlant = 'assets/paywall_icons/image__6_-removebg-preview.png';
+  static const String _paywallIconCrown = 'assets/paywall_icons/image__7_-removebg-preview.png';
   static const String _paywallIconLowerCost =
       'assets/paywall_icons/lower_cost.png';
 
   static const double _kPaywallPremiumBadgeHeight = 52;
   static const double _kPaywallValueIconSize = 64;
-  static const double _kPaywallPlanIconSize = 64;
+  static const double _kPaywallValueIconCircleSize = 52;
+  static const double _kPaywallValueIconInnerPadding = 10;
+  static const Color _paywallPrayIconCircle = Color(0xFFFFF6EB);
+  static const Color _paywallScriptureIconCircle = Color(0xFFF0F7EE);
+  static const double _kPaywallPlanIconSize = 80;
+  static const double _kPaywallPlanIconPadding = 8;
+  static const double _kPaywallLowerCostIconPadding = 4;
   static const double _kPaywallTrustIconSize = 24;
   static const Color _paywallTrustIconColor = Color(0xFF6B6B6B);
   static const double _kPlanBottomBannerHeight = 30;
@@ -2474,7 +2592,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               fit: StackFit.expand,
               children: [
                 Image.asset(
-                  'assets/paywall-bg.png',
+                  'assets/paywall_icons/img.png',
                   fit: BoxFit.cover,
                   alignment: Alignment.center,
                   filterQuality: FilterQuality.high,
@@ -2565,8 +2683,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                             style: TextStyle(
                               fontSize: 14,
                               height: 1.5,
-                              color: _paywallInk.withValues(alpha: 0.6),
-                              fontWeight: FontWeight.w500,
+                              color: _paywallInk,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ],
@@ -2612,6 +2730,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 _paywallIconPray,
                 'Pray With Confidence',
                 'Support during difficult moments',
+                iconCircleColor: _paywallPrayIconCircle,
               ),
             ),
             VerticalDivider(
@@ -2624,6 +2743,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 _paywallIconScripture,
                 'Understand Scripture Better',
                 'Make God\'s Word easier to apply',
+                iconCircleColor: _paywallScriptureIconCircle,
               ),
             ),
             VerticalDivider(
@@ -2647,8 +2767,23 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   Widget _paywallValueColumn(
     String iconAsset,
     String title,
-    String subtitle,
-  ) {
+    String subtitle, {
+    Color? iconCircleColor,
+  }) {
+    final iconImage = Image.asset(
+      iconAsset,
+      width: iconCircleColor == null ? _kPaywallValueIconSize : null,
+      height: iconCircleColor == null ? _kPaywallValueIconSize : null,
+      fit: BoxFit.contain,
+      errorBuilder: (_, __, ___) => Icon(
+        Icons.auto_awesome,
+        color: _paywallGold,
+        size: iconCircleColor == null
+            ? _kPaywallValueIconSize - 8
+            : _kPaywallValueIconSize - _kPaywallValueIconInnerPadding * 2,
+      ),
+    );
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2),
       child: Column(
@@ -2656,17 +2791,25 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           SizedBox(
             width: _kPaywallValueIconSize,
             height: _kPaywallValueIconSize,
-            child: Image.asset(
-              iconAsset,
-              width: _kPaywallValueIconSize,
-              height: _kPaywallValueIconSize,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => Icon(
-                Icons.auto_awesome,
-                color: _paywallGold,
-                size: _kPaywallValueIconSize - 8,
-              ),
-            ),
+            child: iconCircleColor == null
+                ? iconImage
+                : Center(
+                    child: SizedBox(
+                      width: _kPaywallValueIconCircleSize,
+                      height: _kPaywallValueIconCircleSize,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: iconCircleColor,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(
+                              _kPaywallValueIconInnerPadding),
+                          child: iconImage,
+                        ),
+                      ),
+                    ),
+                  ),
           ),
           const SizedBox(height: 8),
           Text(
@@ -2833,13 +2976,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   double? _fakeOffer(ProductDetails product, DashBoardController controller) {
-    if (product.id == widget.sixMonthPlan) {
+    if (product.id == _resolvedSixMonthPlanId) {
       return double.tryParse(controller.sixMonthPlanValue ?? '');
     }
-    if (product.id == widget.oneYearPlan) {
+    if (product.id == _resolvedOneYearPlanId) {
       return double.tryParse(controller.oneYearPlanValue ?? '');
     }
-    if (product.id == widget.lifeTimePlan) {
+    if (product.id == _twoYearPlanId) {
+      return double.tryParse(BibleInfo.twoYearPlanDiscount);
+    }
+    if (product.id == _resolvedLifeTimePlanId) {
       return double.tryParse(controller.lifeTimePlanValue ?? '');
     }
     return null;
@@ -2857,20 +3003,24 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   String _getPlanTitle(int index) {
-    if (_products[index].id == widget.sixMonthPlan) return '6 Months';
-    if (_products[index].id == widget.oneYearPlan) return '1 Year';
-    if (_products[index].id == widget.lifeTimePlan) return 'Lifetime';
+    if (_products[index].id == _resolvedSixMonthPlanId) return '6 Months';
+    if (_products[index].id == _resolvedOneYearPlanId) return '1 Year';
+    if (_products[index].id == _twoYearPlanId) return '2 Years';
+    if (_products[index].id == _resolvedLifeTimePlanId) return 'Lifetime';
     return _products[index].description;
   }
 
   String _getPlanSubtitle(int index) {
-    if (_products[index].id == widget.sixMonthPlan) {
+    if (_products[index].id == _resolvedSixMonthPlanId) {
       return 'Build Your Faith Habit';
     }
-    if (_products[index].id == widget.oneYearPlan) {
+    if (_products[index].id == _resolvedOneYearPlanId) {
       return 'Best for Daily Spiritual Growth';
     }
-    if (_products[index].id == widget.lifeTimePlan) {
+    if (_products[index].id == _twoYearPlanId) {
+      return 'Long-term Spiritual Companion';
+    }
+    if (_products[index].id == _resolvedLifeTimePlanId) {
       return 'Long-term Spiritual Companion';
     }
     return '';
@@ -2912,37 +3062,57 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   String? _getBadgeText(int index, DashBoardController controller) {
     final fakeOfferValue = _fakeOffer(_products[index], controller);
-    if (_products[index].id == widget.oneYearPlan) {
+    if (_products[index].id == _resolvedOneYearPlanId) {
       if (fakeOfferValue != null && fakeOfferValue > 0) {
         return 'Save ${fakeOfferValue.toStringAsFixed(0)}%';
       }
       // Fallback for cases where API value is missing.
       return 'Save 50%';
     }
-    if (_products[index].id == widget.lifeTimePlan) {
+    if (_products[index].id == _twoYearPlanId) {
+      if (fakeOfferValue != null && fakeOfferValue > 0) {
+        return 'Save ${fakeOfferValue.toStringAsFixed(0)}%';
+      }
+      return 'Best Value';
+    }
+    if (_products[index].id == _resolvedLifeTimePlanId) {
       return 'Best Value';
     }
     return null;
   }
 
   String _planBadgeLabel(int index, String? badgeText) {
-    if (_products[index].id == widget.oneYearPlan) {
+    if (_products[index].id == _resolvedOneYearPlanId) {
       return '★ MOST POPULAR';
     }
-    if (_products[index].id == widget.lifeTimePlan) {
+    if (_products[index].id == _twoYearPlanId) {
+      return '💎 BEST VALUE';
+    }
+    if (_products[index].id == _resolvedLifeTimePlanId) {
       return '💎 BEST VALUE';
     }
     return badgeText ?? '';
   }
 
   String _planCenterIconAsset(int index) {
-    if (_products[index].id == widget.sixMonthPlan) {
+    if (_products[index].id == _resolvedSixMonthPlanId) {
       return _paywallIconPlant;
     }
-    if (_products[index].id == widget.oneYearPlan) {
+    if (_products[index].id == _resolvedOneYearPlanId) {
       return _paywallIconCrown;
     }
     return _paywallIconLowerCost;
+  }
+
+  double _planCenterIconPadding(int index) {
+    return _planCenterIconAsset(index) == _paywallIconLowerCost
+        ? _kPaywallLowerCostIconPadding
+        : _kPaywallPlanIconPadding;
+  }
+
+  double _planCenterIconInnerSize(int index) {
+    final padding = _planCenterIconPadding(index);
+    return _kPaywallPlanIconSize - (padding * 2);
   }
 
   Widget _buildPlanCard(int index, DashBoardController controller) {
@@ -2950,20 +3120,22 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     final discountedPrice = _getDiscountedPrice(_products[index], controller);
     final badgeText = _getBadgeText(index, controller);
     final badgeLabel = _planBadgeLabel(index, badgeText);
-    final isSixMonth = _products[index].id == widget.sixMonthPlan;
-    final isOneYear = _products[index].id == widget.oneYearPlan;
-    final isLifetime = _products[index].id == widget.lifeTimePlan;
+    final isSixMonth = _products[index].id == _resolvedSixMonthPlanId;
+    final isOneYear = _products[index].id == _resolvedOneYearPlanId;
+    final isTwoYear = _products[index].id == _twoYearPlanId;
+    final isLifetime = _products[index].id == _resolvedLifeTimePlanId;
+    final isLongTerm = isTwoYear || isLifetime;
 
     final themedAccent = isOneYear
         ? const Color(0xFF7B1FA2)
-        : isLifetime
+        : isLongTerm
             ? const Color(0xFF388E3C)
             : const Color(0xFF5D4037);
     final accent = isSelected ? themedAccent : const Color(0xFF5D4037);
     final bg = isSelected
         ? (isOneYear
             ? const Color(0xFFFAF5FC)
-            : isLifetime
+            : isLongTerm
                 ? const Color(0xFFF5FBF6)
                 : Colors.white)
         : Colors.white;
@@ -2975,7 +3147,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         bottomBanner = badgeText.toUpperCase().contains('SAVE')
             ? badgeText.toUpperCase()
             : 'SAVE 50%';
-      } else if (isLifetime) {
+      } else if (isTwoYear || isLifetime) {
         bottomBanner = 'LOWEST COST';
       }
     }
@@ -3091,11 +3263,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                 width: 1.5,
                               ),
                             ),
-                            padding: const EdgeInsets.all(8),
+                            padding: EdgeInsets.all(
+                                _planCenterIconPadding(index)),
                             child: Image.asset(
                               _planCenterIconAsset(index),
-                              width: _kPaywallPlanIconSize - 16,
-                              height: _kPaywallPlanIconSize - 16,
+                              width: _planCenterIconInnerSize(index),
+                              height: _planCenterIconInnerSize(index),
                               fit: BoxFit.contain,
                             ),
                           ),

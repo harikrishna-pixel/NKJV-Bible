@@ -196,15 +196,24 @@ class BackgroundApiService {
       await prefs.setString('subSharedsecret', value.data?.subSharedsecret ?? '');
       
       // Save subscription plans - Use constants as fallback when API data is not available
-      await prefs.setString('sixMonthPlan', value.data?.subIdentifierSixMonth?.isNotEmpty == true
-          ? value.data!.subIdentifierSixMonth!
-          : BibleInfo.sixMonthPlanid);
-      await prefs.setString('oneYearPlan', value.data?.subIdentifierOneyear?.isNotEmpty == true
-          ? value.data!.subIdentifierOneyear!
-          : BibleInfo.oneYearPlanid);
-      await prefs.setString('lifeTimePlan', value.data?.subIdentifierLifetime?.isNotEmpty == true
-          ? value.data!.subIdentifierLifetime!
-          : BibleInfo.lifeTimePlanid);
+      await prefs.setString(
+          'sixMonthPlan',
+          BibleInfo.resolveSubscriptionProductId(
+            value.data?.subIdentifierSixMonth,
+            BibleInfo.sixMonthPlanid,
+          ));
+      await prefs.setString(
+          'oneYearPlan',
+          BibleInfo.resolveSubscriptionProductId(
+            value.data?.subIdentifierOneyear,
+            BibleInfo.oneYearPlanid,
+          ));
+      await prefs.setString(
+          'lifeTimePlan',
+          BibleInfo.resolveSubscriptionProductId(
+            value.data?.subIdentifierLifetime,
+            BibleInfo.lifeTimePlanid,
+          ));
       await prefs.setString('sixMonthPlanvalue', value.data?.subIdentifierSixMonthValue ?? '');
       await prefs.setString('oneYearPlanvalue', value.data?.subIdentifierOneyearValue ?? '');
       await prefs.setString('lifeTimePlanvalue', value.data?.subIdentifierLifetimeValue ?? '');

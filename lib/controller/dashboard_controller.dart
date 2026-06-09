@@ -408,15 +408,18 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     sharedSecret = value.data?.subSharedsecret ?? "";
 
     // Use constants as fallback when API data is not available
-    sixMonthPlan = value.data?.subIdentifierSixMonth?.isNotEmpty == true
-        ? value.data!.subIdentifierSixMonth!
-        : BibleInfo.sixMonthPlanid;
-    oneYearPlan = value.data?.subIdentifierOneyear?.isNotEmpty == true
-        ? value.data!.subIdentifierOneyear!
-        : BibleInfo.oneYearPlanid;
-    lifeTimePlan = value.data?.subIdentifierLifetime?.isNotEmpty == true
-        ? value.data!.subIdentifierLifetime!
-        : BibleInfo.lifeTimePlanid;
+    sixMonthPlan = BibleInfo.resolveSubscriptionProductId(
+      value.data?.subIdentifierSixMonth,
+      BibleInfo.sixMonthPlanid,
+    );
+    oneYearPlan = BibleInfo.resolveSubscriptionProductId(
+      value.data?.subIdentifierOneyear,
+      BibleInfo.oneYearPlanid,
+    );
+    lifeTimePlan = BibleInfo.resolveSubscriptionProductId(
+      value.data?.subIdentifierLifetime,
+      BibleInfo.lifeTimePlanid,
+    );
 
     final iapdatacheck = value.data?.subIdentifierSixMonth;
 

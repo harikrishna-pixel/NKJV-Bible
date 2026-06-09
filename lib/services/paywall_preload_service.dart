@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
+import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/Model/product_details_model.dart' as m;
 import 'package:biblebookapp/view/screens/dashboard/remove_add-screen.dart';
@@ -30,12 +31,16 @@ class PaywallPreloadService {
 
     try {
       // Get product IDs from SharedPreferences
-      final sixMonthPlan = await SharPreferences.getString('sixMonthPlan') ?? '';
-      final oneYearPlan = await SharPreferences.getString('oneYearPlan') ?? '';
-      final lifeTimePlan = await SharPreferences.getString('lifeTimePlan') ?? '';
-
+      final sixMonthPlan = BibleInfo.resolveSubscriptionProductId(
+        await SharPreferences.getString('sixMonthPlan'),
+        BibleInfo.sixMonthPlanid,
+      );
+      final oneYearPlan = BibleInfo.resolveSubscriptionProductId(
+        await SharPreferences.getString('oneYearPlan'),
+        BibleInfo.oneYearPlanid,
+      );
       // Skip if product IDs are not available yet
-      if (sixMonthPlan.isEmpty || oneYearPlan.isEmpty || lifeTimePlan.isEmpty) {
+      if (sixMonthPlan.isEmpty || oneYearPlan.isEmpty) {
         debugPrint('PaywallPreloadService: Product IDs not available yet, skipping preload');
         _isPreloading = false;
         return;
@@ -62,22 +67,48 @@ class PaywallPreloadService {
         }
 
         // Query product details
-        Set<String> ids = {sixMonthPlan, oneYearPlan, lifeTimePlan};
+        Set<String> ids = {
+          sixMonthPlan,
+          oneYearPlan,
+          BibleInfo.twoYearPlanid,
+        };
         debugPrint('PaywallPreloadService: Querying product details for: $ids');
 
         final ProductDetailsResponse response =
             await _inAppPurchase.queryProductDetails(ids);
         
+        if (response.notFoundIDs.isNotEmpty) {
+          debugPrint(
+              'PaywallPreloadService: Products not found in store: ${response.notFoundIDs}');
+        }
+
         if (response.productDetails.isNotEmpty) {
           _preloadedProducts = response.productDetails;
-          _preloadedProducts.sort((a, b) => a.price.compareTo(b.price));
+          _preloadedProducts.sort((a, b) {
+            int order(String id) {
+              if (id == sixMonthPlan) return 0;
+              if (id == oneYearPlan) return 1;
+              if (id == BibleInfo.twoYearPlanid) return 2;
+              return 3;
+            }
+
+            return order(a.id).compareTo(order(b.id));
+          });
           await _cachePreloadedProducts(_preloadedProducts);
           
           // Save to DownloadProvider cache if available
           try {
             // Note: We can't access Provider here without context, so we'll save directly
             // The screen will handle saving to DownloadProvider
-            debugPrint('PaywallPreloadService: Preloaded ${_preloadedProducts.length} products');
+            debugPrint(
+                'PaywallPreloadService: Preloaded ${_preloadedProducts.length} products');
+            for (var i = 0; i < _preloadedProducts.length; i++) {
+              final product = _preloadedProducts[i];
+              debugPrint(
+                '  preload[$i] id=${product.id} | price=${product.price} | '
+                'rawPrice=${product.rawPrice}',
+              );
+            }
           } catch (e) {
             debugPrint('PaywallPreloadService: Error saving to cache: $e');
           }
