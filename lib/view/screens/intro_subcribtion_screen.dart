@@ -2681,7 +2681,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               fit: StackFit.expand,
               children: [
                 Image.asset(
-                  'assets/paywall_icons/img.png',
+                  'assets/paywall_icons/Dark-home_4.png',
                   fit: BoxFit.cover,
                   alignment: const Alignment(0, -0.15),
                   filterQuality: FilterQuality.high,
