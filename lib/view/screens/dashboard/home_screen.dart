@@ -87,6 +87,34 @@ import 'package:biblebookapp/services/analytics/analytics_service.dart';
 import 'package:biblebookapp/utils/custom_share.dart';
 import 'package:html/parser.dart' as html;
 
+/// Display-only thresholds for subscription info copy (does not affect IAP logic).
+const int _kSubscriptionLifetimeDisplayMinDays = 10000;
+const int _kSubscriptionTwoYearDisplayMinDays = 400;
+
+bool _isLifetimeSubscriptionDisplay(int diffDy) =>
+    diffDy > _kSubscriptionLifetimeDisplayMinDays;
+
+bool _isTwoYearSubscriptionDisplay(int diffDy) =>
+    diffDy >= _kSubscriptionTwoYearDisplayMinDays &&
+    diffDy <= _kSubscriptionLifetimeDisplayMinDays;
+
+String _subscriptionRenewalDisplayText(int diffDy) {
+  if (_isLifetimeSubscriptionDisplay(diffDy)) {
+    return 'Your subscription will never expire';
+  }
+  return '$diffDy day(s) left for the renewal of the subscription.';
+}
+
+String _subscriptionPeriodDisplayText(int diffDy, DateTime expiryDate) {
+  if (_isLifetimeSubscriptionDisplay(diffDy)) {
+    return 'Your subscription period is lifetime';
+  }
+  if (_isTwoYearSubscriptionDisplay(diffDy)) {
+    return 'Your subscription period is 2 years';
+  }
+  return 'Your subscription expires on ${DateFormat('dd-MM-yyyy').format(expiryDate)}';
+}
+
 // ignore: must_be_immutable
 class HomeScreen extends StatefulWidget {
   var selectedBookForRead;
@@ -3179,9 +3207,8 @@ class _HomeScreenState extends State<HomeScreen>
                                                             height: 15,
                                                           ),
                                                           Text(
-                                                              diffDy > 365
-                                                                  ? 'Your subscription will never expire'
-                                                                  : '$diffDy day(s) left for the renewal of the subscription.',
+                                                              _subscriptionRenewalDisplayText(
+                                                                  diffDy),
                                                               style: TextStyle(
                                                                   letterSpacing:
                                                                       BibleInfo
@@ -3203,9 +3230,9 @@ class _HomeScreenState extends State<HomeScreen>
                                                           const SizedBox(
                                                               height: 5),
                                                           Text(
-                                                              diffDy > 365
-                                                                  ? 'Your subscription period is lifetime'
-                                                                  : 'Your subscription expires on ${DateFormat('dd-MM-yyyy').format(ExpiryDate)}',
+                                                              _subscriptionPeriodDisplayText(
+                                                                  diffDy,
+                                                                  ExpiryDate),
                                                               style: TextStyle(
                                                                 letterSpacing:
                                                                     BibleInfo
@@ -5838,9 +5865,8 @@ class _HomeScreenState extends State<HomeScreen>
                                                               height: 15,
                                                             ),
                                                             Text(
-                                                                diffDy > 365
-                                                                    ? 'Your subscription will never expire'
-                                                                    : '$diffDy day(s) left for the renewal of the subscription.',
+                                                                _subscriptionRenewalDisplayText(
+                                                                    diffDy),
                                                                 style: TextStyle(
                                                                     letterSpacing:
                                                                         BibleInfo
@@ -5860,9 +5886,9 @@ class _HomeScreenState extends State<HomeScreen>
                                                             const SizedBox(
                                                                 height: 5),
                                                             Text(
-                                                                diffDy > 365
-                                                                    ? 'Your subscription period is lifetime'
-                                                                    : 'Your subscription expires on ${DateFormat('dd-MM-yyyy').format(ExpiryDate)}',
+                                                                _subscriptionPeriodDisplayText(
+                                                                    diffDy,
+                                                                    ExpiryDate),
                                                                 style:
                                                                     TextStyle(
                                                                   letterSpacing:
@@ -6132,37 +6158,53 @@ class _HomeScreenState extends State<HomeScreen>
                 // const Icon(Icons.menu_book, size: 48, color: Colors.brown),
                 const SizedBox(height: 10),
                 Text(
-                  "How are you feeling today\nwhile using the app?",
+                  'How are you enjoying ${BibleInfo.bible_shortName} so far?',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
+                    fontSize: isTablet ? 20 : 18,
+                    fontWeight: FontWeight.w700,
                     color: CommanColor.black,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                textWithTrailingEmoji(
+                  prefix:
+                      'Your feedback helps us improve the app and serve you better. ',
+                  emoji: '💛',
+                  emojiFontSize: isTablet ? 15 : 14,
+                  prefixStyle: TextStyle(
+                    fontSize: isTablet ? 15 : 14,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.grey.shade600,
+                    height: 1.35,
                   ),
                 ),
                 const SizedBox(height: 20),
                 _buildEmojiOption(
                   context,
-                  emoji: "😍",
-                  text: "Great!",
-                  color: Colors.green.shade100,
+                  emoji: '😍',
+                  text: 'Love It',
+                  color: const Color(0xFFE8F5E9),
+                  textColor: const Color(0xFF2D6A4F),
                   onTap: () => _showRateAppDialog(context),
                 ),
                 const SizedBox(height: 10),
                 _buildEmojiOption(
                   context,
-                  emoji: "😊",
-                  text: "Okay",
-                  color: Colors.orange.shade100,
-                  onTap: () => _showFeedbackDialog(context, "😊"),
+                  emoji: '😊',
+                  text: 'It\'s Good',
+                  color: const Color(0xFFFFEDD5),
+                  textColor: const Color(0xFF9A3412),
+                  onTap: () => _showFeedbackDialog(context, '😊'),
                 ),
                 const SizedBox(height: 10),
                 _buildEmojiOption(
                   context,
-                  emoji: "😔",
-                  text: "Could be better...",
-                  color: Colors.red.shade100,
-                  onTap: () => _showFeedbackDialog(context, "😔"),
+                  emoji: '😔',
+                  text: 'Needs Improvement',
+                  color: const Color(0xFFFEE2E2),
+                  textColor: const Color(0xFFB91C1C),
+                  onTap: () => _showFeedbackDialog(context, '😔'),
                 ),
               ],
             ),
@@ -6176,13 +6218,14 @@ class _HomeScreenState extends State<HomeScreen>
       {required String emoji,
       required String text,
       required Color color,
+      required Color textColor,
       required VoidCallback onTap}) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
         decoration: BoxDecoration(
           color: color,
           borderRadius: BorderRadius.circular(12),
@@ -6190,9 +6233,25 @@ class _HomeScreenState extends State<HomeScreen>
         child: Row(
           children: [
             Text(emoji, style: emojiTextStyle(fontSize: 22)),
-            const SizedBox(width: 10),
-            Text(text,
-                style: const TextStyle(fontSize: 16, color: CommanColor.black)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: textColor,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.chevron_right,
+              color: textColor.withOpacity(0.8),
+              size: 22,
+            ),
           ],
         ),
       ),

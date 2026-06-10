@@ -209,22 +209,32 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     await _addLifetimeWalletBonus();
   }
 
-  Future<void> _finishAfterLifetimePurchaseSuccess() async {
+  Future<void> _navigateToHomeAfterPurchaseSuccess({
+    required bool invisibleHostPopValue,
+  }) async {
     if (!mounted) return;
     if (widget.invisiblePurchaseHost) {
-      Navigator.of(context).pop(true);
-    } else {
-      await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
+      Navigator.of(context).pop(invisibleHostPopValue);
+      return;
     }
+    Get.offAll(
+      () => HomeScreen(
+        From: "premium",
+        selectedVerseNumForRead: "",
+        selectedBookForRead: "",
+        selectedChapterForRead: "",
+        selectedBookNameForRead: "",
+        selectedVerseForRead: "",
+      ),
+    );
+  }
+
+  Future<void> _finishAfterLifetimePurchaseSuccess() async {
+    await _navigateToHomeAfterPurchaseSuccess(invisibleHostPopValue: true);
   }
 
   Future<void> _navigateAfterNonLifetimePurchaseSuccess() async {
-    if (!mounted) return;
-    if (widget.invisiblePurchaseHost) {
-      Navigator.of(context).pop(false);
-    } else {
-      await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
-    }
+    await _navigateToHomeAfterPurchaseSuccess(invisibleHostPopValue: false);
   }
 
   void _popInvisiblePurchaseHost([bool success = false]) {
@@ -1305,6 +1315,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         await SharPreferences.setBoolean('closead', true);
         if (widget.invisiblePurchaseHost) {
           _popInvisiblePurchaseHost(true);
+        } else if (startFlag == true) {
+          Get.offAll(
+            () => HomeScreen(
+              From: "premium",
+              selectedVerseNumForRead: "",
+              selectedBookForRead: "",
+              selectedChapterForRead: "",
+              selectedBookNameForRead: "",
+              selectedVerseForRead: "",
+            ),
+          );
         } else {
           final ctx = context ?? Get.context;
           if (ctx != null) {
@@ -1326,10 +1347,52 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         await SharPreferences.setBoolean('closead', true);
         if (widget.invisiblePurchaseHost) {
           _popInvisiblePurchaseHost(false);
+        } else if (startFlag == true) {
+          Get.offAll(
+            () => HomeScreen(
+              From: "premium",
+              selectedVerseNumForRead: "",
+              selectedBookForRead: "",
+              selectedChapterForRead: "",
+              selectedBookNameForRead: "",
+              selectedVerseForRead: "",
+            ),
+          );
         } else {
           final ctx2 = context ?? Get.context;
           if (ctx2 != null) {
             await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx2);
+          }
+        }
+        return;
+      } else if (productId == _twoYearPlanId) {
+        final dur = DateTime(dateTime.year + 2, dateTime.month, dateTime.day);
+        final diff = dur.difference(DateTime.now());
+        await controller.disableAd(diff);
+        if (downloadProvider != null) {
+          await downloadProvider.setSubscriptionPlan('gold');
+        }
+        await Future.delayed(Duration(seconds: 1));
+        EasyLoading.dismiss();
+        Constants.showToast(successToastMessage);
+        await SharPreferences.setBoolean('closead', true);
+        if (widget.invisiblePurchaseHost) {
+          _popInvisiblePurchaseHost(false);
+        } else if (startFlag == true) {
+          Get.offAll(
+            () => HomeScreen(
+              From: "premium",
+              selectedVerseNumForRead: "",
+              selectedBookForRead: "",
+              selectedChapterForRead: "",
+              selectedBookNameForRead: "",
+              selectedVerseForRead: "",
+            ),
+          );
+        } else {
+          final ctxTwoYear = context ?? Get.context;
+          if (ctxTwoYear != null) {
+            await StreakFlowNavigation.navigateToStreakFlowOrHome(ctxTwoYear);
           }
         }
         return;
@@ -1347,6 +1410,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         await SharPreferences.setBoolean('closead', true);
         if (widget.invisiblePurchaseHost) {
           _popInvisiblePurchaseHost(false);
+        } else if (startFlag == true) {
+          Get.offAll(
+            () => HomeScreen(
+              From: "premium",
+              selectedVerseNumForRead: "",
+              selectedBookForRead: "",
+              selectedChapterForRead: "",
+              selectedBookNameForRead: "",
+              selectedVerseForRead: "",
+            ),
+          );
         } else {
           final ctx3 = context ?? Get.context;
           if (ctx3 != null) {
@@ -1460,6 +1534,18 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   Constants.showToast('Purchase Successful');
                   await SharPreferences.setBoolean('closead', true);
                   debugPrint("restore data 3 ");
+                  await _navigateAfterNonLifetimePurchaseSuccess();
+                  return;
+                } else if (purchaseDetails.productID == _twoYearPlanId) {
+                  await controller.disableAd(const Duration(days: 732));
+                  await Future.delayed(Duration(seconds: 2));
+                  if (Platform.isIOS) {
+                    await _inAppPurchase.completePurchase(purchaseDetails);
+                  }
+                  EasyLoading.dismiss();
+                  Constants.showToast('Purchase Successful');
+                  await SharPreferences.setBoolean('closead', true);
+                  debugPrint("restore data 3b (2 year)");
                   await _navigateAfterNonLifetimePurchaseSuccess();
                   return;
                 } else if (purchaseDetails.productID == widget.lifeTimePlan) {
@@ -3260,27 +3346,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                             ),
                           ),
                           const SizedBox(height: 10),
-                          Container(
+                          Image.asset(
+                            _planCenterIconAsset(index),
                             width: _kPaywallPlanIconSize,
                             height: _kPaywallPlanIconSize,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white,
-                              border: Border.all(
-                                color: isSelected
-                                    ? accent.withValues(alpha: 0.4)
-                                    : Colors.grey.shade300,
-                                width: 1.5,
-                              ),
-                            ),
-                            padding: EdgeInsets.all(
-                                _planCenterIconPadding(index)),
-                            child: Image.asset(
-                              _planCenterIconAsset(index),
-                              width: _planCenterIconInnerSize(index),
-                              height: _planCenterIconInnerSize(index),
-                              fit: BoxFit.contain,
-                            ),
+                            fit: BoxFit.contain,
                           ),
                           const Spacer(),
                           SizedBox(

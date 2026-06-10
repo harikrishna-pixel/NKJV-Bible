@@ -2,7 +2,7 @@ class BibleInfo {
   static String apple_AppId = "6460891065";
 
   // 6484270584  //6459793603
-  static String ios_Bundle_Id = "com.balaklrapps.nivbible";
+  static String ios_Bundle_Id = "com.balaklrapps.genevabible";
   static String bible_shortName = "Geneva Bible";
   static String current_Version = "1.0.69";
   static String android_Package_Name = "com.whitebibles.genevabible";
@@ -10,13 +10,13 @@ class BibleInfo {
   //static int surveyAppId = 3;
 
 //IAP
-  static String sixMonthPlanid = 'com.balaklrapps.nivbible.sixmonthadsfree';
-  static String oneYearPlanid = 'com.balaklrapps.nivbible.oneyearadsfree';
-  static String twoYearPlanid = 'com.balaklrapps.nivbible.twoyearadfree';
-  static String lifeTimePlanid = 'com.balaklrapps.nivbible.lifetimeadsfree';
+  static String sixMonthPlanid = 'com.balaklrapps.genevabible.sixmonthadsfree';
+  static String oneYearPlanid = 'com.balaklrapps.genevabible.oneyearadsfree';
+  static String twoYearPlanid = 'com.balaklrapps.genevabible.twoyearadsfree';
+  static String lifeTimePlanid = 'com.balaklrapps.genevabible.lifetimeadsfree';
   static String subIdentifierTwoYear = twoYearPlanid;
   static String exitOfferPlanid =
-      'com.balaklrapps.nivbible.lifetime.exitoffer';
+      'com.balaklrapps.genevabible.lifetime.exitoffer';
 
   /// API prefs sometimes store flags like "1" instead of a real product id.
   static String resolveSubscriptionProductId(String? stored, String fallback) {
@@ -35,9 +35,9 @@ class BibleInfo {
   static String exitOfferPlanDiscount = '0';
 
   // Coin Pack IDs
-  static String coinPack1Id = 'com.balaklrapps.nivbible.coinspack1';
-  static String coinPack2Id = 'com.balaklrapps.nivbible.coinspack2';
-  static String coinPack3Id = 'com.balaklrapps.nivbibleq.coinspack3';
+  static String coinPack1Id = 'com.balaklrapps.genevabible.coinspack1';
+  static String coinPack2Id = 'com.balaklrapps.genevabible.coinspack2';
+  static String coinPack3Id = 'com.balaklrapps.genevabible.coinspack3';
 
   // Coin Pack Credits (for offline mode)
   static String coinPack1Credits = '100';

@@ -401,20 +401,15 @@ Widget _streakPhotoSubtitleText(BuildContext context, String subtitle) {
 TextStyle _streakPhotoVerseTitleStyle(BuildContext context) => TextStyle(
       fontSize: MediaQuery.of(context).size.width > 450 ? 30 : 26,
       fontWeight: FontWeight.w700,
-      color: const Color(0xFF1A1A1A),
+      color: _kInkBrown,
       fontFamily: 'Georgia',
       height: 1.15,
-      letterSpacing: 0.2,
+      letterSpacing: 0.15,
       shadows: [
         Shadow(
-          color: Colors.white.withOpacity(0.85),
-          blurRadius: 10,
+          color: Colors.white.withOpacity(0.7),
+          blurRadius: 8,
           offset: const Offset(0, 0),
-        ),
-        Shadow(
-          color: Colors.white.withOpacity(0.45),
-          blurRadius: 4,
-          offset: const Offset(0, 1),
         ),
       ],
     );
@@ -422,19 +417,14 @@ TextStyle _streakPhotoVerseTitleStyle(BuildContext context) => TextStyle(
 TextStyle _streakPhotoVerseSubtitleStyle(BuildContext context) => TextStyle(
       fontSize: MediaQuery.of(context).size.width > 450 ? 15 : 14,
       fontWeight: FontWeight.w400,
-      color: const Color(0xFF2E2E2E),
+      color: _kInkSepia,
       fontFamily: 'Georgia',
       height: 1.35,
       shadows: [
         Shadow(
-          color: Colors.white.withOpacity(0.75),
-          blurRadius: 8,
+          color: Colors.white.withOpacity(0.55),
+          blurRadius: 6,
           offset: const Offset(0, 0),
-        ),
-        Shadow(
-          color: Colors.white.withOpacity(0.35),
-          blurRadius: 3,
-          offset: const Offset(0, 1),
         ),
       ],
     );
@@ -789,6 +779,108 @@ Widget _streakGoldDivider({Widget? center}) {
         ),
       ],
     ),
+  );
+}
+
+/// Dark bottom scrim behind Save/Share + CTA on Verse screen (UI only).
+Widget _streakPhotoVerseBottomShadow({required Widget child}) {
+  return Stack(
+    clipBehavior: Clip.none,
+    alignment: Alignment.bottomCenter,
+    children: [
+      Positioned(
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: 280,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.transparent,
+                Colors.black.withOpacity(0.22),
+                Colors.black.withOpacity(0.52),
+                Colors.black.withOpacity(0.78),
+              ],
+              stops: const [0.0, 0.28, 0.62, 1.0],
+            ),
+          ),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: child,
+      ),
+    ],
+  );
+}
+
+/// Save/Share row for Verse screen — plain on bottom shadow (no pill box).
+Widget _streakPhotoVerseSaveShareRow({
+  required bool saved,
+  required String saveLabel,
+  required VoidCallback onSave,
+  required VoidCallback onShare,
+}) {
+  Widget action({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: _kStreakPhotoGold,
+              size: 18,
+              shadows: _kStreakPhotoSoftTextShadows,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Georgia',
+                shadows: _kStreakPhotoSoftTextShadows,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      action(
+        icon: saved ? Icons.bookmark : Icons.bookmark_border,
+        label: saveLabel,
+        onTap: onSave,
+      ),
+      Container(
+        width: 1,
+        height: 18,
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        color: Colors.white.withOpacity(0.4),
+      ),
+      action(
+        icon: Icons.share,
+        label: 'Share',
+        onTap: onShare,
+      ),
+    ],
   );
 }
 
@@ -2505,92 +2597,94 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                 ),
               ),
               if (!widget.viewOnly)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _streakPhotoSaveShareRow(
-                        saved: _saved,
-                        saveLabel: _saved ? 'Saved' : 'Save',
-                        onSave: () async {
-                          if (_saved) {
-                            await StreakSavedStorage.remove(
-                                'verse', item.verseReference, item.verseText);
-                            if (mounted) setState(() => _saved = false);
-                            if (context.mounted) {
-                              _showSavedToast(context, saved: false);
-                            }
-                          } else {
-                            await StreakSavedStorage.add(StreakSavedItem(
-                              type: 'verse',
-                              title: item.verseReference,
-                              body: item.verseText,
-                              savedAt: DateTime.now().toIso8601String(),
-                            ));
-                            if (mounted) setState(() => _saved = true);
-                            if (context.mounted) {
-                              _showSavedToast(context, saved: true);
-                            }
-                          }
-                        },
-                        onShare: () async {
-                          final shareContext = context;
-                          final image = await _captureStreakShareImage(
-                            shareContext,
-                            backgroundAsset: 'assets/back1.png',
-                            content: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Text(
-                                  '"${item.verseText}"',
-                                  textAlign: TextAlign.center,
-                                  style: _streakShareBodyStyle(),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  item.verseReference,
-                                  textAlign: TextAlign.center,
-                                  style: _streakShareReferenceStyle(),
-                                ),
-                              ],
-                            ),
-                          );
-                          if (shareContext.mounted) {
-                            await _shareAsImage(
-                              shareContext,
-                              imageBytes: image,
-                              fallbackText:
-                                  '${item.verseText}\n- ${item.verseReference}',
-                            );
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      _streakPhotoPrimaryButton(
-                        context: context,
-                        label: 'Read Devotional',
-                        onPressed: () async {
-                          await SharPreferences.setInt(
-                              SharPreferences.streakFlowStepsCompletedToday, 2);
-                          await _storeActiveStreakFlowSteps(2);
-                          if (!mounted) return;
-                          await precacheStreakPhotoBackgrounds(context);
-                          if (!mounted) return;
-                          Get.to(() => StreakDevotionalScreen(
-                                item: item,
-                                viewOnly: widget.viewOnly,
+                _streakPhotoVerseBottomShadow(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _streakPhotoVerseSaveShareRow(
+                          saved: _saved,
+                          saveLabel: _saved ? 'Saved' : 'Save',
+                          onSave: () async {
+                            if (_saved) {
+                              await StreakSavedStorage.remove(
+                                  'verse', item.verseReference, item.verseText);
+                              if (mounted) setState(() => _saved = false);
+                              if (context.mounted) {
+                                _showSavedToast(context, saved: false);
+                              }
+                            } else {
+                              await StreakSavedStorage.add(StreakSavedItem(
+                                type: 'verse',
+                                title: item.verseReference,
+                                body: item.verseText,
+                                savedAt: DateTime.now().toIso8601String(),
                               ));
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Explore deeper insights and grow in your faith.',
-                        textAlign: TextAlign.center,
-                        style: _streakPhotoCaptionStyle(context),
-                      ),
-                    ],
+                              if (mounted) setState(() => _saved = true);
+                              if (context.mounted) {
+                                _showSavedToast(context, saved: true);
+                              }
+                            }
+                          },
+                          onShare: () async {
+                            final shareContext = context;
+                            final image = await _captureStreakShareImage(
+                              shareContext,
+                              backgroundAsset: 'assets/back1.png',
+                              content: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    '"${item.verseText}"',
+                                    textAlign: TextAlign.center,
+                                    style: _streakShareBodyStyle(),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    item.verseReference,
+                                    textAlign: TextAlign.center,
+                                    style: _streakShareReferenceStyle(),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (shareContext.mounted) {
+                              await _shareAsImage(
+                                shareContext,
+                                imageBytes: image,
+                                fallbackText:
+                                    '${item.verseText}\n- ${item.verseReference}',
+                              );
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        _streakPhotoPrimaryButton(
+                          context: context,
+                          label: 'Read Devotional',
+                          onPressed: () async {
+                            await SharPreferences.setInt(
+                                SharPreferences.streakFlowStepsCompletedToday, 2);
+                            await _storeActiveStreakFlowSteps(2);
+                            if (!mounted) return;
+                            await precacheStreakPhotoBackgrounds(context);
+                            if (!mounted) return;
+                            Get.to(() => StreakDevotionalScreen(
+                                  item: item,
+                                  viewOnly: widget.viewOnly,
+                                ));
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Explore deeper insights and grow in your faith.',
+                          textAlign: TextAlign.center,
+                          style: _streakPhotoCaptionStyle(context),
+                        ),
+                      ],
+                    ),
                   ),
                 )
               else

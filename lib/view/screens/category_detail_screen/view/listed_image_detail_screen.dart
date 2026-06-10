@@ -295,13 +295,11 @@ class ListedImageDetailScreen extends HookConsumerWidget {
                     backgroundDecoration:
                         const BoxDecoration(color: Colors.transparent),
                     loadingBuilder: (context, event) => Center(
-                      child: SizedBox(
-                        width: 20.0,
-                        height: 20.0,
-                        child: CircularProgressIndicator(
-                          value: (event?.cumulativeBytesLoaded ?? 1) /
-                              (event?.expectedTotalBytes ?? 1),
-                        ),
+                      child: CircularProgressIndicator.adaptive(
+                        value: event == null
+                            ? null
+                            : (event.cumulativeBytesLoaded) /
+                                (event.expectedTotalBytes ?? 1),
                       ),
                     ),
                     onPageChanged: (val) {

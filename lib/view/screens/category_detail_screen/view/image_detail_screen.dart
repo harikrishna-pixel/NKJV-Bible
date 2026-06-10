@@ -949,7 +949,11 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
               ),
               Expanded(
                 // height: Sizecf.scrnHeight! * 0.66,
-                child: Stack(
+                child: photoState.isLoading && photos.isEmpty
+                    ? Center(
+                        child: CircularProgressIndicator.adaptive(),
+                      )
+                    : Stack(
                   children: [
                     PhotoViewGallery.builder(
                       pageController: controller,
@@ -981,6 +985,15 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
                               CachedNetworkImage(
                             imageUrl: photos[i].imageUrl ?? '',
                             fit: BoxFit.fill,
+                            placeholder: (context, url) => const Center(
+                              child: CircularProgressIndicator.adaptive(),
+                            ),
+                            progressIndicatorBuilder:
+                                (context, url, downloadProgress) => Center(
+                              child: CircularProgressIndicator.adaptive(
+                                value: downloadProgress.progress,
+                              ),
+                            ),
                           ),
                           initialScale: PhotoViewComputedScale.contained,
                           // maxScale: PhotoViewComputedScale.contained * 3.7,
@@ -992,13 +1005,11 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
                       backgroundDecoration:
                           const BoxDecoration(color: Colors.transparent),
                       loadingBuilder: (context, event) => Center(
-                        child: SizedBox(
-                          width: 20.0,
-                          height: 20.0,
-                          child: CircularProgressIndicator(
-                            value: (event?.cumulativeBytesLoaded ?? 1) /
-                                (event?.expectedTotalBytes ?? 1),
-                          ),
+                        child: CircularProgressIndicator.adaptive(
+                          value: event == null
+                              ? null
+                              : (event.cumulativeBytesLoaded) /
+                                  (event.expectedTotalBytes ?? 1),
                         ),
                       ),
                       onPageChanged: (val) async {
