@@ -1109,6 +1109,53 @@ class DownloadProvider with ChangeNotifier {
 
     notifyListeners();
   }
+
+  /// Loads verse/book rows from SQLite into memory when cache is empty.
+  Future<bool> preloadBibleDataFromDatabaseIfNeeded() async {
+    if (verseList.isNotEmpty) return true;
+    try {
+      dynamic db;
+      for (var attempt = 0; attempt < 6; attempt++) {
+        db = await DBHelper().db;
+        if (db != null) {
+          final count =
+              await db.rawQuery('SELECT COUNT(*) as c FROM verse LIMIT 1');
+          final verseCount = int.tryParse('${count.first['c']}') ?? 0;
+          if (verseCount > 0) break;
+        }
+        await Future.delayed(Duration(milliseconds: 200 * (attempt + 1)));
+      }
+      if (db == null) {
+        debugPrint('preloadBibleDataFromDatabaseIfNeeded: DB null');
+        return false;
+      }
+
+      final verseRaw = await db.rawQuery('SELECT * FROM verse');
+      if (verseRaw.isEmpty) {
+        debugPrint('preloadBibleDataFromDatabaseIfNeeded: verse table empty');
+        return false;
+      }
+
+      final parsedVerses = await compute(parseVerses, verseRaw);
+      final splitVersesMap = await compute(splitVerses, parsedVerses);
+      final bookRaw = await db.rawQuery('SELECT * FROM book');
+      final parsedBooks = await compute(parseBooks, bookRaw);
+      final splitBooksMap = await compute(splitBooks, parsedBooks);
+
+      setData(
+        allVerses: parsedVerses,
+        otVerses: splitVersesMap['ot']!,
+        ntVerses: splitVersesMap['nt']!,
+        allBooks: parsedBooks,
+        otBooks: splitBooksMap['ot']!,
+        ntBooks: splitBooksMap['nt']!,
+      );
+      return verseList.isNotEmpty;
+    } catch (e) {
+      debugPrint('preloadBibleDataFromDatabaseIfNeeded error: $e');
+      return false;
+    }
+  }
 }
 
 /// One verse per selected topic per day (round-robin), not all from one category.

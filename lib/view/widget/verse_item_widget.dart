@@ -135,6 +135,8 @@ class _VerseItemWidgetState extends State<VerseItemWidget> {
     final screenWidth = MediaQuery.of(context).size.width;
     final parsedText =
         parse(widget.data.content).body?.text ?? widget.data.content;
+    final verseLabel =
+        displayVerseNumber(widget.data, listIndex: widget.index);
     final isHighlighted = widget.data.isHighlighted != "no";
     final isUnderlined = widget.data.isUnderlined == "yes";
     final isBookmarked = widget.data.isBookmarked == "yes";
@@ -163,7 +165,7 @@ class _VerseItemWidgetState extends State<VerseItemWidget> {
                 WidgetSpan(
                   alignment: PlaceholderAlignment.top,
                   child: HtmlWidget(
-                    "${widget.index + 1}. $parsedText",
+                    "$verseLabel. $parsedText",
                     // "And the earth was without form, and void; and darkness <em>was</em> upon the face of the deep. And the Spirit of God moved upon the face of the waters.",
                     textStyle: _getTextStyle(
                       context,

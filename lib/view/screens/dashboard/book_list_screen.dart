@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:math' as math;
+
+import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
@@ -10,6 +14,7 @@ import '../../../Model/mainBookListModel.dart';
 import '../../../controller/dpProvider.dart';
 import '../../constants/images.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../constants/share_preferences.dart';
 
 class BookListScreen extends StatefulWidget {
@@ -21,10 +26,8 @@ class BookListScreen extends StatefulWidget {
 
 class _BookListScreenState extends State<BookListScreen> {
   var testament_num = BibleInfo.old_testament_count;
-  TabController? tabController;
   List<MainBookListModel> bookList = [];
   List<MainBookListModel> newTestmentBookList = [];
-  // final  newTestmentBookList = <MainBookListModel>[].obs ;
   bool loader = false;
   Future<void> _openChapterListForBook(MainBookListModel data) async {
     await SharPreferences.setString('OpenAd', '1');
@@ -53,36 +56,71 @@ class _BookListScreenState extends State<BookListScreen> {
     );
   }
 
-  readBookJson() {
-    DBHelper().db.then((value) {
-      value!.rawQuery("SELECT * From book").then((bookResponse) {
-        setState(() {
-          bookList = bookResponse
-              .map<MainBookListModel>((e) => MainBookListModel.fromJson(e))
-              .toList();
-          for (var i = testament_num; i < bookList.length; i++) {
-            setState(() {
-              newTestmentBookList.add(bookList[i]);
-            });
-          }
-          loader = true;
-        });
-        // for (var i in bookResponse) {
-        //   setState(() {
-        //     // bookList.add(
-        //     //     MainBookListModel(
-        //     //       id: int.parse("${i["id"]}") ,
-        //     //       bookNum: num.parse("${i["book_num"]}"),
-        //     //       chapterCount: num.parse("${i["chapter_count"]}"),
-        //     //       title: "${i["title"]}",
-        //     //       shortTitle: "${i["short_title"]}",
-        //     //       readPer: "${i["read_per"]}",
-        //     //     ));
-        //   });
-        //
-        // }
-      });
-    }).whenComplete(() {});
+  void _splitTestaments() {
+    newTestmentBookList.clear();
+    for (var i = testament_num; i < bookList.length; i++) {
+      newTestmentBookList.add(bookList[i]);
+    }
+  }
+
+  Future<void> _loadBooksFromDatabase() async {
+    final db = await DBHelper().db;
+    if (db == null) return;
+
+    final bookResponse =
+        await db.rawQuery("SELECT * FROM book ORDER BY book_num");
+    if (!mounted) return;
+
+    bookList = bookResponse
+        .map<MainBookListModel>((e) => MainBookListModel.fromJson(e))
+        .toList();
+    _splitTestaments();
+  }
+
+  Future<void> _loadBooksFromCache() async {
+    if (bookList.isNotEmpty) return;
+
+    try {
+      final downloadProvider =
+          Provider.of<DownloadProvider>(context, listen: false);
+      if (downloadProvider.bookList.isNotEmpty) {
+        bookList = List<MainBookListModel>.from(downloadProvider.bookList);
+        _splitTestaments();
+        return;
+      }
+    } catch (_) {}
+
+    final prefs = await SharedPreferences.getInstance();
+    final allBookJson = prefs.getString('bookList');
+    if (allBookJson != null && allBookJson.isNotEmpty) {
+      bookList = (jsonDecode(allBookJson) as List)
+          .map((e) => MainBookListModel.fromJson(e))
+          .toList();
+      _splitTestaments();
+    }
+  }
+
+  Future<void> readBookJson() async {
+    try {
+      for (var attempt = 0; attempt < 3 && bookList.isEmpty; attempt++) {
+        if (attempt > 0) {
+          await Future.delayed(const Duration(milliseconds: 400));
+        }
+        await _loadBooksFromDatabase();
+      }
+      if (bookList.isEmpty) {
+        await _loadBooksFromCache();
+      }
+    } catch (e) {
+      debugPrint('BookListScreen load error: $e');
+      if (bookList.isEmpty) {
+        await _loadBooksFromCache();
+      }
+    } finally {
+      if (mounted) {
+        setState(() => loader = true);
+      }
+    }
   }
 
   // Future<void> filterBookList() async{
@@ -108,6 +146,7 @@ class _BookListScreenState extends State<BookListScreen> {
   @override
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
+    final oldTestamentCount = math.min(testament_num, bookList.length);
     debugPrint("sz current width - $screenWidth ");
     return Scaffold(
       appBar: AppBar(
@@ -163,7 +202,14 @@ class _BookListScreenState extends State<BookListScreen> {
             ? Center(
                 child: Loader(),
               )
-            : Column(
+            : bookList.isEmpty
+                ? Center(
+                    child: Text(
+                      'No books available',
+                      style: CommanStyle.bw16500(context),
+                    ),
+                  )
+                : Column(
                 children: [
                   Expanded(
                     child: DefaultTabController(
@@ -178,7 +224,6 @@ class _BookListScreenState extends State<BookListScreen> {
                             color: CommanColor.white,
                             height: screenWidth > 450 ? 55 : 45,
                             child: TabBar(
-                              controller: tabController,
                               isScrollable: false,
                               indicatorWeight: 0,
                               padding: EdgeInsets.zero,
@@ -228,14 +273,16 @@ class _BookListScreenState extends State<BookListScreen> {
                           Flexible(
                             flex: 1,
                             child: TabBarView(
-                              controller: tabController,
                               children: [
                                 ListView.builder(
-                                  itemCount: testament_num,
+                                  itemCount: oldTestamentCount,
                                   shrinkWrap: true,
                                   padding: EdgeInsets.symmetric(horizontal: 15),
                                   physics: ScrollPhysics(),
                                   itemBuilder: (context, index) {
+                                    if (index >= bookList.length) {
+                                      return const SizedBox.shrink();
+                                    }
                                     var data = bookList[index];
                                     return Padding(
                                       padding: const EdgeInsets.only(

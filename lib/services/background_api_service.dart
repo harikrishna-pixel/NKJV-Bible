@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/controller/api_service.dart';
 import 'package:biblebookapp/Model/get_audio_model.dart';
 import 'package:biblebookapp/services/paywall_preload_service.dart';
@@ -198,19 +199,19 @@ class BackgroundApiService {
       // Save subscription plans - Use constants as fallback when API data is not available
       await prefs.setString(
           'sixMonthPlan',
-          BibleInfo.resolveSubscriptionProductId(
+          AppApiConstant.resolveSubscriptionProductId(
             value.data?.subIdentifierSixMonth,
             BibleInfo.sixMonthPlanid,
           ));
       await prefs.setString(
           'oneYearPlan',
-          BibleInfo.resolveSubscriptionProductId(
+          AppApiConstant.resolveSubscriptionProductId(
             value.data?.subIdentifierOneyear,
             BibleInfo.oneYearPlanid,
           ));
       await prefs.setString(
           'lifeTimePlan',
-          BibleInfo.resolveSubscriptionProductId(
+          AppApiConstant.resolveSubscriptionProductId(
             value.data?.subIdentifierLifetime,
             BibleInfo.lifeTimePlanid,
           ));

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:biblebookapp/Model/product_details_model.dart' as m;
+import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/controller/api_service.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
@@ -66,15 +67,15 @@ class SubscriptionScreen extends StatefulWidget {
 
   /// Navigate to paywall from home (direct, no exit offer).
   static Future<void> navigateToPaywallFromHome(BuildContext context) async {
-    final sixMonthPlan = BibleInfo.resolveSubscriptionProductId(
+    final sixMonthPlan = AppApiConstant.resolveSubscriptionProductId(
       await SharPreferences.getString('sixMonthPlan'),
       BibleInfo.sixMonthPlanid,
     );
-    final oneYearPlan = BibleInfo.resolveSubscriptionProductId(
+    final oneYearPlan = AppApiConstant.resolveSubscriptionProductId(
       await SharPreferences.getString('oneYearPlan'),
       BibleInfo.oneYearPlanid,
     );
-    final lifeTimePlan = BibleInfo.resolveSubscriptionProductId(
+    final lifeTimePlan = AppApiConstant.resolveSubscriptionProductId(
       await SharPreferences.getString('lifeTimePlan'),
       BibleInfo.lifeTimePlanid,
     );
@@ -116,20 +117,34 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   String? _pendingRestoreProductId; // Store product ID for pending restore
   Timer? _loadingTimeoutTimer; // Timer for 10-second loading timeout
   bool _autoPurchaseTriggered = false;
+  Set<String> _lastQueriedProductIds = {};
+  Set<String> _lastStoreNotFoundIds = {};
 
-  String get _twoYearPlanId => BibleInfo.twoYearPlanid;
+  /// Bundle prefix shared by 6M/1Y plans (e.g. com.balaklrapps.bibliasagradacatolica).
+  String get _planBundlePrefix {
+    for (final planId in [_resolvedSixMonthPlanId, _resolvedOneYearPlanId]) {
+      final dotIndex = planId.lastIndexOf('.');
+      if (dotIndex > 0) {
+        return planId.substring(0, dotIndex);
+      }
+    }
+    return BibleInfo.ios_Bundle_Id;
+  }
 
-  String get _resolvedSixMonthPlanId => BibleInfo.resolveSubscriptionProductId(
+  /// 2Y ID uses the same bundle prefix as 6M/1Y (not a hardcoded Geneva id).
+  String get _twoYearPlanId => '$_planBundlePrefix.twoyearadsfree';
+
+  String get _resolvedSixMonthPlanId => AppApiConstant.resolveSubscriptionProductId(
         widget.sixMonthPlan,
         BibleInfo.sixMonthPlanid,
       );
 
-  String get _resolvedOneYearPlanId => BibleInfo.resolveSubscriptionProductId(
+  String get _resolvedOneYearPlanId => AppApiConstant.resolveSubscriptionProductId(
         widget.oneYearPlan,
         BibleInfo.oneYearPlanid,
       );
 
-  String get _resolvedLifeTimePlanId => BibleInfo.resolveSubscriptionProductId(
+  String get _resolvedLifeTimePlanId => AppApiConstant.resolveSubscriptionProductId(
         widget.lifeTimePlan,
         BibleInfo.lifeTimePlanid,
       );
@@ -139,6 +154,62 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         _resolvedOneYearPlanId,
         _twoYearPlanId,
       ];
+
+  Set<String> get _paywallQueryProductIds =>
+      AppApiConstant.paywallStoreQueryIds(
+        sixMonthPlan: _resolvedSixMonthPlanId,
+        oneYearPlan: _resolvedOneYearPlanId,
+        twoYearPlan: _twoYearPlanId,
+      );
+
+  bool _isPaywallProductForThisApp(String productId) =>
+      productId.startsWith('$_planBundlePrefix.');
+
+  bool _cacheHasPaywallSlot(Iterable<String> productIds, String slot) =>
+      productIds.any((id) => id.contains(slot));
+
+  bool _isSixMonthProductId(String productId) =>
+      productId == _resolvedSixMonthPlanId ||
+      productId == widget.sixMonthPlan ||
+      (productId.contains('sixmonth') && _isPaywallProductForThisApp(productId));
+
+  bool _isOneYearProductId(String productId) =>
+      productId == _resolvedOneYearPlanId ||
+      productId == widget.oneYearPlan ||
+      (productId.contains('oneyear') && _isPaywallProductForThisApp(productId));
+
+  bool _isTwoYearProductId(String productId) =>
+      productId == _twoYearPlanId ||
+      productId == '$_planBundlePrefix.twoyearadfree' ||
+      (productId.contains('twoyear') && _isPaywallProductForThisApp(productId));
+
+  void _sanitizeStalePaywallProducts() {
+    final removed = <String>[];
+    _products.removeWhere((product) {
+      final isStale = !_isPaywallProductForThisApp(product.id);
+      if (isStale) {
+        removed.add(product.id);
+      }
+      return isStale;
+    });
+    if (removed.isNotEmpty) {
+      debugPrint(
+        '⚠️ Removed stale paywall products from another app bundle: '
+        '${removed.join(', ')}',
+      );
+      debugPrint('   Current app bundle prefix: $_planBundlePrefix');
+      debugPrint('   ios_Bundle_Id constant: ${BibleInfo.ios_Bundle_Id}');
+    }
+  }
+
+  String _productPlanSlotLabel(String productId) {
+    final id = productId.toLowerCase();
+    if (id.contains('sixmonth')) return '6M';
+    if (id.contains('oneyear')) return '1Y';
+    if (id.contains('twoyear')) return '2Y';
+    if (id.contains('lifetime')) return 'LT';
+    return 'unknown';
+  }
 
   void _applyInitialPlanSelectionIfAny() {
     final idx = widget.initialSelectedPlanIndex;
@@ -164,9 +235,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     _products.sort((a, b) {
       // Define order: 6 months (0), 1 year (1), 2 years (2), lifetime (3)
       int getOrder(String id) {
-        if (id == _resolvedSixMonthPlanId) return 0;
-        if (id == _resolvedOneYearPlanId) return 1;
-        if (id == _twoYearPlanId) return 2;
+        if (_isSixMonthProductId(id)) return 0;
+        if (_isOneYearProductId(id)) return 1;
+        if (_isTwoYearProductId(id)) return 2;
         return 3;
       }
 
@@ -237,6 +308,31 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     await _navigateToHomeAfterPurchaseSuccess(invisibleHostPopValue: false);
   }
 
+  /// After any paywall subscription succeeds, route to Home (purchase) or streak/home (restore-only).
+  Future<void> _completePaywallSubscriptionNavigation({
+    required bool startFlag,
+    bool lifetimeWalletBonus = false,
+    bool invisiblePopSuccess = false,
+  }) async {
+    if (lifetimeWalletBonus) {
+      await _addLifetimeWalletBonusOnce();
+    }
+    if (widget.invisiblePurchaseHost) {
+      _popInvisiblePurchaseHost(invisiblePopSuccess);
+      return;
+    }
+    if (startFlag) {
+      await _navigateToHomeAfterPurchaseSuccess(
+        invisibleHostPopValue: invisiblePopSuccess,
+      );
+      return;
+    }
+    final ctx = context ?? Get.context;
+    if (ctx != null) {
+      await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
+    }
+  }
+
   void _popInvisiblePurchaseHost([bool success = false]) {
     if (!mounted || !widget.invisiblePurchaseHost) return;
     if (Navigator.of(context).canPop()) {
@@ -294,9 +390,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       String? expectedPlan;
       if (productId == widget.lifeTimePlan) {
         expectedPlan = 'platinum';
-      } else if (productId == widget.oneYearPlan) {
+      } else if (_isOneYearProductId(productId)) {
         expectedPlan = 'gold';
-      } else if (productId == widget.sixMonthPlan) {
+      } else if (_isSixMonthProductId(productId)) {
         expectedPlan = 'silver';
       }
 
@@ -443,6 +539,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         });
 
         await SharPreferences.setString('OpenAd', '1');
+        await SharPreferences.setBoolean('startpurches', true);
 
         // Check again before purchase (in case subscription status changed)
         final hasActiveSubscriptionCheck =
@@ -1277,8 +1374,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     final startFlag = await SharPreferences.getBoolean('startpurches');
     final successToastMessage =
         (startFlag == true) ? 'Purchase Successful' : 'Restore Successful';
-    debugPrint("restore data 1 is $data");
-    if (data == true) {
+    debugPrint(
+      "restore data 1 is $data | startFlag=$startFlag | productId=$productId",
+    );
+    if (data == true || startFlag == true) {
       // Treat Exit Offer product as lifetime plan for premium unlock flow
       final bool isExitOfferLifetime =
           productId.toString().toLowerCase().contains('lifetime.exitoffer') ||
@@ -1313,27 +1412,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         }
         Constants.showToast(successToastMessage);
         await SharPreferences.setBoolean('closead', true);
-        if (widget.invisiblePurchaseHost) {
-          _popInvisiblePurchaseHost(true);
-        } else if (startFlag == true) {
-          Get.offAll(
-            () => HomeScreen(
-              From: "premium",
-              selectedVerseNumForRead: "",
-              selectedBookForRead: "",
-              selectedChapterForRead: "",
-              selectedBookNameForRead: "",
-              selectedVerseForRead: "",
-            ),
-          );
-        } else {
-          final ctx = context ?? Get.context;
-          if (ctx != null) {
-            await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
-          }
-        }
+        await _completePaywallSubscriptionNavigation(
+          startFlag: startFlag == true,
+          lifetimeWalletBonus: startFlag == true,
+          invisiblePopSuccess: true,
+        );
         return;
-      } else if (productId == widget.oneYearPlan) {
+      } else if (_isOneYearProductId(productId)) {
         final dur = DateTime(dateTime.year + 1, dateTime.month, dateTime.day);
         final diff = dur.difference(DateTime.now());
         await controller.disableAd(diff);
@@ -1345,27 +1430,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         EasyLoading.dismiss();
         Constants.showToast(successToastMessage);
         await SharPreferences.setBoolean('closead', true);
-        if (widget.invisiblePurchaseHost) {
-          _popInvisiblePurchaseHost(false);
-        } else if (startFlag == true) {
-          Get.offAll(
-            () => HomeScreen(
-              From: "premium",
-              selectedVerseNumForRead: "",
-              selectedBookForRead: "",
-              selectedChapterForRead: "",
-              selectedBookNameForRead: "",
-              selectedVerseForRead: "",
-            ),
-          );
-        } else {
-          final ctx2 = context ?? Get.context;
-          if (ctx2 != null) {
-            await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx2);
-          }
-        }
+        await _completePaywallSubscriptionNavigation(
+            startFlag: startFlag == true);
         return;
-      } else if (productId == _twoYearPlanId) {
+      } else if (_isTwoYearProductId(productId)) {
         final dur = DateTime(dateTime.year + 2, dateTime.month, dateTime.day);
         final diff = dur.difference(DateTime.now());
         await controller.disableAd(diff);
@@ -1376,27 +1444,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         EasyLoading.dismiss();
         Constants.showToast(successToastMessage);
         await SharPreferences.setBoolean('closead', true);
-        if (widget.invisiblePurchaseHost) {
-          _popInvisiblePurchaseHost(false);
-        } else if (startFlag == true) {
-          Get.offAll(
-            () => HomeScreen(
-              From: "premium",
-              selectedVerseNumForRead: "",
-              selectedBookForRead: "",
-              selectedChapterForRead: "",
-              selectedBookNameForRead: "",
-              selectedVerseForRead: "",
-            ),
-          );
-        } else {
-          final ctxTwoYear = context ?? Get.context;
-          if (ctxTwoYear != null) {
-            await StreakFlowNavigation.navigateToStreakFlowOrHome(ctxTwoYear);
-          }
-        }
+        await _completePaywallSubscriptionNavigation(
+            startFlag: startFlag == true);
         return;
-      } else if (productId == widget.sixMonthPlan) {
+      } else if (_isSixMonthProductId(productId)) {
         final dur = addSixMonths(customDate: dateTime);
         final diff = dur.difference(DateTime.now());
         await controller.disableAd(diff);
@@ -1408,25 +1459,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         EasyLoading.dismiss();
         Constants.showToast(successToastMessage);
         await SharPreferences.setBoolean('closead', true);
-        if (widget.invisiblePurchaseHost) {
-          _popInvisiblePurchaseHost(false);
-        } else if (startFlag == true) {
-          Get.offAll(
-            () => HomeScreen(
-              From: "premium",
-              selectedVerseNumForRead: "",
-              selectedBookForRead: "",
-              selectedChapterForRead: "",
-              selectedBookNameForRead: "",
-              selectedVerseForRead: "",
-            ),
-          );
-        } else {
-          final ctx3 = context ?? Get.context;
-          if (ctx3 != null) {
-            await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx3);
-          }
-        }
+        await _completePaywallSubscriptionNavigation(
+            startFlag: startFlag == true);
         return;
       }
     }
@@ -1508,7 +1542,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 final todayDate = DateTime.now();
                 await SharPreferences.setBoolean("downloadreward", true);
                 await Future.delayed(Duration(seconds: 1));
-                if (purchaseDetails.productID == widget.sixMonthPlan) {
+                if (_isSixMonthProductId(purchaseDetails.productID)) {
                   final expiryDate = addSixMonths();
                   final diff = expiryDate.difference(todayDate);
                   await controller.disableAd(diff);
@@ -1523,7 +1557,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   debugPrint("restore data 2");
                   await _navigateAfterNonLifetimePurchaseSuccess();
                   return;
-                } else if (purchaseDetails.productID == widget.oneYearPlan) {
+                } else if (_isOneYearProductId(purchaseDetails.productID)) {
                   await controller.disableAd(const Duration(days: 366));
                   await Future.delayed(Duration(seconds: 2));
                   // Complete the purchase for iOS - critical to prevent infinite loading
@@ -1536,8 +1570,23 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   debugPrint("restore data 3 ");
                   await _navigateAfterNonLifetimePurchaseSuccess();
                   return;
-                } else if (purchaseDetails.productID == _twoYearPlanId) {
+                } else if (_isTwoYearProductId(purchaseDetails.productID)) {
                   await controller.disableAd(const Duration(days: 732));
+                  DownloadProvider? downloadProvider = _myProvider;
+                  downloadProvider ??= context.mounted
+                      ? Provider.of<DownloadProvider>(context, listen: false)
+                      : null;
+                  if (downloadProvider == null) {
+                    final getContext = Get.context;
+                    if (getContext != null) {
+                      downloadProvider = Provider.of<DownloadProvider>(
+                          getContext,
+                          listen: false);
+                    }
+                  }
+                  if (downloadProvider != null) {
+                    await downloadProvider.setSubscriptionPlan('gold');
+                  }
                   await Future.delayed(Duration(seconds: 2));
                   if (Platform.isIOS) {
                     await _inAppPurchase.completePurchase(purchaseDetails);
@@ -1718,7 +1767,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         PaywallPreloadService.getPreloadedAvailability();
     final preloadedProducts = PaywallPreloadService.getPreloadedProducts();
 
-    if (preloadedAvailability != null && preloadedProducts.isNotEmpty) {
+    final preloadedHasAllSlots = preloadedProducts.isNotEmpty &&
+        _cacheHasPaywallSlot(preloadedProducts.map((p) => p.id), 'sixmonth') &&
+        _cacheHasPaywallSlot(preloadedProducts.map((p) => p.id), 'oneyear') &&
+        _cacheHasPaywallSlot(preloadedProducts.map((p) => p.id), 'twoyear');
+
+    if (preloadedAvailability != null &&
+        preloadedProducts.isNotEmpty &&
+        preloadedHasAllSlots) {
       // Use preloaded data - instant display
       debugPrint('Using preloaded paywall data');
       _isAvailable = preloadedAvailability;
@@ -1744,6 +1800,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         );
       }).toList());
     } else {
+      if (preloadedProducts.isNotEmpty && !preloadedHasAllSlots) {
+        debugPrint(
+          '⚠️ Preload missing paywall slots — re-querying store for all plans',
+        );
+      }
       // Fallback to original loading logic if preload not available
       // Check availability of InApp Purchases
       _isAvailable = await _inAppPurchase.isAvailable();
@@ -1812,9 +1873,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       // Purchase transactions will handle delegate setup separately if needed
       await iosPlatformAddition.setDelegate(null);
 
-      Set<String> ids = _expectedPaywallPlanIds.toSet();
+      Set<String> ids = _paywallQueryProductIds;
+      _lastQueriedProductIds = ids;
 
       debugPrint("🔍 Querying products - IDs: $ids");
+      debugPrint("   App bundle prefix: $_planBundlePrefix");
       debugPrint("📦 Current products empty: ${_products.isEmpty}");
 
       final datafn = await productprovider.loadProductList();
@@ -1836,6 +1899,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         debugPrint("🔄 Cache is empty, querying from App Store...");
         ProductDetailsResponse response =
             await _inAppPurchase.queryProductDetails(ids);
+        _lastStoreNotFoundIds = response.notFoundIDs.toSet();
 
         debugPrint("📊 Product Details Response:");
         debugPrint("   - Error: ${response.error}");
@@ -1888,14 +1952,18 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           _createFallbackProductsFromConstants();
         }
       } else {
-        final cachedIds = datafn.map((product) => product.id).toSet();
+        final cachedIds = datafn.map((product) => product.id).toList();
         final missingExpectedPlans =
-            _expectedPaywallPlanIds.any((id) => !cachedIds.contains(id));
+            !_cacheHasPaywallSlot(cachedIds, 'sixmonth') ||
+            !_cacheHasPaywallSlot(cachedIds, 'oneyear') ||
+            !_cacheHasPaywallSlot(cachedIds, 'twoyear');
 
         if (missingExpectedPlans) {
           debugPrint(
               '🔄 Cache missing expected plans, re-querying from App Store...');
           final response = await _inAppPurchase.queryProductDetails(ids);
+          _lastQueriedProductIds = ids;
+          _lastStoreNotFoundIds = response.notFoundIDs.toSet();
           if (response.notFoundIDs.isNotEmpty) {
             debugPrint(
                 '⚠️ Products not found in App Store: ${response.notFoundIDs.join(', ')}');
@@ -1992,10 +2060,31 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   void _mergeMissingFallbackPlans() {
-    final existing = _products.map((product) => product.id).toSet();
+    _sanitizeStalePaywallProducts();
+    final hasSixMonth =
+        _products.any((product) => _isSixMonthProductId(product.id));
+    final hasOneYear =
+        _products.any((product) => _isOneYearProductId(product.id));
+    final hasTwoYear =
+        _products.any((product) => _isTwoYearProductId(product.id));
     for (final fallback in _buildAllFallbackProducts()) {
-      if (!existing.contains(fallback.id)) {
-        _products.add(fallback);
+      if (fallback.id.contains('sixmonth')) {
+        if (!hasSixMonth) {
+          _products.add(fallback);
+        }
+        continue;
+      }
+      if (fallback.id.contains('oneyear')) {
+        if (!hasOneYear) {
+          _products.add(fallback);
+        }
+        continue;
+      }
+      if (fallback.id.contains('twoyear')) {
+        if (!hasTwoYear) {
+          _products.add(fallback);
+        }
+        continue;
       }
     }
     _sortProducts();
@@ -2006,7 +2095,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     debugPrint('════════ PAYWALL DATA ($source) ════════');
     debugPrint('IAP available: $_isAvailable');
     debugPrint('checkad: ${widget.checkad}');
+    debugPrint('App: ${BibleInfo.bible_shortName}');
+    debugPrint('ios_Bundle_Id: ${BibleInfo.ios_Bundle_Id}');
+    debugPrint('Plan bundle prefix: $_planBundlePrefix');
     debugPrint('Expected plan IDs: $_expectedPaywallPlanIds');
+    debugPrint('Queried store IDs: $_lastQueriedProductIds');
+    if (_lastStoreNotFoundIds.isNotEmpty) {
+      debugPrint('Store not found IDs: $_lastStoreNotFoundIds');
+    }
     debugPrint(
       'Resolved IDs -> 6M: $_resolvedSixMonthPlanId | '
       '1Y: $_resolvedOneYearPlanId | 2Y: $_twoYearPlanId | '
@@ -2017,6 +2113,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       '1Y: ${widget.oneYearPlan} | LT: ${widget.lifeTimePlan}',
     );
     debugPrint(
+      'Constants -> 6M: ${BibleInfo.sixMonthPlanid} | '
+      '1Y: ${BibleInfo.oneYearPlanid} | 2Y: ${BibleInfo.twoYearPlanid}',
+    );
+    debugPrint(
       'Products loaded: ${_products.length} | selectedIndex: $selectedindex',
     );
     if (_products.isEmpty) {
@@ -2025,15 +2125,27 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       for (var i = 0; i < _products.length; i++) {
         final product = _products[i];
         final planLabel = _getPlanTitle(i);
+        final slot = _productPlanSlotLabel(product.id);
+        final appMatch = _isPaywallProductForThisApp(product.id);
+        final expected = _expectedPaywallPlanIds.contains(product.id);
         debugPrint(
-          '  [$i] $planLabel | id=${product.id} | price=${product.price} | '
-          'rawPrice=${product.rawPrice} | currency=${product.currencyCode}',
+          '  [$i] $planLabel | slot=$slot | id=${product.id} | '
+          'appMatch=$appMatch | expectedId=$expected | '
+          'price=${product.price} | rawPrice=${product.rawPrice} | '
+          'currency=${product.currencyCode}',
         );
+        if (!appMatch) {
+          debugPrint(
+            '      ⚠️ STALE: product belongs to another app bundle '
+            '(e.g. genevabible cache from a previous install)',
+          );
+        }
       }
       if (selectedindex >= 0 && selectedindex < _products.length) {
         final selected = _products[selectedindex];
         debugPrint(
           'Selected plan -> ${_getPlanTitle(selectedindex)} | '
+          'slot=${_productPlanSlotLabel(selected.id)} | '
           'id=${selected.id} | price=${selected.price}',
         );
       }
@@ -3072,13 +3184,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   double? _fakeOffer(ProductDetails product, DashBoardController controller) {
-    if (product.id == _resolvedSixMonthPlanId) {
+    if (_isSixMonthProductId(product.id)) {
       return double.tryParse(controller.sixMonthPlanValue ?? '');
     }
-    if (product.id == _resolvedOneYearPlanId) {
-      return double.tryParse(controller.oneYearPlanValue ?? '');
+    if (_isOneYearProductId(product.id)) {
+      final fromApi = double.tryParse(controller.oneYearPlanValue ?? '');
+      if (fromApi != null && fromApi > 0) return fromApi;
+      return double.tryParse(BibleInfo.oneYearPlanDiscount);
     }
-    if (product.id == _twoYearPlanId) {
+    if (_isTwoYearProductId(product.id)) {
       return double.tryParse(BibleInfo.twoYearPlanDiscount);
     }
     if (product.id == _resolvedLifeTimePlanId) {
@@ -3099,21 +3213,21 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   String _getPlanTitle(int index) {
-    if (_products[index].id == _resolvedSixMonthPlanId) return '6 Months';
-    if (_products[index].id == _resolvedOneYearPlanId) return '1 Year';
-    if (_products[index].id == _twoYearPlanId) return '2 Years';
+    if (_isSixMonthProductId(_products[index].id)) return '6 Months';
+    if (_isOneYearProductId(_products[index].id)) return '1 Year';
+    if (_isTwoYearProductId(_products[index].id)) return '2 Years';
     if (_products[index].id == _resolvedLifeTimePlanId) return 'Lifetime';
     return _products[index].description;
   }
 
   String _getPlanSubtitle(int index) {
-    if (_products[index].id == _resolvedSixMonthPlanId) {
+    if (_isSixMonthProductId(_products[index].id)) {
       return 'Build Your Faith Habit';
     }
-    if (_products[index].id == _resolvedOneYearPlanId) {
+    if (_isOneYearProductId(_products[index].id)) {
       return 'Best for Daily Spiritual Growth';
     }
-    if (_products[index].id == _twoYearPlanId) {
+    if (_isTwoYearProductId(_products[index].id)) {
       return 'Long-term Spiritual Companion';
     }
     if (_products[index].id == _resolvedLifeTimePlanId) {
@@ -3128,9 +3242,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         selectedindex >= 0 &&
         selectedindex < _products.length) {
       final currentId = _products[selectedindex].id;
-      if (currentId == widget.sixMonthPlan) {
+      if (_isSixMonthProductId(currentId)) {
         label = "Get 500 Bonus credits with this plan";
-      } else if (currentId == widget.oneYearPlan) {
+      } else if (_isOneYearProductId(currentId)) {
         label = "Get 1,000 Bonus credits with this plan";
       } else if (currentId == widget.lifeTimePlan) {
         label = "Get 5,000 Bonus credits with this plan";
@@ -3145,9 +3259,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         selectedindex >= 0 &&
         selectedindex < _products.length) {
       final currentId = _products[selectedindex].id;
-      if (currentId == widget.sixMonthPlan) {
+      if (_isSixMonthProductId(currentId)) {
         highlight = "500 Bonus credits";
-      } else if (currentId == widget.oneYearPlan) {
+      } else if (_isOneYearProductId(currentId)) {
         highlight = "1,000 Bonus credits";
       } else if (currentId == widget.lifeTimePlan) {
         highlight = "5,000 Bonus credits";
@@ -3158,14 +3272,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   String? _getBadgeText(int index, DashBoardController controller) {
     final fakeOfferValue = _fakeOffer(_products[index], controller);
-    if (_products[index].id == _resolvedOneYearPlanId) {
+    if (_isOneYearProductId(_products[index].id)) {
       if (fakeOfferValue != null && fakeOfferValue > 0) {
         return 'Save ${fakeOfferValue.toStringAsFixed(0)}%';
       }
       // Fallback for cases where API value is missing.
       return 'Save 50%';
     }
-    if (_products[index].id == _twoYearPlanId) {
+    if (_isTwoYearProductId(_products[index].id)) {
       if (fakeOfferValue != null && fakeOfferValue > 0) {
         return 'Save ${fakeOfferValue.toStringAsFixed(0)}%';
       }
@@ -3178,10 +3292,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   String _planBadgeLabel(int index, String? badgeText) {
-    if (_products[index].id == _resolvedOneYearPlanId) {
+    if (_isOneYearProductId(_products[index].id)) {
       return '★ MOST POPULAR';
     }
-    if (_products[index].id == _twoYearPlanId) {
+    if (_isTwoYearProductId(_products[index].id)) {
       return '💎 BEST VALUE';
     }
     if (_products[index].id == _resolvedLifeTimePlanId) {
@@ -3191,10 +3305,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   String _planCenterIconAsset(int index) {
-    if (_products[index].id == _resolvedSixMonthPlanId) {
+    if (_isSixMonthProductId(_products[index].id)) {
       return _paywallIconPlant;
     }
-    if (_products[index].id == _resolvedOneYearPlanId) {
+    if (_isOneYearProductId(_products[index].id)) {
       return _paywallIconCrown;
     }
     return _paywallIconLowerCost;
@@ -3216,9 +3330,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     final discountedPrice = _getDiscountedPrice(_products[index], controller);
     final badgeText = _getBadgeText(index, controller);
     final badgeLabel = _planBadgeLabel(index, badgeText);
-    final isSixMonth = _products[index].id == _resolvedSixMonthPlanId;
-    final isOneYear = _products[index].id == _resolvedOneYearPlanId;
-    final isTwoYear = _products[index].id == _twoYearPlanId;
+    final isSixMonth = _isSixMonthProductId(_products[index].id);
+    final isOneYear = _isOneYearProductId(_products[index].id);
+    final isTwoYear = _isTwoYearProductId(_products[index].id);
     final isLifetime = _products[index].id == _resolvedLifeTimePlanId;
     final isLongTerm = isTwoYear || isLifetime;
 

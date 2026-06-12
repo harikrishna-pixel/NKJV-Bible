@@ -1,31 +1,24 @@
 class BibleInfo {
-  static String apple_AppId = "6460891065";
+  static String apple_AppId = "6484271788";
 
   // 6484270584  //6459793603
-  static String ios_Bundle_Id = "com.balaklrapps.genevabible";
-  static String bible_shortName = "Geneva Bible";
-  static String current_Version = "1.0.69";
+  static String ios_Bundle_Id = "com.balaklrapps.bibliasagradacatolica";
+  static String bible_shortName = "Biblia Sagrada Catolica";
+  static String current_Version = "1.0.110";
   static String android_Package_Name = "com.whitebibles.genevabible";
-  static String appID = '11656bd4-ed0c-11ef-b28e-fa163e8c011b';
+  static String appID = 'cc8fede9-ed17-11ef-b28e-fa163e8c011b';
   //static int surveyAppId = 3;
 
 //IAP
-  static String sixMonthPlanid = 'com.balaklrapps.genevabible.sixmonthadsfree';
-  static String oneYearPlanid = 'com.balaklrapps.genevabible.oneyearadsfree';
-  static String twoYearPlanid = 'com.balaklrapps.genevabible.twoyearadsfree';
-  static String lifeTimePlanid = 'com.balaklrapps.genevabible.lifetimeadsfree';
+  static String sixMonthPlanid = 'com.balaklrapps.bibliasagradacatolica.sixmonthadsfree';
+  static String oneYearPlanid = 'com.balaklrapps.bibliasagradacatolica.oneyearadsfree';
+  static String twoYearPlanid = 'com.balaklrapps.bibliasagradacatolica.twoyearadsfree';
+  static String lifeTimePlanid = 'com.balaklrapps.bibliasagradacatolica.lifetimeadsfree';
   static String subIdentifierTwoYear = twoYearPlanid;
   static String exitOfferPlanid =
-      'com.balaklrapps.genevabible.lifetime.exitoffer';
+      'com.balaklrapps.bibliasagradacatolica.lifetime.exitoffer';
 
-  /// API prefs sometimes store flags like "1" instead of a real product id.
-  static String resolveSubscriptionProductId(String? stored, String fallback) {
-    final value = stored?.trim() ?? '';
-    if (value.contains('.') && value.startsWith('com.')) {
-      return value;
-    }
-    return fallback;
-  }
+
 
   // IAP Discounts (for offline mode)
   static String sixMonthPlanDiscount = '0';
@@ -35,9 +28,9 @@ class BibleInfo {
   static String exitOfferPlanDiscount = '0';
 
   // Coin Pack IDs
-  static String coinPack1Id = 'com.balaklrapps.genevabible.coinspack1';
-  static String coinPack2Id = 'com.balaklrapps.genevabible.coinspack2';
-  static String coinPack3Id = 'com.balaklrapps.genevabible.coinspack3';
+  static String coinPack1Id = 'com.balaklrapps.bibliasagradacatolica.coinspack1';
+  static String coinPack2Id = 'com.balaklrapps.bibliasagradacatolica.coinspack2';
+  static String coinPack3Id = 'com.balaklrapps.bibliasagradacatolica.coinspack3';
 
   // Coin Pack Credits (for offline mode)
   static String coinPack1Credits = '100';
@@ -96,7 +89,7 @@ class BibleInfo {
 
 // add folder names here  assets/zipped/
   static List<String> folders = [
-    "Geneva Bible"
+    "Biblia Sagrada Catolica"
     // "Bengali Bible",
   ];
 
@@ -115,8 +108,8 @@ class BibleInfo {
   static String exportText =
       'Save your Bookmarked verses, Highlights, Notes and Verse Images directly to your device. This option stores a backup file locally, which can be transferred or accessed later. You can import this file into the app whenever needed, even on another device.';
   static String importText = 'Please select the file you exported last time.';
-  static String autoCloudBackupText =
-      'If you don\'t export manually, your library is backed up automatically when you sign in. A daily cloud backup also runs after 2:00 AM when you open the app (signed-in users only).';
+
+
 
   static String termsandConditionURL =
       "https://bibleoffice.com/terms_conditions.html";

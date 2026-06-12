@@ -10,7 +10,7 @@
 import SwiftUI
 import WidgetKit
 
-private let appGroupId = "group.com.balaklrapps.genevabible"
+private let appGroupId = "group.com.balaklrapps.bibliasagradacatolica"
 
 // MARK: - Container Background (iOS 17+)
 

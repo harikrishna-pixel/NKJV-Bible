@@ -121,5 +121,17 @@ List<VerseBookContentModel> filterContent(
       filteredContent = [...filteredContent, content];
     }
   }
+  filteredContent.sort((a, b) {
+    final av = a.verseNum ?? 0;
+    final bv = b.verseNum ?? 0;
+    return av.compareTo(bv);
+  });
   return filteredContent;
+}
+
+/// DB stores 0-based verse_num; UI shows 1-based verse numbers.
+int displayVerseNumber(VerseBookContentModel verse, {int listIndex = 0}) {
+  final stored = verse.verseNum;
+  if (stored != null) return stored.toInt() + 1;
+  return listIndex + 1;
 }

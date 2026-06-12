@@ -115,10 +115,13 @@ class floatingButtonState extends State<floatingButton>
     checknetwork();
     audioPlayer = widget.audioPlayer;
     setupAudioPlayer().then((_) {
-      selectedChapter = int.parse(widget.chapterNum);
-      audioChapterNum = int.parse(widget.chapterNum);
-      audioBookNum = int.parse(widget.bookNum.toString()) + 1;
-      currentBookChapterCount = int.parse(widget.chapterCount.toString());
+      if (!mounted) return;
+      selectedChapter = int.tryParse(widget.chapterNum) ?? 1;
+      audioChapterNum = selectedChapter;
+      final parsedBookNum = int.tryParse(widget.bookNum.toString());
+      audioBookNum = (parsedBookNum ?? 0) + 1;
+      currentBookChapterCount =
+          int.tryParse(widget.chapterCount.toString()) ?? 1;
       setChapterContent();
       initTts();
       checkTTS();

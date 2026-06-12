@@ -46,6 +46,8 @@ class SharPreferences {
   static const lastExportedDate = 'lastExportedDate';
   static const lastCloudBackupDate = 'lastCloudBackupDate';
   static const lastScheduledCloudBackupDate = 'lastScheduledCloudBackupDate';
+  static const lastCloudBackupFailed = 'lastCloudBackupFailed';
+  static const lastCloudBackupFailureReason = 'lastCloudBackupFailureReason';
   static const userLocalData = 'userLocalData';
   static const calendarLocal = 'calendarLocal';
   static const bookadscatid = 'bookadscatid';

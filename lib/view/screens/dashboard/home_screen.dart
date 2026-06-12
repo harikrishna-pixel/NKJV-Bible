@@ -98,21 +98,83 @@ bool _isTwoYearSubscriptionDisplay(int diffDy) =>
     diffDy >= _kSubscriptionTwoYearDisplayMinDays &&
     diffDy <= _kSubscriptionLifetimeDisplayMinDays;
 
+/// Calendar-day count until expiry (matches what users expect in "X days left").
+int _subscriptionDaysRemaining(DateTime expiryDate, [DateTime? now]) {
+  final current = now ?? DateTime.now();
+  final expiryOnly =
+      DateTime(expiryDate.year, expiryDate.month, expiryDate.day);
+  final nowOnly = DateTime(current.year, current.month, current.day);
+  return expiryOnly.difference(nowOnly).inDays;
+}
+
 String _subscriptionRenewalDisplayText(int diffDy) {
+  if (diffDy < 0) {
+    return 'Your subscription has expired';
+  }
   if (_isLifetimeSubscriptionDisplay(diffDy)) {
     return 'Your subscription will never expire';
   }
   return '$diffDy day(s) left for the renewal of the subscription.';
 }
 
-String _subscriptionPeriodDisplayText(int diffDy, DateTime expiryDate) {
-  if (_isLifetimeSubscriptionDisplay(diffDy)) {
+String _subscriptionPeriodDisplayText(
+  String? plan,
+  int diffDy,
+  DateTime expiryDate,
+) {
+  final planKey = plan?.toLowerCase() ?? '';
+  if (_isLifetimeSubscriptionDisplay(diffDy) || planKey == 'platinum') {
     return 'Your subscription period is lifetime';
+  }
+  if (planKey == 'silver') {
+    return 'Your subscription period is 6 months';
   }
   if (_isTwoYearSubscriptionDisplay(diffDy)) {
     return 'Your subscription period is 2 years';
   }
+  if (planKey == 'gold') {
+    return 'Your subscription period is 1 year';
+  }
   return 'Your subscription expires on ${DateFormat('dd-MM-yyyy').format(expiryDate)}';
+}
+
+Widget _buildSubscriptionInfoDetails({
+  required BuildContext context,
+  required DateTime expiryDate,
+  required double screenWidth,
+}) {
+  final diffDy = _subscriptionDaysRemaining(expiryDate);
+  final downloadProvider =
+      Provider.of<DownloadProvider>(context, listen: false);
+  final textStyle = TextStyle(
+    letterSpacing: BibleInfo.letterSpacing,
+    fontSize: screenWidth < 380
+        ? BibleInfo.fontSizeScale * 13
+        : BibleInfo.fontSizeScale * 15,
+    color: CommanColor.lightDarkPrimary(context),
+    fontWeight: FontWeight.w400,
+  );
+
+  return FutureBuilder<String?>(
+    future: downloadProvider.getSubscriptionPlan(),
+    builder: (context, snapshot) {
+      final plan = snapshot.data;
+      return Column(
+        children: [
+          Text(
+            _subscriptionRenewalDisplayText(diffDy),
+            style: textStyle,
+          ),
+          const SizedBox(height: 5),
+          Text(
+            _subscriptionPeriodDisplayText(plan, diffDy, expiryDate),
+            style: textStyle,
+          ),
+          const SizedBox(height: 5),
+        ],
+      );
+    },
+  );
 }
 
 // ignore: must_be_immutable
@@ -1271,11 +1333,60 @@ class _HomeScreenState extends State<HomeScreen>
   // }
 
   /// Truncate only long book names (e.g. Song of Solomon); short names stay full.
+  static const int _kAppBarBookNameMaxChars = 14;
+
   String _formatAppBarBookName(String name) {
-    const maxChars = 18;
     final trimmed = name.trim();
-    if (trimmed.length <= maxChars) return trimmed;
-    return '${trimmed.substring(0, maxChars - 1)}…';
+    if (trimmed.length <= _kAppBarBookNameMaxChars) return trimmed;
+    return '${trimmed.substring(0, _kAppBarBookNameMaxChars - 1)}…';
+  }
+
+  Widget _buildAppBarBookTitleSelector({
+    required BuildContext context,
+    required DashBoardController controller,
+    required double screenWidth,
+    required VoidCallback onTap,
+  }) {
+    final displayBookName = _formatAppBarBookName(
+      '${selectedBookname ?? controller.selectedBook}',
+    );
+    final arrowSize = screenWidth > 450 ? 39.0 : 24.0;
+    final barWidth = MediaQuery.sizeOf(context).width;
+    final maxNameWidth = barWidth > 0
+        ? (barWidth - arrowSize - 130).clamp(48.0, barWidth * 0.5)
+        : 120.0;
+
+    return InkWell(
+      onTap: onTap,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxNameWidth),
+            child: Text(
+              displayBookName,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: CommanStyle.appBarStyle(context).copyWith(
+                fontSize: screenWidth > 450
+                    ? BibleInfo.fontSizeScale * 26
+                    : BibleInfo.fontSizeScale * 18,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 3.0, left: 4),
+            child: Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: CommanColor.whiteBlack(context),
+              size: arrowSize,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// "How are you feeling" — once on the 2nd app open (launchCount == 2 after splash).
@@ -3041,47 +3152,78 @@ class _HomeScreenState extends State<HomeScreen>
                     toolbarHeight: screenWidth > 450 ? 70 : 55,
                     iconTheme:
                         IconThemeData(color: CommanColor.whiteBlack(context)),
-                    flexibleSpace: Container(
-                      color: p.Provider.of<ThemeProvider>(context)
-                                  .currentCustomTheme ==
-                              AppCustomTheme.vintage
-                          ? null
-                          : Provider.of<ThemeProvider>(context).themeMode ==
-                                  ThemeMode.dark
-                              ? CommanColor.darkPrimaryColor
-                              : p.Provider.of<ThemeProvider>(context)
-                                          .currentCustomTheme ==
-                                      AppCustomTheme.vintage
-                                  ? CommanColor.darkPrimaryColor
-                                  : p.Provider.of<ThemeProvider>(context)
-                                      .backgroundColor,
-                      decoration: p.Provider.of<ThemeProvider>(context)
-                                  .currentCustomTheme ==
-                              AppCustomTheme.vintage
-                          ? BoxDecoration(
-                              color: Provider.of<ThemeProvider>(context)
-                                          .themeMode ==
+                    flexibleSpace: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Container(
+                          color: p.Provider.of<ThemeProvider>(context)
+                                      .currentCustomTheme ==
+                                  AppCustomTheme.vintage
+                              ? null
+                              : Provider.of<ThemeProvider>(context).themeMode ==
                                       ThemeMode.dark
-                                  ? CommanColor.black
+                                  ? CommanColor.darkPrimaryColor
                                   : p.Provider.of<ThemeProvider>(context)
                                               .currentCustomTheme ==
                                           AppCustomTheme.vintage
                                       ? CommanColor.darkPrimaryColor
                                       : p.Provider.of<ThemeProvider>(context)
                                           .backgroundColor,
-                              image: DecorationImage(
-                                image: AssetImage(Images.bgImage((context))),
-                                fit: BoxFit.cover,
-                              ),
-                            )
-                          : null,
+                          decoration: p.Provider.of<ThemeProvider>(context)
+                                      .currentCustomTheme ==
+                                  AppCustomTheme.vintage
+                              ? BoxDecoration(
+                                  color: Provider.of<ThemeProvider>(context)
+                                              .themeMode ==
+                                          ThemeMode.dark
+                                      ? CommanColor.black
+                                      : p.Provider.of<ThemeProvider>(context)
+                                                  .currentCustomTheme ==
+                                              AppCustomTheme.vintage
+                                          ? CommanColor.darkPrimaryColor
+                                          : p.Provider.of<ThemeProvider>(context)
+                                              .backgroundColor,
+                                  image: DecorationImage(
+                                    image:
+                                        AssetImage(Images.bgImage((context))),
+                                    fit: BoxFit.cover,
+                                  ),
+                                )
+                              : null,
+                        ),
+                        SafeArea(
+                          bottom: false,
+                          child: Align(
+                            alignment: Alignment.center,
+                            child: Transform.translate(
+                              offset: const Offset(0, -13),
+                              child: _buildAppBarBookTitleSelector(
+                              context: context,
+                              controller: controller,
+                              screenWidth: screenWidth,
+                              onTap: () async {
+                                if (controller.adFree.value == false) {
+                                  controller.bannerAd?.dispose();
+                                  controller.bannerAd?.load();
+                                }
+                                Get.to(() => const BookListScreen(),
+                                    transition: Transition.cupertinoDialog,
+                                    duration:
+                                        const Duration(milliseconds: 300));
+                              },
+                            ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     backgroundColor: p.Provider.of<ThemeProvider>(context)
                                 .currentCustomTheme ==
                             AppCustomTheme.vintage
                         ? Colors.transparent
                         : null,
-                    leadingWidth: 120,
+                    leadingWidth: 96,
+                    titleSpacing: 0,
                     leading: Row(
                       children: [
                         SizedBox(width: 12),
@@ -3127,17 +3269,8 @@ class _HomeScreenState extends State<HomeScreen>
                                             clipBehavior:
                                                 Clip.antiAliasWithSaveLayer,
                                             builder: (BuildContext context) {
-                                              final startTime = DateTime.parse(
+                                              final expiryDate = DateTime.parse(
                                                   '${controller.RewardAdExpireDate}');
-
-                                              DateTime ExpiryDate = startTime;
-
-                                              final currentTime =
-                                                  DateTime.now();
-                                              final diffDy =
-                                                  ExpiryDate.difference(
-                                                          currentTime)
-                                                      .inDays;
 
                                               return Stack(
                                                 children: [
@@ -3206,54 +3339,13 @@ class _HomeScreenState extends State<HomeScreen>
                                                           const SizedBox(
                                                             height: 15,
                                                           ),
-                                                          Text(
-                                                              _subscriptionRenewalDisplayText(
-                                                                  diffDy),
-                                                              style: TextStyle(
-                                                                  letterSpacing:
-                                                                      BibleInfo
-                                                                          .letterSpacing,
-                                                                  fontSize: screenWidth <
-                                                                          380
-                                                                      ? BibleInfo
-                                                                              .fontSizeScale *
-                                                                          13
-                                                                      : BibleInfo
-                                                                              .fontSizeScale *
-                                                                          15,
-                                                                  color: CommanColor
-                                                                      .lightDarkPrimary(
-                                                                          context),
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w400)),
-                                                          const SizedBox(
-                                                              height: 5),
-                                                          Text(
-                                                              _subscriptionPeriodDisplayText(
-                                                                  diffDy,
-                                                                  ExpiryDate),
-                                                              style: TextStyle(
-                                                                letterSpacing:
-                                                                    BibleInfo
-                                                                        .letterSpacing,
-                                                                fontSize: screenWidth <
-                                                                        380
-                                                                    ? BibleInfo
-                                                                            .fontSizeScale *
-                                                                        13
-                                                                    : BibleInfo
-                                                                            .fontSizeScale *
-                                                                        15,
-                                                                color: CommanColor
-                                                                    .lightDarkPrimary(
-                                                                        context),
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w400,
-                                                              )),
-                                                          const SizedBox(
-                                                              height: 5),
+                                                          _buildSubscriptionInfoDetails(
+                                                            context: context,
+                                                            expiryDate:
+                                                                expiryDate,
+                                                            screenWidth:
+                                                                screenWidth,
+                                                          ),
                                                         ],
                                                       ),
                                                     ),
@@ -3344,7 +3436,7 @@ class _HomeScreenState extends State<HomeScreen>
                       BibleInfo.folders.length != 1
                           ? Padding(
                               padding:
-                                  const EdgeInsets.symmetric(horizontal: 10),
+                                  const EdgeInsets.symmetric(horizontal: 4),
                               child: InkWell(
                                   onTap: () {
                                     if (controller.adFree.value == false) {
@@ -3405,48 +3497,7 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
                       ),
                     ],
-                    title: InkWell(
-                      onTap: () async {
-                        if (controller.adFree.value == false) {
-                          controller.bannerAd?.dispose();
-                          controller.bannerAd?.load();
-                        }
-                        Get.to(() => const BookListScreen(),
-                            transition: Transition.cupertinoDialog,
-                            duration: const Duration(milliseconds: 300));
-                      },
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Flexible(
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                _formatAppBarBookName(
-                                  '${selectedBookname ?? controller.selectedBook}',
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.clip,
-                                textAlign: TextAlign.center,
-                                style: CommanStyle.appBarStyle(context).copyWith(
-                                  fontSize: screenWidth > 450
-                                      ? BibleInfo.fontSizeScale * 26
-                                      : BibleInfo.fontSizeScale * 18,
-                                ),
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.only(top: 3.0, left: 4),
-                            child: Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              color: CommanColor.whiteBlack(context),
-                              size: screenWidth > 450 ? 39 : 24,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    title: const SizedBox.shrink(),
                     bottom: PreferredSize(
                       preferredSize: const Size.fromHeight(30.0),
                       child: Theme(
@@ -3724,7 +3775,8 @@ class _HomeScreenState extends State<HomeScreen>
                                               });
                                               debugPrint(" step 1 ");
                                             },
-                                                    verNum: "${index + 1}",
+                                                    verNum:
+                                                        "${displayVerseNumber(data, listIndex: index)}",
                                                     verseBookdata: data,
                                                     selectedColor: data
                                                                 .isHighlighted ==
@@ -5784,17 +5836,8 @@ class _HomeScreenState extends State<HomeScreen>
                                               clipBehavior:
                                                   Clip.antiAliasWithSaveLayer,
                                               builder: (BuildContext context) {
-                                                final startTime = DateTime.parse(
+                                                final expiryDate = DateTime.parse(
                                                     '${controller.RewardAdExpireDate}');
-
-                                                DateTime ExpiryDate = startTime;
-
-                                                final currentTime =
-                                                    DateTime.now();
-                                                final diffDy =
-                                                    ExpiryDate.difference(
-                                                            currentTime)
-                                                        .inDays;
 
                                                 return Stack(
                                                   children: [
@@ -5864,53 +5907,13 @@ class _HomeScreenState extends State<HomeScreen>
                                                             const SizedBox(
                                                               height: 15,
                                                             ),
-                                                            Text(
-                                                                _subscriptionRenewalDisplayText(
-                                                                    diffDy),
-                                                                style: TextStyle(
-                                                                    letterSpacing:
-                                                                        BibleInfo
-                                                                            .letterSpacing,
-                                                                    fontSize: screenWidth <
-                                                                            380
-                                                                        ? BibleInfo.fontSizeScale *
-                                                                            13
-                                                                        : BibleInfo.fontSizeScale *
-                                                                            15,
-                                                                    color: CommanColor
-                                                                        .lightDarkPrimary(
-                                                                            context),
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w400)),
-                                                            const SizedBox(
-                                                                height: 5),
-                                                            Text(
-                                                                _subscriptionPeriodDisplayText(
-                                                                    diffDy,
-                                                                    ExpiryDate),
-                                                                style:
-                                                                    TextStyle(
-                                                                  letterSpacing:
-                                                                      BibleInfo
-                                                                          .letterSpacing,
-                                                                  fontSize: screenWidth <
-                                                                          380
-                                                                      ? BibleInfo
-                                                                              .fontSizeScale *
-                                                                          13
-                                                                      : BibleInfo
-                                                                              .fontSizeScale *
-                                                                          15,
-                                                                  color: CommanColor
-                                                                      .lightDarkPrimary(
-                                                                          context),
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w400,
-                                                                )),
-                                                            const SizedBox(
-                                                                height: 5),
+                                                            _buildSubscriptionInfoDetails(
+                                                              context: context,
+                                                              expiryDate:
+                                                                  expiryDate,
+                                                              screenWidth:
+                                                                  screenWidth,
+                                                            ),
                                                           ],
                                                         ),
                                                       ),
@@ -6834,6 +6837,48 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
+  Future<void> _ensureHomeContentLoaded(
+      GetXState<DashBoardController> state) async {
+    final downloadProvider =
+        Provider.of<DownloadProvider>(context, listen: false);
+    await downloadProvider.preloadBibleDataFromDatabaseIfNeeded();
+
+    final chapter =
+        int.tryParse(state.controller!.selectedChapter.value) ?? 1;
+
+    for (var attempt = 0; attempt < 8; attempt++) {
+      if (!mounted) return;
+      if (state.controller!.selectedBookContent.isNotEmpty) return;
+
+      if (attempt > 0) {
+        await Future.delayed(Duration(milliseconds: 200 * attempt));
+        await downloadProvider.preloadBibleDataFromDatabaseIfNeeded();
+      }
+
+      if (!mounted) return;
+      await state.controller!.getSelectedChapterAndBook();
+
+      if (state.controller!.selectedBookContent.isEmpty &&
+          downloadProvider.verseList.isNotEmpty) {
+        final hydrated =
+            await state.controller!.hydrateChapterFromCachedVerses(
+          downloadProvider.verseList,
+          chapter,
+        );
+        if (hydrated && mounted) {
+          setState(() {});
+          return;
+        }
+      }
+    }
+
+    if (!mounted) return;
+    if (state.controller!.selectedBookContent.isEmpty) {
+      _attemptedProviderChapterFallback = false;
+      if (mounted) setState(() {});
+    }
+  }
+
   void _loadInitialData(GetXState<DashBoardController> state) {
     state.controller!.selectedIndex.value = -1;
 
@@ -6855,7 +6900,8 @@ class _HomeScreenState extends State<HomeScreen>
         state.controller!.getBookContentForRead();
       } else {
         // Use normal chapter loading for other flows
-        state.controller!.getSelectedChapterAndBook();
+        await state.controller!.getSelectedChapterAndBook();
+        await _ensureHomeContentLoaded(state);
       }
 
       await state.controller!.getFont();
@@ -6946,7 +6992,10 @@ class _HomeScreenState extends State<HomeScreen>
               Provider.of<DownloadProvider>(context, listen: false);
           if (downloadProvider.verseList.isEmpty) return;
 
-          final bookNum = int.tryParse(controller.selectedBookNum.value) ?? 0;
+          var bookNum = int.tryParse(controller.selectedBookNum.value) ?? 0;
+          if (bookNum <= 0) {
+            bookNum = 1;
+          }
           final chapter = int.tryParse(controller.selectedChapter.value) ?? 1;
           final safeChapter = chapter <= 0 ? 1 : chapter;
 

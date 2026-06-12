@@ -17,6 +17,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:get/get.dart';
 import 'package:open_file_manager/open_file_manager.dart';
+import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -305,6 +306,26 @@ class ExportDb {
     OverallDbModel overAllDB = OverallDbModel.fromJson(jsonData);
     await overAllDB.updateLocalDB();
     await overAllDB.updateLocalDBsync();
+  }
+
+  /// Local safety copy before cloud restore (does not change restore/import flows).
+  static Future<void> createLocalSafetyCopyBeforeRestore() async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final safetyRoot = Directory(
+        '${appDir.path}/${BibleInfo.bible_shortName}/safety_backups',
+      );
+      if (!await safetyRoot.exists()) {
+        await safetyRoot.create(recursive: true);
+      }
+      final stamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+      final folder = Directory('${safetyRoot.path}/$stamp');
+      await folder.create(recursive: true);
+      await writeBackupFileToDirectory(folder);
+      debugPrint('Local safety backup saved: ${folder.path}');
+    } catch (e, st) {
+      log('createLocalSafetyCopyBeforeRestore: $e $st');
+    }
   }
 
   /// Restores library data from an existing .enc backup file (e.g. cloud download).

@@ -34,4 +34,41 @@ class AppApiConstant {
       }
     } catch (_) {}
   }
+
+  static String autoCloudBackupText =
+      'If you don\'t export manually, your library is backed up automatically when you sign in. A daily cloud backup also runs after 2:00 AM when you open the app (signed-in users only).';
+
+  /// API prefs sometimes store flags like "1" instead of a real product id.
+  static String resolveSubscriptionProductId(String? stored, String fallback) {
+    final value = stored?.trim() ?? '';
+    if (value.contains('.') && value.startsWith('com.')) {
+      return value;
+    }
+    return fallback;
+  }
+
+  /// App Store may use `adfree` or `adsfree` suffix — query both spellings.
+  static Set<String> subscriptionProductIdQueryVariants(String planId) {
+    final variants = <String>{planId.trim()};
+    if (planId.contains('adsfree')) {
+      variants.add(planId.replaceFirst('adsfree', 'adfree'));
+    } else if (planId.contains('adfree')) {
+      variants.add(planId.replaceFirst('adfree', 'adsfree'));
+    }
+    return variants;
+  }
+
+  static Set<String> paywallStoreQueryIds({
+    required String sixMonthPlan,
+    required String oneYearPlan,
+    required String twoYearPlan,
+  }) {
+    return {
+      ...subscriptionProductIdQueryVariants(sixMonthPlan),
+      ...subscriptionProductIdQueryVariants(oneYearPlan),
+      ...subscriptionProductIdQueryVariants(twoYearPlan),
+    };
+  }
+
 }
+

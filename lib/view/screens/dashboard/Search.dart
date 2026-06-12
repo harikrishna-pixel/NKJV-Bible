@@ -89,6 +89,11 @@ class _SearchScreenState extends State<SearchScreen> {
     super.initState();
     loadBookListsFromPrefs();
     getFont();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        loadLocal();
+      }
+    });
   }
 
   // loadLocal() async {
@@ -163,7 +168,9 @@ class _SearchScreenState extends State<SearchScreen> {
           .map((e) => MainBookListModel.fromJson(e))
           .toList();
     }
-    setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
     // debugPrint("check data -$bookList  ");
     // Decode and convert to model lists
 
@@ -175,9 +182,11 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _performSearch() async {
-    setState(() {
-      isLoading = true;
-    });
+    if (mounted) {
+      setState(() {
+        isLoading = true;
+      });
+    }
     Provider.of<DownloadProvider>(context, listen: false).disableAd();
     final currentFocus = FocusScope.of(context);
     await SharPreferences.setString('OpenAd', '1');
@@ -185,13 +194,12 @@ class _SearchScreenState extends State<SearchScreen> {
       currentFocus.unfocus();
     }
     await loadLocal();
-    _searchFilter(searchController.text);
+    await _searchFilter(searchController.text);
     await SharPreferences.setString('OpenAd', '1');
-    if (mounted) {
-      setState(() {
-        isLoading = false;
-      });
-    }
+    if (!mounted) return;
+    setState(() {
+      isLoading = false;
+    });
   }
 
   Future<void> _onFilterSelected(int index) async {
@@ -200,14 +208,16 @@ class _SearchScreenState extends State<SearchScreen> {
     if (!currentFocus.hasPrimaryFocus) {
       currentFocus.unfocus();
     }
-    setState(() {
-      selectedBook = MainBookListModel(bookNum: -1);
-      selectedValueFilter =
-          index == 0 ? "ALL" : index == 1 ? "OT" : "NT";
-      selectedValueFilterIndex = index;
-      filterSelectedVersesContent.clear();
-      _searchFilter(searchController.text);
-    });
+    if (mounted) {
+      setState(() {
+        selectedBook = MainBookListModel(bookNum: -1);
+        selectedValueFilter =
+            index == 0 ? "ALL" : index == 1 ? "OT" : "NT";
+        selectedValueFilterIndex = index;
+        filterSelectedVersesContent.clear();
+      });
+    }
+    await _searchFilter(searchController.text);
   }
 
   /// Resolves a [DropdownButton2] value that exists in the current items list.
@@ -353,10 +363,19 @@ class _SearchScreenState extends State<SearchScreen> {
       await SharPreferences.setString('OpenAd', '1');
       downloadProvider.disableAd();
 
-      final db = await DBHelper().db;
+      dynamic db;
+      for (var attempt = 0; attempt < 5; attempt++) {
+        db = await DBHelper().db;
+        if (db != null) break;
+        await Future.delayed(Duration(milliseconds: 200 * (attempt + 1)));
+      }
+      if (db == null) {
+        debugPrint('Search loadLocal: DB null after retries');
+        return;
+      }
 
       // Load and parse verses
-      final verseRaw = await db!.rawQuery("SELECT * FROM verse");
+      final verseRaw = await db.rawQuery("SELECT * FROM verse");
       final parsedVerses = await compute(parseVerses, verseRaw);
       final splitVersesMap = await compute(splitVerses, parsedVerses);
 
@@ -364,6 +383,11 @@ class _SearchScreenState extends State<SearchScreen> {
       final bookRaw = await db.rawQuery("SELECT * FROM book");
       final parsedBooks = await compute(parseBooks, bookRaw);
       final splitBooksMap = await compute(splitBooks, parsedBooks);
+
+      if (parsedVerses.isEmpty) {
+        debugPrint('Search loadLocal: no verses in database');
+        return;
+      }
 
       // Set provider data
       downloadProvider.setData(
@@ -375,14 +399,16 @@ class _SearchScreenState extends State<SearchScreen> {
         ntBooks: splitBooksMap['nt']!,
       );
 
-      setState(() {
-        oTBookList =
-            oTBookList.isEmpty ? downloadProvider.otBookList : oTBookList;
-        nTBookList =
-            nTBookList.isEmpty ? downloadProvider.ntBookList : nTBookList;
-        allVersesContent = downloadProvider.verseList;
-        bookList = bookList.isEmpty ? downloadProvider.bookList : bookList;
-      });
+      if (mounted) {
+        setState(() {
+          oTBookList =
+              oTBookList.isEmpty ? downloadProvider.otBookList : oTBookList;
+          nTBookList =
+              nTBookList.isEmpty ? downloadProvider.ntBookList : nTBookList;
+          allVersesContent = downloadProvider.verseList;
+          bookList = bookList.isEmpty ? downloadProvider.bookList : bookList;
+        });
+      }
 
 // ✅ Save to SharedPreferences
       await prefs.setString(
@@ -433,6 +459,27 @@ class _SearchScreenState extends State<SearchScreen> {
 
   int _safeInt(dynamic v) => int.tryParse(v?.toString() ?? '') ?? 0;
 
+  String _plainVerseText(dynamic content) {
+    final raw = content?.toString() ?? '';
+    if (raw.isEmpty) return '';
+    return html.parse(raw).body?.text ?? raw;
+  }
+
+  bool _verseMatchesQuery(VerseBookContentModel v, dynamic value) {
+    final query = (value ?? '').toString().trim().toLowerCase();
+    if (query.isEmpty) return false;
+    return _plainVerseText(v.content).toLowerCase().contains(query);
+  }
+
+  Future<void> _ensureSearchVersesLoaded(DownloadProvider downloadProvider) async {
+    if (downloadProvider.verseList.isNotEmpty) return;
+    final loaded =
+        await downloadProvider.preloadBibleDataFromDatabaseIfNeeded();
+    if (!loaded && mounted) {
+      await loadLocal();
+    }
+  }
+
   Future<void> _searchFilter(value) async {
     // setState(() {
     //   if (selectedValueFilter == "ALL" && selectedBook.bookNum != -1) {
@@ -475,6 +522,7 @@ class _SearchScreenState extends State<SearchScreen> {
     await prefs.setString('OpenAd', '1');
     final downloadProvider =
         Provider.of<DownloadProvider>(context, listen: false);
+    await _ensureSearchVersesLoaded(downloadProvider);
 
     // If user typed a book name (Genesis/Exodus/etc), show the full book content
     // (all verses across all chapters) in this same results view.
@@ -483,7 +531,7 @@ class _SearchScreenState extends State<SearchScreen> {
         ? downloadProvider.bookList
         : bookList;
     final matchedBook = _findMatchingBook(queryText, booksSource);
-    if (matchedBook != null) {
+    if (matchedBook != null && queryText.length >= 3) {
       List<VerseBookContentModel> bookVerses = [];
       if (selectedValueFilter == "OT") {
         bookVerses = downloadProvider.otVerseList
@@ -505,10 +553,12 @@ class _SearchScreenState extends State<SearchScreen> {
         return _safeInt(a.verseNum).compareTo(_safeInt(b.verseNum));
       });
 
-      setState(() {
-        filterSelectedVersesContent = bookVerses;
-        _isBookNameSearchMode = true;
-      });
+      if (mounted) {
+        setState(() {
+          filterSelectedVersesContent = bookVerses;
+          _isBookNameSearchMode = true;
+        });
+      }
       return;
     }
 
@@ -518,50 +568,52 @@ class _SearchScreenState extends State<SearchScreen> {
       sourceList = downloadProvider.verseList
           .where(
             (v) =>
-                v.content?.toLowerCase().contains(value.toLowerCase()) &&
+                _verseMatchesQuery(v, value) &&
                 v.bookNum == selectedBook.bookNum,
           )
           .toList();
     } else if (selectedValueFilter == "OT" && selectedBook.bookNum == -1) {
       sourceList = downloadProvider.otVerseList
           .where(
-            (v) => v.content?.toLowerCase().contains(value.toLowerCase()),
+            (v) => _verseMatchesQuery(v, value),
           )
           .toList();
     } else if (selectedValueFilter == "OT" && selectedBook.bookNum != -1) {
       sourceList = downloadProvider.otVerseList
           .where(
             (v) =>
-                v.content?.toLowerCase().contains(value.toLowerCase()) &&
+                _verseMatchesQuery(v, value) &&
                 v.bookNum == selectedBook.bookNum,
           )
           .toList();
     } else if (selectedValueFilter == "NT" && selectedBook.bookNum == -1) {
       sourceList = downloadProvider.ntVerseList
           .where(
-            (v) => v.content?.toLowerCase().contains(value.toLowerCase()),
+            (v) => _verseMatchesQuery(v, value),
           )
           .toList();
     } else if (selectedValueFilter == "NT" && selectedBook.bookNum != -1) {
       sourceList = downloadProvider.ntVerseList
           .where(
             (v) =>
-                v.content?.toLowerCase().contains(value.toLowerCase()) &&
+                _verseMatchesQuery(v, value) &&
                 v.bookNum == selectedBook.bookNum,
           )
           .toList();
     } else {
       sourceList = downloadProvider.verseList
           .where(
-            (v) => v.content?.toLowerCase().contains(value.toLowerCase()),
+            (v) => _verseMatchesQuery(v, value),
           )
           .toList();
     }
     await SharPreferences.setString('OpenAd', '1');
-    setState(() {
-      filterSelectedVersesContent = sourceList;
-      _isBookNameSearchMode = false;
-    });
+    if (mounted) {
+      setState(() {
+        filterSelectedVersesContent = sourceList;
+        _isBookNameSearchMode = false;
+      });
+    }
   }
 
   @override

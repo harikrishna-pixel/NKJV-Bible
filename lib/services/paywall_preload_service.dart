@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
+import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
@@ -31,11 +32,11 @@ class PaywallPreloadService {
 
     try {
       // Get product IDs from SharedPreferences
-      final sixMonthPlan = BibleInfo.resolveSubscriptionProductId(
+      final sixMonthPlan = AppApiConstant.resolveSubscriptionProductId(
         await SharPreferences.getString('sixMonthPlan'),
         BibleInfo.sixMonthPlanid,
       );
-      final oneYearPlan = BibleInfo.resolveSubscriptionProductId(
+      final oneYearPlan = AppApiConstant.resolveSubscriptionProductId(
         await SharPreferences.getString('oneYearPlan'),
         BibleInfo.oneYearPlanid,
       );
@@ -66,12 +67,19 @@ class PaywallPreloadService {
           }
         }
 
-        // Query product details
-        Set<String> ids = {
-          sixMonthPlan,
-          oneYearPlan,
-          BibleInfo.twoYearPlanid,
-        };
+        final dotIndex = sixMonthPlan.lastIndexOf('.');
+      final bundlePrefix = dotIndex > 0
+          ? sixMonthPlan.substring(0, dotIndex)
+          : BibleInfo.ios_Bundle_Id;
+      final twoYearPlanId = '$bundlePrefix.twoyearadsfree';
+
+      // Query product details (include adfree/adsfree spelling variants)
+        final Set<String> ids = AppApiConstant.paywallStoreQueryIds(
+          sixMonthPlan: sixMonthPlan,
+          oneYearPlan: oneYearPlan,
+          twoYearPlan: twoYearPlanId,
+        );
+        debugPrint('PaywallPreloadService: App bundle prefix: $bundlePrefix');
         debugPrint('PaywallPreloadService: Querying product details for: $ids');
 
         final ProductDetailsResponse response =
@@ -83,12 +91,24 @@ class PaywallPreloadService {
         }
 
         if (response.productDetails.isNotEmpty) {
-          _preloadedProducts = response.productDetails;
+          _preloadedProducts = response.productDetails
+              .where((product) => product.id.startsWith('$bundlePrefix.'))
+              .toList();
+          if (_preloadedProducts.length != response.productDetails.length) {
+            final stale = response.productDetails
+                .where((product) => !product.id.startsWith('$bundlePrefix.'))
+                .map((product) => product.id)
+                .toList();
+            debugPrint(
+              'PaywallPreloadService: Ignored stale products from other bundle: '
+              '$stale',
+            );
+          }
           _preloadedProducts.sort((a, b) {
             int order(String id) {
-              if (id == sixMonthPlan) return 0;
-              if (id == oneYearPlan) return 1;
-              if (id == BibleInfo.twoYearPlanid) return 2;
+              if (id == sixMonthPlan || id.contains('sixmonth')) return 0;
+              if (id == oneYearPlan || id.contains('oneyear')) return 1;
+              if (id == twoYearPlanId || id.contains('twoyear')) return 2;
               return 3;
             }
 
@@ -104,9 +124,17 @@ class PaywallPreloadService {
                 'PaywallPreloadService: Preloaded ${_preloadedProducts.length} products');
             for (var i = 0; i < _preloadedProducts.length; i++) {
               final product = _preloadedProducts[i];
+              final slot = product.id.contains('sixmonth')
+                  ? '6M'
+                  : product.id.contains('oneyear')
+                      ? '1Y'
+                      : product.id.contains('twoyear')
+                          ? '2Y'
+                          : '?';
               debugPrint(
-                '  preload[$i] id=${product.id} | price=${product.price} | '
-                'rawPrice=${product.rawPrice}',
+                '  preload[$i] slot=$slot | id=${product.id} | '
+                'price=${product.price} | rawPrice=${product.rawPrice} | '
+                'currency=${product.currencyCode}',
               );
             }
           } catch (e) {

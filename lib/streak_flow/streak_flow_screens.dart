@@ -1952,7 +1952,7 @@ class StreakConnectionScreen extends StatefulWidget {
 }
 
 class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
-  // UI shows 5 stops (Far/Returning/Near/Close/Deeply Connected),
+  // UI shows 5 stops (Very Far/Far/Growing/Close/Very Close),
   // but we still map it into the existing 3 buckets for content selection.
   double _value = 0.5;
 
@@ -1981,15 +1981,15 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
   }
 
   int get _connectionIndex {
-    // 0.00 (Far) + 0.25 (Returning) => bucket 0
-    // 0.50 (Near) => bucket 1
-    // 0.75 (Close) + 1.00 (Deeply Connected) => bucket 2
+    // 0.00 (Very Far) + 0.25 (Far) => bucket 0
+    // 0.50 (Growing) => bucket 1
+    // 0.75 (Close) + 1.00 (Very Close) => bucket 2
     if (_value <= 0.375) return 0;
     if (_value <= 0.625) return 1;
     return 2;
   }
 
-  /// Which label to highlight for UI: 0=Far, 1=Returning, 2=Near, 3=Close, 4=Deeply Connected.
+  /// Which label to highlight for UI: 0=Very Far, 1=Far, 2=Growing, 3=Close, 4=Very Close.
   /// Each slider position highlights its own label.
   int get _activeLabelIndex {
     if (_value <= 0.125) return 0;
@@ -2083,7 +2083,7 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                                       alignment: Alignment.centerLeft,
                                       child: FittedBox(
                                         fit: BoxFit.scaleDown,
-                                        child: Text('Far',
+                                        child: Text('Very Far',
                                             textAlign: TextAlign.center,
                                             style: _labelStyle(context,
                                                 active:
@@ -2100,7 +2100,7 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                                         child: FittedBox(
                                           fit: BoxFit.scaleDown,
                                           child: Text(
-                                            'Returning',
+                                            'Far',
                                             textAlign: TextAlign.center,
                                             style: _labelStyle(context,
                                                 active: _activeLabelIndex == 1),
@@ -2114,7 +2114,7 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                                       alignment: Alignment.center,
                                       child: FittedBox(
                                         fit: BoxFit.scaleDown,
-                                        child: Text('Near',
+                                        child: Text('Growing',
                                             textAlign: TextAlign.center,
                                             style: _labelStyle(context,
                                                 active:
@@ -2145,7 +2145,7 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                                       alignment: Alignment.centerRight,
                                       child: FittedBox(
                                         fit: BoxFit.scaleDown,
-                                        child: Text('Surrender',
+                                        child: Text('Very Close',
                                             textAlign: TextAlign.center,
                                             style: _labelStyle(context,
                                                 active:

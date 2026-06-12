@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
@@ -39,43 +41,38 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     selectedChapter = int.parse(widget.selectedChapter.toString()) - 1;
   }
 
-  loadChapter() {
-    DBHelper().db.then((value) {
-      value!
-          .rawQuery(
-              "SELECT * From verse WHERE book_num ='${int.parse(widget.book_num.toString())}'")
-          .then((value) {
-        setState(() {
-          selectedVersesContent = value
-              .map<VerseBookContentModel>(
-                  (e) => VerseBookContentModel.fromJson(e))
-              .toList();
-          loader = true;
-        });
+  Future<void> loadChapter() async {
+    try {
+      final db = await DBHelper().db;
+      if (db == null) return;
 
-        // for (var i in value) {
-        //   setState(() {
-        //     selectedVersesContent.add(
-        //         VerseBookContentModel(
-        //           id: int.parse("${i["id"]}") ,
-        //           bookNum: num.parse("${i["book_num"]}"),
-        //           chapterNum: num.parse("${i["chapter_num"]}"),
-        //           verseNum:num.parse("${i["verse_num"]}"),
-        //           content: "${i["content"]}",
-        //           isBookmarked:"${i["is_bookmarked"]}",
-        //           isHighlighted: "${i["is_highlighted"]}",
-        //           isNoted: "${i["is_noted"]}",
-        //           isUnderlined: "${i["is_underlined"]}",
-        //           isRead: "${i["is_read"]}",
-        //         ));
-        //   });
-        // }
+      final bookNum = int.parse(widget.book_num.toString());
+      final rows = await db.rawQuery(
+        "SELECT * FROM verse WHERE book_num = ?",
+        [bookNum],
+      );
+
+      if (!mounted) return;
+      setState(() {
+        selectedVersesContent = rows
+            .map<VerseBookContentModel>(
+                (e) => VerseBookContentModel.fromJson(e))
+            .toList();
       });
-    });
+    } catch (e) {
+      debugPrint('ChapterListScreen load error: $e');
+    } finally {
+      if (mounted) {
+        setState(() => loader = true);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final chapterCount =
+        math.max(0, int.tryParse(widget.chapterCount.toString()) ?? 0);
+
     return Scaffold(
       body: Container(
           height: MediaQuery.of(context).size.height,
@@ -91,7 +88,14 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
               ? const Center(
                   child: Loader(),
                 )
-              : ListView(
+              : chapterCount == 0
+                  ? Center(
+                      child: Text(
+                        'No chapters available',
+                        style: CommanStyle.bw16500(context),
+                      ),
+                    )
+                  : ListView(
                   shrinkWrap: true,
                   physics: const ScrollPhysics(),
                   children: [
@@ -127,7 +131,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                     ),
                     GridView.builder(
                       shrinkWrap: true,
-                      itemCount: int.parse(widget.chapterCount.toString()),
+                      itemCount: chapterCount,
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
@@ -141,7 +145,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                       itemBuilder: (context, index) {
                         var chapterRead = 'no';
                         for (var i = 0; i < selectedVersesContent.length; i++) {
-                          if (index == selectedVersesContent[i].chapterNum) {
+                          if (index + 1 ==
+                              selectedVersesContent[i].chapterNum) {
                             chapterRead =
                                 selectedVersesContent[i].isRead.toString();
                             break;

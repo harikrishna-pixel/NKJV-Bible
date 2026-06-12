@@ -38,6 +38,35 @@ class LibraryBackupUploadService {
 
   static String _two(int n) => n.toString().padLeft(2, '0');
 
+  static Future<void> _clearBackupFailureFlag() async {
+    await SharPreferences.setBoolean(SharPreferences.lastCloudBackupFailed, false);
+    await SharPreferences.setString(
+        SharPreferences.lastCloudBackupFailureReason, '');
+  }
+
+  static Future<void> _setBackupFailureFlag(String reason) async {
+    await SharPreferences.setBoolean(SharPreferences.lastCloudBackupFailed, true);
+    await SharPreferences.setString(
+        SharPreferences.lastCloudBackupFailureReason, reason);
+  }
+
+  static String _failureReasonFromError(Object e) {
+    final message = e.toString().toLowerCase();
+    if (message.contains('socket') ||
+        message.contains('network') ||
+        message.contains('connection') ||
+        message.contains('timeout') ||
+        message.contains('host')) {
+      return 'No internet';
+    }
+    if (message.contains('401') ||
+        message.contains('403') ||
+        message.contains('unauthorized')) {
+      return 'Sign-in expired';
+    }
+    return 'Upload failed';
+  }
+
   /// Wraps the local .enc backup in a .zip for cloud upload only.
   static Future<File> _zipEncBackupForUpload(File encFile) async {
     final encBytes = await encFile.readAsBytes();
@@ -118,11 +147,19 @@ class LibraryBackupUploadService {
             SharPreferences.lastCloudBackupDate, now);
         await SharPreferences.setString(
             SharPreferences.lastExportedDate, now);
+        await _clearBackupFailureFlag();
+      } else {
+        await _setBackupFailureFlag(
+          response.statusCode == 401 || response.statusCode == 403
+              ? 'Sign-in expired'
+              : 'Upload failed',
+        );
       }
       return ok;
     } catch (e, st) {
       log('Library backup upload failed: $e $st');
       debugPrint('Library backup upload failed: $e');
+      await _setBackupFailureFlag(_failureReasonFromError(e));
       return false;
     } finally {
       if (zipFile != null && await zipFile.exists()) {

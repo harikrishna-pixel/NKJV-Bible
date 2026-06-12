@@ -8,6 +8,7 @@ import 'package:get/get.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/signup_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
+import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
 class BibleAlertBox extends StatelessWidget {
@@ -454,6 +455,10 @@ class BackupDialog extends StatelessWidget {
         return _buildComplete(context);
       case 'import':
         return _buildImport(context);
+      case 'cloud_backup_confirm':
+        return _buildCloudBackupConfirm(context);
+      case 'cloud_restore_confirm':
+        return _buildCloudRestoreConfirm(context);
       default:
         return [const Text("Unknown Dialog Type")];
     }
@@ -528,7 +533,7 @@ class BackupDialog extends StatelessWidget {
         child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              "• ${BibleInfo.autoCloudBackupText}",
+              "• ${AppApiConstant.autoCloudBackupText}",
               style: const TextStyle(
                 color: CommanColor.black,
               ),
@@ -800,6 +805,166 @@ class BackupDialog extends StatelessWidget {
                         fontWeight: FontWeight.w500,
                         color: CommanColor.white),
                   )),
+            ),
+          ),
+        ],
+      ),
+    ];
+  }
+
+  List<Widget> _buildCloudBackupConfirm(BuildContext context) {
+    return [
+      const SizedBox(height: 9),
+      _buildImage("assets/folder_e.png"),
+      const SizedBox(height: 17),
+      const Text(
+        'Replace Cloud Backup?',
+        style: TextStyle(
+          fontSize: 19,
+          fontWeight: FontWeight.w600,
+          color: CommanColor.black,
+        ),
+      ),
+      const SizedBox(height: 14),
+      const Text(
+        'This will replace your previous cloud backup.',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 14,
+          height: 1.4,
+          color: CommanColor.black,
+        ),
+      ),
+      const SizedBox(height: 20),
+      Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: onSecondaryPressed,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: CommanColor.lightGrey1,
+                  borderRadius: const BorderRadius.all(Radius.circular(5)),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black26, blurRadius: 2)
+                  ],
+                ),
+                child: const Text(
+                  'Cancel',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: CommanColor.black,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 15),
+          Expanded(
+            child: GestureDetector(
+              onTap: onPrimaryPressed,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: CommanColor.darkPrimaryColor,
+                  borderRadius: const BorderRadius.all(Radius.circular(5)),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black26, blurRadius: 2)
+                  ],
+                ),
+                child: const Text(
+                  'Continue Backup',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: CommanColor.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ];
+  }
+
+  List<Widget> _buildCloudRestoreConfirm(BuildContext context) {
+    return [
+      const SizedBox(height: 9),
+      _buildImage("assets/folder_i.png"),
+      const SizedBox(height: 17),
+      const Text(
+        'Restore from Cloud?',
+        style: TextStyle(
+          fontSize: 19,
+          fontWeight: FontWeight.w600,
+          color: CommanColor.black,
+        ),
+      ),
+      const SizedBox(height: 14),
+      const Text(
+        'This will replace your current library with your latest cloud backup.',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 14,
+          height: 1.4,
+          color: CommanColor.black,
+        ),
+      ),
+      const SizedBox(height: 20),
+      Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: onSecondaryPressed,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: CommanColor.lightGrey1,
+                  borderRadius: const BorderRadius.all(Radius.circular(5)),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black26, blurRadius: 2)
+                  ],
+                ),
+                child: const Text(
+                  'Cancel',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: CommanColor.black,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 15),
+          Expanded(
+            child: GestureDetector(
+              onTap: onPrimaryPressed,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: CommanColor.darkPrimaryColor,
+                  borderRadius: const BorderRadius.all(Radius.circular(5)),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black26, blurRadius: 2)
+                  ],
+                ),
+                child: const Text(
+                  'Restore',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: CommanColor.white,
+                  ),
+                ),
+              ),
             ),
           ),
         ],

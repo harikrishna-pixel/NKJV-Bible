@@ -18,6 +18,7 @@ import 'package:biblebookapp/view/screens/dashboard/wallpaper_library_widget.dar
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:get/get.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../constants/colors.dart';
@@ -1246,6 +1247,8 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
   static const Color _brownMuted = Color(0xFF6D4C41);
   static const Color _greenBox = Color(0xFFE8F5E9);
   static const Color _greenText = Color(0xFF2E7D32);
+  static const Color _redBox = Color(0xFFFFEBEE);
+  static const Color _redText = Color(0xFFC62828);
   static const Color _tanBox = Color(0xFFF5EDE4);
 
   static const String _assetRefresh =
@@ -1276,6 +1279,9 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
 
   String? _userId;
   DateTime? _lastBackup;
+  String? _lastScheduledDate;
+  bool _backupFailed = false;
+  String _failureReason = '';
   bool _loadingMeta = true;
 
   void updateLoading(bool val, {String? mess}) {
@@ -1298,6 +1304,14 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
         SharPreferences.lastCloudBackupDate);
     final exportRaw =
         await SharPreferences.getString(SharPreferences.lastExportedDate);
+    final scheduledRaw = await SharPreferences.getString(
+        SharPreferences.lastScheduledCloudBackupDate);
+    final failed =
+        await SharPreferences.getBoolean(SharPreferences.lastCloudBackupFailed) ??
+            false;
+    final failureReason = await SharPreferences.getString(
+            SharPreferences.lastCloudBackupFailureReason) ??
+        '';
     final parsed = DateTime.tryParse(cloudRaw ?? '') ??
         DateTime.tryParse(exportRaw ?? '');
     if (!mounted) return;
@@ -1305,21 +1319,49 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
       final trimmed = id?.toString().trim();
       _userId = (trimmed == null || trimmed.isEmpty) ? null : trimmed;
       _lastBackup = parsed;
+      _lastScheduledDate = scheduledRaw;
+      _backupFailed = failed;
+      _failureReason =
+          failureReason.trim().isEmpty ? 'Upload failed' : failureReason.trim();
       _loadingMeta = false;
     });
   }
 
   bool get _isSignedIn => _userId != null;
 
+  String _todayKey() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  String _formatScheduledDayLabel(DateTime target) {
+    final now = DateTime.now();
+    final local = DateTime(target.year, target.month, target.day);
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+    if (local == today) return 'Today';
+    if (local == tomorrow) return 'Tomorrow';
+    return DateFormat('MMM d').format(local);
+  }
+
   String _formatLastBackup() {
     if (_lastBackup == null) return 'Not yet';
     final dt = _lastBackup!.toLocal();
+    return '${_formatScheduledDayLabel(dt)}, ${DateFormat('h:mm a').format(dt)}';
+  }
+
+  String _formatNextBackup() {
     final now = DateTime.now();
-    final isToday =
-        dt.year == now.year && dt.month == now.month && dt.day == now.day;
-    final dayPart =
-        isToday ? 'Today' : DateFormat('MMM d').format(dt);
-    return '$dayPart, ${DateFormat('h:mm a').format(dt)}';
+    final today2am = DateTime(now.year, now.month, now.day, 2);
+    DateTime next;
+    if (now.isBefore(today2am)) {
+      next = today2am;
+    } else if (_lastScheduledDate == _todayKey()) {
+      next = today2am.add(const Duration(days: 1));
+    } else {
+      next = today2am;
+    }
+    return '${_formatScheduledDayLabel(next)}, 2:00 AM';
   }
 
   void _closeDialog() => Navigator.of(context).pop();
@@ -1333,13 +1375,77 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
     );
   }
 
+  Future<bool> _showCloudBackupConfirmDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => BackupDialog(
+        type: 'cloud_backup_confirm',
+        onPrimaryPressed: () => Navigator.of(dialogContext).pop(true),
+        onSecondaryPressed: () => Navigator.of(dialogContext).pop(false),
+      ),
+    );
+    return result == true;
+  }
+
+  Future<bool> _showCloudRestoreConfirmDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => BackupDialog(
+        type: 'cloud_restore_confirm',
+        onPrimaryPressed: () => Navigator.of(dialogContext).pop(true),
+        onSecondaryPressed: () => Navigator.of(dialogContext).pop(false),
+      ),
+    );
+    return result == true;
+  }
+
+  Future<void> _runCloudBackup() async {
+    if (!_isSignedIn) {
+      _goToLogin();
+      return;
+    }
+    final hasInternet = await InternetConnection().hasInternetAccess;
+    if (!hasInternet) {
+      await SharPreferences.setBoolean(
+          SharPreferences.lastCloudBackupFailed, true);
+      await SharPreferences.setString(
+          SharPreferences.lastCloudBackupFailureReason, 'No internet');
+      await _loadBackupMeta();
+      Constants.showToast('No Internet Connection');
+      return;
+    }
+    updateLoading(true, mess: 'Backing up to cloud...');
+    final ok = await LibraryBackupUploadService.backupToCloud();
+    updateLoading(false);
+    await _loadBackupMeta();
+    if (ok) {
+      Constants.showToast('Cloud backup completed');
+    } else {
+      Constants.showToast('Backup failed. Please try again.');
+    }
+  }
+
+  Future<void> _onBackupNow() async {
+    if (!_isSignedIn) {
+      _goToLogin();
+      return;
+    }
+    final confirmed = await _showCloudBackupConfirmDialog();
+    if (!confirmed) return;
+    await _runCloudBackup();
+  }
+
   Future<void> _onRestoreFromCloud() async {
     if (!_isSignedIn) {
       _goToLogin();
       return;
     }
+    final confirmed = await _showCloudRestoreConfirmDialog();
+    if (!confirmed) return;
     _closeDialog();
     await SharPreferences.setString('OpenAd', '1');
+    updateLoading(true, mess: 'Creating local safety copy...');
+    await ExportDb.createLocalSafetyCopyBeforeRestore();
     updateLoading(true, mess: 'Downloading backup...');
     final ok = await LibraryBackupUploadService.downloadAndImportFromCloud();
     updateLoading(false);
@@ -1492,11 +1598,18 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
                         _cloudIllustration(signedIn: _isSignedIn),
                         const SizedBox(height: 12),
                         if (_isSignedIn)
-                          _signedInStatusBox()
+                          (_backupFailed
+                              ? _signedInFailedStatusBox()
+                              : _signedInStatusBox())
                         else
                           _signedOutStatusBox(),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         if (_isSignedIn) ...[
+                          if (!_backupFailed) ...[
+                            _backupNowButton(),
+                            const SizedBox(height: 16),
+                          ] else
+                            const SizedBox(height: 4),
                           _primaryActionTile(
                             iconAsset: _assetDownload,
                             title: 'Restore from Cloud',
@@ -1595,19 +1708,146 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
                     Icon(Icons.schedule,
                         size: 14, color: _brownMuted.withValues(alpha: 0.7)),
                     const SizedBox(width: 6),
-                    Text(
-                      'Last backup: ${_formatLastBackup()}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: _brownMuted.withValues(alpha: 0.8),
+                    Expanded(
+                      child: Text(
+                        'Last backup: ${_formatLastBackup()}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _brownMuted.withValues(alpha: 0.8),
+                        ),
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.update,
+                        size: 14, color: _brownMuted.withValues(alpha: 0.7)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Next backup: ${_formatNextBackup()}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _brownMuted.withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Your latest cloud backup replaces the previous one.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    height: 1.35,
+                    color: _brownMuted.withValues(alpha: 0.75),
+                    fontStyle: FontStyle.italic,
+                  ),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _signedInFailedStatusBox() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      decoration: BoxDecoration(
+        color: _redBox,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _redText.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.error_outline, size: 40, color: _redText),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Last backup failed',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: _redText,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Reason: $_failureReason',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.4,
+                    color: _brownMuted.withValues(alpha: 0.9),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: Material(
+                    color: _redText,
+                    borderRadius: BorderRadius.circular(10),
+                    child: InkWell(
+                      onTap: _onBackupNow,
+                      borderRadius: BorderRadius.circular(10),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: Text(
+                          'Try Again',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _backupNowButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: Material(
+        color: _brown,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: _onBackupNow,
+          borderRadius: BorderRadius.circular(12),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(vertical: 13),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.cloud_upload_outlined, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Text(
+                  'Backup Now',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1642,7 +1882,7 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Sign in to sync your library securely across devices and restore anytime.',
+                      'Sign in to backup your library every day at 2 AM.',
                       style: TextStyle(
                         fontSize: 12.5,
                         height: 1.4,
