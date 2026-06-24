@@ -6983,8 +6983,7 @@ class VerseShareImageCard extends StatelessWidget {
             : BibleInfo.fontSizeScale * 14;
     final verseMaxSize = maxVerseFontSize;
     final verseMinSize = minVerseFontSize.clamp(10.0, verseMaxSize);
-    final footerReserve =
-        (screenWidth < 380 ? 62.0 : 70.0) + actionBarReserve;
+    final footerHeight = screenWidth < 380 ? 68.0 : 76.0;
 
     return Stack(
       fit: StackFit.expand,
@@ -7001,58 +7000,55 @@ class VerseShareImageCard extends StatelessWidget {
         Positioned(
           left: 22,
           right: 22,
-          top: screenWidth < 380 ? 20 : 28,
-          bottom: footerReserve + 12,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight,
+          top: 0,
+          bottom: actionBarReserve + footerHeight,
+          child: Align(
+            alignment: Alignment(
+              0,
+              screenWidth < 380 ? 0.14 : 0.18,
+            ),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: AutoSizeHtmlWidget(
+                      html: verseHtml,
+                      maxLines: 16,
+                      maxFontSize: verseMaxSize,
+                      minFontSize: verseMinSize,
+                      color: _kVerseInk,
+                      textAlign: TextAlign.center,
+                      height: 1.55,
+                      fontWeight: FontWeight.w400,
+                    ),
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2),
-                        child: AutoSizeHtmlWidget(
-                          html: verseHtml,
-                          maxLines: 16,
-                          maxFontSize: verseMaxSize,
-                          minFontSize: verseMinSize,
-                          color: _kVerseInk,
-                          textAlign: TextAlign.center,
-                          height: 1.55,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                      SizedBox(height: screenWidth < 380 ? 12 : 16),
-                      Text(
-                        verseReference,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: _kVerseInk,
-                          fontSize: referenceSize,
-                          fontStyle: FontStyle.italic,
-                          fontWeight: FontWeight.w400,
-                          height: 1.35,
-                        ),
-                      ),
-                    ],
+                  SizedBox(height: screenWidth < 380 ? 12 : 16),
+                  Text(
+                    verseReference,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: _kVerseInk,
+                      fontSize: referenceSize,
+                      fontStyle: FontStyle.italic,
+                      fontWeight: FontWeight.w400,
+                      height: 1.35,
+                    ),
                   ),
-                ),
-              );
-            },
+                ],
+              ),
+            ),
           ),
         ),
         Positioned(
           left: 0,
           right: 0,
           bottom: actionBarReserve,
-          height: screenWidth < 380 ? 68.0 : 76.0,
+          height: footerHeight,
           child: Stack(
             fit: StackFit.expand,
             children: [

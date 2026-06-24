@@ -915,6 +915,13 @@ class DownloadProvider with ChangeNotifier {
     final bool dataIsChanged = prefs.getBool('dataIsChanged') ?? true;
     final String? cachedJson = prefs.getString('cachedDailyVerseList');
 
+    // Already loaded at splash/home — skip redundant local reload.
+    if (!dataIsChanged && dailyVerseList.isNotEmpty) {
+      isLoadingDailyVerse = false;
+      notifyListeners();
+      return;
+    }
+
     if (!dataIsChanged && cachedJson != null) {
       final selectedForCache =
           prefs.getStringList('selected_categories') ?? [];
@@ -926,13 +933,13 @@ class DownloadProvider with ChangeNotifier {
       if (selectedForCache.isNotEmpty) {
         final dbClient = await DBHelper().db;
         if (dbClient != null) {
-          final rows =
-              await dbClient.rawQuery("SELECT * FROM dailyVersesnew");
+          final rows = await dbClient.rawQuery(
+            "SELECT Category_Name, Date FROM dailyVersesnew",
+          );
           if (_categoriesMissingFromPastSchedule(rows, selectedForCache)) {
             await prefs.setBool('dataIsChanged', true);
           } else {
-            final List<dynamic> decoded = jsonDecode(cachedJson);
-            dailyVerseList = decoded
+            dailyVerseList = decodedCache
                 .map((e) => DailyVerseList.fromJson(e as Map<String, dynamic>))
                 .toSet()
                 .toList();
@@ -996,18 +1003,19 @@ class DownloadProvider with ChangeNotifier {
       'today': todayString,
     });
 
-    // Fetch book names
+    // Fetch book names (single query — same titles as per-verse lookups).
+    final bookRows = await dbClient.rawQuery("SELECT book_num, title FROM book");
+    final bookTitleByNum = <int, String>{
+      for (final row in bookRows)
+        int.parse(row['book_num'].toString()): row['title'] as String,
+    };
+
     final List<DailyVerseList> enrichedList = [];
 
     for (var verse in result) {
       final bookIdStored = int.parse(verse['Book_Id'].toString());
       final bookNum = bookIdStored > 0 ? bookIdStored - 1 : bookIdStored;
-      final bookData = await dbClient.rawQuery(
-        "SELECT DISTINCT title FROM book WHERE book_num = ? LIMIT 1",
-        [bookNum],
-      );
-      final bookName =
-          bookData.isNotEmpty ? bookData.first['title'] as String : 'Unknown';
+      final bookName = bookTitleByNum[bookNum] ?? 'Unknown';
 
       enrichedList.add(DailyVerseList(
         categoryName: verse['Category_Name'],

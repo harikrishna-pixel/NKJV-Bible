@@ -141,10 +141,44 @@ class _DailyVerseState extends State<DailyVerse> {
   @override
   void initState() {
     super.initState();
+    final provider = Provider.of<DownloadProvider>(context, listen: false);
+    if (provider.dailyVerseList.isNotEmpty) {
+      _applyDailyVersesFromAll(provider.dailyVerseList);
+    }
     loaddata();
     getFont();
     // Track Daily Verses event
     AnalyticsService.trackDailyVerses();
+  }
+
+  void _applyDailyVersesFromAll(List<DailyVerseList> allVerses) {
+    final todayOnly = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+    dailyVerseList = allVerses
+        .where((verse) {
+          try {
+            final verseDate = DateTime.parse(verse.date.toString());
+            final verseDateOnly = DateFormat('yyyy-MM-dd').format(verseDate);
+            return verseDateOnly.compareTo(todayOnly) <= 0; // today or past
+          } catch (e) {
+            return false;
+          }
+        })
+        .toList();
+
+    if (dailyVerseList.isEmpty && allVerses.isNotEmpty) {
+      dailyVerseList = List<DailyVerseList>.from(allVerses);
+    }
+
+    dailyVerseList.sort((a, b) {
+      try {
+        final da = DateTime.parse(a.date.toString());
+        final db = DateTime.parse(b.date.toString());
+        return db.compareTo(da);
+      } catch (_) {
+        return 0;
+      }
+    });
   }
 
   void loaddata() async {
@@ -164,34 +198,7 @@ class _DailyVerseState extends State<DailyVerse> {
       }
     }
 
-    final todayOnly = DateFormat('yyyy-MM-dd').format(DateTime.now());
-
-    dailyVerseList = allVerses
-        .where((verse) {
-          try {
-            final verseDate = DateTime.parse(verse.date.toString());
-            final verseDateOnly = DateFormat('yyyy-MM-dd').format(verseDate);
-            return verseDateOnly.compareTo(todayOnly) <= 0; // today or past
-          } catch (e) {
-            return false;
-          }
-        })
-        .toList();
-
-    if (dailyVerseList.isEmpty && allVerses.isNotEmpty) {
-      dailyVerseList = List<DailyVerseList>.from(allVerses);
-    }
-
-    // Stable ordering: newest (latest date) first so "first" is deterministic.
-    dailyVerseList.sort((a, b) {
-      try {
-        final da = DateTime.parse(a.date.toString());
-        final db = DateTime.parse(b.date.toString());
-        return db.compareTo(da);
-      } catch (_) {
-        return 0;
-      }
-    });
+    _applyDailyVersesFromAll(allVerses);
 
     // When opened from Verse of the Day widget, show the same verse as on the widget first
     if (widget.fromWidget && dailyVerseList.isNotEmpty) {
@@ -769,7 +776,8 @@ class _DailyVerseState extends State<DailyVerse> {
                   height: 10,
                 ),
                 Expanded(
-                  child: provider.isLoadingDailyVerse
+                  child: provider.isLoadingDailyVerse &&
+                          dailyVerseList.isEmpty
                       ? Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           //   crossAxisAlignment: CrossAxisAlignment.center,

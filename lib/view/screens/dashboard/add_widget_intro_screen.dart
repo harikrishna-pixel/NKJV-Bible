@@ -42,6 +42,9 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
       _currentPage >= _imagePathsForTheme(isDark).length - 1;
 
   Widget _buildFullScreenSlide(String path) {
+    final isDark = Provider.of<ThemeProvider>(context, listen: false)
+            .themeMode ==
+        ThemeMode.dark;
     return Image.asset(
       path,
       fit: BoxFit.cover,
@@ -49,6 +52,16 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
       height: double.infinity,
       alignment: _slideAlignment,
       gaplessPlayback: true,
+      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+        if (wasSynchronouslyLoaded || frame != null) return child;
+        return ColoredBox(
+          color: isDark
+              ? CommanColor.darkPrimaryColor
+              : Provider.of<ThemeProvider>(context, listen: false)
+                  .backgroundColor,
+          child: child,
+        );
+      },
     );
   }
 
@@ -94,6 +107,20 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final isDark = Provider.of<ThemeProvider>(context, listen: false)
+              .themeMode ==
+          ThemeMode.dark;
+      for (final path in _imagePathsForTheme(isDark)) {
+        precacheImage(AssetImage(path), context);
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
@@ -103,17 +130,20 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
     final isLastPage = _isLastPage(isDark);
 
     return Scaffold(
-      backgroundColor: themeProvider.backgroundColor,
+      backgroundColor: isDark
+          ? CommanColor.darkPrimaryColor
+          : themeProvider.backgroundColor,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Slide image
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: KeyedSubtree(
-              key: ValueKey<int>(_currentPage),
-              child: _buildFullScreenSlide(imagePaths[_currentPage]),
-            ),
+          // Keep all slides mounted so dark-mode page changes don't flash the
+          // light scaffold while the next asset decodes.
+          IndexedStack(
+            index: _currentPage,
+            sizing: StackFit.expand,
+            children: [
+              for (final path in imagePaths) _buildFullScreenSlide(path),
+            ],
           ),
 
           // Top page dots indicator
