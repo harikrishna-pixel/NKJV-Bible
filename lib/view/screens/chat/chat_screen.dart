@@ -21,7 +21,6 @@ import 'package:biblebookapp/view/screens/chat/chat_translations.dart';
 import 'package:biblebookapp/services/milestone_lifetime_paywall_coordinator.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
-import 'package:biblebookapp/view/screens/paywall/feature_credits_paywall_screen.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/services/analytics/analytics_service.dart';
@@ -112,10 +111,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   List<Map<String, String>> get _topicQuestions =>
       _topicQuestionKeys.map((keys) {
         return {
-          'topic': ChatTranslations.get(
-              keys['topicKey']!, _uiLang),
-          'question': ChatTranslations.get(
-              keys['questionKey']!, _uiLang),
+          'topic': ChatTranslations.get(keys['topicKey']!, _uiLang),
+          'question': ChatTranslations.get(keys['questionKey']!, _uiLang),
         };
       }).toList();
 
@@ -364,121 +361,126 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                             child: SingleChildScrollView(
                               physics: const ClampingScrollPhysics(),
                               child: Padding(
-                                padding: EdgeInsets.all(
-                                    screenWidth > 450 ? 24 : 20),
+                                padding:
+                                    EdgeInsets.all(screenWidth > 450 ? 24 : 20),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                // Info Card
-                                Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: isDark
-                                        ? Colors.white.withOpacity(0.05)
-                                        : CommanColor.lightDarkPrimary(context)
-                                            .withOpacity(0.05),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: isDark
-                                          ? Colors.white.withOpacity(0.1)
-                                          : CommanColor.lightDarkPrimary(
-                                                  context)
-                                              .withOpacity(0.1),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 36,
-                                        height: 36,
-                                        decoration: BoxDecoration(
+                                    // Info Card
+                                    Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: isDark
+                                            ? Colors.white.withOpacity(0.05)
+                                            : CommanColor.lightDarkPrimary(
+                                                    context)
+                                                .withOpacity(0.05),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(
                                           color: isDark
-                                              ? Colors.white.withOpacity(0.12)
+                                              ? Colors.white.withOpacity(0.1)
                                               : CommanColor.lightDarkPrimary(
                                                       context)
                                                   .withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: isDark
-                                              ? Border.all(
-                                                  color: Colors.white
-                                                      .withOpacity(0.35),
-                                                  width: 1,
-                                                )
-                                              : null,
-                                        ),
-                                        child: Icon(
-                                          Icons.lightbulb_outline,
-                                          color: isDark
-                                              ? const Color(0xFFFFD54F)
-                                              : CommanColor.lightDarkPrimary(
-                                                  context),
-                                          size: 20,
                                         ),
                                       ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          'Each answer uses credits. You can change this anytime in your Wallet.',
-                                          style: TextStyle(
-                                            color:
-                                                CommanColor.whiteBlack(context)
-                                                    .withOpacity(0.8),
-                                            fontSize:
-                                                screenWidth > 450 ? 14 : 13,
-                                            height: 1.5,
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 36,
+                                            height: 36,
+                                            decoration: BoxDecoration(
+                                              color: isDark
+                                                  ? Colors.white
+                                                      .withOpacity(0.12)
+                                                  : CommanColor
+                                                          .lightDarkPrimary(
+                                                              context)
+                                                      .withOpacity(0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              border: isDark
+                                                  ? Border.all(
+                                                      color: Colors.white
+                                                          .withOpacity(0.35),
+                                                      width: 1,
+                                                    )
+                                                  : null,
+                                            ),
+                                            child: Icon(
+                                              Icons.lightbulb_outline,
+                                              color: isDark
+                                                  ? const Color(0xFFFFD54F)
+                                                  : CommanColor
+                                                      .lightDarkPrimary(
+                                                          context),
+                                              size: 20,
+                                            ),
                                           ),
-                                        ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              'Each answer uses credits. You can change this anytime in your Wallet.',
+                                              style: TextStyle(
+                                                color: CommanColor.whiteBlack(
+                                                        context)
+                                                    .withOpacity(0.8),
+                                                fontSize:
+                                                    screenWidth > 450 ? 14 : 13,
+                                                height: 1.5,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
+                                    ),
+                                    const SizedBox(height: 20),
 
-                                // Answer Length Options
-                                Text(
-                                  'Select Answer Length',
-                                  style: TextStyle(
-                                    color: CommanColor.whiteBlack(context),
-                                    fontSize: screenWidth > 450 ? 17 : 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                    // Answer Length Options
+                                    Text(
+                                      'Select Answer Length',
+                                      style: TextStyle(
+                                        color: CommanColor.whiteBlack(context),
+                                        fontSize: screenWidth > 450 ? 17 : 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    _buildIntroAnswerLengthOption(
+                                      context,
+                                      screenWidth,
+                                      isDark,
+                                      'small',
+                                      'Short Answer',
+                                      'Quick & concise response',
+                                      '20 Credits',
+                                      setBottomSheetState,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    _buildIntroAnswerLengthOption(
+                                      context,
+                                      screenWidth,
+                                      isDark,
+                                      'medium',
+                                      'Medium Answer',
+                                      'Balanced explanation',
+                                      '50 Credits',
+                                      setBottomSheetState,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    _buildIntroAnswerLengthOption(
+                                      context,
+                                      screenWidth,
+                                      isDark,
+                                      'large',
+                                      'Full Study',
+                                      'Detailed & comprehensive',
+                                      '100 Credits',
+                                      setBottomSheetState,
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 16),
-                                _buildIntroAnswerLengthOption(
-                                  context,
-                                  screenWidth,
-                                  isDark,
-                                  'small',
-                                  'Short Answer',
-                                  'Quick & concise response',
-                                  '20 Credits',
-                                  setBottomSheetState,
-                                ),
-                                const SizedBox(height: 12),
-                                _buildIntroAnswerLengthOption(
-                                  context,
-                                  screenWidth,
-                                  isDark,
-                                  'medium',
-                                  'Medium Answer',
-                                  'Balanced explanation',
-                                  '50 Credits',
-                                  setBottomSheetState,
-                                ),
-                                const SizedBox(height: 12),
-                                _buildIntroAnswerLengthOption(
-                                  context,
-                                  screenWidth,
-                                  isDark,
-                                  'large',
-                                  'Full Study',
-                                  'Detailed & comprehensive',
-                                  '100 Credits',
-                                  setBottomSheetState,
-                                ),
-                              ],
-                            ),
-                          ),
+                              ),
                             ),
                           ),
                           Padding(
@@ -507,8 +509,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                 onPressed: () async {
                                   final prefs =
                                       await SharedPreferences.getInstance();
-                                  await prefs.setBool(
-                                      'chat_intro_seen', true);
+                                  await prefs.setBool('chat_intro_seen', true);
                                   if (mounted) {
                                     Navigator.pop(context);
                                   }
@@ -533,8 +534,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                       'Got it, Let\'s Chat!',
                                       style: TextStyle(
                                         color: Colors.white,
-                                        fontSize:
-                                            screenWidth > 450 ? 17 : 16,
+                                        fontSize: screenWidth > 450 ? 17 : 16,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -585,9 +585,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               ? (isDark
                   ? Colors.white.withOpacity(0.14)
                   : CommanColor.lightDarkPrimary(context).withOpacity(0.08))
-              : (isDark
-                  ? Colors.black.withOpacity(0.22)
-                  : Colors.grey.shade50),
+              : (isDark ? Colors.black.withOpacity(0.22) : Colors.grey.shade50),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
@@ -631,9 +629,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         height: 10,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: isDark
-                              ? const Color(0xFF3D2914)
-                              : Colors.white,
+                          color:
+                              isDark ? const Color(0xFF3D2914) : Colors.white,
                         ),
                       ),
                     )
@@ -683,9 +680,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 cost,
                 style: TextStyle(
                   color: isSelected
-                      ? (isDark
-                          ? const Color(0xFF3D2914)
-                          : Colors.white)
+                      ? (isDark ? const Color(0xFF3D2914) : Colors.white)
                       : (isDark
                           ? Colors.white.withOpacity(0.88)
                           : CommanColor.lightDarkPrimary(context)),
@@ -947,7 +942,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             backgroundColor: isDark
                 ? CommanColor.darkPrimaryColor
                 : CommanColor.backgrondcolor,
-            insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            insetPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
             child: Padding(
@@ -1024,9 +1020,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
-                              color: isDark
-                                  ? Colors.white12
-                                  : Colors.white,
+                              color: isDark ? Colors.white12 : Colors.white,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
                                 color: CommanColor.lightDarkPrimary(ctx),
@@ -1617,15 +1611,58 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _showInsufficientCreditsDialog() async {
+    final credits = await WalletService.getCredits();
+    final chatCost = await WalletService.getChatCost();
+
     if (!mounted) return;
 
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        fullscreenDialog: true,
-        builder: (_) => const FeatureCreditsPaywallScreen(
-          kind: FeatureCreditsPaywallKind.chat,
-        ),
-      ),
+    await showCupertinoDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return CupertinoAlertDialog(
+          title: const Text(
+            'Insufficient Credits',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          content: Text(
+            'You need $chatCost credits to send a message. You currently have $credits credits.\n\nGet more credits from the wallet!',
+            style: const TextStyle(
+              fontSize: 14,
+            ),
+          ),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ),
+            CupertinoDialogAction(
+              isDefaultAction: true,
+              onPressed: () {
+                Navigator.pop(context);
+                Get.to(
+                  () => const WalletScreen(),
+                  transition: Transition.cupertinoDialog,
+                  duration: const Duration(milliseconds: 300),
+                );
+              },
+              child: const Text(
+                'Get Credits',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -2630,121 +2667,126 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                                   .shortestSide >=
                                               600;
                                           Future.delayed(
-                                            Duration(
-                                                milliseconds:
-                                                    tablet ? 280 : 100),
-                                            () {
-                                              if (!mounted) return;
-                                              showModalBottomSheet(
-                                            context: context,
-                                            backgroundColor:
-                                                Colors.transparent,
-                                            isDismissible:
-                                                true, // Allow dismissing when tapping outside
-                                            enableDrag: true,
-                                            builder: (_) {
-                                              final bg = isDark
-                                                  ? CommanColor.darkPrimaryColor
-                                                      .withOpacity(0.96)
-                                                  : const Color(0xFFF6F1E9);
-                                              return SafeArea(
-                                                child: Container(
-                                                  margin:
-                                                      const EdgeInsets.all(12),
-                                                  padding:
-                                                      const EdgeInsets.all(12),
-                                                  decoration: BoxDecoration(
-                                                    color: bg,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            18),
-                                                  ),
-                                                  child: Column(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    children: [
-                                                      ListTile(
-                                                        dense: true,
-                                                        leading: Icon(
-                                                          Icons.add,
-                                                          color: isDark
-                                                              ? Colors.white
-                                                              : const Color(
-                                                                  0xFF8D6E63),
-                                                        ),
-                                                        title: Text(
-                                                          ChatTranslations.get(
-                                                              'new_chat',
-                                                              'EN'),
-                                                          style: TextStyle(
+                                              Duration(
+                                                  milliseconds:
+                                                      tablet ? 280 : 100), () {
+                                            if (!mounted) return;
+                                            showModalBottomSheet(
+                                              context: context,
+                                              backgroundColor:
+                                                  Colors.transparent,
+                                              isDismissible:
+                                                  true, // Allow dismissing when tapping outside
+                                              enableDrag: true,
+                                              builder: (_) {
+                                                final bg = isDark
+                                                    ? CommanColor
+                                                        .darkPrimaryColor
+                                                        .withOpacity(0.96)
+                                                    : const Color(0xFFF6F1E9);
+                                                return SafeArea(
+                                                  child: Container(
+                                                    margin:
+                                                        const EdgeInsets.all(
+                                                            12),
+                                                    padding:
+                                                        const EdgeInsets.all(
+                                                            12),
+                                                    decoration: BoxDecoration(
+                                                      color: bg,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              18),
+                                                    ),
+                                                    child: Column(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        ListTile(
+                                                          dense: true,
+                                                          leading: Icon(
+                                                            Icons.add,
                                                             color: isDark
                                                                 ? Colors.white
                                                                 : const Color(
                                                                     0xFF8D6E63),
-                                                            fontWeight:
-                                                                FontWeight.w600,
                                                           ),
+                                                          title: Text(
+                                                            ChatTranslations
+                                                                .get('new_chat',
+                                                                    'EN'),
+                                                            style: TextStyle(
+                                                              color: isDark
+                                                                  ? Colors.white
+                                                                  : const Color(
+                                                                      0xFF8D6E63),
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                            ),
+                                                          ),
+                                                          onTap: () {
+                                                            Navigator.pop(
+                                                                context);
+                                                            if (_messages
+                                                                .isNotEmpty) {
+                                                              _showNewChatBottomSheet();
+                                                            } else {
+                                                              _startNewChat();
+                                                            }
+                                                          },
                                                         ),
-                                                        onTap: () {
-                                                          Navigator.pop(
-                                                              context);
-                                                          if (_messages
-                                                              .isNotEmpty) {
-                                                            _showNewChatBottomSheet();
-                                                          } else {
-                                                            _startNewChat();
-                                                          }
-                                                        },
-                                                      ),
-                                                      const Divider(height: 1),
-                                                      ListTile(
-                                                        dense: true,
-                                                        leading: Image.asset(
-                                                          "assets/message-time.png",
-                                                          width: 22,
-                                                          height: 22,
-                                                          color: isDark
-                                                              ? Colors.white
-                                                              : const Color(
-                                                                  0xFF8D6E63),
-                                                        ),
-                                                        title: Text(
-                                                          ChatTranslations.get(
-                                                              'history',
-                                                              'EN'),
-                                                          style: TextStyle(
+                                                        const Divider(
+                                                            height: 1),
+                                                        ListTile(
+                                                          dense: true,
+                                                          leading: Image.asset(
+                                                            "assets/message-time.png",
+                                                            width: 22,
+                                                            height: 22,
                                                             color: isDark
                                                                 ? Colors.white
                                                                 : const Color(
                                                                     0xFF8D6E63),
-                                                            fontWeight:
-                                                                FontWeight.w600,
                                                           ),
+                                                          title: Text(
+                                                            ChatTranslations
+                                                                .get('history',
+                                                                    'EN'),
+                                                            style: TextStyle(
+                                                              color: isDark
+                                                                  ? Colors.white
+                                                                  : const Color(
+                                                                      0xFF8D6E63),
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                            ),
+                                                          ),
+                                                          onTap: () {
+                                                            Navigator.pop(
+                                                                context);
+                                                            Get.to(
+                                                              () =>
+                                                                  const ChatHistoryScreen(),
+                                                              transition: Transition
+                                                                  .cupertinoDialog,
+                                                              duration:
+                                                                  const Duration(
+                                                                      milliseconds:
+                                                                          300),
+                                                            )?.then((_) {
+                                                              _loadRecentConversations();
+                                                            });
+                                                          },
                                                         ),
-                                                        onTap: () {
-                                                          Navigator.pop(
-                                                              context);
-                                                          Get.to(
-                                                            () =>
-                                                                const ChatHistoryScreen(),
-                                                            transition: Transition
-                                                                .cupertinoDialog,
-                                                            duration:
-                                                                const Duration(
-                                                                    milliseconds:
-                                                                        300),
-                                                          )?.then((_) {
-                                                            _loadRecentConversations();
-                                                          });
-                                                        },
-                                                      ),
-                                                    ],
+                                                      ],
+                                                    ),
                                                   ),
-                                                ),
-                                              );
-                                            },
-                                          );
-                                            });
+                                                );
+                                              },
+                                            );
+                                          });
                                         });
                                       },
                                       child: Icon(
@@ -2767,116 +2809,121 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                                   .shortestSide >=
                                               600;
                                           Future.delayed(
-                                            Duration(
-                                                milliseconds:
-                                                    tablet ? 280 : 100),
-                                            () {
-                                              if (!mounted) return;
-                                              showModalBottomSheet(
-                                            context: context,
-                                            backgroundColor:
-                                                Colors.transparent,
-                                            isDismissible:
-                                                true, // Allow dismissing when tapping outside
-                                            enableDrag: true,
-                                            builder: (_) {
-                                              final bg = isDark
-                                                  ? CommanColor.darkPrimaryColor
-                                                      .withOpacity(0.96)
-                                                  : const Color(0xFFF6F1E9);
-                                              return SafeArea(
-                                                child: Container(
-                                                  margin:
-                                                      const EdgeInsets.all(12),
-                                                  padding:
-                                                      const EdgeInsets.all(12),
-                                                  decoration: BoxDecoration(
-                                                    color: bg,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            18),
-                                                  ),
-                                                  child: Column(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    children: [
-                                                      ListTile(
-                                                        dense: true,
-                                                        leading: Icon(
-                                                          Icons.add,
-                                                          color: isDark
-                                                              ? Colors.white
-                                                              : const Color(
-                                                                  0xFF8D6E63),
-                                                        ),
-                                                        title: Text(
-                                                          ChatTranslations.get(
-                                                              'new_chat',
-                                                              'EN'),
-                                                          style: TextStyle(
+                                              Duration(
+                                                  milliseconds:
+                                                      tablet ? 280 : 100), () {
+                                            if (!mounted) return;
+                                            showModalBottomSheet(
+                                              context: context,
+                                              backgroundColor:
+                                                  Colors.transparent,
+                                              isDismissible:
+                                                  true, // Allow dismissing when tapping outside
+                                              enableDrag: true,
+                                              builder: (_) {
+                                                final bg = isDark
+                                                    ? CommanColor
+                                                        .darkPrimaryColor
+                                                        .withOpacity(0.96)
+                                                    : const Color(0xFFF6F1E9);
+                                                return SafeArea(
+                                                  child: Container(
+                                                    margin:
+                                                        const EdgeInsets.all(
+                                                            12),
+                                                    padding:
+                                                        const EdgeInsets.all(
+                                                            12),
+                                                    decoration: BoxDecoration(
+                                                      color: bg,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              18),
+                                                    ),
+                                                    child: Column(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        ListTile(
+                                                          dense: true,
+                                                          leading: Icon(
+                                                            Icons.add,
                                                             color: isDark
                                                                 ? Colors.white
                                                                 : const Color(
                                                                     0xFF8D6E63),
-                                                            fontWeight:
-                                                                FontWeight.w600,
                                                           ),
+                                                          title: Text(
+                                                            ChatTranslations
+                                                                .get('new_chat',
+                                                                    'EN'),
+                                                            style: TextStyle(
+                                                              color: isDark
+                                                                  ? Colors.white
+                                                                  : const Color(
+                                                                      0xFF8D6E63),
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                            ),
+                                                          ),
+                                                          onTap: () {
+                                                            Navigator.pop(
+                                                                context);
+                                                            _startNewChat();
+                                                          },
                                                         ),
-                                                        onTap: () {
-                                                          Navigator.pop(
-                                                              context);
-                                                          _startNewChat();
-                                                        },
-                                                      ),
-                                                      const Divider(height: 1),
-                                                      ListTile(
-                                                        dense: true,
-                                                        leading: Image.asset(
-                                                          "assets/message-time.png",
-                                                          width: 22,
-                                                          height: 22,
-                                                          color: isDark
-                                                              ? Colors.white
-                                                              : const Color(
-                                                                  0xFF8D6E63),
-                                                        ),
-                                                        title: Text(
-                                                          ChatTranslations.get(
-                                                              'history',
-                                                              'EN'),
-                                                          style: TextStyle(
+                                                        const Divider(
+                                                            height: 1),
+                                                        ListTile(
+                                                          dense: true,
+                                                          leading: Image.asset(
+                                                            "assets/message-time.png",
+                                                            width: 22,
+                                                            height: 22,
                                                             color: isDark
                                                                 ? Colors.white
                                                                 : const Color(
                                                                     0xFF8D6E63),
-                                                            fontWeight:
-                                                                FontWeight.w600,
                                                           ),
+                                                          title: Text(
+                                                            ChatTranslations
+                                                                .get('history',
+                                                                    'EN'),
+                                                            style: TextStyle(
+                                                              color: isDark
+                                                                  ? Colors.white
+                                                                  : const Color(
+                                                                      0xFF8D6E63),
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                            ),
+                                                          ),
+                                                          onTap: () {
+                                                            Navigator.pop(
+                                                                context);
+                                                            Get.to(
+                                                              () =>
+                                                                  const ChatHistoryScreen(),
+                                                              transition: Transition
+                                                                  .cupertinoDialog,
+                                                              duration:
+                                                                  const Duration(
+                                                                      milliseconds:
+                                                                          300),
+                                                            )?.then((_) {
+                                                              _loadRecentConversations();
+                                                            });
+                                                          },
                                                         ),
-                                                        onTap: () {
-                                                          Navigator.pop(
-                                                              context);
-                                                          Get.to(
-                                                            () =>
-                                                                const ChatHistoryScreen(),
-                                                            transition: Transition
-                                                                .cupertinoDialog,
-                                                            duration:
-                                                                const Duration(
-                                                                    milliseconds:
-                                                                        300),
-                                                          )?.then((_) {
-                                                            _loadRecentConversations();
-                                                          });
-                                                        },
-                                                      ),
-                                                    ],
+                                                      ],
+                                                    ),
                                                   ),
-                                                ),
-                                              );
-                                            },
-                                          );
-                                            });
+                                                );
+                                              },
+                                            );
+                                          });
                                         });
                                       },
                                       child: Icon(
@@ -3199,12 +3246,9 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  ChatTranslations.get(
-                      'what_god_say_fear', _uiLang),
-                  ChatTranslations.get(
-                      'example_forgive', _uiLang),
-                  ChatTranslations.get(
-                      'example_purpose', _uiLang),
+                  ChatTranslations.get('what_god_say_fear', _uiLang),
+                  ChatTranslations.get('example_forgive', _uiLang),
+                  ChatTranslations.get('example_purpose', _uiLang),
                 ].asMap().entries.map((entry) {
                   final index = entry.key;
                   final question = entry.value;
@@ -3595,7 +3639,8 @@ Your 3 questions (exactly 3 lines):''';
     final suggestions = _geminiFollowUpSuggestions!
         .map((s) => s.trim())
         .where((s) => s.isNotEmpty)
-        .where((s) => !_matchesAnyUsedSuggestion(s, _usedFollowUpSuggestionKeys))
+        .where(
+            (s) => !_matchesAnyUsedSuggestion(s, _usedFollowUpSuggestionKeys))
         .take(3)
         .toList();
     if (suggestions.isEmpty) return const SizedBox.shrink();
@@ -4065,8 +4110,7 @@ Your 3 questions (exactly 3 lines):''';
     for (final s in items) {
       final t = s.trim();
       if (t.isEmpty) continue;
-      final isExplain =
-          markers.any((m) => m.isNotEmpty && t.contains(m));
+      final isExplain = markers.any((m) => m.isNotEmpty && t.contains(m));
       if (isExplain) {
         if (keptExplain) continue;
         keptExplain = true;
@@ -4089,13 +4133,9 @@ Your 3 questions (exactly 3 lines):''';
     final pq = precedingQuestion?.trim();
 
     var list = _dedupeChatSuggestions(raw, max: 20);
-    list = list
-        .where((s) => !_matchesAnyUsedSuggestion(s, usedKeys))
-        .toList();
+    list = list.where((s) => !_matchesAnyUsedSuggestion(s, usedKeys)).toList();
     if (pq != null && pq.isNotEmpty) {
-      list = list
-          .where((s) => !_suggestionEchoesUserMessage(s, pq))
-          .toList();
+      list = list.where((s) => !_suggestionEchoesUserMessage(s, pq)).toList();
     }
     list = _dedupeChatSuggestions(list, max: 10);
     list = _capExplainMoreFamilyChips(list, lang);
@@ -4104,9 +4144,7 @@ Your 3 questions (exactly 3 lines):''';
       final t = candidate.trim();
       if (t.isEmpty) return false;
       if (_matchesAnyUsedSuggestion(t, usedKeys)) return false;
-      if (pq != null &&
-          pq.isNotEmpty &&
-          _suggestionEchoesUserMessage(t, pq)) {
+      if (pq != null && pq.isNotEmpty && _suggestionEchoesUserMessage(t, pq)) {
         return false;
       }
       return !list.any((x) => _chatSuggestionTooSimilar(x, t));
@@ -4142,8 +4180,7 @@ Your 3 questions (exactly 3 lines):''';
       addUniqueToPool(f);
     }
 
-    final rotatedPool =
-        _rotateStrings(combinedPool, suggestionRotation);
+    final rotatedPool = _rotateStrings(combinedPool, suggestionRotation);
 
     for (final f in rotatedPool) {
       if (list.length >= 3) break;
@@ -4200,14 +4237,8 @@ Your 3 questions (exactly 3 lines):''';
     if (xa.contains(taExplainCore) && xb.contains(taExplainCore)) {
       return true;
     }
-    final wa = xa
-        .split(RegExp(r'\s+'))
-        .where((w) => w.length > 2)
-        .toSet();
-    final wb = xb
-        .split(RegExp(r'\s+'))
-        .where((w) => w.length > 2)
-        .toSet();
+    final wa = xa.split(RegExp(r'\s+')).where((w) => w.length > 2).toSet();
+    final wb = xb.split(RegExp(r'\s+')).where((w) => w.length > 2).toSet();
     if (wa.isEmpty || wb.isEmpty) return false;
     final inter = wa.intersection(wb).length;
     final union = wa.union(wb).length;
@@ -4913,8 +4944,7 @@ Your 3 questions (exactly 3 lines):''';
                         ),
                       ),
                       // Hide copy/share when no real AI response was generated.
-                      if (!isUser &&
-                          !_isFailedChatResponseText(message.text))
+                      if (!isUser && !_isFailedChatResponseText(message.text))
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -5027,7 +5057,8 @@ Your 3 questions (exactly 3 lines):''';
     final lower = trimmed.toLowerCase();
     return lower.startsWith('error:') ||
         trimmed == 'Sorry, I could not generate a response.' ||
-        trimmed == 'Sorry, I could not generate a response. Please try again.' ||
+        trimmed ==
+            'Sorry, I could not generate a response. Please try again.' ||
         lower.contains('sorry, i could not generate');
   }
 
@@ -5091,8 +5122,7 @@ Your 3 questions (exactly 3 lines):''';
             ),
             onTap: () async {
               await Clipboard.setData(ClipboardData(text: message.text));
-              Constants.showToast(
-                  ChatTranslations.get('copied', _uiLang));
+              Constants.showToast(ChatTranslations.get('copied', _uiLang));
             },
           ),
         if (!message.isUser && !_isFailedChatResponseText(message.text))
@@ -5201,13 +5231,12 @@ Your 3 questions (exactly 3 lines):''';
                       ),
                       decoration: InputDecoration(
                         hintText: _isListening
-                            ? ChatTranslations.get(
-                                'listening', _uiLang)
+                            ? ChatTranslations.get('listening', _uiLang)
                             : (_isLoading
-                                ? ChatTranslations.get('seeking_guidance',
-                                    _uiLang)
-                                : ChatTranslations.get('ask_anything',
-                                    _uiLang)),
+                                ? ChatTranslations.get(
+                                    'seeking_guidance', _uiLang)
+                                : ChatTranslations.get(
+                                    'ask_anything', _uiLang)),
                         hintStyle: TextStyle(
                           color:
                               CommanColor.whiteBlack(context).withOpacity(0.5),

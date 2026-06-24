@@ -21,7 +21,6 @@ import 'package:biblebookapp/view/screens/prayer_wall/post_prayer_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
-import 'package:biblebookapp/view/screens/paywall/feature_credits_paywall_screen.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/gestures.dart';
@@ -526,11 +525,44 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
   }
 
   void _showInsufficientCreditsDialog() {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        fullscreenDialog: true,
-        builder: (_) => const FeatureCreditsPaywallScreen(
-          kind: FeatureCreditsPaywallKind.prayerGuidance,
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              Icons.info_outline,
+              color: Colors.white.withOpacity(0.9),
+              size: 22,
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Insufficient credits. Please add credits.',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF6D4C41),
+        duration: const Duration(seconds: 5),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        elevation: 6,
+        action: SnackBarAction(
+          label: 'Add Credits',
+          textColor: const Color(0xFFFFF3E0),
+          backgroundColor: const Color(0xFF8D6E63),
+          disabledBackgroundColor: Colors.grey,
+          onPressed: () {
+            Get.to(() => const WalletScreen());
+          },
         ),
       ),
     );
