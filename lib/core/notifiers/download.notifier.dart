@@ -382,6 +382,7 @@ class DownloadProvider with ChangeNotifier {
     debugPrint("dailyVersesnew is sucess");
     isLoading = false;
     notifyListeners();
+    await loadDailyVerses();
   }
 
   Future<void> _insertDailyVersesFromMainList({
@@ -449,9 +450,15 @@ class DownloadProvider with ChangeNotifier {
         continue;
       }
 
+      final lookup = _verseTableIndicesFromMainListRow(
+        bookId: bookId,
+        chapter: chapter,
+        verseRaw: verseStr,
+      );
+
       final verseResult = await dbClient.rawQuery(
         "SELECT * FROM verse WHERE book_num = ? AND chapter_num = ? AND verse_num = ?",
-        [bookId, chapter, verse],
+        [lookup.$1, lookup.$2, lookup.$3],
       );
 
       if (verseResult.isNotEmpty) {
@@ -911,6 +918,11 @@ class DownloadProvider with ChangeNotifier {
     if (!dataIsChanged && cachedJson != null) {
       final selectedForCache =
           prefs.getStringList('selected_categories') ?? [];
+      final List<dynamic> decodedCache = jsonDecode(cachedJson);
+      final staleEmptyCache =
+          selectedForCache.isNotEmpty && decodedCache.isEmpty;
+
+      if (!staleEmptyCache) {
       if (selectedForCache.isNotEmpty) {
         final dbClient = await DBHelper().db;
         if (dbClient != null) {
@@ -941,6 +953,7 @@ class DownloadProvider with ChangeNotifier {
         notifyListeners();
         return;
       }
+      }
     }
 
     // Continue loading from DB
@@ -948,7 +961,11 @@ class DownloadProvider with ChangeNotifier {
         prefs.getStringList('selected_categories') ?? ['faith-in-hard-times'];
 
     final dbClient = await DBHelper().db;
-    if (dbClient == null) return;
+    if (dbClient == null) {
+      isLoadingDailyVerse = false;
+      notifyListeners();
+      return;
+    }
 
     final table = selectedCategories.isEmpty ? "dailyVerses" : "dailyVersesnew";
     var dailyVerses = await dbClient.rawQuery("SELECT * FROM $table");
@@ -983,9 +1000,11 @@ class DownloadProvider with ChangeNotifier {
     final List<DailyVerseList> enrichedList = [];
 
     for (var verse in result) {
+      final bookIdStored = int.parse(verse['Book_Id'].toString());
+      final bookNum = bookIdStored > 0 ? bookIdStored - 1 : bookIdStored;
       final bookData = await dbClient.rawQuery(
         "SELECT DISTINCT title FROM book WHERE book_num = ? LIMIT 1",
-        [verse['Book_Id']],
+        [bookNum],
       );
       final bookName =
           bookData.isNotEmpty ? bookData.first['title'] as String : 'Unknown';
@@ -1193,6 +1212,19 @@ List<Map<String, dynamic>> _interleaveDailyVersesByCategory(
     round++;
   }
   return result;
+}
+
+/// Maps dailyVersesMainList 1-based ids to 0-based verse table columns
+/// (same convention as splash [loadDailyVerseData]).
+(int, int, int) _verseTableIndicesFromMainListRow({
+  required int bookId,
+  required int chapter,
+  required String verseRaw,
+}) {
+  final verseNum = verseRaw.length == 2
+      ? int.parse(verseRaw) - 1
+      : int.parse(verseRaw.split('-').first) - 1;
+  return (bookId - 1, chapter - 1, verseNum);
 }
 
 // Background selectedCategories

@@ -6,6 +6,7 @@ import 'package:biblebookapp/view/screens/authenitcation/bloc/login_bloc.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/forget_password_screen.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/mail_verification_screen.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/signup_screen.dart';
+import 'package:biblebookapp/view/screens/authenitcation/view/widget/referral_code_bottom_sheet.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/social_auth_widget.dart';
 import 'package:biblebookapp/view/screens/authenitcation/widgets/text_form_field.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
@@ -156,6 +157,16 @@ class LoginScreen extends HookConsumerWidget {
                                 if (user != null) {
                                   Constants.showToast(
                                       "Hi ${user.displayName}, Welcome to ${BibleInfo.bible_shortName}");
+                                  if (context.mounted) {
+                                    await ReferralCodeBottomSheet.show(
+                                      context: context,
+                                      email: loginState.emailCon.text.trim(),
+                                      password: loginState.passCon.text,
+                                      ownReferralCode: user.referralCode,
+                                      initialReferredBy: user.referredBy,
+                                    );
+                                  }
+                                  if (!context.mounted) return;
                                   if (popOnSuccess) {
                                     return Navigator.of(context).pop(true);
                                   }

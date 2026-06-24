@@ -8,10 +8,10 @@ import 'package:biblebookapp/Model/image_model.dart';
 import 'package:biblebookapp/core/library_backup_upload_service.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
+import 'package:biblebookapp/utils/referral_api_logger.dart';
 import 'package:biblebookapp/view/constants/assets_constants.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
-import 'package:biblebookapp/view/screens/authenitcation/view/login_screen.dart';
 import 'package:biblebookapp/view/screens/books/model/book_model.dart';
 import 'package:biblebookapp/view/screens/calendar_screen/model/calendar_model.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
@@ -27,6 +27,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 // import 'package:http/http.dart' as http;
 
 import '../Model/get_audio_model.dart';
+import '../core/api/auth/profile_update.api.dart';
 
 class Api {
   static const moreAppList =
@@ -545,7 +546,43 @@ Future<String> getTempToken() async {
   }
 }
 
-Future<void> registerUser(
+Future<bool> updateReferralRewardClaimed({required int value}) async {
+  final result =
+      await ProfileUpdateApi().updateReferralRewardClaimed(value: value);
+  if (result == null || result.isEmpty) return false;
+  try {
+    final parsed = jsonDecode(result) as Map<String, dynamic>;
+    return parsed['status'] == true;
+  } catch (_) {
+    return false;
+  }
+}
+
+String? _referralCodeFromAuthResponse(dynamic response) {
+  if (response is! Map) return null;
+  final map = Map<String, dynamic>.from(response);
+  Map<String, dynamic>? user;
+  final data = map['data'];
+  if (data is Map && data['user'] is Map) {
+    user = Map<String, dynamic>.from(data['user'] as Map);
+  } else if (map['user'] is Map) {
+    user = Map<String, dynamic>.from(map['user'] as Map);
+  }
+  if (user == null) return null;
+  for (final key in ['referral_code', 'referralCode']) {
+    final value = user[key]?.toString().trim();
+    if (value != null && value.isNotEmpty) return value;
+  }
+  if (data is Map) {
+    for (final key in ['referral_code', 'referralCode']) {
+      final value = data[key]?.toString().trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
+  }
+  return null;
+}
+
+Future<String?> registerUser(
     {required String email,
     required String name,
     required String password}) async {
@@ -570,6 +607,7 @@ Future<void> registerUser(
     });
     final data = jsonDecode(resp.body);
 
+    logAuthApiReferralFields('REGISTER API', data);
     debugPrint("sign up - $data ");
 
     if (data['status']) {
@@ -584,10 +622,7 @@ Future<void> registerUser(
       await cacheNotifier.writeCache(
           key: "authtoken", value: '${data['data']['token']}');
       Constants.showToast("Account Created Successfully");
-      Get.to(() => LoginScreen(
-            hasSkip: false,
-          ));
-      return data['message'];
+      return _referralCodeFromAuthResponse(data);
     } else {
       throw data['message'] ?? 'Failed to register';
     }
@@ -625,21 +660,28 @@ Future<void> registerUser(
 }
 
 Future<UserModel> loginUser(
-    {required String email, required String password}) async {
+    {required String email,
+    required String password,
+    String? referralCode}) async {
   try {
     final token = await getTempToken();
-    final resp =
-        await http.post(Uri.parse(Api.login), headers: <String, String>{
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': 'Bearer $token'
-    }, body: {
+    final body = <String, String>{
       'email': email,
       'password': password,
       'app_id': BibleInfo.appID.toString(),
       "device_type": Platform.isIOS ? "iOS" : "Android",
-    });
+    };
+    if (referralCode != null && referralCode.trim().isNotEmpty) {
+      body['referral_code'] = referralCode.trim();
+    }
+    final resp =
+        await http.post(Uri.parse(Api.login), headers: <String, String>{
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': 'Bearer $token'
+    }, body: body);
     final data = jsonDecode(resp.body);
 
+    logAuthApiReferralFields('LOGIN API', data);
     debugPrint("user login - $data");
     if (data['status']) {
       await cacheNotifier.writeCache(
@@ -664,7 +706,14 @@ Future<UserModel> loginUser(
       //     selectedChapterForRead: "",
       //     selectedBookNameForRead: "",
       //     selectedVerseForRead: ""));
-      return UserModel.fromJson(data['data']['user'], data['data']['token']);
+      final user =
+          UserModel.fromJson(data['data']['user'], data['data']['token']);
+      debugPrint('LOGIN parsed referral fields:');
+      debugPrint('  referred_by              → ${user.referredBy ?? ''}');
+      debugPrint('  referral_count           → ${user.referralCount}');
+      debugPrint(
+          '  referral_reward_claimed  → ${user.referralRewardClaimed}');
+      return user;
     } else {
       throw data['message'] ?? 'Failed to login';
     }
@@ -697,6 +746,87 @@ Future<UserModel> loginUser(
       throw e.toString();
     }
     debugPrint('loginUser: Error: $e');
+    throw 'Something went wrong. Please try again.';
+  }
+}
+
+Future<void> applyReferralViaLogin({
+  required String email,
+  required String password,
+  required String referralCode,
+  String? ownReferralCode,
+  String? initialReferredBy,
+}) async {
+  final code = referralCode.trim();
+  if (code.isEmpty) {
+    throw 'Please enter a referral ID';
+  }
+  if (ownReferralCode != null &&
+      ownReferralCode.trim().isNotEmpty &&
+      code.toUpperCase() == ownReferralCode.trim().toUpperCase()) {
+    throw 'You cannot use your own referral code';
+  }
+  if (initialReferredBy != null && initialReferredBy.trim().isNotEmpty) {
+    throw 'Referral code already applied';
+  }
+
+  try {
+    final token = await getTempToken();
+    final resp =
+        await http.post(Uri.parse(Api.login), headers: <String, String>{
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': 'Bearer $token'
+    }, body: {
+      'email': email,
+      'password': password,
+      'app_id': BibleInfo.appID.toString(),
+      'device_type': Platform.isIOS ? 'iOS' : 'Android',
+      'referral_code': code,
+    });
+    final data = jsonDecode(resp.body) as Map<String, dynamic>;
+
+    logAuthApiReferralFields('LOGIN API (referral apply)', data);
+    debugPrint('applyReferralViaLogin - $data');
+    if (data['status'] != true) {
+      final apiMessage = data['message']?.toString().trim();
+      throw (apiMessage != null && apiMessage.isNotEmpty)
+          ? apiMessage
+          : 'Invalid referral code';
+    }
+
+    await cacheNotifier.writeCache(
+        key: 'user', value: '${data['data']['user']['email']}');
+    await cacheNotifier.writeCache(
+        key: 'userid', value: '${data['data']['user']['user_id']}');
+    await cacheNotifier.writeCache(
+        key: 'name', value: '${data['data']['user']['name']}');
+    await cacheNotifier.writeCache(
+        key: 'authtoken', value: '${data['data']['token']}');
+  } catch (e) {
+    if (e is String) {
+      throw e;
+    }
+    final err = e.toString().toLowerCase();
+    if (e is SocketException ||
+        e is TimeoutException ||
+        err.contains('socketexception') ||
+        err.contains('host lookup') ||
+        err.contains('failed host lookup') ||
+        err.contains('timed out') ||
+        err.contains('timeout')) {
+      throw 'No Internet Connection';
+    }
+    if (err.contains('certificate_verify_failed') ||
+        err.contains('handshake') ||
+        err.contains('certificate') ||
+        err.contains('ssl') ||
+        err.contains('failed to get temp token')) {
+      throw 'Something went wrong. Please check your internet connection and try again.';
+    }
+    if (err.contains('something went wrong')) {
+      throw e.toString();
+    }
+    debugPrint('applyReferralViaLogin: Error: $e');
     throw 'Something went wrong. Please try again.';
   }
 }

@@ -431,7 +431,7 @@ class DBHelper {
   Future<List<BookMarkModel>> getBookMark() async {
     var dbAccount = await db;
     final List<Map<String, Object?>> queryResult =
-        await dbAccount!.query("bookmark");
+        await dbAccount!.query("bookmark", orderBy: "id DESC");
     return queryResult.map((e) => BookMarkModel.fromJson(e)).toList();
   }
 
@@ -473,7 +473,7 @@ class DBHelper {
   Future<List<SaveNotesModel>> getNotes() async {
     var dbAccount = await db;
     final List<Map<String, Object?>> queryResult =
-        await dbAccount!.query("save_notes");
+        await dbAccount!.query("save_notes", orderBy: "id DESC");
     // print(queryResult);
     return queryResult.map((e) => SaveNotesModel.fromJson(e)).toList();
   }
@@ -526,7 +526,7 @@ class DBHelper {
   Future<List<HighLightContentModal>> getHighlight() async {
     var dbAccount = await db;
     final List<Map<String, Object?>> queryResult =
-        await dbAccount!.query("highlight");
+        await dbAccount!.query("highlight", orderBy: "id DESC");
     // print(queryResult);
     return queryResult.map((e) => HighLightContentModal.fromJson(e)).toList();
   }
@@ -631,7 +631,7 @@ class DBHelper {
   Future<List<BookMarkModel>> getUnderLine() async {
     var dbAccount = await db;
     final List<Map<String, Object?>> queryResult =
-        await dbAccount!.query("underline");
+        await dbAccount!.query("underline", orderBy: "id DESC");
     print(queryResult);
     return queryResult.map((e) => BookMarkModel.fromJson(e)).toList();
   }

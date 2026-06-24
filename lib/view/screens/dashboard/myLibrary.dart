@@ -186,12 +186,24 @@ class _LibraryScreenState extends State<LibraryScreen>
     });
   }
 
-  /// Selected tab: white icon on brown chip. Unselected: contrast on white chip.
+  /// Selected tab: white icon on brown chip. Unselected: contrast on chip fill.
   Color _libraryTabIconColor(BuildContext context, int tabIndex) {
     if (selectedTap == tabIndex) return Colors.white;
     return CommanColor.isDarkTheme(context)
         ? CommanColor.lightDarkPrimary(context)
         : Colors.white;
+  }
+
+  TextStyle _libraryTabTextStyle(
+      BuildContext context, int tabIndex, double screenWidth) {
+    final fontSize = screenWidth > 450
+        ? BibleInfo.fontSizeScale * 17
+        : BibleInfo.fontSizeScale * 12;
+    if (selectedTap == tabIndex) {
+      return CommanStyle.white12400.copyWith(fontSize: fontSize);
+    }
+    return CommanStyle.inDarkPrimaryInLightWhite12400(context)
+        .copyWith(fontSize: fontSize);
   }
 
   Widget _libraryBackupHeaderIcon(BuildContext context, double size) {
@@ -204,6 +216,26 @@ class _LibraryScreenState extends State<LibraryScreen>
     return ColorFiltered(
       colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
       child: image,
+    );
+  }
+
+  BoxDecoration _libraryTabChipDecoration(BuildContext context, int tabIndex) {
+    final isSelected = selectedTap == tabIndex;
+
+    return BoxDecoration(
+      shape: BoxShape.rectangle,
+      borderRadius: BorderRadius.circular(3),
+      boxShadow: const [
+        BoxShadow(
+          color: Colors.black38,
+          blurRadius: 0.5,
+          spreadRadius: 1,
+          offset: Offset(0, 1),
+        ),
+      ],
+      color: isSelected
+          ? CommanColor.lightDarkPrimary(context)
+          : CommanColor.whiteBlack45(context),
     );
   }
 
@@ -606,7 +638,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                 indicatorPadding: const EdgeInsets.only(
                                     right: 2, bottom: 10, left: 0),
                                 labelPadding: const EdgeInsets.only(
-                                    right: 8, bottom: 10, left: 5),
+                                    right: 12, bottom: 10, left: 8),
                                 indicatorSize: TabBarIndicatorSize.label,
                                 indicator: BoxDecoration(
                                     borderRadius: BorderRadius.circular(3),
@@ -625,23 +657,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                                           horizontal: 10),
                                       height: screenWidth > 450 ? 50 : 35,
                                       width: screenWidth > 450 ? 135 : 110,
-                                      decoration: BoxDecoration(
-                                          shape: BoxShape.rectangle,
-                                          borderRadius:
-                                              BorderRadius.circular(3),
-                                          boxShadow: const [
-                                            BoxShadow(
-                                              color: Colors.black38,
-                                              blurRadius: 0.5,
-                                              spreadRadius: 1,
-                                              offset: Offset(0, 1),
-                                            ),
-                                          ],
-                                          color: selectedTap == 0
-                                              ? CommanColor.lightDarkPrimary(
-                                                  context)
-                                              : CommanColor.whiteBlack45(
-                                                  context)),
+                                      decoration:
+                                          _libraryTabChipDecoration(context, 0),
                                       child: Row(
                                         mainAxisAlignment:
                                             MainAxisAlignment.spaceEvenly,
@@ -664,27 +681,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                           // SizedBox(width: 2,),
                                           Text(
                                             "BookMark",
-                                            style: selectedTap == 0
-                                                ? CommanStyle.white12400.copyWith(
-                                                    fontSize: screenWidth > 450
-                                                        ? BibleInfo
-                                                                .fontSizeScale *
-                                                            17
-                                                        : BibleInfo
-                                                                .fontSizeScale *
-                                                            12)
-                                                : CommanStyle
-                                                        .inDarkPrimaryInLightWhite12400(
-                                                            context)
-                                                    .copyWith(
-                                                        fontSize: screenWidth >
-                                                                450
-                                                            ? BibleInfo
-                                                                    .fontSizeScale *
-                                                                17
-                                                            : BibleInfo
-                                                                    .fontSizeScale *
-                                                                12),
+                                            style: _libraryTabTextStyle(context, 0, screenWidth),
                                           )
                                         ],
                                       ),
@@ -697,23 +694,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                       // height: screenWidth > 450 ? 55 : 35,
                                       height: screenWidth > 450 ? 50 : 35,
                                       width: screenWidth > 450 ? 135 : 110,
-                                      decoration: BoxDecoration(
-                                          shape: BoxShape.rectangle,
-                                          borderRadius:
-                                              BorderRadius.circular(3),
-                                          boxShadow: const [
-                                            BoxShadow(
-                                              color: Colors.black38,
-                                              blurRadius: 0.5,
-                                              spreadRadius: 1,
-                                              offset: Offset(0, 1),
-                                            ),
-                                          ],
-                                          color: selectedTap == 1
-                                              ? CommanColor.lightDarkPrimary(
-                                                  context)
-                                              : CommanColor.whiteBlack45(
-                                                  context)),
+                                      decoration: _libraryTabChipDecoration(context, 1),
                                       child: Row(
                                         mainAxisAlignment:
                                             MainAxisAlignment.spaceEvenly,
@@ -735,27 +716,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                           // ),
                                           Text(
                                             "Highlights",
-                                            style: selectedTap == 1
-                                                ? CommanStyle.white12400.copyWith(
-                                                    fontSize: screenWidth > 450
-                                                        ? BibleInfo
-                                                                .fontSizeScale *
-                                                            17
-                                                        : BibleInfo
-                                                                .fontSizeScale *
-                                                            12)
-                                                : CommanStyle
-                                                        .inDarkPrimaryInLightWhite12400(
-                                                            context)
-                                                    .copyWith(
-                                                        fontSize: screenWidth >
-                                                                450
-                                                            ? BibleInfo
-                                                                    .fontSizeScale *
-                                                                17
-                                                            : BibleInfo
-                                                                    .fontSizeScale *
-                                                                12),
+                                            style: _libraryTabTextStyle(context, 1, screenWidth),
                                           )
                                         ],
                                       ),
@@ -768,23 +729,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                       //  height: 35,
                                       height: screenWidth > 450 ? 50 : 35,
                                       width: screenWidth > 450 ? 135 : 110,
-                                      decoration: BoxDecoration(
-                                          shape: BoxShape.rectangle,
-                                          borderRadius:
-                                              BorderRadius.circular(3),
-                                          boxShadow: const [
-                                            BoxShadow(
-                                              color: Colors.black38,
-                                              blurRadius: 0.5,
-                                              spreadRadius: 1,
-                                              offset: Offset(0, 1),
-                                            ),
-                                          ],
-                                          color: selectedTap == 2
-                                              ? CommanColor.lightDarkPrimary(
-                                                  context)
-                                              : CommanColor.whiteBlack45(
-                                                  context)),
+                                      decoration: _libraryTabChipDecoration(context, 2),
                                       child: Row(
                                         mainAxisAlignment:
                                             MainAxisAlignment.spaceEvenly,
@@ -806,27 +751,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                           // ),
                                           Text(
                                             "Underline",
-                                            style: selectedTap == 2
-                                                ? CommanStyle.white12400.copyWith(
-                                                    fontSize: screenWidth > 450
-                                                        ? BibleInfo
-                                                                .fontSizeScale *
-                                                            17
-                                                        : BibleInfo
-                                                                .fontSizeScale *
-                                                            12)
-                                                : CommanStyle
-                                                        .inDarkPrimaryInLightWhite12400(
-                                                            context)
-                                                    .copyWith(
-                                                        fontSize: screenWidth >
-                                                                450
-                                                            ? BibleInfo
-                                                                    .fontSizeScale *
-                                                                17
-                                                            : BibleInfo
-                                                                    .fontSizeScale *
-                                                                12),
+                                            style: _libraryTabTextStyle(context, 2, screenWidth),
                                           )
                                         ],
                                       ),
@@ -839,23 +764,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                       // height: 35,
                                       height: screenWidth > 450 ? 50 : 35,
                                       width: screenWidth > 450 ? 135 : 110,
-                                      decoration: BoxDecoration(
-                                          shape: BoxShape.rectangle,
-                                          borderRadius:
-                                              BorderRadius.circular(3),
-                                          boxShadow: const [
-                                            BoxShadow(
-                                              color: Colors.black38,
-                                              blurRadius: 0.5,
-                                              spreadRadius: 1,
-                                              offset: Offset(0, 1),
-                                            ),
-                                          ],
-                                          color: selectedTap == 3
-                                              ? CommanColor.lightDarkPrimary(
-                                                  context)
-                                              : CommanColor.whiteBlack45(
-                                                  context)),
+                                      decoration: _libraryTabChipDecoration(context, 3),
                                       child: Row(
                                         mainAxisAlignment:
                                             MainAxisAlignment.spaceEvenly,
@@ -877,27 +786,7 @@ class _LibraryScreenState extends State<LibraryScreen>
 
                                           Text(
                                             "Notes",
-                                            style: selectedTap == 3
-                                                ? CommanStyle.white12400.copyWith(
-                                                    fontSize: screenWidth > 450
-                                                        ? BibleInfo
-                                                                .fontSizeScale *
-                                                            17
-                                                        : BibleInfo
-                                                                .fontSizeScale *
-                                                            12)
-                                                : CommanStyle
-                                                        .inDarkPrimaryInLightWhite12400(
-                                                            context)
-                                                    .copyWith(
-                                                        fontSize: screenWidth >
-                                                                450
-                                                            ? BibleInfo
-                                                                    .fontSizeScale *
-                                                                17
-                                                            : BibleInfo
-                                                                    .fontSizeScale *
-                                                                12),
+                                            style: _libraryTabTextStyle(context, 3, screenWidth),
                                           )
                                         ],
                                       ),
@@ -910,23 +799,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                       width: screenWidth > 450 ? 135 : 110,
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 10),
-                                      decoration: BoxDecoration(
-                                          shape: BoxShape.rectangle,
-                                          borderRadius:
-                                              BorderRadius.circular(3),
-                                          boxShadow: const [
-                                            BoxShadow(
-                                              color: Colors.black38,
-                                              blurRadius: 0.5,
-                                              spreadRadius: 1,
-                                              offset: Offset(0, 1),
-                                            ),
-                                          ],
-                                          color: selectedTap == 4
-                                              ? CommanColor.lightDarkPrimary(
-                                                  context)
-                                              : CommanColor.whiteBlack45(
-                                                  context)),
+                                      decoration: _libraryTabChipDecoration(context, 4),
                                       child: Row(
                                         mainAxisAlignment:
                                             MainAxisAlignment.spaceEvenly,
@@ -941,27 +814,7 @@ class _LibraryScreenState extends State<LibraryScreen>
 
                                           Text(
                                             "Images",
-                                            style: selectedTap == 4
-                                                ? CommanStyle.white12400.copyWith(
-                                                    fontSize: screenWidth > 450
-                                                        ? BibleInfo
-                                                                .fontSizeScale *
-                                                            17
-                                                        : BibleInfo
-                                                                .fontSizeScale *
-                                                            12)
-                                                : CommanStyle
-                                                        .inDarkPrimaryInLightWhite12400(
-                                                            context)
-                                                    .copyWith(
-                                                        fontSize: screenWidth >
-                                                                450
-                                                            ? BibleInfo
-                                                                    .fontSizeScale *
-                                                                17
-                                                            : BibleInfo
-                                                                    .fontSizeScale *
-                                                                12),
+                                            style: _libraryTabTextStyle(context, 4, screenWidth),
                                           )
                                         ],
                                       ),
@@ -974,23 +827,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                       width: screenWidth > 450 ? 135 : 110,
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 10),
-                                      decoration: BoxDecoration(
-                                          shape: BoxShape.rectangle,
-                                          borderRadius:
-                                              BorderRadius.circular(3),
-                                          boxShadow: const [
-                                            BoxShadow(
-                                              color: Colors.black38,
-                                              blurRadius: 0.5,
-                                              spreadRadius: 1,
-                                              offset: Offset(0, 1),
-                                            ),
-                                          ],
-                                          color: selectedTap == 5
-                                              ? CommanColor.lightDarkPrimary(
-                                                  context)
-                                              : CommanColor.whiteBlack45(
-                                                  context)),
+                                      decoration: _libraryTabChipDecoration(context, 5),
                                       child: Row(
                                         mainAxisAlignment:
                                             MainAxisAlignment.spaceEvenly,
@@ -1007,27 +844,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                           ),
                                           Text(
                                             "Wallpapers",
-                                            style: selectedTap == 5
-                                                ? CommanStyle.white12400.copyWith(
-                                                    fontSize: screenWidth > 450
-                                                        ? BibleInfo
-                                                                .fontSizeScale *
-                                                            17
-                                                        : BibleInfo
-                                                                .fontSizeScale *
-                                                            12)
-                                                : CommanStyle
-                                                        .inDarkPrimaryInLightWhite12400(
-                                                            context)
-                                                    .copyWith(
-                                                        fontSize: screenWidth >
-                                                                450
-                                                            ? BibleInfo
-                                                                    .fontSizeScale *
-                                                                17
-                                                            : BibleInfo
-                                                                    .fontSizeScale *
-                                                                12),
+                                            style: _libraryTabTextStyle(context, 5, screenWidth),
                                           )
                                         ],
                                       ),
@@ -1040,23 +857,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                       width: screenWidth > 450 ? 135 : 110,
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 10),
-                                      decoration: BoxDecoration(
-                                          shape: BoxShape.rectangle,
-                                          borderRadius:
-                                              BorderRadius.circular(3),
-                                          boxShadow: const [
-                                            BoxShadow(
-                                              color: Colors.black38,
-                                              blurRadius: 0.5,
-                                              spreadRadius: 1,
-                                              offset: Offset(0, 1),
-                                            ),
-                                          ],
-                                          color: selectedTap == 6
-                                              ? CommanColor.lightDarkPrimary(
-                                                  context)
-                                              : CommanColor.whiteBlack45(
-                                                  context)),
+                                      decoration: _libraryTabChipDecoration(context, 6),
                                       child: Row(
                                         mainAxisAlignment:
                                             MainAxisAlignment.spaceEvenly,
@@ -1073,27 +874,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                           ),
                                           Text(
                                             "Quotes",
-                                            style: selectedTap == 6
-                                                ? CommanStyle.white12400.copyWith(
-                                                    fontSize: screenWidth > 450
-                                                        ? BibleInfo
-                                                                .fontSizeScale *
-                                                            17
-                                                        : BibleInfo
-                                                                .fontSizeScale *
-                                                            12)
-                                                : CommanStyle
-                                                        .inDarkPrimaryInLightWhite12400(
-                                                            context)
-                                                    .copyWith(
-                                                        fontSize: screenWidth >
-                                                                450
-                                                            ? BibleInfo
-                                                                    .fontSizeScale *
-                                                                17
-                                                            : BibleInfo
-                                                                    .fontSizeScale *
-                                                                12),
+                                            style: _libraryTabTextStyle(context, 6, screenWidth),
                                           )
                                         ],
                                       ),
@@ -1451,6 +1232,7 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
     updateLoading(false);
     await SharPreferences.setString('OpenAd', '1');
     if (ok) {
+      await Future.delayed(const Duration(milliseconds: 2800));
       Get.offAll(() => HomeScreen(
             From: "splash",
             selectedVerseNumForRead: "",
@@ -1670,7 +1452,7 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
 
   Widget _signedInStatusBox() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
       decoration: BoxDecoration(
         color: _greenBox,
         borderRadius: BorderRadius.circular(14),
@@ -1679,8 +1461,11 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _backupIcon(_assetEncryption, size: _kStatusIconSize),
-          const SizedBox(width: 12),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: _backupIcon(_assetEncryption, size: 48),
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1690,58 +1475,69 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
+                    height: 1.25,
                     color: _greenText,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Text(
                   'Your library is synced securely to the cloud because you\'re signed in.',
                   style: TextStyle(
                     fontSize: 12.5,
-                    height: 1.4,
+                    height: 1.45,
                     color: _brownMuted.withValues(alpha: 0.85),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.schedule,
-                        size: 14, color: _brownMuted.withValues(alpha: 0.7)),
-                    const SizedBox(width: 6),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 1),
+                      child: Icon(Icons.schedule,
+                          size: 14, color: _brownMuted.withValues(alpha: 0.7)),
+                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Last backup: ${_formatLastBackup()}',
                         style: TextStyle(
                           fontSize: 12,
+                          height: 1.35,
                           color: _brownMuted.withValues(alpha: 0.8),
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.update,
-                        size: 14, color: _brownMuted.withValues(alpha: 0.7)),
-                    const SizedBox(width: 6),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 1),
+                      child: Icon(Icons.update,
+                          size: 14, color: _brownMuted.withValues(alpha: 0.7)),
+                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Next backup: ${_formatNextBackup()}',
                         style: TextStyle(
                           fontSize: 12,
+                          height: 1.35,
                           color: _brownMuted.withValues(alpha: 0.8),
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Text(
-                  'Your latest cloud backup replaces the previous one.',
+                  '*Your latest cloud backup replaces the previous one.*',
                   style: TextStyle(
                     fontSize: 11,
-                    height: 1.35,
+                    height: 1.4,
                     color: _brownMuted.withValues(alpha: 0.75),
                     fontStyle: FontStyle.italic,
                   ),

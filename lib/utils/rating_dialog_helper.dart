@@ -1,13 +1,10 @@
-import 'package:biblebookapp/utils/emoji_text_style.dart';
+import 'package:biblebookapp/view/widget/thanks_for_love_rating_dialog_content.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
-import 'package:biblebookapp/view/constants/theme_provider.dart';
-import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:in_app_review/in_app_review.dart';
-import 'package:provider/provider.dart';
 
 class RatingDialogHelper {
   /// Shows rating dialog on first share action
@@ -49,138 +46,66 @@ class RatingDialogHelper {
 
     debugPrint('RatingDialogHelper: Showing rating dialog');
 
-    final isTablet = MediaQuery.of(context).size.width > 600;
-    final dialogWidth = isTablet ? 400.0 : double.infinity;
-    final screenWidth = MediaQuery.of(context).size.width;
-
     // Await showDialog to ensure dialog is shown and wait for user interaction
     // This will pause execution until dialog is dismissed
     await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
-        final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-        final isDark = themeProvider.themeMode == ThemeMode.dark;
+        final isTablet = MediaQuery.of(dialogContext).size.width > 600;
+        final dialogWidth = isTablet ? 400.0 : double.infinity;
+
         return Dialog(
-          backgroundColor: isDark
-              ? CommanColor.white
-              : CommanColor.white,
+          backgroundColor: CommanColor.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
           ),
           child: Container(
             width: dialogWidth,
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.of(dialogContext).pop();
-                        },
-                        child: const Icon(
-                          Icons.close,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                emojiText('😍', fontSize: 40),
-                const SizedBox(height: 15),
-                textWithTrailingEmoji(
-                  prefix: 'Thanks for Sharing!',
-                  emoji: '💛',
-                  emojiFontSize: isTablet ? 26 : 22,
-                  prefixStyle: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: isTablet ? 26 : 22,
-                    color: CommanColor.black,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  "Your quick rating helps more people experience God's Word too!",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: isTablet
-                        ? 20
-                        : screenWidth < 380
-                            ? 17
-                            : 18, // Increased font size
-                    color: CommanColor.black,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () async {
-                    Navigator.pop(dialogContext);
-                    // Check internet connection with retry mechanism for reliability
-                    bool hasConnection = false;
-                    for (int i = 0; i < 3; i++) {
-                      try {
-                        final connectivityResult =
-                            await Connectivity().checkConnectivity();
-                        // If result is empty (occasionally on first call), retry after delay
-                        if (connectivityResult.isEmpty) {
-                          if (i < 2) {
-                            await Future.delayed(const Duration(milliseconds: 300));
-                          }
-                          continue;
-                        }
-                        hasConnection =
-                            connectivityResult.contains(ConnectivityResult.mobile) ||
-                            connectivityResult.contains(ConnectivityResult.wifi) ||
-                            connectivityResult.contains(ConnectivityResult.ethernet);
-                        // Empty result (e.g. on some 5G/configs) — assume connected for rate us
-                        if (connectivityResult.isEmpty) hasConnection = true;
-                        if (hasConnection) {
-                          break; // Connection found, exit retry loop
-                        }
-                        // Wait a bit before retrying (only if not last attempt)
-                        if (i < 2) {
-                          await Future.delayed(const Duration(milliseconds: 300));
-                        }
-                      } catch (e) {
-                        debugPrint('Connectivity check error: $e');
-                        // Continue to next retry
+            child: ThanksForLoveRatingDialogContent(
+              onClose: () => Navigator.of(dialogContext).pop(),
+              onRate: () async {
+                Navigator.pop(dialogContext);
+                // Check internet connection with retry mechanism for reliability
+                bool hasConnection = false;
+                for (int i = 0; i < 3; i++) {
+                  try {
+                    final connectivityResult =
+                        await Connectivity().checkConnectivity();
+                    // If result is empty (occasionally on first call), retry after delay
+                    if (connectivityResult.isEmpty) {
+                      if (i < 2) {
+                        await Future.delayed(const Duration(milliseconds: 300));
                       }
+                      continue;
                     }
-                    
-                    if (!hasConnection) {
-                      Constants.showToast("Check your Internet connection");
-                      return;
+                    hasConnection =
+                        connectivityResult.contains(ConnectivityResult.mobile) ||
+                        connectivityResult.contains(ConnectivityResult.wifi) ||
+                        connectivityResult.contains(ConnectivityResult.ethernet);
+                    // Empty result (e.g. on some 5G/configs) — assume connected for rate us
+                    if (connectivityResult.isEmpty) hasConnection = true;
+                    if (hasConnection) {
+                      break; // Connection found, exit retry loop
                     }
-                    await SharPreferences.setString('OpenAd', '1');
-                    await _requestReview();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.brown,
-                  ),
-                  child: Text(
-                    "Rate the app",
-                    style: TextStyle(
-                      color: CommanColor.white,
-                      fontSize: isTablet ? 18 : null,
-                    ),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: Text(
-                    "Later",
-                    style: TextStyle(
-                      color: CommanColor.black,
-                      fontSize: isTablet ? 17 : null,
-                    ),
-                  ),
-                ),
-              ],
+                    // Wait a bit before retrying (only if not last attempt)
+                    if (i < 2) {
+                      await Future.delayed(const Duration(milliseconds: 300));
+                    }
+                  } catch (e) {
+                    debugPrint('Connectivity check error: $e');
+                    // Continue to next retry
+                  }
+                }
+
+                if (!hasConnection) {
+                  Constants.showToast("Check your Internet connection");
+                  return;
+                }
+                await SharPreferences.setString('OpenAd', '1');
+                await _requestReview();
+              },
+              onMaybeLater: () => Navigator.pop(dialogContext),
             ),
           ),
         );

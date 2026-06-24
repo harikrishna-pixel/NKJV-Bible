@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:biblebookapp/constant/size_config.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
@@ -17,10 +19,12 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/chat/chat_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
+import 'package:biblebookapp/view/screens/verse_topics/verse_topics_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -61,8 +65,15 @@ class _SearchScreenState extends State<SearchScreen> {
   List<VerseBookContentModel> allNtVersesContent = [];
   TextEditingController searchController = TextEditingController();
 
+  static const String _recentSearchesKey = 'search_recent_queries';
+  static const int _maxRecentSearches = 10;
+  List<String> _bookSuggestions = [];
+  List<String> _recentSearches = [];
+  int _faithCredits = 0;
+
   bool isLoading = false;
   bool _isBookNameSearchMode = false;
+  bool _hasPerformedSearch = false;
 
   double fontSize = Sizecf.scrnWidth! > 450 ? 25.0 : 15.0;
   var fontSizeS = "";
@@ -87,13 +98,268 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
-    loadBookListsFromPrefs();
     getFont();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    _loadRecentSearches();
+    _loadFaithCredits();
+    searchController.addListener(() {
       if (mounted) {
-        loadLocal();
+        setState(() {
+          if (searchController.text.trim().isEmpty) {
+            _hasPerformedSearch = false;
+          }
+        });
       }
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeSearchData();
+    });
+  }
+
+  void _syncListsFromProvider(DownloadProvider downloadProvider) {
+    allVersesContent = downloadProvider.verseList;
+    allOtVersesContent = downloadProvider.otVerseList;
+    allNtVersesContent = downloadProvider.ntVerseList;
+    if (bookList.length <= 1) {
+      bookList = downloadProvider.bookList;
+    }
+    if (oTBookList.isEmpty) {
+      oTBookList = downloadProvider.otBookList;
+    }
+    if (nTBookList.isEmpty) {
+      nTBookList = downloadProvider.ntBookList;
+    }
+  }
+
+  Future<void> _initializeSearchData() async {
+    final downloadProvider =
+        Provider.of<DownloadProvider>(context, listen: false);
+
+    // Show suggestions immediately when splash/home already cached Bible data.
+    if (downloadProvider.verseList.isNotEmpty) {
+      _syncListsFromProvider(downloadProvider);
+      if (mounted) {
+        setState(() => _refreshVerseSuggestions());
+      }
+    }
+
+    final bookListsFuture = loadBookListsFromPrefs();
+
+    if (allVersesContent.isEmpty) {
+      final loaded =
+          await downloadProvider.preloadBibleDataFromDatabaseIfNeeded();
+      if (loaded && mounted) {
+        _syncListsFromProvider(downloadProvider);
+        setState(() => _refreshVerseSuggestions());
+      }
+    }
+
+    await bookListsFuture;
+    if (!mounted) return;
+    setState(() {});
+
+    // Keep full local hydrate + prefs sync in background (no UI wait).
+    unawaited(loadLocal());
+  }
+
+  Future<void> _loadRecentSearches() async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_recentSearchesKey) ?? [];
+    if (mounted) {
+      setState(() => _recentSearches = list);
+    }
+  }
+
+  Future<void> _saveRecentSearch(String query) async {
+    final q = query.trim();
+    if (q.isEmpty) return;
+    final updated = [
+      q,
+      ..._recentSearches.where((e) => e.toLowerCase() != q.toLowerCase()),
+    ];
+    if (updated.length > _maxRecentSearches) {
+      updated.removeRange(_maxRecentSearches, updated.length);
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_recentSearchesKey, updated);
+    if (mounted) setState(() => _recentSearches = updated);
+  }
+
+  Future<void> _removeRecentSearch(String query) async {
+    final updated =
+        _recentSearches.where((e) => e.toLowerCase() != query.toLowerCase()).toList();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_recentSearchesKey, updated);
+    if (mounted) setState(() => _recentSearches = updated);
+  }
+
+  Future<void> _clearRecentSearches() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_recentSearchesKey);
+    if (mounted) setState(() => _recentSearches = []);
+  }
+
+  Future<void> _loadFaithCredits() async {
+    final credits = await WalletService.getCredits();
+    if (mounted) setState(() => _faithCredits = credits);
+  }
+
+  void _applySearchQuery(String query) {
+    searchController.text = query;
+    _performSearch();
+  }
+
+  void _refreshVerseSuggestions() {
+    List<VerseBookContentModel> verses = allVersesContent;
+    if (verses.isEmpty) {
+      verses =
+          Provider.of<DownloadProvider>(context, listen: false).verseList;
+    }
+    if (verses.isEmpty) return;
+
+    final random = math.Random();
+    final suggestions = <String>[];
+    final picked = <int>{};
+    final total = verses.length;
+    var attempts = 0;
+    final maxAttempts = math.min(total * 3, 120);
+
+    while (suggestions.length < 4 && attempts < maxAttempts) {
+      attempts++;
+      final index = random.nextInt(total);
+      if (!picked.add(index)) continue;
+
+      final snippet = _verseSuggestionSnippet(verses[index]);
+      if (snippet.isEmpty) continue;
+      final isDuplicate = suggestions.any(
+        (existing) => existing.toLowerCase() == snippet.toLowerCase(),
+      );
+      if (!isDuplicate) suggestions.add(snippet);
+    }
+
+    _bookSuggestions = suggestions;
+  }
+
+  void _openPreferenceSelection() {
+    Get.to(() => const VerseTopicsScreen());
+  }
+
+  Widget _buildExploreTopicsBanner(double screenWidth) {
+    final primary = CommanColor.lightDarkPrimary(context);
+    final lightText = _searchUsesLightText(context);
+    final textColor = _searchTextColor(context);
+    final mutedColor = _searchMutedTextColor(context, 0.75);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(15, 16, 15, 24),
+      child: Container(
+        padding: EdgeInsets.all(screenWidth > 450 ? 16 : 12),
+        decoration: BoxDecoration(
+          color: lightText
+              ? Colors.white.withOpacity(0.12)
+              : const Color(0xFFF8F4EB),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _searchCardBorderColor(context, primary)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                boxShadow: [
+                  BoxShadow(
+                    color: primary.withOpacity(0.22),
+                    blurRadius: 14,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: Image.asset(
+                Images.searchPlaceHolder(context),
+                width: screenWidth > 450 ? 72 : 58,
+                height: screenWidth > 450 ? 72 : 58,
+                fit: BoxFit.contain,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    "Can't find what you're looking for?",
+                    style: TextStyle(
+                      fontSize: screenWidth > 450 ? 15 : 13,
+                      fontWeight: FontWeight.w700,
+                      color: textColor,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Explore popular topics and curated verses to inspire your journey.',
+                    style: TextStyle(
+                      fontSize: screenWidth > 450 ? 12 : 11,
+                      color: mutedColor,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              onPressed: _openPreferenceSelection,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: EdgeInsets.symmetric(
+                  horizontal: screenWidth > 450 ? 14 : 10,
+                  vertical: screenWidth > 450 ? 12 : 10,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: Text(
+                'Explore Topics',
+                style: TextStyle(
+                  fontSize: screenWidth > 450 ? 13 : 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool _searchUsesLightText(BuildContext context) {
+    return CommanColor.isDarkTheme(context);
+  }
+
+  Color _searchTextColor(BuildContext context) {
+    return _searchUsesLightText(context) ? Colors.white : Colors.black;
+  }
+
+  Color _searchMutedTextColor(BuildContext context, [double opacity = 0.78]) {
+    return _searchUsesLightText(context)
+        ? Colors.white.withOpacity(opacity)
+        : Colors.black.withOpacity(opacity * 0.85);
+  }
+
+  Color _searchCardColor(BuildContext context) {
+    return _searchUsesLightText(context)
+        ? Colors.white.withOpacity(0.14)
+        : Colors.white;
+  }
+
+  Color _searchCardBorderColor(BuildContext context, Color primary) {
+    return _searchUsesLightText(context)
+        ? Colors.white.withOpacity(0.28)
+        : primary.withOpacity(0.22);
   }
 
   // loadLocal() async {
@@ -171,7 +437,6 @@ class _SearchScreenState extends State<SearchScreen> {
     if (mounted) {
       setState(() {});
     }
-    // debugPrint("check data -$bookList  ");
     // Decode and convert to model lists
 
     // if (allBookJson != null) {
@@ -195,11 +460,20 @@ class _SearchScreenState extends State<SearchScreen> {
     }
     await loadLocal();
     await _searchFilter(searchController.text);
+    final query = searchController.text.trim();
+    if (query.isNotEmpty) {
+      await _saveRecentSearch(query);
+    }
     await SharPreferences.setString('OpenAd', '1');
     if (!mounted) return;
     setState(() {
       isLoading = false;
+      _hasPerformedSearch = query.isNotEmpty;
     });
+  }
+
+  bool _showExploreTopicsBanner() {
+    return _hasPerformedSearch && searchController.text.trim().isNotEmpty;
   }
 
   Future<void> _onFilterSelected(int index) async {
@@ -244,39 +518,38 @@ class _SearchScreenState extends State<SearchScreen> {
     required String label,
     required double screenWidth,
   }) {
-    final isDark = CommanColor.isDarkTheme(context);
     final isSelected = selectedValueFilterIndex == index;
     final primary = CommanColor.lightDarkPrimary(context);
-    final selectedFill =
-        isDark ? Colors.white.withOpacity(0.2) : primary;
-    final selectedBorder = isDark ? Colors.white : primary;
-    final unselectedBorder =
-        isDark ? Colors.white.withOpacity(0.35) : primary.withOpacity(0.45);
+    final lightText = _searchUsesLightText(context);
     return GestureDetector(
       onTap: () => _onFilterSelected(index),
       child: Padding(
         padding: EdgeInsets.only(right: screenWidth > 450 ? 10 : 8),
         child: Container(
           padding: EdgeInsets.symmetric(
-            horizontal: screenWidth > 450 ? 14 : 10,
-            vertical: screenWidth > 450 ? 8 : 6,
+            horizontal: screenWidth > 450 ? 18 : 14,
+            vertical: screenWidth > 450 ? 10 : 8,
           ),
           decoration: BoxDecoration(
-            color: isSelected ? selectedFill : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
+            color: isSelected
+                ? (lightText ? Colors.white : primary)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: isSelected ? selectedBorder : unselectedBorder,
-              width: isSelected ? 1.5 : 1,
+              color: lightText
+                  ? Colors.white
+                  : (isSelected ? primary : primary.withOpacity(0.45)),
+              width: lightText ? 1.4 : 1.2,
             ),
           ),
           child: Text(
             label,
             style: TextStyle(
-              fontSize: screenWidth > 450 ? 16 : 13,
+              fontSize: screenWidth > 450 ? 15 : 13,
               fontWeight: FontWeight.w600,
               color: isSelected
-                  ? (isDark ? Colors.white : Colors.white)
-                  : (isDark ? Colors.white70 : primary),
+                  ? (lightText ? primary : Colors.white)
+                  : (lightText ? Colors.white : primary),
             ),
           ),
         ),
@@ -284,69 +557,293 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildSearchEmptyState(double screenWidth) {
-    final textColor = CommanColor.whiteBlack(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
-              Images.searchPlaceHolder(context),
-              height: screenWidth > 450 ? 170 : 140,
-              width: screenWidth > 450 ? 170 : 140,
+  Widget _buildSuggestionsSection(double screenWidth) {
+    if (_bookSuggestions.isEmpty) return const SizedBox.shrink();
+    final primary = CommanColor.lightDarkPrimary(context);
+    final textColor = _searchTextColor(context);
+    final lightText = _searchUsesLightText(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 15),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Suggestions',
+            style: TextStyle(
+              fontSize: screenWidth > 450 ? 20 : 17,
+              fontWeight: FontWeight.w700,
+              color: textColor,
+              fontFamily: 'Georgia',
             ),
-            const SizedBox(height: 20),
-            Text.rich(
-              TextSpan(
-                style: TextStyle(
-                  fontSize: screenWidth > 450 ? 18 : 15,
-                  height: 1.5,
-                  color: textColor.withOpacity(0.85),
-                  fontFamily: 'Georgia',
+          ),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: _searchCardColor(context),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _searchCardBorderColor(context, primary)),
+            ),
+            child: Column(
+              children: List.generate(_bookSuggestions.length, (index) {
+                final suggestion = _bookSuggestions[index];
+                return Column(
+                  children: [
+                    InkWell(
+                      onTap: () => _applySearchQuery(suggestion),
+                      borderRadius: BorderRadius.vertical(
+                        top: index == 0 ? const Radius.circular(16) : Radius.zero,
+                        bottom: index == _bookSuggestions.length - 1
+                            ? const Radius.circular(16)
+                            : Radius.zero,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 14),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 34,
+                              height: 34,
+                              decoration: BoxDecoration(
+                                color: lightText
+                                    ? Colors.white.withOpacity(0.18)
+                                    : primary.withOpacity(0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.search,
+                                size: 18,
+                                color: lightText ? Colors.white : primary,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                suggestion,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: screenWidth > 450 ? 16 : 14,
+                                  color: textColor,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            Icon(
+                              Icons.chevron_right,
+                              color: _searchMutedTextColor(context, 0.85),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (index < _bookSuggestions.length - 1)
+                      Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: lightText
+                            ? Colors.white.withOpacity(0.18)
+                            : primary.withOpacity(0.12),
+                        indent: 14,
+                        endIndent: 14,
+                      ),
+                  ],
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecentSearchesSection(double screenWidth) {
+    if (_recentSearches.isEmpty) return const SizedBox.shrink();
+    final primary = CommanColor.lightDarkPrimary(context);
+    final textColor = _searchTextColor(context);
+    final lightText = _searchUsesLightText(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(15, 22, 15, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Recent Searches',
+                  style: TextStyle(
+                    fontSize: screenWidth > 450 ? 20 : 17,
+                    fontWeight: FontWeight.w700,
+                    color: textColor,
+                    fontFamily: 'Georgia',
+                  ),
                 ),
-                children: const [
-                  TextSpan(text: 'Search by '),
-                  TextSpan(
-                    text: 'word',
-                    style: TextStyle(fontStyle: FontStyle.italic),
-                  ),
-                  TextSpan(text: ' or '),
-                  TextSpan(
-                    text: 'book name',
-                    style: TextStyle(fontStyle: FontStyle.italic),
-                  ),
-                ],
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text.rich(
-              TextSpan(
-                style: TextStyle(
-                  fontSize: screenWidth > 450 ? 16 : 14,
-                  height: 1.45,
-                  color: textColor.withOpacity(0.7),
-                  fontFamily: 'Georgia',
+              TextButton(
+                onPressed: _clearRecentSearches,
+                style: TextButton.styleFrom(
+                  foregroundColor:
+                      lightText ? Colors.white.withOpacity(0.92) : primary,
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                children: const [
-                  TextSpan(text: 'Example: '),
-                  TextSpan(
-                    text: 'Love',
-                    style: TextStyle(fontStyle: FontStyle.italic),
+                child: Text(
+                  'Clear All',
+                  style: TextStyle(
+                    fontSize: screenWidth > 450 ? 15 : 13,
+                    fontWeight: FontWeight.w600,
                   ),
-                  TextSpan(text: ' or '),
-                  TextSpan(
-                    text: 'Genesis',
-                    style: TextStyle(fontStyle: FontStyle.italic),
-                  ),
-                ],
+                ),
               ),
-              textAlign: TextAlign.center,
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: _recentSearches.map((query) {
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _searchCardColor(context),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: _searchCardBorderColor(context, primary)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.access_time,
+                      size: 16,
+                      color: lightText ? Colors.white : primary,
+                    ),
+                    const SizedBox(width: 6),
+                    InkWell(
+                      onTap: () => _applySearchQuery(query),
+                      child: Text(
+                        query,
+                        style: TextStyle(
+                          fontSize: screenWidth > 450 ? 15 : 13,
+                          color: textColor,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    InkWell(
+                      onTap: () => _removeRecentSearch(query),
+                      child: Icon(
+                        Icons.close,
+                        size: 16,
+                        color: _searchMutedTextColor(context, 0.85),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoResultsState(double screenWidth) {
+    final textColor = _searchTextColor(context);
+    final primary = CommanColor.lightDarkPrimary(context);
+    final lightText = _searchUsesLightText(context);
+    final query = searchController.text.trim();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 28, 24, 8),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Divider(
+                  color: lightText
+                      ? Colors.white.withOpacity(0.28)
+                      : primary.withOpacity(0.25),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Text(
+                  '◆',
+                  style: TextStyle(
+                    color: lightText
+                        ? Colors.white.withOpacity(0.75)
+                        : primary.withOpacity(0.7),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Divider(
+                  color: lightText
+                      ? Colors.white.withOpacity(0.28)
+                      : primary.withOpacity(0.25),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Image.asset(
+            Images.searchPlaceHolder(context),
+            height: screenWidth > 450 ? 150 : 120,
+            width: screenWidth > 450 ? 150 : 120,
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'No results found',
+            style: TextStyle(
+              fontSize: screenWidth > 450 ? 28 : 22,
+              fontWeight: FontWeight.w700,
+              color: textColor,
+              fontFamily: 'Georgia',
             ),
-          ],
-        ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          Text.rich(
+            TextSpan(
+              style: TextStyle(
+                fontSize: screenWidth > 450 ? 16 : 14,
+                height: 1.45,
+                color: _searchMutedTextColor(context, 0.82),
+              ),
+              children: [
+                const TextSpan(text: "We couldn't find anything for "),
+                TextSpan(
+                  text: "'$query'",
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const TextSpan(
+                  text:
+                      '. Try another keyword or explore our suggestions.',
+                ),
+              ],
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBrowseScrollContent(double screenWidth) {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildSuggestionsSection(screenWidth),
+          _buildRecentSearchesSection(screenWidth),
+          if (_showExploreTopicsBanner()) _buildNoResultsState(screenWidth),
+          const SizedBox(height: 8),
+        ],
       ),
     );
   }
@@ -407,6 +904,7 @@ class _SearchScreenState extends State<SearchScreen> {
               nTBookList.isEmpty ? downloadProvider.ntBookList : nTBookList;
           allVersesContent = downloadProvider.verseList;
           bookList = bookList.isEmpty ? downloadProvider.bookList : bookList;
+          _refreshVerseSuggestions();
         });
       }
 
@@ -463,6 +961,19 @@ class _SearchScreenState extends State<SearchScreen> {
     final raw = content?.toString() ?? '';
     if (raw.isEmpty) return '';
     return html.parse(raw).body?.text ?? raw;
+  }
+
+  String _verseSuggestionSnippet(VerseBookContentModel verse) {
+    final plain =
+        _plainVerseText(verse.content).replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (plain.isEmpty) return '';
+
+    final words =
+        plain.split(' ').where((word) => word.trim().isNotEmpty).toList();
+    if (words.isEmpty) return '';
+
+    final wordCount = words.length >= 3 ? 3 : words.length;
+    return words.take(wordCount).join(' ');
   }
 
   bool _verseMatchesQuery(VerseBookContentModel v, dynamic value) {
@@ -624,6 +1135,9 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
+    final lightText = _searchUsesLightText(context);
+    final primaryText = _searchTextColor(context);
+    final mutedText = _searchMutedTextColor(context);
     debugPrint("sz current width - $screenWidth ");
 
     // final downloadProvider =
@@ -736,7 +1250,7 @@ class _SearchScreenState extends State<SearchScreen> {
                             child: Icon(
                               Icons.arrow_back_ios,
                               size: screenWidth > 450 ? 30 : 20,
-                              color: CommanColor.whiteBlack(context),
+                              color: primaryText,
                             ),
                           ),
                         ),
@@ -745,11 +1259,16 @@ class _SearchScreenState extends State<SearchScreen> {
                         "Search",
                         style: screenWidth > 450
                             ? CommanStyle.appBarStyle(context).copyWith(
-                                fontSize: 29,
-                                color: CommanColor.whiteBlack(context))
+                                fontSize: 32,
+                                fontFamily: 'Georgia',
+                                fontWeight: FontWeight.w700,
+                                color: primaryText)
                             : CommanStyle.appBarStyle(context).copyWith(
-                                color: CommanColor.whiteBlack(context)),
+                                fontFamily: 'Georgia',
+                                fontWeight: FontWeight.w700,
+                                color: primaryText),
                       ),
+
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -759,8 +1278,10 @@ class _SearchScreenState extends State<SearchScreen> {
                       children: [
                         Expanded(
                           child: Divider(
-                            color: CommanColor.lightDarkPrimary(context)
-                                .withOpacity(0.35),
+                            color: lightText
+                                ? Colors.white.withOpacity(0.35)
+                                : CommanColor.lightDarkPrimary(context)
+                                    .withOpacity(0.35),
                           ),
                         ),
                         Padding(
@@ -768,91 +1289,109 @@ class _SearchScreenState extends State<SearchScreen> {
                           child: Text(
                             '◆',
                             style: TextStyle(
-                              color: CommanColor.lightDarkPrimary(context)
-                                  .withOpacity(0.7),
+                              color: lightText
+                                  ? Colors.white.withOpacity(0.75)
+                                  : CommanColor.lightDarkPrimary(context)
+                                      .withOpacity(0.7),
                               fontSize: screenWidth > 450 ? 14 : 12,
                             ),
                           ),
                         ),
                         Expanded(
                           child: Divider(
-                            color: CommanColor.lightDarkPrimary(context)
-                                .withOpacity(0.35),
+                            color: lightText
+                                ? Colors.white.withOpacity(0.35)
+                                : CommanColor.lightDarkPrimary(context)
+                                    .withOpacity(0.35),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Text(
+                      'Search for prayers, topics, verses or guidance to grow your faith.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: screenWidth > 450 ? 16 : 14,
+                        height: 1.4,
+                        color: mutedText,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 15),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: Container(
-                            height: screenWidth > 450 ? 55 : 48,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8F4EB),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: CommanColor.lightDarkPrimary(context)
-                                    .withOpacity(0.2),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: TextFormField(
+                    child: Container(
+                      height: screenWidth > 450 ? 56 : 50,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8F4EB),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: CommanColor.lightDarkPrimary(context)
+                              .withOpacity(0.2),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
                                     style: CommanStyle.black16500.copyWith(
                                       fontSize: screenWidth > 450
                                           ? BibleInfo.fontSizeScale * 20
                                           : BibleInfo.fontSizeScale * 16,
+                                      color: Colors.black87,
                                     ),
-                                    controller: searchController,
-                                    cursorColor:
-                                        CommanColor.lightDarkPrimary(context),
-                                    onFieldSubmitted: (_) => _performSearch(),
-                                    decoration: InputDecoration(
-                                      contentPadding: EdgeInsets.symmetric(
-                                        vertical: screenWidth > 450 ? 14 : 12,
-                                        horizontal: 12,
-                                      ),
-                                      hintText: 'Search',
-                                      hintStyle: CommanStyle.grey13400,
-                                      border: InputBorder.none,
-                                      enabledBorder: InputBorder.none,
-                                      focusedBorder: InputBorder.none,
-                                      filled: false,
-                                    ),
-                                  ),
+                              controller: searchController,
+                              cursorColor:
+                                  CommanColor.lightDarkPrimary(context),
+                              onFieldSubmitted: (_) => _performSearch(),
+                              decoration: InputDecoration(
+                                contentPadding: EdgeInsets.fromLTRB(
+                                  screenWidth > 450 ? 16 : 14,
+                                  screenWidth > 450 ? 14 : 12,
+                                  8,
+                                  screenWidth > 450 ? 14 : 12,
                                 ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        InkWell(
-                          onTap: _performSearch,
-                          borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            width: screenWidth > 450 ? 55 : 48,
-                            height: screenWidth > 450 ? 55 : 48,
-                            decoration: BoxDecoration(
-                              color: CommanColor.lightDarkPrimary(context),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Center(
-                              child: Image.asset(
-                                'assets/search.png',
-                                height: screenWidth > 450 ? 22 : 18,
-                                width: 18,
-                                color: Colors.white,
+                                hintText: 'Search',
+                                hintStyle: CommanStyle.grey13400,
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                filled: false,
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                          InkWell(
+                            onTap: _performSearch,
+                            borderRadius: const BorderRadius.horizontal(
+                              right: Radius.circular(14),
+                            ),
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: screenWidth > 450 ? 20 : 16,
+                              ),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: CommanColor.lightDarkPrimary(context),
+                                borderRadius: const BorderRadius.horizontal(
+                                  right: Radius.circular(14),
+                                ),
+                              ),
+                              child: Text(
+                                'Search',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: screenWidth > 450 ? 16 : 14,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -867,7 +1406,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           children: [
                             _buildFilterChip(
                               index: 0,
-                              label: 'ALL',
+                              label: 'All',
                               screenWidth: screenWidth,
                             ),
                             _buildFilterChip(
@@ -886,8 +1425,10 @@ class _SearchScreenState extends State<SearchScreen> {
                                 height: 28,
                                 margin:
                                     const EdgeInsets.symmetric(horizontal: 6),
-                                color: CommanColor.lightDarkPrimary(context)
-                                    .withOpacity(0.25),
+                                color: lightText
+                                    ? Colors.white.withOpacity(0.28)
+                                    : CommanColor.lightDarkPrimary(context)
+                                        .withOpacity(0.25),
                               ),
                               SizedBox(
                                 width: screenWidth > 450 ? 140 : 110,
@@ -908,8 +1449,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                                       screenWidth > 450
                                                           ? 14
                                                           : 12,
-                                                  color: CommanColor
-                                                      .whiteBlack(context),
+                                                  color: primaryText,
                                                   fontWeight: FontWeight.w600,
                                                 ),
                                               ),
@@ -929,9 +1469,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                                             screenWidth > 450
                                                                 ? 14
                                                                 : 12,
-                                                        color: CommanColor
-                                                            .whiteBlack(
-                                                                context),
+                                                        color: primaryText,
                                                         fontWeight:
                                                             FontWeight.w600,
                                                       ),
@@ -954,9 +1492,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                                             screenWidth > 450
                                                                 ? 14
                                                                 : 12,
-                                                        color: CommanColor
-                                                            .whiteBlack(
-                                                                context),
+                                                        color: primaryText,
                                                         fontWeight:
                                                             FontWeight.w600,
                                                       ),
@@ -978,9 +1514,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                                             screenWidth > 450
                                                                 ? 14
                                                                 : 12,
-                                                        color: CommanColor
-                                                            .whiteBlack(
-                                                                context),
+                                                        color: primaryText,
                                                         fontWeight:
                                                             FontWeight.w600,
                                                       ),
@@ -990,11 +1524,11 @@ class _SearchScreenState extends State<SearchScreen> {
                                                 .toList(),
                                     value: _resolveDropdownValue(),
                                     hint: Text(
-                                      'All Chapter',
+                                      'All Chapters',
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         fontSize: screenWidth > 450 ? 14 : 12,
-                                        color: CommanColor.whiteBlack(context),
+                                        color: primaryText,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -1017,8 +1551,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                         Icons.keyboard_arrow_down_sharp,
                                       ),
                                       iconSize: screenWidth > 450 ? 22 : 18,
-                                      iconEnabledColor:
-                                          CommanColor.whiteBlack(context),
+                                      iconEnabledColor: primaryText,
                                     ),
                                     buttonStyleData: ButtonStyleData(
                                       height: screenWidth > 450 ? 40 : 34,
@@ -1048,7 +1581,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                     ),
                                     style: TextStyle(
                                       fontSize: screenWidth > 450 ? 14 : 12,
-                                      color: CommanColor.whiteBlack(context),
+                                      color: primaryText,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -1062,36 +1595,12 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                   const SizedBox(height: 12),
                   Expanded(
-                    child: searchController.text.isEmpty
-                        ? _buildSearchEmptyState(screenWidth)
-                        : filterSelectedVersesContent.isEmpty
-                            ? Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Image.asset(
-                                      Images.searchPlaceHolder(context),
-                                      height: 120,
-                                      width: 120,
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      isLoading
-                                          ? 'Fetching data... Please wait'
-                                          : 'No results found',
-                                      style: CommanStyle.black16500.copyWith(
-                                        color:
-                                            CommanColor.whiteBlack(context),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : ListView.builder(
-                                shrinkWrap: true,
+                    child: filterSelectedVersesContent.isNotEmpty
+                        ? ListView.builder(
                                 itemCount: filterSelectedVersesContent.length,
-                                padding: EdgeInsets.symmetric(horizontal: 15),
-                                physics: const ScrollPhysics(),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 15),
+                                physics: const BouncingScrollPhysics(),
                                 itemBuilder: (context, index) {
                                   print(filterSelectedVersesContent.length);
                                   var data = filterSelectedVersesContent[index];
@@ -2015,8 +2524,29 @@ class _SearchScreenState extends State<SearchScreen> {
                                     ),
                                   );
                                 },
+                              )
+                        : isLoading
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(top: 40),
+                                  child: Text(
+                                    'Fetching data... Please wait',
+                                    style: CommanStyle.black16500.copyWith(
+                                      color: primaryText,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Column(
+                                children: [
+                                  Expanded(
+                                    child: _buildSearchBrowseScrollContent(
+                                        screenWidth),
+                                  ),
+                                  _buildExploreTopicsBanner(screenWidth),
+                                ],
                               ),
-                            )
+                  ),
                 ],
               ),
             ),

@@ -5,15 +5,14 @@ import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/view/listed_image_detail_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
+import 'package:biblebookapp/view/widget/library_empty_state.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../Model/saveImagesModel.dart';
 import '../../../controller/dpProvider.dart';
 import '../../constants/colors.dart';
-import '../../constants/images.dart';
 
 class ImageScreen extends StatefulWidget {
   const ImageScreen({super.key});
@@ -509,74 +508,13 @@ class _ImageScreenState extends State<ImageScreen> {
               },
             );
           } else {
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Image.asset(
-                      Images.imagesPlaceHolder(context),
-                      height: 80, width: 80,color: Colors.transparent.withOpacity(0.3),
-                    ),
-                    SizedBox(
-                      height: 20,
-                    ),
-                    Text(
-                      "No relevant content",
-                      style: CommanStyle.placeholderText(context),
-                    ),
-                    SizedBox(
-                      height: 20,
-                    ),
-                    InkWell(
-                      onTap: () {
-                        // Navigator.push(context, MaterialPageRoute(builder: (context) => );
-                        Get.offAll(
-                            () => HomeScreen(
-                                From: "Go to Read",
-                                selectedVerseNumForRead: "",
-                                selectedBookForRead: "",
-                                selectedChapterForRead: "",
-                                selectedBookNameForRead: "",
-                                selectedVerseForRead: ""),
-                            transition: Transition.cupertinoDialog,
-                            duration: const Duration(milliseconds: 300));
-                      },
-                      child: Column(
-                        children: [
-                          Container(
-                              padding: const EdgeInsets.all(8),
-                              height: 40,
-                              width: 40,
-                              decoration: BoxDecoration(
-                                  border: Border.all(
-                                      color: CommanColor.lightDarkPrimary300(
-                                          context),
-                                      width: 1.2),
-                                  borderRadius: BorderRadius.circular(3)),
-                              child: Image.asset(
-                                "assets/reading_book.png",
-                                height: 25,
-                                width: 15,
-                                color: CommanColor.lightDarkPrimary300(context),
-                              )),
-                          const SizedBox(
-                            height: 15,
-                          ),
-                          Text("Go to Read",
-                              style: CommanStyle.placeholderText(context)),
-                        ],
-                      ),
-                    ),
-                    SizedBox(
-                      height: 20,
-                    ),
-                  ],
-                ),
-              ],
+            return const SizedBox.expand(
+              child: LibraryEmptyState(
+                icon: Icons.image_outlined,
+                title: 'No Images Yet',
+                subtitle:
+                    'Save images while reading to access them anytime.',
+              ),
             );
           }
         },

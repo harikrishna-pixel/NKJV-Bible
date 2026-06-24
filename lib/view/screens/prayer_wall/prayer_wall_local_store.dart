@@ -12,6 +12,7 @@ class PrayerWallLocalStore {
   static const _kPrayerAuthorMap = 'prayer_wall_prayer_author_map_v1';
   static const _kLastDisplayName = 'prayer_wall_last_display_name_v1';
   static const _kMyPrayerIds = 'prayer_wall_my_prayer_ids_v1';
+  static const _kSeenPrayerIds = 'prayer_wall_seen_prayer_ids_v1';
 
   static Future<Map<String, String>> loadLikeMap() async {
     final p = await SharedPreferences.getInstance();
@@ -151,5 +152,35 @@ class PrayerWallLocalStore {
     final s = await loadMyPrayerIds();
     s.remove(pid);
     await saveMyPrayerIds(s);
+  }
+
+  /// Prayer ids the user has already opened on the Prayer Wall (badge = unseen only).
+  static Future<Set<String>> loadSeenPrayerIds() async {
+    final p = await SharedPreferences.getInstance();
+    final s = p.getString(_kSeenPrayerIds);
+    if (s == null || s.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(s);
+      if (decoded is! List) return {};
+      return decoded.map((e) => e.toString()).toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> saveSeenPrayerIds(Set<String> ids) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kSeenPrayerIds, jsonEncode(ids.toList()));
+  }
+
+  static Future<void> markPrayersAsSeen(Iterable<String> prayerIds) async {
+    final seen = await loadSeenPrayerIds();
+    var changed = false;
+    for (final raw in prayerIds) {
+      final pid = raw.trim();
+      if (pid.isEmpty) continue;
+      if (seen.add(pid)) changed = true;
+    }
+    if (changed) await saveSeenPrayerIds(seen);
   }
 }

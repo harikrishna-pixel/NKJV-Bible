@@ -4,6 +4,7 @@ import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:provider/provider.dart';
 
 enum MilestoneLifetimeKind { scripture, prayer }
@@ -21,6 +22,48 @@ class MilestoneLifetimeIapScreen extends StatefulWidget {
 }
 
 class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen> {
+  String _salePrice = '\$19.99';
+  String _originalPrice = '\$39.99';
+  String _discountLabel = 'SAVE 50%';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOneYearPricing();
+  }
+
+  Future<void> _loadOneYearPricing() async {
+    try {
+      final oneYearId = await SharPreferences.getString('oneYearPlan') ??
+          BibleInfo.oneYearPlanid;
+      final discountStr = await SharPreferences.getString('oneYearPlanvalue') ??
+          BibleInfo.oneYearPlanDiscount;
+      final discount = double.tryParse(discountStr) ?? 50;
+
+      final available = await InAppPurchase.instance.isAvailable();
+      if (!available) return;
+
+      final response =
+          await InAppPurchase.instance.queryProductDetails({oneYearId});
+      if (response.productDetails.isEmpty || !mounted) return;
+
+      final product = response.productDetails.first;
+      final discountFraction = discount / 100;
+      final original = discountFraction < 1
+          ? product.rawPrice / (1 - discountFraction)
+          : product.rawPrice;
+
+      setState(() {
+        _salePrice = product.price;
+        _originalPrice =
+            '${product.currencySymbol}${original.toStringAsFixed(2)}';
+        _discountLabel = 'SAVE ${discount.toStringAsFixed(0)}%';
+      });
+    } catch (_) {
+      // Keep fallback display prices.
+    }
+  }
+
   Future<void> _openInvisibleLifetimePurchase(BuildContext context) async {
     final sixMonth = await SharPreferences.getString('sixMonthPlan') ??
         BibleInfo.sixMonthPlanid;
@@ -45,7 +88,7 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
           oneYearPlan: oneYear,
           lifeTimePlan: lifeTime,
           checkad: checkad,
-          initialSelectedPlanIndex: 2,
+          initialSelectedPlanIndex: 1,
           autoStartSelectedPlanPurchase: true,
           invisiblePurchaseHost: true,
         ),
@@ -207,7 +250,7 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
                         child: Column(
                           children: [
                             Text(
-                              'LIFETIME ACCESS',
+                              '1 YEAR PREMIUM',
                               style: TextStyle(
                                 fontFamily: 'Georgia',
                                 fontSize: 18,
@@ -217,7 +260,7 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'One Time Payment',
+                              'Best for Daily Spiritual Growth',
                               textAlign: TextAlign.center,
                               style: subtitleStyle,
                             ),
@@ -228,7 +271,7 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
                               textBaseline: TextBaseline.alphabetic,
                               children: [
                                 Text(
-                                  '\$99.99',
+                                  _originalPrice,
                                   style: TextStyle(
                                     decoration: TextDecoration.lineThrough,
                                     fontSize: 14,
@@ -239,7 +282,7 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
                                 ),
                                 const SizedBox(width: 10),
                                 Text(
-                                  '\$19.99',
+                                  _salePrice,
                                   style: TextStyle(
                                     fontSize: 26,
                                     fontWeight: FontWeight.w800,
@@ -248,7 +291,7 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  '- 80% OFF',
+                                  _discountLabel,
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
@@ -303,7 +346,7 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
                                       .withValues(alpha: 0.5)),
                             ),
                             child: Text(
-                              'Limited-Time Blessing',
+                              '★ MOST POPULAR',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
@@ -327,7 +370,7 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
                       ),
                     ),
                     child: const Text(
-                      'Unlock Lifetime Access',
+                      'Unlock 1 Year Access',
                       style: TextStyle(
                         fontFamily: 'Georgia',
                         fontSize: 16,

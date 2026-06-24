@@ -147,6 +147,7 @@ flutter:
     - assets/zipped/
     - assets/zipped/Sagrada Catolica/
     - assets/icons/
+    - assets/prayer_guidance_icons/
     - assets/onboarding/
     - assets/dark_modes/
     - assets/light_modes/
@@ -155,6 +156,7 @@ flutter:
     - assets/home-widgets/
     - assets/export_backup/
     - assets/paywall_icons/
+    - assets/splash_welcome_icons/
     - assets/home-widgets/light-home_1.png
     - assets/home-widgets/light-home_2.png
     - assets/home-widgets/light-home_3.png

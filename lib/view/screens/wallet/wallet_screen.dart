@@ -46,6 +46,9 @@ class _WalletScreenState extends State<WalletScreen> {
   Map<String, Timer> _purchaseTimeouts =
       {}; // Track timeout timers for each product
   bool _isLowNetwork = false; // Track if network is low/2G
+  Timer? _storeLoadFallbackTimer;
+  bool _usingFallbackPacks = false;
+  bool _iapPriceFallback = false;
 
   // Prevent double-crediting the same purchase/restore event
   static const String _processedWalletPurchaseKey =
@@ -194,6 +197,25 @@ class _WalletScreenState extends State<WalletScreen> {
     return 0;
   }
 
+  String _localPriceForIdentifier(String identifier) {
+    if (identifier == BibleInfo.coinPack1Id) return BibleInfo.coinPack1Price;
+    if (identifier == BibleInfo.coinPack2Id) return BibleInfo.coinPack2Price;
+    if (identifier == BibleInfo.coinPack3Id) return BibleInfo.coinPack3Price;
+    return '';
+  }
+
+  String _displayPriceForPack(
+    String identifier,
+    ProductDetails? product,
+    Map<String, dynamic> pack,
+  ) {
+    if (product != null && product.price.isNotEmpty) return product.price;
+    if (_usingFallbackPacks || _iapPriceFallback) {
+      return _localPriceForIdentifier(identifier);
+    }
+    return 'Loading...';
+  }
+
   Future<void> _grantCreditsForPurchase(PurchaseDetails purchaseDetails) async {
     try {
       // Ensure we don't credit twice for the same purchase/restore event.
@@ -248,13 +270,18 @@ class _WalletScreenState extends State<WalletScreen> {
     _checkConnectivityAndShowToast();
     // Initialize and load credits immediately from local storage (works offline)
     _initializeCredits();
-    // Initialize coin packs with constants immediately so UI shows data right away
-    _loadCoinPacksFromConstants();
-    // Then try to load from API/SharedPreferences (will update if available)
     _loadCoinPacks();
-    _initStoreInfoIfOnline(); // Only initialize store if online
-    _loadRewardedAd(); // Load rewarded ad for watch ad feature
-    _loadAnswerLength(); // Load current answer length preference
+    _initStoreInfoIfOnline();
+    _loadRewardedAd();
+    _loadAnswerLength();
+    _storeLoadFallbackTimer = Timer(const Duration(seconds: 6), () {
+      if (!mounted) return;
+      if (_products.isEmpty && !_usingFallbackPacks) {
+        setState(() {
+          _iapPriceFallback = true;
+        });
+      }
+    });
     // Refresh credits every second to show real-time updates
     _creditsTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _loadCredits();
@@ -356,6 +383,7 @@ class _WalletScreenState extends State<WalletScreen> {
   void dispose() {
     _subscription?.cancel();
     _creditsTimer?.cancel();
+    _storeLoadFallbackTimer?.cancel();
     _rewardedAd?.dispose();
     // Cancel all pending purchase timeouts
     for (var timer in _purchaseTimeouts.values) {
@@ -505,23 +533,11 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Future<void> _loadCoinPacks() async {
-    // Check connectivity first - if offline, use constants directly
-    final hasInternet = await InternetConnection().hasInternetAccess;
-
-    if (!hasInternet) {
-      // Offline - use constants directly (don't check SharedPreferences)
-      _loadCoinPacksFromConstants();
-      return;
-    }
-
-    // Online - Load coin packs data from API response (saved in SharedPreferences by BackgroundApiService)
-    // Credits amount comes from API's sub_fields -> item_1 field
     final prefs = await SharedPreferences.getInstance();
     final coinPacksJson = prefs.getString('coin_packs');
 
     if (coinPacksJson != null && coinPacksJson.isNotEmpty) {
       try {
-        // Print the official API response from SharedPreferences
         debugPrint(
             '═══════════════════════════════════════════════════════════════════════');
         debugPrint('Wallet Screen: Loading Coin Packs from API Response');
@@ -534,7 +550,6 @@ class _WalletScreenState extends State<WalletScreen> {
         final packs = <Map<String, dynamic>>[];
 
         coinPacksMap.forEach((identifier, data) {
-          // Determine which credits and discount constants to use based on identifier
           String creditsFromConstants = '';
           String discountFromConstants = '';
           if (identifier == BibleInfo.coinPack1Id) {
@@ -555,29 +570,25 @@ class _WalletScreenState extends State<WalletScreen> {
                 ? data['credits'].toString()
                 : (creditsFromConstants.isNotEmpty
                     ? creditsFromConstants
-                    : '0'), // Credits from API response or constants
+                    : '0'),
             'discount': (data['discount'] != null &&
                     data['discount'].toString().isNotEmpty)
                 ? data['discount'].toString()
                 : (discountFromConstants.isNotEmpty
                     ? discountFromConstants
-                    : '0'), // Discount from API response or constants
-            'price': '', // Price will come from IAP product details
+                    : '0'),
+            'price': '',
           };
 
-          // Print individual pack details
           debugPrint('Coin Pack Details:');
           debugPrint('  - Identifier: $identifier');
           debugPrint('  - Credits (from API): ${data['credits']}');
           debugPrint('  - Discount (from API): ${data['discount']}');
-          debugPrint('  - Credits (from constants): $creditsFromConstants');
-          debugPrint('  - Discount (from constants): $discountFromConstants');
           debugPrint('  - Full Pack Data: $packData');
 
           packs.add(packData);
         });
 
-        // Sort by credits amount
         packs.sort((a, b) {
           final aCredits = int.tryParse(a['credits']?.toString() ?? '0') ?? 0;
           final bCredits = int.tryParse(b['credits']?.toString() ?? '0') ?? 0;
@@ -590,18 +601,23 @@ class _WalletScreenState extends State<WalletScreen> {
 
         if (mounted) {
           setState(() {
+            _usingFallbackPacks = false;
             _coinPacks = packs;
           });
         }
+        return;
       } catch (e) {
-        debugPrint('Error loading coin packs: $e');
-        // Fallback to constants if JSON parsing fails
-        _loadCoinPacksFromConstants();
+        debugPrint('Error loading coin packs from API cache: $e');
       }
-    } else {
-      // No API data available (first time) - use constants as fallback
-      _loadCoinPacksFromConstants();
     }
+
+    final hasInternet = await InternetConnection().hasInternetAccess;
+    if (!hasInternet) {
+      _loadCoinPacksFromConstants();
+      return;
+    }
+
+    _loadCoinPacksFromConstants();
   }
 
   /// Load coin packs from constants directly (offline mode or fallback)
@@ -616,26 +632,27 @@ class _WalletScreenState extends State<WalletScreen> {
       final packs = <Map<String, dynamic>>[
         {
           'identifier': coinPack1Id,
-          'credits': BibleInfo.coinPack1Credits, // Credits from constants
-          'discount': BibleInfo.coinPack1Discount, // Discount from constants
-          'price': '', // Price will come from IAP product details
+          'credits': BibleInfo.coinPack1Credits,
+          'discount': BibleInfo.coinPack1Discount,
+          'price': BibleInfo.coinPack1Price,
         },
         {
           'identifier': coinPack2Id,
-          'credits': BibleInfo.coinPack2Credits, // Credits from constants
-          'discount': BibleInfo.coinPack2Discount, // Discount from constants
-          'price': '', // Price will come from IAP product details
+          'credits': BibleInfo.coinPack2Credits,
+          'discount': BibleInfo.coinPack2Discount,
+          'price': BibleInfo.coinPack2Price,
         },
         {
           'identifier': coinPack3Id,
-          'credits': BibleInfo.coinPack3Credits, // Credits from constants
-          'discount': BibleInfo.coinPack3Discount, // Discount from constants
-          'price': '', // Price will come from IAP product details
+          'credits': BibleInfo.coinPack3Credits,
+          'discount': BibleInfo.coinPack3Discount,
+          'price': BibleInfo.coinPack3Price,
         },
       ];
 
       if (mounted) {
         setState(() {
+          _usingFallbackPacks = true;
           _coinPacks = packs;
         });
         debugPrint(
@@ -654,17 +671,31 @@ class _WalletScreenState extends State<WalletScreen> {
     // Check connectivity first - skip if offline
     final hasInternet = await InternetConnection().hasInternetAccess;
     if (!hasInternet) {
-      // Offline - don't try to query products, just show coin packs from constants
       if (mounted) {
         setState(() {
-          _isAvailable = false; // Mark as unavailable when offline
-          _loadingProductId = null; // Clear any loading state when offline
+          _isAvailable = false;
+          _loadingProductId = null;
+          if (!_usingFallbackPacks) _iapPriceFallback = true;
         });
       }
       return;
     }
 
     await _initStoreInfo();
+  }
+
+  Future<ProductDetails?> _resolveProduct(String identifier) async {
+    try {
+      return _products.firstWhere((p) => p.id == identifier);
+    } catch (_) {}
+
+    await _initStoreInfo();
+
+    try {
+      return _products.firstWhere((p) => p.id == identifier);
+    } catch (_) {}
+
+    return null;
   }
 
   Future<void> _initStoreInfo() async {
@@ -710,7 +741,21 @@ class _WalletScreenState extends State<WalletScreen> {
       setState(() {
         _isAvailable = isAvailable;
         _products = response.productDetails;
+        if (response.productDetails.isNotEmpty) {
+          _iapPriceFallback = false;
+        }
       });
+      if (response.productDetails.isEmpty) {
+        debugPrint(
+            'WalletScreen: Store returned no products for: $productIds');
+        if (response.notFoundIDs.isNotEmpty) {
+          debugPrint(
+              'WalletScreen: notFoundIDs: ${response.notFoundIDs}');
+        }
+        if (response.error != null) {
+          debugPrint('WalletScreen: store error: ${response.error}');
+        }
+      }
     }
 
     // Listen to purchase updates
@@ -1304,9 +1349,9 @@ class _WalletScreenState extends State<WalletScreen> {
 
     // If _coinPacks is empty, use constants directly
     if (_coinPacks.isEmpty) {
-      debugPrint('WalletScreen: _coinPacks is empty, loading from constants');
-      _loadCoinPacksFromConstants();
-      return widgets; // Return empty for now, will rebuild after setState
+      debugPrint('WalletScreen: _coinPacks is empty, loading coin packs');
+      _loadCoinPacks();
+      return widgets;
     }
 
     for (var pack in _coinPacks) {
@@ -1341,11 +1386,9 @@ class _WalletScreenState extends State<WalletScreen> {
               onTap: (_loadingProductId == product?.id && product != null)
                   ? null
                   : () async {
-                      // Check internet connection first before proceeding
                       final hasInternet =
                           await InternetConnection().hasInternetAccess;
                       if (!hasInternet) {
-                        // Clear any loading state when offline
                         if (mounted) {
                           setState(() {
                             _loadingProductId = null;
@@ -1354,21 +1397,24 @@ class _WalletScreenState extends State<WalletScreen> {
                         Constants.showToast("Check your internet connection.");
                         return;
                       }
-                      if (product == null) {
-                        // Clear any loading state when product is null
+
+                      final resolved = await _resolveProduct(identifier);
+                      if (resolved == null) {
                         if (mounted) {
                           setState(() {
                             _loadingProductId = null;
                           });
                         }
-                        Constants.showToast("Check your internet connection.");
+                        Constants.showToast(
+                            "Store price is loading. Please try again.");
                         return;
                       }
+
                       if (!_isAvailable) return;
                       setState(() {
                         _selectedProductId = identifier;
                       });
-                      _buyCoinPack(product!);
+                      _buyCoinPack(resolved);
                     },
               borderRadius: BorderRadius.circular(12),
               child: Container(
@@ -1487,20 +1533,11 @@ class _WalletScreenState extends State<WalletScreen> {
                                     children: [
                                       // Price comes from IAP product details
                                       Text(
-                                        () {
-                                          // Determine display price (only from IAP product details)
-                                          String displayPrice;
-                                          if (product != null &&
-                                              product.price.isNotEmpty) {
-                                            displayPrice = product.price;
-                                          } else {
-                                            displayPrice = 'Loading...';
-                                          }
-
-                                          debugPrint(
-                                              'WalletScreen: Text for $identifier - product: ${product?.id}, displayPrice: "$displayPrice"');
-                                          return displayPrice;
-                                        }(),
+                                        _displayPriceForPack(
+                                          identifier,
+                                          product,
+                                          pack,
+                                        ),
                                         style: TextStyle(
                                           color: Colors.white,
                                           fontSize:

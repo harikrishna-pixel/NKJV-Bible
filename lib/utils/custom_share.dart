@@ -146,175 +146,209 @@ class ImageBottomSheets extends StatelessWidget {
   final String selectedBook;
   final String selectedChapter;
   final String selectedVerseView;
+  final String shareFooterMessage;
   const ImageBottomSheets(
       {super.key,
       required this.controller,
       required this.content,
       required this.selectedBook,
       required this.selectedChapter,
-      required this.selectedVerseView});
+      required this.selectedVerseView,
+      this.shareFooterMessage = ''});
 
   @override
   Widget build(BuildContext context) {
-    double screenWidth = MediaQuery.of(context).size.width;
+    final media = MediaQuery.of(context);
+    final screenWidth = media.size.width;
+    final bottomInset = media.padding.bottom;
+    const actionBarHeight = 52.0;
+    final actionBarTotalHeight = actionBarHeight + bottomInset + 16;
+    final topGap = media.padding.top + kToolbarHeight;
+    final availableBelowAppBar = media.size.height - topGap;
+    final sheetHeight = screenWidth < 380
+        ? availableBelowAppBar * 0.84
+        : screenWidth > 450
+            ? availableBelowAppBar * 0.80
+            : availableBelowAppBar * 0.82;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        controller.isImageBannerAdLoaded.value &&
-                controller.imageBannerAd != null &&
-                controller.adFree.value == false
-            ? IgnorePointer(
-                child: SizedBox(
-                  height: controller.imageBannerAd?.size.height.toDouble(),
-                  width: controller.imageBannerAd?.size.width.toDouble(),
+    return SizedBox(
+      height: media.size.height,
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: SizedBox(
+          height: sheetHeight,
+          child: Column(
+        children: [
+          controller.isImageBannerAdLoaded.value &&
+                  controller.imageBannerAd != null &&
+                  controller.adFree.value == false
+              ? IgnorePointer(
+                  child: SizedBox(
+                    height: controller.imageBannerAd?.size.height.toDouble(),
+                    width: controller.imageBannerAd?.size.width.toDouble(),
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 5),
+                      child: AdWidget(ad: controller.imageBannerAd!),
+                    ),
+                  ),
+                )
+              : const SizedBox(height: 4),
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Screenshot(
+                  controller: controller.screenshotController.value,
+                  child: GestureDetector(
+                    onTap: () {},
+                    child: Obx(
+                      () => VerseShareImageCard(
+                        backgroundImagePath: controller
+                            .bgImagesList[controller.selectedBgImage.value],
+                        verseHtml: content,
+                        verseReference:
+                            "$selectedBook ${int.parse(selectedChapter.toString())}:${int.parse(selectedVerseView.toString())}",
+                        screenWidth: screenWidth,
+                        maxVerseFontSize: screenWidth < 380
+                            ? BibleInfo.fontSizeScale * 18
+                            : screenWidth > 450
+                                ? BibleInfo.fontSizeScale * 30
+                                : BibleInfo.fontSizeScale * 24,
+                        minVerseFontSize: screenWidth < 380 ? 14 : 16,
+                        actionBarReserve: actionBarTotalHeight,
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 12,
+                  bottom: actionBarTotalHeight + 8,
+                  child: _verseNavButton(
+                    screenWidth: screenWidth,
+                    icon: Icons.chevron_left,
+                    onTap: () async {
+                      try {
+                        await SharPreferences.setString('OpenAd', '1');
+                        controller.selectedBgImage.value == 9
+                            ? controller.selectedBgImage.value = 0
+                            : controller.selectedBgImage.value += 1;
+                      } catch (_) {}
+                    },
+                  ),
+                ),
+                Positioned(
+                  right: 12,
+                  bottom: actionBarTotalHeight + 8,
+                  child: _verseNavButton(
+                    screenWidth: screenWidth,
+                    icon: Icons.chevron_right,
+                    onTap: () async {
+                      await SharPreferences.setString('OpenAd', '1');
+                      controller.selectedBgImage.value == 9
+                          ? controller.selectedBgImage.value = 0
+                          : controller.selectedBgImage.value += 1;
+                    },
+                  ),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: actionBarTotalHeight + 68,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.1),
+                            Colors.black.withOpacity(0.34),
+                            Colors.black.withOpacity(0.5),
+                          ],
+                          stops: const [0.0, 0.38, 0.72, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 5),
-                    child: AdWidget(ad: controller.imageBannerAd!),
+                    padding: EdgeInsets.fromLTRB(
+                      12,
+                      14,
+                      12,
+                      bottomInset + 10,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildShareImageButton(context, "Share"),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildShareImageButton(context, "Save"),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildShareImageButton(context, "Close"),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              )
-            : SizedBox(height: screenWidth < 380 ? 2 : 100),
-        Flexible(
-          child: FractionallySizedBox(
-            heightFactor: screenWidth < 380
-                ? 0.85
-                : screenWidth > 450
-                    ? 0.82
-                    : 0.81,
-            child: Container(
-              decoration: const BoxDecoration(
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(0),
-                  topRight: Radius.circular(0),
-                ),
-                color: Colors.white,
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox(height: 6),
-                  Stack(
-                    children: [
-                      Screenshot(
-                        controller: controller.screenshotController.value,
-                        child: GestureDetector(
-                          onTap: () {},
-                          child: SizedBox(
-                            height: screenWidth < 380
-                                ? MediaQuery.of(context).size.height * 0.735
-                                : screenWidth > 450
-                                    ? MediaQuery.of(context).size.height * 0.69
-                                    : MediaQuery.of(context).size.height * 0.62,
-                            width: MediaQuery.sizeOf(context).width,
-                            child: Obx(
-                              () => VerseShareImageCard(
-                                backgroundImagePath: controller
-                                    .bgImagesList[
-                                        controller.selectedBgImage.value],
-                                verseHtml: content,
-                                verseReference:
-                                    "$selectedBook ${int.parse(selectedChapter.toString())}:${int.parse(selectedVerseView.toString())}",
-                                screenWidth: screenWidth,
-                                maxVerseFontSize: screenWidth < 380
-                                    ? BibleInfo.fontSizeScale * 18
-                                    : screenWidth > 450
-                                        ? BibleInfo.fontSizeScale * 30
-                                        : BibleInfo.fontSizeScale * 24,
-                                minVerseFontSize:
-                                    screenWidth < 380 ? 14 : 16,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        right: 10,
-                        bottom: 25,
-                        child: InkWell(
-                          onTap: () async {
-                            await SharPreferences.setString('OpenAd', '1');
-                            controller.selectedBgImage.value == 9
-                                ? controller.selectedBgImage.value = 0
-                                : controller.selectedBgImage.value += 1;
-                          },
-                          child: Container(
-                            height: screenWidth > 450 ? 45 : 25,
-                            width: screenWidth > 450 ? 45 : 25,
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.black38,
-                            ),
-                            child: Center(
-                              child: Image.asset(
-                                "assets/next.png",
-                                color: Colors.white,
-                                height: 15,
-                                width: 15,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        left: 10,
-                        bottom: 25,
-                        child: InkWell(
-                          onTap: () async {
-                            try {
-                              await SharPreferences.setString('OpenAd', '1');
-                              controller.selectedBgImage.value == 9
-                                  ? controller.selectedBgImage.value = 0
-                                  : controller.selectedBgImage.value += 1;
-                            } catch (e) {
-                              // DebugConsole.log("image priv error - $e");
-                            }
-                          },
-                          child: Container(
-                            height: screenWidth > 450 ? 45 : 25,
-                            width: screenWidth > 450 ? 45 : 25,
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.black38,
-                            ),
-                            child: Center(
-                              child: Image.asset(
-                                "assets/priv.png",
-                                color: Colors.white,
-                                height: 15,
-                                width: 15,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildShareImageButton(context, "Share"),
-                      _buildShareImageButton(context, "Save"),
-                      _buildShareImageButton(context, "Close"),
-                    ],
-                  ),
-                  const Spacer(),
-                  const SizedBox(height: 1),
-                ],
-              ),
+              ],
             ),
           ),
+        ],
+          ),
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _verseNavButton({
+    required double screenWidth,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    final size = screenWidth > 450 ? 45.0 : 36.0;
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        height: size,
+        width: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.black.withOpacity(0.22),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.85),
+            width: 1.4,
+          ),
+        ),
+        child: Icon(
+          icon,
+          color: Colors.white.withOpacity(0.95),
+          size: screenWidth > 450 ? 22 : 18,
+        ),
+      ),
     );
   }
 
   Widget _buildShareImageButton(BuildContext context, String label) {
+    final icon = switch (label) {
+      'Share' => Icons.share_outlined,
+      'Save' => Icons.bookmark_border,
+      _ => Icons.close,
+    };
+
     return SizedBox(
-      width: 100,
-      height: MediaQuery.of(context).size.width > 450 ? 60 : null,
+      width: double.infinity,
+      height: MediaQuery.of(context).size.width > 450 ? 48 : 44,
       child: ElevatedButton(
         onPressed: () async {
           await SharPreferences.setString('OpenAd', '1');
@@ -344,7 +378,7 @@ class ImageBottomSheets extends StatelessWidget {
             }
             
             // Image-only share (same as home Verse of the Day); branding is on the image.
-            saveAndShare(image, "bible", "", context: context);
+            saveAndShare(image, "bible", shareFooterMessage, context: context);
             // Track Share event
             AnalyticsService.trackShare();
           } else if (label == "Save") {
@@ -358,20 +392,42 @@ class ImageBottomSheets extends StatelessWidget {
         },
         style: ButtonStyle(
           backgroundColor: WidgetStatePropertyAll(
-            CommanColor.lightDarkPrimary(context),
+            const Color(0xFF5C4033).withOpacity(0.72),
           ),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: Colors.white,
-              letterSpacing: BibleInfo.letterSpacing,
-              fontSize: MediaQuery.of(context).size.width > 450
-                  ? BibleInfo.fontSizeScale * 17
-                  : BibleInfo.fontSizeScale * 14,
+          elevation: const WidgetStatePropertyAll(0),
+          padding: WidgetStatePropertyAll(
+            EdgeInsets.symmetric(
+              horizontal: MediaQuery.of(context).size.width > 450 ? 14 : 10,
+              vertical: 10,
             ),
           ),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: MediaQuery.of(context).size.width > 450 ? 18 : 16,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white,
+                letterSpacing: BibleInfo.letterSpacing,
+                fontSize: MediaQuery.of(context).size.width > 450
+                    ? BibleInfo.fontSizeScale * 15
+                    : BibleInfo.fontSizeScale * 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );

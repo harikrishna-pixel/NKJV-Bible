@@ -261,68 +261,62 @@ class _FontTypeState extends State<FontType> {
                   },
                 ),
               ),
-              Flexible(
-                fit: FlexFit.tight,
-                child: GestureDetector(
-                  onTap: () async {
-                    setState(() {
-                      fontSizeS = SharPreferences.setString(
-                              SharPreferences.selectedFontSize,
-                              Sizecf.scrnWidth! > 450 ? "25.0" : "18")
-                          .then((value) {
-                        fontSize = Sizecf.scrnWidth! > 450
-                            ? double.parse("25.0")
-                            : double.parse("18");
+              Padding(
+                padding: EdgeInsets.only(
+                  top: 19,
+                  bottom: screenWidth < 380
+                      ? 7
+                      : screenWidth > 450
+                          ? 35
+                          : 10,
+                ),
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () async {
+                      setState(() {
+                        fontSizeS = SharPreferences.setString(
+                                SharPreferences.selectedFontSize,
+                                Sizecf.scrnWidth! > 450 ? "25.0" : "18")
+                            .then((value) {
+                          fontSize = Sizecf.scrnWidth! > 450
+                              ? double.parse("25.0")
+                              : double.parse("18");
+                        });
+                        SharPreferences.setString(
+                                SharPreferences.selectedFontFamily, "Arial")
+                            .then((value) {
+                          selectedFontFamily = "Arial";
+                        });
                       });
-                      SharPreferences.setString(
-                              SharPreferences.selectedFontFamily, "Arial")
-                          .then((value) {
-                        selectedFontFamily = "Arial";
-                      });
-                    });
-                    Constants.showToast("Reset Successful!");
-                  },
-                  child: Padding(
-                    padding: EdgeInsets.only(
-                        top: 19,
-                        bottom: screenWidth < 380
-                            ? 7
-                            : screenWidth > 450
-                                ? 35
-                                : 10),
+                      Constants.showToast("Reset Successful!");
+                    },
                     child: Container(
-                        // height: MediaQuery.of(context).size.height * 0.03,
-                        width: screenWidth < 380
-                            ? MediaQuery.of(context).size.width * 0.35
-                            : screenWidth > 450
-                                ? MediaQuery.of(context).size.width * 0.25
-                                : MediaQuery.of(context).size.width * 0.35,
-                        // margin: const EdgeInsets.symmetric(horizontal: 25),
-                        // padding: const EdgeInsets.symmetric(vertical: 8),
-                        decoration: BoxDecoration(
-                          color: CommanColor.whiteLightModePrimary(context),
-                          borderRadius:
-                              const BorderRadius.all(Radius.circular(9)),
-                          boxShadow: const [
-                            BoxShadow(color: Colors.black26, blurRadius: 2)
-                          ],
+                      height: 44,
+                      constraints: BoxConstraints(
+                        minWidth: screenWidth > 450 ? 168 : 140,
+                        maxWidth: screenWidth > 450 ? 168 : 140,
+                      ),
+                      decoration: BoxDecoration(
+                        color: CommanColor.whiteLightModePrimary(context),
+                        borderRadius:
+                            const BorderRadius.all(Radius.circular(9)),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black26, blurRadius: 2)
+                        ],
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Reset to default',
+                        textAlign: TextAlign.center,
+                        textScaler: TextScaler.noScaling,
+                        style: TextStyle(
+                          letterSpacing: BibleInfo.letterSpacing,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: CommanColor.darkModePrimaryWhite(context),
                         ),
-                        child: Center(
-                          child: Text(
-                            'Reset to default',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                letterSpacing: BibleInfo.letterSpacing,
-                                fontSize: screenWidth < 380
-                                    ? BibleInfo.fontSizeScale * 14
-                                    : screenWidth > 450
-                                        ? BibleInfo.fontSizeScale * 19
-                                        : BibleInfo.fontSizeScale * 14,
-                                fontWeight: FontWeight.w500,
-                                color:
-                                    CommanColor.darkModePrimaryWhite(context)),
-                          ),
-                        )),
+                      ),
+                    ),
                   ),
                 ),
               )

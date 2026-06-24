@@ -12,6 +12,7 @@ import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// Uploads library backup (.enc) to the authhub user-backup API.
@@ -282,6 +283,12 @@ class LibraryBackupUploadService {
       return false;
     }
 
+    final hasInternet = await InternetConnection().hasInternetAccess;
+    if (!hasInternet) {
+      Constants.showToast('No Internet Connection');
+      return false;
+    }
+
     _downloadInProgress = true;
     File? encFile;
     File? zipFile;
@@ -332,7 +339,10 @@ class LibraryBackupUploadService {
     } catch (e, st) {
       log('Library backup download failed: $e $st');
       debugPrint('Library backup download failed: $e');
-      Constants.showToast(e.toString());
+      final online = await InternetConnection().hasInternetAccess;
+      Constants.showToast(
+        online ? 'Check your internet connection' : 'No Internet Connection',
+      );
       return false;
     } finally {
       if (zipFile != null && await zipFile.exists()) {

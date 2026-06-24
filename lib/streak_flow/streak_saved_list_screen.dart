@@ -202,6 +202,15 @@ class _StreakSavedListScreenState extends State<StreakSavedListScreen> {
 
   Future<void> _load() async {
     final list = await StreakSavedStorage.getAll();
+    list.sort((a, b) {
+      try {
+        final da = DateTime.parse(a.savedAt);
+        final db = DateTime.parse(b.savedAt);
+        return db.compareTo(da); // newest first
+      } catch (_) {
+        return 0;
+      }
+    });
     if (mounted) {
       setState(() {
         _items = list;

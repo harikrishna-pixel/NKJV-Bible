@@ -15,21 +15,19 @@ class SignupBloc extends ChangeNotifier {
   TextEditingController confirmPassCon = TextEditingController();
   bool isLoading = false;
   UserModel? user;
-  Future<void> createAccount() async {
+  Future<String?> createAccount() async {
     isLoading = true;
     notifyListeners();
     try {
-      final newUser = await registerUser(
+      final referralCode = await registerUser(
           email: emailCon.text, name: nameCon.text, password: passCon.text);
-      //user = newUser;
-      // await ref.read(userBloc).createUser(
-      //     nameCon.text.trim(), emailCon.text.trim(), passCon.text.trim());
+      isLoading = false;
+      notifyListeners();
+      return referralCode;
     } catch (_) {
       isLoading = false;
       notifyListeners();
       rethrow;
     }
-    isLoading = false;
-    notifyListeners();
   }
 }

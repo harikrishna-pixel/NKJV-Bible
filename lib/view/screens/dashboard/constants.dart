@@ -28,9 +28,9 @@ class BibleInfo {
   static String exitOfferPlanDiscount = '0';
 
   // Coin Pack IDs
-  static String coinPack1Id = 'com.balaklrapps.bibliasagradacatolica.coinspack1';
-  static String coinPack2Id = 'com.balaklrapps.bibliasagradacatolica.coinspack2';
-  static String coinPack3Id = 'com.balaklrapps.bibliasagradacatolica.coinspack3';
+  static String coinPack1Id = 'com.balaklrapps.bibliasagradacatolica.creditpack1';
+  static String coinPack2Id = 'com.balaklrapps.bibliasagradacatolica.creditpack2';
+  static String coinPack3Id = 'com.balaklrapps.bibliasagradacatolica.creditpack3';
 
   // Coin Pack Credits (for offline mode)
   static String coinPack1Credits = '100';
@@ -41,6 +41,11 @@ class BibleInfo {
   static String coinPack1Discount = '0';
   static String coinPack2Discount = '30';
   static String coinPack3Discount = '50';
+
+  // Coin Pack display prices (offline / IAP-load fallback)
+  static String coinPack1Price = '\$0.99';
+  static String coinPack2Price = '\$3.99';
+  static String coinPack3Price = '\$6.99';
 
   static bool enableIAP = true;
 
@@ -87,9 +92,9 @@ class BibleInfo {
   // static String adsGoogleRewardInterstitialIdIos =
   //     "ca-app-pub-3940256099942544/6978759866";
 
-// add folder names here  assets/zipped/
+// Must match subfolder names under assets/zipped/ (not bible_shortName).
   static List<String> folders = [
-    "Biblia Sagrada Catolica"
+    "Sagrada Catolica"
     // "Bengali Bible",
   ];
 

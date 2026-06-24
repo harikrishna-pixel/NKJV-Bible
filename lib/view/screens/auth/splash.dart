@@ -43,7 +43,6 @@ import 'package:biblebookapp/view/widget/notification_service.dart';
 import '../../../Model/dailyVersesMainListModel.dart';
 import '../../../Model/verseBookContentModel.dart';
 import '../../../controller/dpProvider.dart';
-import '../../constants/images.dart';
 import '../../constants/share_preferences.dart';
 import 'package:biblebookapp/streak_flow/streak_flow_screens.dart' hide SharPreferences;
 import '../dashboard/home_screen.dart';
@@ -73,7 +72,8 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey();
 
   late String selecteDailyVerses;
@@ -83,7 +83,8 @@ class _SplashScreenState extends State<SplashScreen> {
 
   double _progress = 0;
   final bool _isLoading = true;
-  String _loaderMessage = "Please wait...";
+  String _loaderMessage = "Loading God's Word...";
+  late final AnimationController _splashProgressController;
 
   // Platform messages are asynchronous, so we initialize in an async method.
 
@@ -101,7 +102,28 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
+    _splashProgressController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3500),
+    );
+    final splashProgressAnim = CurvedAnimation(
+      parent: _splashProgressController,
+      curve: Curves.easeOutCubic,
+    );
+    splashProgressAnim.addListener(() {
+      if (!mounted) return;
+      setState(() {
+        _progress = splashProgressAnim.value * 0.92;
+      });
+    });
+    _splashProgressController.forward();
     _initialize();
+  }
+
+  @override
+  void dispose() {
+    _splashProgressController.dispose();
+    super.dispose();
   }
 
   void _schedulePostSplashAtt() {
@@ -137,8 +159,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 _appOpenAd = null;
               },
             );
-            // Show open ad after 2 seconds (Splash requirement).
-            Future.delayed(const Duration(seconds: 2), () {
+            Future.delayed(const Duration(milliseconds: 500), () {
               if (!mounted) return;
               final adToShow = _appOpenAd;
               if (adToShow == null) return;
@@ -199,10 +220,8 @@ class _SplashScreenState extends State<SplashScreen> {
             setState(() {});
           }
         });
-        await Future.delayed(const Duration(seconds: 1));
       } else {
         await SharPreferences.setString('test', 'test');
-        await Future.delayed(const Duration(seconds: 1));
       }
     });
   }
@@ -224,19 +243,20 @@ class _SplashScreenState extends State<SplashScreen> {
         print('SPLASH before migrateToEncryptedDatabase');
         // Also log to system console (visible in Mac Console.app)
         debugPrint('SPLASH before migrateToEncryptedDatabase');
-        await DBMigrationHelper.migrateToEncryptedDatabase(password);
+        await Future.wait<void>([
+          DBMigrationHelper.migrateToEncryptedDatabase(password),
+          WalletService.initializeWallet(),
+        ]);
         print('SPLASH after migrateToEncryptedDatabase');
         debugPrint('SPLASH after migrateToEncryptedDatabase');
         
-        // Debug: Check what DB files exist
-        await DBHelper.debugPrintDatabaseFiles();
+        if (kDebugMode) {
+          await DBHelper.debugPrintDatabaseFiles();
+        }
         
         // Essential: Reset purchase flags
         await SharPreferences.setBoolean('restorepurches', false);
         await SharPreferences.setBoolean('startpurches', false);
-        
-        // Initialize wallet (gives 100 free credits to new users)
-        await WalletService.initializeWallet();
         
         // Preload Paywall Screen data in background (non-blocking)
         PaywallPreloadService.preloadPaywallData();
@@ -245,62 +265,58 @@ class _SplashScreenState extends State<SplashScreen> {
         await checkappcount();
         
         // Essential: Load local data (books, verses from DB)
-        await loadBookList();
-        await loadBookContent();
+        await Future.wait<void>([
+          loadBookList(),
+          loadBookContent(),
+        ]);
         // Prefs can survive reinstall/restore while DB is empty → clear "loaded"
         // flags and JSON caches so daily verse + home never trust stale state.
         await reconcilePersistedBibleStateWithDatabase();
         await loadDailyVerseData();
         await loadLocal();
         
-        // Essential: Set default book if not set
-        await DBHelper().db.then((db) async {
-          if (db != null) {
-            final result = await db.rawQuery(
-              "SELECT * FROM book WHERE book_num = ?",
-              [int.parse("0")],
-            );
+        // Essential: Set default book if not set + preserve legacy user data
+        await Future.wait<void>([
+          DBHelper().db.then((db) async {
+            if (db != null) {
+              final result = await db.rawQuery(
+                "SELECT * FROM book WHERE book_num = ?",
+                [int.parse("0")],
+              );
 
-            if (result.isNotEmpty && result[0]["title"] != null) {
-              final title = result[0]["title"].toString();
-              final data = await SharPreferences.getString(
+              if (result.isNotEmpty && result[0]["title"] != null) {
+                final title = result[0]["title"].toString();
+                final data = await SharPreferences.getString(
+                      SharPreferences.selectedBook,
+                    ) ??
+                    "";
+                if (data.isEmpty) {
+                  await SharPreferences.setString(
                     SharPreferences.selectedBook,
-                  ) ??
-                  "";
-              if (data.isEmpty) {
-                await SharPreferences.setString(
-                  SharPreferences.selectedBook,
-                  title,
-                );
+                    title,
+                  );
+                }
+              } else {
+                debugPrint("testapp No book found with book_num = 0");
               }
             } else {
-              debugPrint("testapp No book found with book_num = 0");
+              debugPrint("testapp Database instance is null");
             }
-          } else {
-            debugPrint("testapp Database instance is null");
-          }
-        });
-        
-        // CRITICAL: Must preserve user data BEFORE updateLocalDB() runs
-        // This ensures existing bookmarks/highlights/notes are available when verse flags are synced
-        await DBMigrationHelper.copyUserDataFromLegacyIfNeeded(password);
+          }),
+          DBMigrationHelper.copyUserDataFromLegacyIfNeeded(password),
+        ]);
         
         // Essential: Update local DB (sync verse flags with bookmarks/highlights)
-        await updateLocalDB();
+        await Future.wait<void>([
+          updateLocalDB(),
+          deleteFiles(),
+        ]);
         print('SPLASH after copyUserDataFromLegacyIfNeeded');
-        await DBHelper.debugPrintLibraryTableCounts();
-        print('SPLASH before deleteFiles');
-        
-        // Force flush logs to system console (works even if VM service fails)
-        await Future.delayed(Duration(milliseconds: 100));
-        await deleteFiles();
+        if (kDebugMode) {
+          await DBHelper.debugPrintLibraryTableCounts();
+        }
+        print('SPLASH before navigation');
 
-        // Ensure splash screen is visible for at least 1-2 seconds before navigation
-        // This gives users time to see the splash screen
-        await Future.delayed(const Duration(seconds: 2));
-
-        // Navigate after splash screen has been visible - APIs are loading in background
-        // They will be ready by the time user reaches home screen
         await handleNavigation();
       } catch (e) {
         print('SPLASH init error - $e');
@@ -534,13 +550,8 @@ class _SplashScreenState extends State<SplashScreen> {
       Get.offAll(() => const WelcomeScreen());
     } else {
       _schedulePostSplashAtt();
-      Future.delayed(
-        const Duration(seconds: 1),
-        () async {
-          SharPreferences.setBoolean(SharPreferences.isLoadBookContent, true);
-          await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
-        },
-      );
+      await SharPreferences.setBoolean(SharPreferences.isLoadBookContent, true);
+      await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
     }
   }
 
@@ -1202,53 +1213,230 @@ class _SplashScreenState extends State<SplashScreen> {
     debugPrint("db updated");
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-          height: MediaQuery.of(context).size.height,
-          width: MediaQuery.of(context).size.width,
-          // Always paint a stable background to avoid first-frame flicker
-          // when theme/provider initializes.
-          decoration: BoxDecoration(
-            color: CommanColor.backgrondcolor,
-            image: DecorationImage(
-              image: AssetImage(Images.bgImage(context)),
-              fit: BoxFit.cover,
+  static const Color _splashInk = Color(0xFF4A3728);
+  static const Color _splashGold = Color(0xFFC59434);
+
+  Widget _splashOrnamentDivider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 52),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: 1,
+              color: _splashGold.withValues(alpha: 0.75),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Icon(
+              Icons.diamond_outlined,
+              size: 11,
+              color: _splashGold.withValues(alpha: 0.9),
+            ),
+          ),
+          Expanded(
+            child: Container(
+              height: 1,
+              color: _splashGold.withValues(alpha: 0.75),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _splashLoadingBookIcon() {
+    return SizedBox(
+      width: 34,
+      height: 34,
+      child: Image.asset(
+        'assets/paywall_icons/read_scripture.png',
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => Icon(
+          Icons.auto_stories_rounded,
+          size: 30,
+          color: _splashGold.withValues(alpha: 0.95),
+        ),
+      ),
+    );
+  }
+
+  Widget _splashProgressBar(bool isCompact) {
+    final percent = (_progress * 100).clamp(0, 100).round();
+    final barHeight = isCompact ? 24.0 : 26.0;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Container(
+          height: barHeight,
+          width: constraints.maxWidth,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(barHeight / 2),
+            color: const Color(0xFFE8D9C4).withValues(alpha: 0.88),
+          ),
+          clipBehavior: Clip.antiAlias,
           child: Stack(
             alignment: Alignment.center,
             children: [
-              Center(
-                child: Container(
-                  height: 220,
-                  width: 220,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    image: DecorationImage(image: AssetImage("assets/Icon-1024.png"))
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FractionallySizedBox(
+                  widthFactor: _progress.clamp(0.0, 1.0),
+                  heightFactor: 1,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(barHeight / 2),
+                      gradient: const LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          Color(0xFFD4A04A),
+                          Color(0xFFC59434),
+                          Color(0xFF9A6B2F),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
-              Positioned(
-                  bottom: 50,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SizedBox(height: 8),
-                      CircularProgressIndicator.adaptive(),
-                      const SizedBox(height: 12),
-                      Text(
-                        _loaderMessage,
-                        style: const TextStyle(
-                          color: Colors.black87,
-                          fontWeight: FontWeight.w500,
-                        ),
+              Text(
+                '$percent%',
+                style: TextStyle(
+                  fontFamily: 'Georgia',
+                  fontSize: isCompact ? 11.5 : 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  height: 1,
+                  shadows: const [
+                    Shadow(
+                      color: Color(0x66000000),
+                      blurRadius: 2,
+                      offset: Offset(0, 1),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _splashLoadingSection(bool isCompact) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(36, 0, 36, isCompact ? 22 : 30),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _splashLoadingBookIcon(),
+          SizedBox(height: isCompact ? 12 : 14),
+          Text(
+            _loaderMessage,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'Georgia',
+              fontSize: isCompact ? 14 : 15,
+              fontWeight: FontWeight.w600,
+              color: _splashInk.withValues(alpha: 0.9),
+            ),
+          ),
+          SizedBox(height: isCompact ? 14 : 16),
+          _splashProgressBar(isCompact),
+          SizedBox(height: isCompact ? 10 : 12),
+          Text(
+            'Preparing your Bible experience',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'Georgia',
+              fontSize: isCompact ? 11.5 : 12.5,
+              fontWeight: FontWeight.w500,
+              color: _splashInk.withValues(alpha: 0.72),
+              height: 1.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isCompact = size.height < 700;
+    final iconSize = isCompact ? 168.0 : 200.0;
+
+    return Scaffold(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'assets/splash-bg.png',
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            alignment: Alignment.center,
+          ),
+          SafeArea(
+            child: Column(
+              children: [
+                const Spacer(flex: 2),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(22),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFD4A574).withValues(alpha: 0.45),
+                        blurRadius: 36,
+                        spreadRadius: 6,
                       ),
                     ],
-                  ))
-            ],
-          )),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: Image.asset(
+                      'assets/Icon-1024.png',
+                      width: iconSize,
+                      height: iconSize,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                SizedBox(height: isCompact ? 22 : 28),
+                Text(
+                  BibleInfo.bible_shortName,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'Georgia',
+                    fontSize: isCompact ? 30 : 34,
+                    fontWeight: FontWeight.w700,
+                    color: _splashInk,
+                    height: 1.1,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                SizedBox(height: isCompact ? 14 : 18),
+                _splashOrnamentDivider(),
+                SizedBox(height: isCompact ? 14 : 18),
+                Text(
+                  'Trusted Scripture.\nModern Experience.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'Georgia',
+                    fontSize: isCompact ? 16 : 18,
+                    fontWeight: FontWeight.w500,
+                    color: _splashInk.withValues(alpha: 0.92),
+                    height: 1.45,
+                  ),
+                ),
+                const Spacer(flex: 2),
+                _splashLoadingSection(isCompact),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1620,7 +1808,6 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
         // }
       } else {
         await _markOpenAdFlowComplete();
-        await Future.delayed(Duration(seconds: 7));
         debugPrint('Update is available. Skipping open ad.');
       }
     });
@@ -1659,8 +1846,7 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
               },
             );
 
-            // Show open ad after 2 seconds (Splash requirement).
-            Future.delayed(const Duration(seconds: 2), () {
+            Future.delayed(const Duration(milliseconds: 500), () {
               if (!mounted) return;
               final adToShow = _appOpenAd;
               if (adToShow == null) return;
@@ -1675,7 +1861,7 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
         ),
       );
     }
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.delayed(const Duration(seconds: 1));
     if (_appOpenAd == null) {
       await _markOpenAdFlowComplete();
     }
@@ -1730,10 +1916,8 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
             setState(() {});
           }
         });
-        await Future.delayed(const Duration(seconds: 1));
       } else {
         await SharPreferences.setString('test', 'test');
-        await Future.delayed(const Duration(seconds: 1));
       }
     });
   }

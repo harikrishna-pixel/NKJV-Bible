@@ -144,6 +144,12 @@ class _BookListScreenState extends State<BookListScreen> {
   }
 
   @override
+  void activate() {
+    super.activate();
+    readBookJson();
+  }
+
+  @override
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
     final oldTestamentCount = math.min(testament_num, bookList.length);

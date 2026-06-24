@@ -8,6 +8,7 @@ import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.da
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_models.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_share_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
+import 'package:biblebookapp/utils/network_error_message.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:flutter/material.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
@@ -64,20 +65,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
   Map<String, String> _likeIdByPrayerId = {};
   final Set<String> _likeToggleBusy = {};
 
-  bool _looksOffline(Object e) {
-    final s = e.toString();
-    return s.contains('SocketException') ||
-        s.contains('Failed host lookup') ||
-        s.contains('ClientException') ||
-        s.contains('Network is unreachable');
-  }
+  bool _looksOffline(Object e) => isNetworkRelatedError(e);
 
-  String _friendlyError(Object e) {
-    if (_looksOffline(e)) {
-      return 'You’re offline. Please check your internet connection and try again.';
-    }
-    return e.toString();
-  }
+  String _friendlyError(Object e) => userFacingNetworkMessage(e);
 
   void _showAppleToast(String message) {
     final overlay = Overlay.maybeOf(context);
@@ -197,8 +187,10 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
         PrayerWallService.fetchCommentCountsByPrayer(),
       ]);
       if (!mounted) return;
+      final prayers = results[0] as List<PrayerWallItem>;
+      await PrayerWallLocalStore.markPrayersAsSeen(prayers.map((p) => p.id));
       setState(() {
-        _all = results[0] as List<PrayerWallItem>;
+        _all = prayers;
         _likeCounts = Map<String, int>.from(results[1] as Map<String, int>);
         _commentCounts = Map<String, int>.from(results[2] as Map<String, int>);
         _prayerAuthorMap = authorMap;

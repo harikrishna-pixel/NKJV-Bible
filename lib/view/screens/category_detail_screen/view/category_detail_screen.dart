@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'package:biblebookapp/Model/category_model.dart';
+import 'package:biblebookapp/utils/network_error_message.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
@@ -178,8 +179,21 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
               ),
               const SizedBox(height: 20),
               imageState.isLoading && imageState.photos.isEmpty
-                  ? const CircularProgressIndicator.adaptive()
-                  : Expanded(
+                  ? const Center(child: CircularProgressIndicator.adaptive())
+                  : imageState.photos.isEmpty
+                      ? Expanded(
+                          child: Center(
+                            child: Text(
+                              kCheckInternetConnectionMessage,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: CommanColor.whiteBlack(context),
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Expanded(
                       child: SingleChildScrollView(
                         controller: controller,
                         padding: const EdgeInsets.symmetric(horizontal: 8),

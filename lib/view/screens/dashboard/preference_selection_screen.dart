@@ -1983,8 +1983,8 @@ Map<String, String> preferenceSelectionCategoryMapFromJsonString(
   for (final e in decoded) {
     if (e is! Map) continue;
     final m = Map<String, dynamic>.from(e);
-    final name = m['Category_Name']?.toString() ??
-        m['Main_Category']?.toString() ??
+    final name = m['Main_Category']?.toString() ??
+        m['Category_Name']?.toString() ??
         '';
     if (name.isNotEmpty) out[name] = name;
   }

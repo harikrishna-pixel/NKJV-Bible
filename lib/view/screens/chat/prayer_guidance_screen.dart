@@ -3,22 +3,25 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:biblebookapp/constant/app_api_constant.dart';
-import 'package:biblebookapp/controller/dpProvider.dart';
+import 'package:biblebookapp/main.dart';
+import 'package:biblebookapp/services/smart_notification_helper.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/milestone_lifetime_paywall_coordinator.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
-import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
 import 'package:biblebookapp/view/screens/chat/chat_translations.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
-import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
+import 'package:biblebookapp/view/screens/dashboard/setting_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/post_prayer_screen.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
+import 'package:biblebookapp/view/screens/paywall/feature_credits_paywall_screen.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/gestures.dart';
@@ -30,6 +33,7 @@ import 'package:get/get.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:http/http.dart' as http;
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -41,7 +45,7 @@ class PrayerGuidanceScreen extends StatefulWidget {
 }
 
 class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, RouteAware, WidgetsBindingObserver {
   static const String _baseUrl =
       'https://my-backend-one-eta.vercel.app/api/gemini';
 
@@ -111,11 +115,159 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
     'Offer praise and worship to our faithful God.',
   ];
 
-  // UI mode: true => Pray for Me view (search + categories). Community navigates to PrayerWallScreen.
-  bool _isPrayForMeMode = true;
+  static const Color _kPrayerCardCream = Color(0xFFFFFAF4);
+  static const Color _kPrayerCardBorder = Color(0xFFE6D8C8);
+  static const Color _kPrayerBrownDark = Color(0xFF4E342E);
+  static const Color _kPrayerBrownMid = Color(0xFF6D4C41);
 
-  /// When false, hide the community "live" dot (e.g. offline).
-  bool _communityLiveOnline = false;
+  Color _categoryAccentColor(int categoryIndex) {
+    // UI-only: small accent per tile to match reference feel.
+    final palette = <Color>[
+      const Color(0xFFD4A017), // gold
+      const Color(0xFF388E3C), // green
+      const Color(0xFF1976D2), // blue
+      const Color(0xFF7B1FA2), // purple
+      const Color(0xFFEF6C00), // orange
+      const Color(0xFF795548), // brown
+    ];
+    return palette[categoryIndex % palette.length];
+  }
+
+  // UI mode: true => Pray for Me view (search + categories). Community navigates to PrayerWallScreen.
+  int _communityPrayerCount = 0;
+  bool _communityPrayerCountLoaded = false;
+  late Future<bool> _showPrayerReminderPromptFuture;
+
+  String _timeGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good Morning ☀️';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  }
+
+  Future<bool> _shouldShowPrayerReminderPrompt() async {
+    final status = await Permission.notification.status;
+    final permitted =
+        status.isGranted || status.isLimited || status.isProvisional;
+    if (!permitted) return true;
+
+    final hasNotificationsEnabled =
+        await SmartNotificationHelper.userHasManualNotificationEnabled();
+    return !hasNotificationsEnabled;
+  }
+
+  void _refreshPrayerReminderPrompt() {
+    setState(() {
+      _showPrayerReminderPromptFuture = _shouldShowPrayerReminderPrompt();
+    });
+  }
+
+  Widget _buildDailyPrayerReminderCard(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.black.withOpacity(0.42) : _kPrayerCardCream,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.22) : _kPrayerCardBorder,
+        ),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: _kPrayerBrownDark.withOpacity(0.06),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withOpacity(0.12)
+                  : _kPrayerBrownMid.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.calendar_month,
+              color: isDark ? Colors.white : _kPrayerBrownMid,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Daily Prayer Reminder',
+                  style: TextStyle(
+                    color: isDark ? Colors.white : const Color(0xFF3D2914),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    fontFamily: 'Georgia',
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Set a reminder to keep\nyour prayer life strong.',
+                  style: TextStyle(
+                    color: (isDark ? Colors.white : const Color(0xFF3D2914))
+                        .withOpacity(0.78),
+                    fontWeight: FontWeight.w500,
+                    fontSize: 11.5,
+                    height: 1.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          GestureDetector(
+            onTap: () async {
+              await Get.to(
+                () => const SettingScreen(notificationValue: false),
+              );
+              if (mounted) _refreshPrayerReminderPrompt();
+            },
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    _kPrayerBrownMid,
+                    _kPrayerBrownDark,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Set Reminder',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                  SizedBox(width: 6),
+                  Icon(Icons.chevron_right, size: 16, color: Colors.white),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   // Background music asset path (without 'assets/' prefix as AssetSource adds it automatically)
   static const String _backgroundMusicUrl =
@@ -373,47 +525,12 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
         false;
   }
 
-  // Show insufficient credits toast with "Add Credits" button
   void _showInsufficientCreditsDialog() {
-    // Show a styled snackbar with action button
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              Icons.info_outline,
-              color: Colors.white.withOpacity(0.9),
-              size: 22,
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                'Insufficient credits. Please add credits.',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: const Color(0xFF6D4C41),
-        duration: const Duration(seconds: 5),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        elevation: 6,
-        action: SnackBarAction(
-          label: 'Add Credits',
-          textColor: const Color(0xFFFFF3E0),
-          backgroundColor: const Color(0xFF8D6E63),
-          disabledBackgroundColor: Colors.grey,
-          onPressed: () {
-            Get.to(() => const WalletScreen());
-          },
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => const FeatureCreditsPaywallScreen(
+          kind: FeatureCreditsPaywallKind.prayerGuidance,
         ),
       ),
     );
@@ -717,7 +834,7 @@ ${category.prompt}
               prefs.getBool('prayer_credit_debit_shown') ?? false;
           if (!creditDebitShown) {
             Constants.showToast(
-                'Used $chatCost credits for this response', 5000);
+                'Used $chatCost credits for this response', 1500);
             await prefs.setBool('prayer_credit_debit_shown', true);
           }
           _loadCreditsFromLocal();
@@ -1145,7 +1262,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
               prefs.getBool('prayer_credit_debit_shown') ?? false;
           if (!creditDebitShown) {
             Constants.showToast(
-                'Used $chatCost credits for this response', 5000);
+                'Used $chatCost credits for this response', 1500);
             await prefs.setBool('prayer_credit_debit_shown', true);
           }
           _loadCreditsFromLocal();
@@ -1435,6 +1552,15 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                 return ElevatedButton(
                                   onPressed: hasText
                                       ? () async {
+                                          final isConnected =
+                                              await InternetConnection()
+                                                  .hasInternetAccess;
+                                          if (!isConnected) {
+                                            Constants.showToast(
+                                                'No internet connection',
+                                                5000);
+                                            return;
+                                          }
                                           final request =
                                               _customPrayerController.text.trim();
                                           Navigator.of(dialogContext).pop();
@@ -1529,6 +1655,9 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
       _loadCreditsFromLocal();
     });
 
+    WidgetsBinding.instance.addObserver(this);
+    _showPrayerReminderPromptFuture = _shouldShowPrayerReminderPrompt();
+
     // Show shared answer-length intro if needed (same behaviour as Chat).
     _showPrayerIntroIfNeeded();
     _refreshCommunityLiveIndicator();
@@ -1551,9 +1680,34 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
   Future<void> _refreshCommunityLiveIndicator() async {
     try {
       final online = await InternetConnection().hasInternetAccess;
-      if (mounted) setState(() => _communityLiveOnline = online);
+      if (mounted) {
+        setState(() {
+          _communityPrayerCountLoaded = false;
+          if (!online) _communityPrayerCount = 0;
+        });
+      }
+      if (!online) return;
     } catch (_) {
-      if (mounted) setState(() => _communityLiveOnline = false);
+      if (mounted) {
+        setState(() {
+          _communityPrayerCountLoaded = false;
+          _communityPrayerCount = 0;
+        });
+      }
+      return;
+    }
+
+    try {
+      final prayers = await PrayerWallService.fetchPrayers();
+      final seenIds = await PrayerWallLocalStore.loadSeenPrayerIds();
+      if (!mounted) return;
+      setState(() {
+        _communityPrayerCount =
+            prayers.where((p) => !seenIds.contains(p.id)).length;
+        _communityPrayerCountLoaded = true;
+      });
+    } catch (_) {
+      // Keep live dot when online; count fetch failed.
     }
   }
 
@@ -1566,7 +1720,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
         });
       }
     } catch (e) {
-      debugPrint('Prayer credits load error: $e');
+      debugPrint('redits load error: $e');
     }
   }
 
@@ -2106,7 +2260,30 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final modalRoute = ModalRoute.of(context);
+    if (modalRoute != null) {
+      routeObserver.subscribe(this, modalRoute);
+    }
+  }
+
+  @override
+  void didPopNext() {
+    _refreshPrayerReminderPrompt();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshPrayerReminderPrompt();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    routeObserver.unsubscribe(this);
     _creditsTimer?.cancel();
     _amenToastTimer?.cancel();
     _amenToastEntry?.remove();
@@ -2410,7 +2587,237 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
   static const Color _kPrayerGuidanceInk = Color(0xFF3D2914);
   static const Color _kPrayerGuidanceGold = Color(0xFFC59434);
   static const Color _kPrayerGuidanceCream = Color(0xFFF8F4EE);
-  static const String _kPrayerResponseTopBg = 'assets/back3.png';
+  static const String _kPrayerGuidanceBg = 'assets/prayer_gudiance-bg.png';
+  static const String _kPrayerCreatingBg = 'assets/creating_prayer.png';
+
+  bool _prayerGuidanceIsCreatingView() =>
+      _isLoading && !_prayerGuidanceHasAiResponse();
+
+  String? _categoryIconAsset(int categoryIndex) {
+    switch (categoryIndex) {
+      case 0:
+        return 'assets/prayer_guidance_icons/Thanksgiving.png';
+      case 1:
+        return 'assets/prayer_guidance_icons/Forgiveness.png';
+      case 2:
+        return 'assets/prayer_guidance_icons/guidance.png';
+      case 3:
+        return 'assets/prayer_guidance_icons/Anxiety.png';
+      case 4:
+        return 'assets/prayer_guidance_icons/Healing.png';
+      case 5:
+        return 'assets/prayer_guidance_icons/family.png';
+      default:
+        return null;
+    }
+  }
+
+  Widget _prayerGuidanceHomeHeaderIcon(Size size, {required bool isDark}) {
+    final iconSize = size.width > 450 ? 52.0 : 48.0;
+    return Icon(
+      Icons.volunteer_activism,
+      size: iconSize,
+      color: isDark ? Colors.white70 : const Color(0xFF5C4033),
+    );
+  }
+
+  Widget _prayerGuidanceReadableCaption(
+    String text, {
+    required bool isDark,
+    TextAlign textAlign = TextAlign.center,
+    int? maxLines,
+  }) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.black.withOpacity(0.4)
+            : Colors.white.withOpacity(0.82),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        child: Text(
+          text,
+          textAlign: textAlign,
+          maxLines: maxLines,
+          style: TextStyle(
+            fontSize: 14,
+            height: 1.4,
+            fontWeight: FontWeight.w500,
+            color: isDark
+                ? Colors.white.withOpacity(0.94)
+                : const Color(0xFF3D2914),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _prayerGuidanceHomeSubtitle(
+    String subtitle,
+    bool isDark, {
+    String? secondLine,
+  }) {
+    final text = secondLine == null ? subtitle : '$subtitle\n$secondLine';
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: _prayerGuidanceReadableCaption(
+        text,
+        isDark: isDark,
+        maxLines: 2,
+      ),
+    );
+  }
+
+  Widget _prayerGuidanceActionIcon(
+    String assetPath, {
+    required Color tintColor,
+    double scale = 1.35,
+  }) {
+    return SizedBox(
+      width: 40,
+      height: 40,
+      child: ClipRect(
+        child: Align(
+          alignment: Alignment.center,
+          child: Transform.scale(
+            scale: scale,
+            child: Image.asset(
+              assetPath,
+              width: 40,
+              height: 40,
+              fit: BoxFit.contain,
+              color: tintColor,
+              colorBlendMode: BlendMode.srcIn,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _prayerGuidanceActionCardBody({
+    required Widget icon,
+    required String title,
+    required String subtitleFirstLine,
+    required String subtitleSecondLine,
+    required Color titleColor,
+    required Color subtitleColor,
+    double titleSize = 13.5,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        icon,
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: titleColor,
+                  fontWeight: FontWeight.w700,
+                  fontSize: titleSize,
+                  height: 1.15,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '$subtitleFirstLine\n$subtitleSecondLine',
+                maxLines: 2,
+                style: TextStyle(
+                  color: subtitleColor,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 11,
+                  height: 1.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _prayerGuidanceSceneBackground({
+    required double imageHeightFactor,
+    double imageTop = 0,
+    Alignment imageAlignment = Alignment.topCenter,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final imageHeight = constraints.maxHeight * imageHeightFactor;
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: _kPrayerGuidanceCream),
+            Positioned(
+              top: imageTop,
+              left: 0,
+              right: 0,
+              height: imageHeight,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(
+                    _kPrayerGuidanceBg,
+                    fit: BoxFit.cover,
+                    alignment: imageAlignment,
+                    filterQuality: FilterQuality.high,
+                    gaplessPlayback: true,
+                  ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.white.withOpacity(0.62),
+                          Colors.white.withOpacity(0.22),
+                          Colors.transparent,
+                          _kPrayerGuidanceCream.withOpacity(0.45),
+                          _kPrayerGuidanceCream,
+                        ],
+                        stops: const [0.0, 0.22, 0.42, 0.72, 1.0],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: constraints.maxHeight * 0.36,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.white.withOpacity(0.9),
+                        Colors.white.withOpacity(0.62),
+                        Colors.white.withOpacity(0.18),
+                        Colors.transparent,
+                      ],
+                      stops: const [0.0, 0.38, 0.72, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   String _prayerInstructionalSubtitle(String title) {
     final index = _categories.indexWhere((category) => category.title == title);
@@ -2426,32 +2833,10 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
 
   Widget _prayerGuidanceResponseSubtitleBanner(String subtitle, bool isDark) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: isDark
-              ? Colors.black.withOpacity(0.48)
-              : Colors.black.withOpacity(0.32),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.white.withOpacity(0.14)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              height: 1.35,
-              color: Colors.white,
-              fontFamily: 'Georgia',
-              fontWeight: FontWeight.w500,
-              shadows: const [
-                Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 1)),
-              ],
-            ),
-          ),
-        ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: _prayerGuidanceReadableCaption(
+        subtitle,
+        isDark: isDark,
       ),
     );
   }
@@ -2486,6 +2871,19 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     );
   }
 
+
+  Widget _prayerCreatingStepConnector() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: CustomPaint(
+        size: const Size(2, 42),
+        painter: _PrayerCreatingDashedLinePainter(
+          color: _kPrayerGuidanceGold.withOpacity(0.38),
+        ),
+      ),
+    );
+  }
+
   Widget _prayerLoadingStepRow({
     required IconData icon,
     required String label,
@@ -2503,33 +2901,29 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                 height: 44,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.88),
+                  color: Colors.white.withOpacity(0.72),
                   border: Border.all(
-                    color: _kPrayerGuidanceGold.withOpacity(0.45),
+                    color: _kPrayerGuidanceGold.withOpacity(0.42),
                   ),
                 ),
-                child: Icon(icon, color: _kPrayerGuidanceGold, size: 22),
+                child: Icon(icon, color: _kPrayerGuidanceGold, size: 21),
               ),
-              if (showConnector)
-                Container(
-                  width: 2,
-                  height: 40,
-                  margin: const EdgeInsets.symmetric(vertical: 6),
-                  color: _kPrayerGuidanceGold.withOpacity(0.35),
-                ),
+              if (showConnector) _prayerCreatingStepConnector(),
             ],
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.only(top: 11),
+              padding: const EdgeInsets.only(top: 12),
               child: Text(
                 label,
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight:
-                      showSpinner ? FontWeight.w600 : FontWeight.w400,
-                  color: _kPrayerGuidanceInk,
+                      showSpinner ? FontWeight.w600 : FontWeight.w500,
+                  color: _kPrayerGuidanceInk.withOpacity(
+                    showSpinner ? 1 : 0.88,
+                  ),
                   fontFamily: 'Georgia',
                   height: 1.35,
                 ),
@@ -2537,23 +2931,23 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
             ),
           ),
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.only(top: 9),
             child: showSpinner
                 ? SizedBox(
-                    width: 26,
-                    height: 26,
+                    width: 24,
+                    height: 24,
                     child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
+                      strokeWidth: 2.2,
                       color: _kPrayerGuidanceGold,
                     ),
                   )
                 : Container(
-                    width: 24,
-                    height: 24,
+                    width: 22,
+                    height: 22,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: _kPrayerGuidanceInk.withOpacity(0.22),
+                        color: _kPrayerGuidanceInk.withOpacity(0.16),
                         width: 1.5,
                       ),
                     ),
@@ -2565,169 +2959,230 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
   }
 
   Widget _buildPrayerCreatingView(BuildContext context, Size size, bool isDark) {
+    final horizontalPad = size.width > 450 ? 28.0 : 24.0;
     return SingleChildScrollView(
       controller: _scrollController,
-      padding: EdgeInsets.symmetric(
-        horizontal: size.width > 450 ? 28 : 20,
+      padding: EdgeInsets.fromLTRB(
+        horizontalPad,
+        16,
+        horizontalPad,
+        28,
       ),
       child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: 8),
-            Center(child: _prayerGuidanceResponseHeaderIcon(size)),
-            const SizedBox(height: 18),
-            Text(
-              'Creating your prayer...',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: size.width > 450 ? 26 : 23,
-                fontWeight: FontWeight.w700,
-                color: _kPrayerGuidanceInk,
-                fontFamily: 'Georgia',
-              ),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Image.asset(
+              'assets/welcome_prayer.png',
+              width: size.width > 450 ? 112 : 100,
+              height: size.width > 450 ? 112 : 100,
+              fit: BoxFit.contain,
             ),
-            const SizedBox(height: 12),
-            _prayerGuidanceGoldDivider(),
-            const SizedBox(height: 12),
-            Text(
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Creating your prayer...',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: size.width > 450 ? 26 : 24,
+              fontWeight: FontWeight.w700,
+              color: _kPrayerGuidanceInk,
+              fontFamily: 'Georgia',
+              height: 1.15,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _prayerGuidanceGoldDivider(),
+          const SizedBox(height: 10),
+          Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: size.width > 450 ? 12 : 8,
+            ),
+            child: Text(
               "We're searching God's Word and preparing words of hope for you.",
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: size.width > 450 ? 15 : 14,
-                color: _kPrayerGuidanceInk.withOpacity(0.78),
-                fontFamily: 'Georgia',
-                height: 1.45,
+                color: _kPrayerGuidanceInk.withOpacity(0.88),
+                height: 1.5,
+                fontWeight: FontWeight.w400,
               ),
             ),
-            const SizedBox(height: 28),
-            _prayerLoadingStepRow(
-              icon: Icons.search,
-              label: 'Finding the right Scriptures',
-              showSpinner: true,
-              showConnector: true,
-            ),
-            const SizedBox(height: 4),
-            _prayerLoadingStepRow(
-              icon: Icons.menu_book_outlined,
-              label: 'Understanding your need',
-              showSpinner: true,
-              showConnector: true,
-            ),
-            const SizedBox(height: 4),
-            _prayerLoadingStepRow(
-              icon: Icons.favorite_border,
-              label: 'Preparing your prayer',
-              showSpinner: true,
-              showConnector: false,
-            ),
-            const SizedBox(height: 32),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.82),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: _kPrayerGuidanceGold.withOpacity(0.35),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.format_quote_rounded,
-                    color: _kPrayerGuidanceGold,
-                    size: 28,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Call to Me, and I will answer you, and show you great and mighty things.',
-                    style: TextStyle(
-                      fontSize: size.width > 450 ? 17 : 15,
-                      height: 1.5,
-                      color: _kPrayerGuidanceInk,
-                      fontFamily: 'Georgia',
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Jeremiah 33:3',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: _kPrayerGuidanceInk.withOpacity(0.72),
-                      fontFamily: 'Georgia',
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
-    );
-  }
-
-  Widget _prayerGuidanceBackgroundLayer() {
-    if (_prayerGuidanceIsMainScreen()) {
-      return Positioned.fill(
-        child: Image.asset(
-          'assets/back1.png',
-          fit: BoxFit.cover,
-        ),
-      );
-    }
-    if (_prayerGuidanceHasAiResponse()) {
-      return Positioned.fill(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final imageHeight = constraints.maxHeight * 0.38;
-            return Stack(
-              fit: StackFit.expand,
+          ),
+          const SizedBox(height: 32),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Column(
               children: [
-                const ColoredBox(color: _kPrayerGuidanceCream),
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: imageHeight,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Image.asset(
-                        _kPrayerResponseTopBg,
-                        fit: BoxFit.cover,
-                        alignment: Alignment.topCenter,
-                      ),
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.black.withOpacity(0.05),
-                              Colors.transparent,
-                              _kPrayerGuidanceCream.withOpacity(0.5),
-                              _kPrayerGuidanceCream,
-                            ],
-                            stops: const [0.0, 0.28, 0.68, 1.0],
-                          ),
-                        ),
-                      ),
-                    ],
+                _prayerLoadingStepRow(
+                  icon: Icons.search,
+                  label: 'Finding the right Scriptures',
+                  showSpinner: true,
+                  showConnector: true,
+                ),
+                const SizedBox(height: 10),
+                _prayerLoadingStepRow(
+                  icon: Icons.menu_book_outlined,
+                  label: 'Understanding your need',
+                  showSpinner: true,
+                  showConnector: true,
+                ),
+                const SizedBox(height: 10),
+                _prayerLoadingStepRow(
+                  icon: Icons.favorite_border,
+                  label: 'Preparing your prayer',
+                  showSpinner: true,
+                  showConnector: false,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 36),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.52),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.78),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: _kPrayerBrownDark.withOpacity(0.05),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '“',
+                  style: TextStyle(
+                    fontSize: size.width > 450 ? 34 : 32,
+                    height: 0.9,
+                    color: _kPrayerGuidanceGold,
+                    fontFamily: 'Georgia',
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Call to Me, and I will answer you, and show you great and mighty things.',
+                  style: TextStyle(
+                    fontSize: size.width > 450 ? 17 : 15,
+                    height: 1.55,
+                    color: _kPrayerGuidanceInk,
+                    fontFamily: 'Georgia',
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Jeremiah 33:3',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: _kPrayerGuidanceInk.withOpacity(0.82),
+                    fontFamily: 'Georgia',
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
-            );
-          },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  double _prayerGuidanceMainHeroHeight(BuildContext context) {
+    // Match paywall hero sizing so the top image coverage feels consistent.
+    final size = MediaQuery.sizeOf(context);
+    return (size.height * 0.40).clamp(280.0, 360.0);
+  }
+
+  Widget _prayerGuidanceMainScreenTopHero(BuildContext context) {
+    final heroHeight = _prayerGuidanceMainHeroHeight(context);
+    final isDark =
+        Provider.of<ThemeProvider>(context, listen: false).themeMode ==
+            ThemeMode.dark;
+    final fadeColor =
+        isDark ? CommanColor.darkPrimaryColor : const Color(0xFFFDFBF7);
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      height: heroHeight,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'assets/back1.png',
+            fit: BoxFit.cover,
+            alignment: const Alignment(0, -0.15),
+            filterQuality: FilterQuality.high,
+            gaplessPlayback: true,
+          ),
+          if (isDark)
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.12),
+                    Colors.black.withOpacity(0.28),
+                  ],
+                ),
+              ),
+            ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: heroHeight * 0.55,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    fadeColor.withOpacity(0.25),
+                    fadeColor.withOpacity(0.82),
+                    fadeColor,
+                  ],
+                  stops: const [0.0, 0.4, 0.78, 1.0],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _prayerGuidanceBackgroundLayer(BuildContext context) {
+    if (_prayerGuidanceIsCreatingView()) {
+      return Positioned.fill(
+        child: Image.asset(
+          _kPrayerCreatingBg,
+          fit: BoxFit.cover,
+          alignment: Alignment.center,
+          width: double.infinity,
+          height: double.infinity,
+          filterQuality: FilterQuality.high,
+          gaplessPlayback: true,
         ),
       );
     }
     return Positioned.fill(
-      child: Image.asset(
-        'assets/dove_faith.png',
-        fit: BoxFit.cover,
+      child: _prayerGuidanceSceneBackground(
+        imageHeightFactor: 0.45,
+        imageTop: -1,
+        imageAlignment: const Alignment(0, -0.65),
       ),
     );
   }
@@ -2871,9 +3326,10 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     );
     final closingMatch = closingPattern.firstMatch(text);
     final bodyText = closingMatch == null
-        ? text
+        ? text.trimRight()
         : text.substring(0, closingMatch.start).trimRight();
-    final closingText = closingMatch?.group(0);
+    final closingText =
+        closingMatch?.group(0) ?? "In Jesus' Name, Amen.";
 
     final baseStyle = TextStyle(
       fontSize: fontSize,
@@ -2889,7 +3345,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
         _guidanceResponseSpansForSegment(bodyText, textColor, versePattern),
       );
     }
-    if (closingText != null && closingText.isNotEmpty) {
+    if (closingText.isNotEmpty) {
       if (spans.isNotEmpty) {
         spans.add(const TextSpan(text: '\n\n'));
       }
@@ -2950,10 +3406,10 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5EDE3),
+        color: const Color(0xFFF8F0E6),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: _kPrayerGuidanceGold.withOpacity(0.28),
+          color: _kPrayerGuidanceGold.withOpacity(0.22),
         ),
       ),
       child: Row(
@@ -3009,39 +3465,53 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
   Widget _buildPrayerResponseCard(String aiText, Size size, bool isDark) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 22,
-            offset: const Offset(0, 8),
+            color: Colors.black.withOpacity(0.07),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              '“',
-              style: TextStyle(
-                fontSize: size.width > 450 ? 40 : 36,
-                height: 0.9,
-                color: _kPrayerGuidanceGold,
-                fontFamily: 'Georgia',
-                fontWeight: FontWeight.w700,
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '“',
+                  style: TextStyle(
+                    fontSize: size.width > 450 ? 44 : 40,
+                    height: 0.85,
+                    color: _kPrayerGuidanceGold,
+                    fontFamily: 'Georgia',
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
-            ),
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Icon(
+                  Icons.bookmark_border_rounded,
+                  color: _kPrayerGuidanceGold.withOpacity(0.85),
+                  size: 24,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           _buildGuidanceResponseBody(aiText, size, isDark),
-          const SizedBox(height: 18),
-          _prayerGuidanceGoldDivider(),
           const SizedBox(height: 16),
+          _prayerGuidanceGoldDivider(),
+          const SizedBox(height: 14),
           _buildPrayerResponseInsightBox(aiText, size),
         ],
       ),
@@ -3078,35 +3548,50 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
       return Expanded(
         child: Material(
           color: Colors.white,
-          elevation: 1,
-          shadowColor: Colors.black.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(14),
+          elevation: 0,
+          shadowColor: Colors.black.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(16),
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(14),
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                vertical: size.width > 450 ? 14 : 12,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    icon,
-                    size: 18,
-                    color: _kPrayerGuidanceInk.withOpacity(0.72),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: size.width > 450 ? 15 : 14,
-                      fontWeight: FontWeight.w600,
-                      color: _kPrayerGuidanceInk.withOpacity(0.85),
-                      fontFamily: 'Georgia',
-                    ),
+            borderRadius: BorderRadius.circular(16),
+            child: Ink(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: _kPrayerGuidanceInk.withOpacity(0.08),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
                   ),
                 ],
+              ),
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  vertical: size.width > 450 ? 14 : 13,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      icon,
+                      size: 18,
+                      color: _kPrayerGuidanceInk.withOpacity(0.7),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: size.width > 450 ? 15 : 14,
+                        fontWeight: FontWeight.w600,
+                        color: _kPrayerGuidanceInk.withOpacity(0.82),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -3151,15 +3636,14 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
         ? _prayerInstructionalSubtitle(title)
         : 'Words of hope from God\'s Word for your heart.';
 
-    final horizontalPad = size.width > 450 ? 22.0 : 16.0;
-    final titleSidePad = size.width > 450 ? 56.0 : 48.0;
+    final horizontalPad = size.width > 450 ? 20.0 : 16.0;
 
     return SingleChildScrollView(
       controller: _scrollController,
       clipBehavior: Clip.none,
       padding: EdgeInsets.fromLTRB(
         horizontalPad,
-        0,
+        20,
         horizontalPad,
         8,
       ),
@@ -3169,37 +3653,28 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Center(
-              child: _prayerGuidanceResponseHeaderIcon(size, compact: true),
-            ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: titleSidePad),
+              padding: EdgeInsets.symmetric(
+                horizontal: size.width > 450 ? 40 : 28,
+              ),
               child: Text(
                 title,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: size.width > 450 ? 26 : 24,
+                  fontSize: size.width > 450 ? 28 : 26,
                   fontWeight: FontWeight.w700,
                   color: headerColor,
                   fontFamily: 'Georgia',
-                  shadows: isDark
-                      ? const [
-                          Shadow(
-                            color: Colors.black87,
-                            blurRadius: 10,
-                            offset: Offset(0, 2),
-                          ),
-                        ]
-                      : null,
+                  height: 1.1,
                 ),
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             _prayerGuidanceGoldDivider(),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             _prayerGuidanceResponseSubtitleBanner(instructional, isDark),
-            const SizedBox(height: 12),
+            const SizedBox(height: 32),
             if (aiText != null) ...[
               _buildPrayerResponseCard(aiText, size, isDark),
               if (!_isPrayerGenerationError(aiText)) ...[
@@ -3213,11 +3688,88 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     );
   }
 
+  Widget _buildPrayerAmenButton(Size size, {required VoidCallback onPressed}) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(32),
+        child: Ink(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(
+            horizontal: size.width > 450 ? 22 : 18,
+            vertical: size.width > 450 ? 14 : 12,
+          ),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [
+                Color(0xFFD4AF37),
+                Color(0xFFC89B3C),
+                Color(0xFFB8893A),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(32),
+            boxShadow: [
+              BoxShadow(
+                color: _kPrayerGuidanceGold.withOpacity(0.35),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.favorite_border,
+                color: Colors.white,
+                size: size.width > 450 ? 24 : 22,
+              ),
+              const SizedBox(width: 14),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Amen',
+                    style: TextStyle(
+                      fontSize: size.width > 450 ? 20 : 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      fontFamily: 'Georgia',
+                      height: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'I have prayed this prayer',
+                    style: TextStyle(
+                      fontSize: size.width > 450 ? 13 : 12,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.white.withOpacity(0.92),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final isCompactPhone = size.width < 390 || size.height < 750;
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.themeMode == ThemeMode.dark;
+    final systemIsDark = themeProvider.themeMode == ThemeMode.dark;
+    // Main category screen always uses the light scenic UI (cream cards),
+    // even when the app theme is dark.
+    final isDark =
+        _prayerGuidanceIsMainScreen() ? false : systemIsDark;
     final isWhiteLight = !isDark &&
         themeProvider.currentCustomTheme == AppCustomTheme.white;
     final accentFill = isWhiteLight
@@ -3242,47 +3794,63 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
         return false;
       },
       child: Scaffold(
+        backgroundColor: _prayerGuidanceIsCreatingView()
+            ? Colors.transparent
+            : (isDark
+                ? CommanColor.darkPrimaryColor
+                : _kPrayerGuidanceCream),
         body: Stack(
           fit: StackFit.expand,
           children: [
-            _prayerGuidanceBackgroundLayer(),
-            if (_prayerGuidanceIsMainScreen()) _prayerGuidanceMainScreenOverlay(),
+            _prayerGuidanceBackgroundLayer(context),
             SafeArea(
+              top: false,
               child: Column(
                 children: [
                   Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    child: Row(
+                    padding: EdgeInsets.fromLTRB(
+                      12,
+                      MediaQuery.paddingOf(context).top +
+                          4 +
+                          (_prayerGuidanceIsMainScreen() ? 0 : 14),
+                      12,
+                      _prayerGuidanceIsMainScreen() ? 8 : 4,
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
                       children: [
-                        IconButton(
-                          onPressed: () async {
-                            // If viewing responses, go back to category selection view
-                            if (_messages.isNotEmpty ||
-                                _isLoading ||
-                                _responseHeaderTitle != null) {
-                              debugPrint(
-                                  '🔙 BACK BUTTON: Back arrow pressed, clearing messages...');
-                              _resetPrayerChatView();
-                              return;
-                            }
-                            // If on category selection view, close the screen (show interstitial for unsubscribed then pop)
-                            debugPrint(
-                                '🔙 BACK BUTTON: Back arrow pressed, closing screen...');
-                            await _maybeShowInterstitialAndPop();
-                          },
-                          icon: Icon(
-                            Icons.arrow_back_ios,
-                            color: _prayerGuidanceIsMainScreen()
-                                ? CommanColor.whiteBlack(context)
-                                : (isDark ? Colors.white : _kPrayerGuidanceInk),
-                            size: 18,
-                          ),
-                        ),
-                      const Expanded(child: SizedBox.shrink()),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
+                        Row(
+                          children: [
+                            IconButton(
+                              onPressed: () async {
+                                // If viewing responses, go back to category selection view
+                                if (_messages.isNotEmpty ||
+                                    _isLoading ||
+                                    _responseHeaderTitle != null) {
+                                  debugPrint(
+                                      '🔙 BACK BUTTON: Back arrow pressed, clearing messages...');
+                                  _resetPrayerChatView();
+                                  return;
+                                }
+                                // If on category selection view, close the screen (show interstitial for unsubscribed then pop)
+                                debugPrint(
+                                    '🔙 BACK BUTTON: Back arrow pressed, closing screen...');
+                                await _maybeShowInterstitialAndPop();
+                              },
+                              icon: Icon(
+                                Icons.arrow_back_ios,
+                                color: _prayerGuidanceIsMainScreen()
+                                    ? _kPrayerGuidanceInk
+                                    : (isDark
+                                        ? Colors.white
+                                        : _kPrayerGuidanceInk),
+                                size: 18,
+                              ),
+                            ),
+                            const Spacer(),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
                           // Wallet icon and credits (same as Chat screen)
                           Container(
                             padding: EdgeInsets.symmetric(
@@ -3290,9 +3858,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                               vertical: size.width > 450 ? 10 : 8,
                             ),
                             decoration: BoxDecoration(
-                              color: Provider.of<ThemeProvider>(context)
-                                          .themeMode ==
-                                      ThemeMode.dark
+                              color: isDark
                                   ? (_prayerGuidanceHasAiResponse()
                                       ? Colors.black.withOpacity(0.55)
                                       : CommanColor.darkPrimaryColor
@@ -3300,9 +3866,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                   : const Color(0xFFF6F1E9).withOpacity(0.65),
                               borderRadius: BorderRadius.circular(22),
                               border: Border.all(
-                                color: Provider.of<ThemeProvider>(context)
-                                            .themeMode ==
-                                        ThemeMode.dark
+                                color: isDark
                                     ? Colors.white.withOpacity(0.28)
                                     : const Color(0xFF8D6E63)
                                         .withOpacity(0.18),
@@ -3327,9 +3891,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                     Icons.account_balance_wallet,
                                     size: size.width > 450 ? 22 : 20,
                                     color: _prayerGuidanceIsMainScreen()
-                                        ? (Provider.of<ThemeProvider>(context)
-                                                    .themeMode ==
-                                                ThemeMode.dark
+                                        ? (isDark
                                             ? Colors.white
                                             : const Color(0xFF8D6E63))
                                         : (isDark
@@ -3341,10 +3903,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                     '$_currentCredits',
                                     style: TextStyle(
                                       color: _prayerGuidanceIsMainScreen()
-                                          ? (Provider.of<ThemeProvider>(
-                                                      context)
-                                                  .themeMode ==
-                                              ThemeMode.dark
+                                          ? (isDark
                                               ? Colors.white
                                               : const Color(0xFF8D6E63))
                                           : (isDark
@@ -3390,38 +3949,26 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                             )
                           else
                             const SizedBox(width: 24, height: 48),
-                        ],
-                      ),
-                    ],
-                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                 ),
                 Expanded(
                   child: _messages.isEmpty
                       ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // Header: illustration, title, subtitle (full-width)
                             Padding(
                               padding:
-                                  const EdgeInsets.symmetric(horizontal: 8),
+                                  const EdgeInsets.symmetric(horizontal: 16),
                               child: Column(
                                 children: [
-                                  const SizedBox(height: 8),
-                                  Icon(
-                                    Icons.volunteer_activism,
-                                    size: size.width > 450 ? 56 : 48,
-                                    color: isDark ? Colors.white : accentFill,
-                                    shadows: isDark
-                                        ? const [
-                                            Shadow(
-                                              color: Colors.black54,
-                                              blurRadius: 8,
-                                              offset: Offset(0, 2),
-                                            ),
-                                          ]
-                                        : null,
-                                  ),
-                                  const SizedBox(height: 12),
+                                  _prayerGuidanceHomeHeaderIcon(size, isDark: isDark),
+                                  const SizedBox(height: 10),
                                   Text(
                                     ChatTranslations.get(
                                         'prayer_guidance_title', 'EN'),
@@ -3429,86 +3976,115 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                     style: TextStyle(
                                       fontWeight: FontWeight.w700,
                                       color: isDark ? Colors.white : titleInk,
-                                      fontSize: size.width > 450 ? 24 : 22,
+                                      fontSize: size.width > 450 ? 26 : 24,
                                       fontFamily: 'Georgia',
-                                      shadows: isDark
-                                          ? const [
-                                              Shadow(
-                                                color: Colors.black87,
-                                                blurRadius: 10,
-                                                offset: Offset(0, 2),
-                                              ),
-                                            ]
-                                          : null,
+                                      height: 1.15,
                                     ),
                                   ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    ChatTranslations.get('get_guidance_need', 'EN'),
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: isDark
-                                          ? Colors.white
-                                          : const Color(0xFF6D6D6D),
-                                      fontSize: size.width > 450 ? 15 : 14,
-                                      fontWeight:
-                                          isDark ? FontWeight.w500 : FontWeight.w400,
-                                      height: 1.35,
-                                      shadows: isDark
-                                          ? const [
-                                              Shadow(
-                                                color: Colors.black87,
-                                                blurRadius: 12,
-                                                offset: Offset(0, 2),
-                                              ),
-                                              Shadow(
-                                                color: Colors.black54,
-                                                blurRadius: 4,
-                                                offset: Offset(0, 1),
-                                              ),
-                                            ]
-                                          : null,
+                                  const SizedBox(height: 8),
+                                  _prayerGuidanceHomeSubtitle(
+                                    'Get guidance based on your need',
+                                    isDark,
+                                    secondLine: 'and God\'s Word.',
+                                  ),
+                                  const SizedBox(height: 10),
+                                  _prayerGuidanceGoldDivider(),
+                                  const SizedBox(height: 14),
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      _timeGreeting(),
+                                      style: TextStyle(
+                                        color: isDark
+                                            ? Colors.white.withOpacity(0.88)
+                                            : const Color(0xFF805531),
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: size.width > 450 ? 16 : 14,
+                                        fontFamily: 'Georgia',
+                                      ),
                                     ),
                                   ),
-                                  const SizedBox(height: 16),
-                                  // Mode selector: Pray for Me / Community Prayers
+                                  SizedBox(
+                                      height: size.width > 450
+                                          ? 6
+                                          : (isCompactPhone ? 2 : 4)),
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      'What do you need\nprayer for today?',
+                                      style: TextStyle(
+                                        color: isDark ? Colors.white : titleInk,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: size.width > 450 ? 26 : 22,
+                                        height: 1.1,
+                                        fontFamily: 'Georgia',
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                      height: size.width > 450
+                                          ? 14
+                                          : (isCompactPhone ? 8 : 10)),
+                                  // Action cards: Pray for Me / Community Prayers
                                   Row(
                                     children: [
                                       Expanded(
                                         child: InkWell(
                                           onTap: () async {
-                                            // When Pray for Me is tapped, directly show the custom prayer dialog (same popup as the search input used to open)
-                                            if (mounted) {
-                                              setState(() {
-                                                _isPrayForMeMode = true;
-                                              });
+                                            final isConnected =
+                                                await InternetConnection()
+                                                    .hasInternetAccess;
+                                            if (!isConnected) {
+                                              Constants.showToast(
+                                                  'No internet connection',
+                                                  5000);
+                                              return;
                                             }
+                                            // When Pray for Me is tapped, directly show the custom prayer dialog (same popup as the search input used to open)
                                             final agreed = await _showPleaseNoteDialog();
                                             if (!agreed || !mounted) return;
                                             _showCustomPrayerDialog(context);
                                           },
-                                          borderRadius: BorderRadius.circular(28),
+                                          borderRadius: BorderRadius.circular(16),
                                           child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 10),
-                                            decoration:
-                                                _prayerModeSelectorDecoration(
-                                              isSelected: _isPrayForMeMode,
-                                              isDark: isDark,
-                                              isWhiteLight: isWhiteLight,
-                                              accentFill: accentFill,
-                                            ),
-                                            child: Center(
-                                              child: Text(
-                                                'Pray for Me',
-                                                style:
-                                                    _prayerModeSelectorTextStyle(
-                                                  isSelected: _isPrayForMeMode,
-                                                  isDark: isDark,
-                                                  titleInk: titleInk,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
+                                            decoration: BoxDecoration(
+                                              gradient: const LinearGradient(
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                                colors: [
+                                                  _kPrayerBrownMid,
+                                                  _kPrayerBrownDark,
+                                                ],
                                               ),
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: _kPrayerBrownDark
+                                                      .withOpacity(0.28),
+                                                  blurRadius: 10,
+                                                  offset: const Offset(0, 5),
+                                                ),
+                                              ],
+                                            ),
+                                            constraints: const BoxConstraints(
+                                              minHeight: 72,
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 12, vertical: 12),
+                                            child: _prayerGuidanceActionCardBody(
+                                              icon: _prayerGuidanceActionIcon(
+                                                'assets/pray_fr_me.png',
+                                                tintColor: Colors.white,
+                                              ),
+                                              title: 'Pray for Me',
+                                              subtitleFirstLine:
+                                                  'Receive personal',
+                                              subtitleSecondLine:
+                                                  'prayer guidance',
+                                              titleColor: Colors.white,
+                                              subtitleColor: Colors.white70,
+                                              titleSize: 12,
                                             ),
                                           ),
                                         ),
@@ -3519,11 +4095,6 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                           onTap: () async {
                                             // Navigate to Prayer Wall (community prayers)
                                             _resetPrayerChatView();
-                                            if (mounted) {
-                                              setState(() {
-                                                _isPrayForMeMode = false;
-                                              });
-                                            }
                                             await _refreshCommunityLiveIndicator();
                                             await Navigator.of(context).push(
                                               MaterialPageRoute(
@@ -3533,76 +4104,135 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                             if (mounted) {
                                               await _refreshCommunityLiveIndicator();
                                               _resetPrayerChatView();
-                                              setState(() {
-                                                _isPrayForMeMode = true;
-                                              });
                                             }
                                           },
-                                          borderRadius: BorderRadius.circular(28),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 10),
-                                            decoration:
-                                                _prayerModeSelectorDecoration(
-                                              isSelected: !_isPrayForMeMode,
-                                              isDark: isDark,
-                                              isWhiteLight: isWhiteLight,
-                                              accentFill: accentFill,
-                                            ),
-                                            child: Stack(
-                                              clipBehavior: Clip.none,
-                                              alignment: Alignment.center,
-                                              children: [
-                                                Center(
-                                                  child: Text(
-                                                    'Community Prayers',
-                                                    style:
-                                                        _prayerModeSelectorTextStyle(
-                                                      isSelected:
-                                                          !_isPrayForMeMode,
-                                                      isDark: isDark,
-                                                      titleInk: titleInk,
-                                                    ),
+                                          borderRadius: BorderRadius.circular(16),
+                                          child: Stack(
+                                            clipBehavior: Clip.none,
+                                            children: [
+                                              Container(
+                                                decoration: BoxDecoration(
+                                                  color: isDark
+                                                      ? Colors.black
+                                                          .withOpacity(0.42)
+                                                      : _kPrayerCardCream,
+                                                  borderRadius:
+                                                      BorderRadius.circular(16),
+                                                  border: Border.all(
+                                                    color: isDark
+                                                        ? Colors.white
+                                                            .withOpacity(0.22)
+                                                        : _kPrayerCardBorder,
                                                   ),
-                                                ),
-                                                if (_communityLiveOnline)
-                                                  Positioned(
-                                                    top: -3,
-                                                    right: 6,
-                                                    child: Container(
-                                                      width: 9,
-                                                      height: 9,
-                                                      decoration: BoxDecoration(
-                                                        color: Colors.red,
-                                                        shape: BoxShape.circle,
-                                                        border: Border.all(
-                                                          color: isDark
-                                                              ? Colors.white
-                                                                  .withOpacity(
-                                                                      0.9)
-                                                              : Colors.white,
-                                                          width: 1.5,
-                                                        ),
-                                                        boxShadow: [
+                                                  boxShadow: isDark
+                                                      ? null
+                                                      : [
                                                           BoxShadow(
-                                                            color: Colors.red
-                                                                .withOpacity(0.55),
-                                                            blurRadius: 4,
+                                                            color:
+                                                                _kPrayerBrownDark
+                                                                    .withOpacity(
+                                                                        0.08),
+                                                            blurRadius: 8,
+                                                            offset:
+                                                                const Offset(
+                                                                    0, 4),
                                                           ),
                                                         ],
+                                                ),
+                                                constraints:
+                                                    const BoxConstraints(
+                                                  minHeight: 72,
+                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 12,
+                                                  vertical: 12,
+                                                ),
+                                                child:
+                                                    _prayerGuidanceActionCardBody(
+                                                  icon: _prayerGuidanceActionIcon(
+                                                    'assets/community.png',
+                                                    tintColor: isDark
+                                                        ? Colors.white
+                                                        : _kPrayerBrownMid,
+                                                  ),
+                                                  title: 'Community Prayers',
+                                                  subtitleFirstLine:
+                                                      'See what others',
+                                                  subtitleSecondLine:
+                                                      'are praying for',
+                                                  titleColor: isDark
+                                                      ? Colors.white
+                                                      : const Color(
+                                                          0xFF3D2914),
+                                                  subtitleColor: isDark
+                                                      ? Colors.white
+                                                          .withOpacity(0.78)
+                                                      : const Color(
+                                                              0xFF4A3728)
+                                                          .withOpacity(0.72),
+                                                  titleSize: 11.5,
+                                                ),
+                                              ),
+                                              if (_communityPrayerCountLoaded &&
+                                                  _communityPrayerCount > 0)
+                                                Positioned(
+                                                  top: -11,
+                                                  right: 6,
+                                                  child: Container(
+                                                    constraints:
+                                                        const BoxConstraints(
+                                                      minWidth: 22,
+                                                      minHeight: 22,
+                                                    ),
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 2,
+                                                    ),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(
+                                                          0xFFE89B3C),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              11),
+                                                      border: Border.all(
+                                                        color: Colors.white,
+                                                        width: 2,
+                                                      ),
+                                                    ),
+                                                    alignment: Alignment.center,
+                                                    child: Text(
+                                                      _communityPrayerCount > 99
+                                                          ? '99+'
+                                                          : '$_communityPrayerCount',
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        height: 1.1,
                                                       ),
                                                     ),
                                                   ),
-                                              ],
-                                            ),
+                                                )
+                                            ],
                                           ),
                                         ),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 20),
-                                  // Search input removed: tapping "Pray for Me" shows the same popup as before
-                                  const SizedBox(height: 12),
+                                  SizedBox(
+                                    height: size.width > 450
+                                        ? 14
+                                        : (isCompactPhone ? 8 : 10),
+                                  ),
+
+                                  SizedBox(
+                                    height: size.width > 450
+                                        ? 8
+                                        : (isCompactPhone ? 2 : 4),
+                                  ),
                                 ],
                               ),
                             ),
@@ -3610,61 +4240,83 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                             Expanded(
                               child: SingleChildScrollView(
                                 controller: _scrollController,
+                                physics: const ClampingScrollPhysics(),
+                                primary: false,
                                 padding:
-                                    const EdgeInsets.symmetric(horizontal: 8),
+                                    const EdgeInsets.symmetric(horizontal: 16),
                                 child: Column(
                                   children: [
-                                    GridView.builder(
-                                      shrinkWrap: true,
-                                      physics:
-                                          const NeverScrollableScrollPhysics(),
-                                      gridDelegate:
-                                          SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: 2,
-                                        crossAxisSpacing:
-                                            size.width > 450 ? 16 : 12,
-                                        mainAxisSpacing:
-                                            size.width > 450 ? 16 : 12,
-                                        childAspectRatio:
-                                            size.width > 450 ? 1.4 : 1.3,
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        'Prayer Categories',
+                                        style: TextStyle(
+                                          color: isDark
+                                              ? Colors.white
+                                              : const Color(0xFF3D2914),
+                                          fontWeight: FontWeight.w700,
+                                          fontSize:
+                                              size.width > 450 ? 18 : 16,
+                                          fontFamily: 'Georgia',
+                                          shadows: isDark
+                                              ? const [
+                                                  Shadow(
+                                                    color: Colors.black54,
+                                                    blurRadius: 6,
+                                                    offset: Offset(0, 1),
+                                                  ),
+                                                ]
+                                              : null,
+                                        ),
                                       ),
-                                      itemCount: _categories.length,
-                                      itemBuilder: (context, index) {
-                                        final categoryIndex = index;
-                                        // Get icon for each category
-                                        IconData categoryIcon;
+                                    ),
+                                    // Keep the grid tight under the header.
+                                    const SizedBox(height: 10),
+                                    LayoutBuilder(
+                                      builder: (context, gridConstraints) {
+                                        const crossAxisCount = 3;
+                                        const gridSpacing = 10.0;
+                                        const categoryCircleSize = 56.0;
+                                        final titleSlotHeight =
+                                            size.width > 450 ? 34.0 : 30.0;
+                                        final subtitleSlotHeight =
+                                            size.width > 450 ? 26.0 : 24.0;
+                                        final accentStripHeight = isDark ? 4.0 : 11.0;
+                                        final cardPaddingV =
+                                            size.width > 450 ? 14.0 : 10.0;
+                                        const cardBorderInset = 2.0;
+                                        final cellHeight = (categoryCircleSize +
+                                                6 +
+                                                titleSlotHeight +
+                                                subtitleSlotHeight +
+                                                accentStripHeight +
+                                                cardPaddingV * 2 +
+                                                cardBorderInset)
+                                            .clamp(148.0, 176.0);
 
-                                        switch (categoryIndex % 9) {
-                                          case 0: // Thanksgiving
-                                            categoryIcon = Icons.celebration;
-                                            break;
-                                          case 1: // Forgiving
-                                            categoryIcon = Icons.favorite;
-                                            break;
-                                          case 2: // Guidance
-                                            categoryIcon = Icons.lightbulb;
-                                            break;
-                                          case 3: // Anxiety & Peace
-                                            categoryIcon =
-                                                Icons.self_improvement;
-                                            break;
-                                          case 4: // Healing
-                                            categoryIcon = Icons.healing;
-                                            break;
-                                          case 5: // Family
-                                            categoryIcon =
-                                                Icons.family_restroom;
-                                            break;
-                                          case 6: // Strength
-                                            categoryIcon = Icons.fitness_center;
-                                            break;
-                                          case 7: // Protection
-                                            categoryIcon = Icons.shield;
-                                            break;
-                                          default: // Feelings
-                                            categoryIcon = Icons.mood;
-                                            break;
-                                        }
+                                        return GridView.builder(
+                                          shrinkWrap: true,
+                                          physics:
+                                              const NeverScrollableScrollPhysics(),
+                                          padding: EdgeInsets.zero,
+                                          gridDelegate:
+                                              SliverGridDelegateWithFixedCrossAxisCount(
+                                            crossAxisCount: crossAxisCount,
+                                            crossAxisSpacing: gridSpacing,
+                                            mainAxisSpacing: gridSpacing,
+                                            mainAxisExtent: cellHeight,
+                                          ),
+                                          itemCount: _categories.length >= 6
+                                              ? 6
+                                              : _categories.length,
+                                          itemBuilder: (context, index) {
+                                        // Match reference order: Thanksgiving, Healing, Forgiveness, Guidance, Anxiety & Peace, Family
+                                        final order = <int>[0, 4, 1, 2, 3, 5];
+                                        final categoryIndex = order
+                                            .where((i) => i < _categories.length)
+                                            .toList()[index];
+                                        final iconAsset =
+                                            _categoryIconAsset(categoryIndex);
 
                                         final borderClr = isDark
                                             ? Colors.white.withOpacity(0.28)
@@ -3672,6 +4324,8 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                         final textClr = isDark
                                             ? Colors.white
                                             : const Color(0xFF3D2914);
+                                        final accentClr =
+                                            _categoryAccentColor(categoryIndex);
                                         final textShadows = isDark
                                             ? const [
                                                 Shadow(
@@ -3690,89 +4344,193 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                               BorderRadius.circular(16),
                                           child: Container(
                                             padding: EdgeInsets.symmetric(
-                                              horizontal:
-                                                  size.width > 450 ? 16 : 12,
-                                              vertical:
-                                                  size.width > 450 ? 20 : 16,
+                                              horizontal: 8,
+                                              vertical: size.width > 450
+                                                  ? 14
+                                                  : 10,
                                             ),
                                             decoration: BoxDecoration(
-                                              image: isDark
-                                                  ? null
-                                                  : DecorationImage(
-                                                      image: AssetImage(
-                                                          Images.bgImage(
-                                                              context)),
-                                                      fit: BoxFit.cover,
-                                                      colorFilter:
-                                                          ColorFilter.mode(
-                                                        Colors.white
-                                                            .withOpacity(0.12),
-                                                        BlendMode.srcATop,
-                                                      ),
-                                                    ),
                                               color: isDark
                                                   ? Colors.black
                                                       .withOpacity(0.48)
-                                                  : Colors.white
-                                                      .withOpacity(0.88),
+                                                  : _kPrayerCardCream,
                                               borderRadius:
                                                   BorderRadius.circular(16),
                                               border: Border.all(
-                                                color: borderClr,
+                                                color: isDark
+                                                    ? borderClr
+                                                    : _kPrayerCardBorder,
                                                 width: 1,
                                               ),
+                                              boxShadow: isDark
+                                                  ? null
+                                                  : [
+                                                      BoxShadow(
+                                                        color: _kPrayerBrownDark
+                                                            .withOpacity(0.06),
+                                                        blurRadius: 6,
+                                                        offset:
+                                                            const Offset(0, 3),
+                                                      ),
+                                                    ],
                                             ),
                                             child: Column(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
+                                              mainAxisSize: MainAxisSize.min,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.center,
                                               children: [
-                                                Icon(
-                                                  categoryIcon,
-                                                  size: size.width > 450
-                                                      ? 30
-                                                      : 26,
-                                                  color: textClr,
-                                                  shadows: textShadows,
-                                                ),
-                                                const SizedBox(height: 8),
-                                                Text(
-                                                  _categories[categoryIndex]
-                                                      .title,
-                                                  textAlign: TextAlign.center,
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.w600,
-                                                    fontSize: size.width > 450
-                                                        ? 15
-                                                        : 13,
-                                                    color: textClr,
-                                                    shadows: textShadows,
+                                                SizedBox(
+                                                  height: categoryCircleSize + 6,
+                                                  width: double.infinity,
+                                                  child: Center(
+                                                    child: iconAsset != null
+                                                        ? SizedBox(
+                                                            width:
+                                                                categoryCircleSize,
+                                                            height:
+                                                                categoryCircleSize,
+                                                            child: Image.asset(
+                                                              iconAsset,
+                                                              fit: BoxFit.contain,
+                                                              filterQuality:
+                                                                  FilterQuality
+                                                                      .high,
+                                                            ),
+                                                          )
+                                                        : Container(
+                                                            width:
+                                                                categoryCircleSize,
+                                                            height:
+                                                                categoryCircleSize,
+                                                            decoration:
+                                                                BoxDecoration(
+                                                              color: isDark
+                                                                  ? Colors.white
+                                                                      .withOpacity(
+                                                                          0.12)
+                                                                  : accentClr
+                                                                      .withOpacity(
+                                                                          0.14),
+                                                              shape: BoxShape
+                                                                  .circle,
+                                                            ),
+                                                            child: Icon(
+                                                              Icons.favorite,
+                                                              size:
+                                                                  categoryCircleSize *
+                                                                      0.38,
+                                                              color: isDark
+                                                                  ? textClr
+                                                                  : accentClr,
+                                                              shadows:
+                                                                  textShadows,
+                                                            ),
+                                                          ),
                                                   ),
                                                 ),
-                                                const SizedBox(height: 6),
-                                                Text(
-                                                  categoryIndex < _categorySubtitles.length
-                                                      ? _categorySubtitles[categoryIndex]
-                                                      : '',
-                                                  textAlign: TextAlign.center,
-                                                  style: TextStyle(
-                                                    fontSize: size.width > 450 ? 13 : 12,
-                                                    color: isDark
-                                                        ? Colors.white
-                                                            .withOpacity(0.9)
-                                                        : textClr
-                                                            .withOpacity(0.85),
-                                                    fontWeight: FontWeight.w400,
-                                                    shadows: textShadows,
+                                                SizedBox(
+                                                  height: titleSlotHeight,
+                                                  width: double.infinity,
+                                                  child: Align(
+                                                    alignment: Alignment.center,
+                                                    child: Text(
+                                                      _categories[categoryIndex]
+                                                          .title,
+                                                      maxLines: 2,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      textAlign: TextAlign.center,
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        fontSize:
+                                                            size.width > 450
+                                                                ? 14
+                                                                : 12,
+                                                        height: 1.1,
+                                                        color: textClr,
+                                                        shadows: textShadows,
+                                                      ),
+                                                    ),
                                                   ),
                                                 ),
+                                                SizedBox(
+                                                  height: subtitleSlotHeight,
+                                                  width: double.infinity,
+                                                  child: Align(
+                                                    alignment: Alignment.center,
+                                                    child: Text(
+                                                      categoryIndex <
+                                                              _categorySubtitles
+                                                                  .length
+                                                          ? _categorySubtitles[
+                                                              categoryIndex]
+                                                          : '',
+                                                      maxLines: 2,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      textAlign: TextAlign.center,
+                                                      style: TextStyle(
+                                                        fontSize:
+                                                            size.width > 450
+                                                                ? 11.5
+                                                                : 10,
+                                                        color: isDark
+                                                            ? Colors.white
+                                                                .withOpacity(
+                                                                    0.9)
+                                                            : textClr
+                                                                .withOpacity(
+                                                                    0.78),
+                                                        fontWeight:
+                                                            FontWeight.w400,
+                                                        shadows: textShadows,
+                                                        height: 1.15,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                if (!isDark) ...[
+                                                  const SizedBox(height: 4),
+                                                  Center(
+                                                    child: Container(
+                                                      width: 24,
+                                                      height: 3,
+                                                      decoration: BoxDecoration(
+                                                        color: accentClr
+                                                            .withOpacity(0.7),
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(6),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                                const SizedBox(height: 2),
                                               ],
                                             ),
                                           ),
                                         );
                                       },
+                                    );
+                                      },
                                     ),
-                                    const SizedBox(height: 24),
-
+                                    const SizedBox(height: 16),
+                                    FutureBuilder<bool>(
+                                      future: _showPrayerReminderPromptFuture,
+                                      builder: (context, snapshot) {
+                                        if (snapshot.data != true) {
+                                          return const SizedBox.shrink();
+                                        }
+                                        return Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            _buildDailyPrayerReminderCard(isDark),
+                                            const SizedBox(height: 16),
+                                          ],
+                                        );
+                                      },
+                                    ),
                                     const SizedBox(height: 24),
                                   ],
                                 ),
@@ -3792,10 +4550,9 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                       size.width > 450 ? 20 : 16,
                       12,
                     ),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () async {
+                    child: _buildPrayerAmenButton(
+                      size,
+                      onPressed: () async {
                           // Increment AMEN tap counter
                           _amenTapCount++;
                           await _saveAmenTapCount(); // Save to SharedPreferences
@@ -3834,47 +4591,6 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                             }
                           }
                         },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: isDark
-                              ? const Color(0xFF8B6F47)
-                              : const Color(0xFFC59434),
-                          foregroundColor: Colors.white,
-                          elevation: 2,
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 14,
-                            horizontal: 20,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(32),
-                          ),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Amen',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: size.width > 450 ? 20 : 18,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                                fontFamily: 'Georgia',
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'I have prayed this prayer',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: size.width > 450 ? 13 : 12,
-                                fontWeight: FontWeight.w400,
-                                color: Colors.white.withOpacity(0.92),
-                                fontFamily: 'Georgia',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     ),
                   ),
               ],
@@ -3885,6 +4601,33 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     ),
     );
   }
+}
+
+class _PrayerCreatingDashedLinePainter extends CustomPainter {
+  _PrayerCreatingDashedLinePainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
+    const dashHeight = 4.0;
+    const gap = 4.0;
+    var y = 0.0;
+    final x = size.width / 2;
+    while (y < size.height) {
+      final endY = y + dashHeight;
+      canvas.drawLine(Offset(x, y), Offset(x, endY > size.height ? size.height : endY), paint);
+      y += dashHeight + gap;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _PrayerCreatingDashedLinePainter oldDelegate) =>
+      oldDelegate.color != color;
 }
 
 class _GuidanceCategory {

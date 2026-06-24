@@ -9,6 +9,7 @@ import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/main.dart';
 import 'package:biblebookapp/utils/emoji_text_style.dart';
+import 'package:biblebookapp/view/widget/thanks_for_love_rating_dialog_content.dart';
 import 'package:biblebookapp/view/constants/assets_constants.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
@@ -649,90 +650,24 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
-        final isTablet = MediaQuery.of(context).size.width > 600;
+      builder: (dialogContext) {
+        final isTablet = MediaQuery.of(dialogContext).size.width > 600;
         final dialogWidth = isTablet ? 400.0 : double.infinity;
-        double screenWidth = MediaQuery.of(context).size.width;
         return Dialog(
           backgroundColor: CommanColor.white,
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           child: Container(
             width: dialogWidth,
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      GestureDetector(
-                          onTap: () {
-                            Navigator.of(context).pop();
-                          },
-                          child: Icon(
-                            Icons.close,
-                            color: Colors.grey,
-                          )),
-                    ],
-                  ),
-                ),
-                emojiText('😍', fontSize: 40),
-                const SizedBox(height: 15),
-                textWithTrailingEmoji(
-                  prefix: 'Thanks for the love! ',
-                  emoji: '💛',
-                  emojiFontSize: isTablet ? 19 : 16,
-                  prefixStyle: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: isTablet ? 19 : 16,
-                    color: CommanColor.black,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  "Leave us a quick rating to help others\nexperience God's Word too!",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: isTablet
-                        ? 19
-                        : screenWidth < 380
-                            ? 12.5
-                            : 14,
-                    color: CommanColor.black,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () async {
-                    Navigator.pop(context);
-                    // Add your rate app logic here
-                    await SharPreferences.setString('OpenAd', '1');
-                    _requestReview();
-                  },
-                  style:
-                      ElevatedButton.styleFrom(backgroundColor: Colors.brown),
-                  child: Text(
-                    "Rate the app",
-                    style: TextStyle(
-                      color: CommanColor.white,
-                      fontSize: isTablet ? 17 : null,
-                    ),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(
-                    "Later",
-                    style: TextStyle(
-                      color: CommanColor.black,
-                      fontSize: isTablet ? 17 : null,
-                    ),
-                  ),
-                ),
-              ],
+            child: ThanksForLoveRatingDialogContent(
+              onClose: () => Navigator.of(dialogContext).pop(),
+              onRate: () async {
+                Navigator.pop(dialogContext);
+                // Add your rate app logic here
+                await SharPreferences.setString('OpenAd', '1');
+                _requestReview();
+              },
+              onMaybeLater: () => Navigator.pop(dialogContext),
             ),
           ),
         );

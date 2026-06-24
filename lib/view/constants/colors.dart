@@ -67,6 +67,15 @@ class CommanColor {
         : Colors.black;
   }
 
+  /// Text on solid custom backgrounds (yellow/white themes) stays dark even in dark mode.
+  static Color contentTextColor(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    if (themeProvider.currentCustomTheme != AppCustomTheme.vintage) {
+      return Colors.black;
+    }
+    return whiteBlack(context);
+  }
+
   static Color container(BuildContext context) {
     return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
         ? const Color.fromARGB(255, 121, 90, 43)
@@ -158,6 +167,16 @@ class CommanStyle {
             fontSize: BibleInfo.fontSizeScale * 18,
             overflow: TextOverflow.ellipsis,
             fontWeight: FontWeight.w600);
+  }
+
+  static TextStyle themedAppBarStyle(BuildContext context) {
+    return TextStyle(
+      color: CommanColor.contentTextColor(context),
+      letterSpacing: BibleInfo.letterSpacing,
+      fontSize: BibleInfo.fontSizeScale * 18,
+      overflow: TextOverflow.ellipsis,
+      fontWeight: FontWeight.w600,
+    );
   }
 
   static TextStyle bw14400(BuildContext context) {

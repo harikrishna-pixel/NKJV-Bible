@@ -1,5 +1,6 @@
 import 'package:biblebookapp/services/analytics/analytics_service.dart';
 import 'package:biblebookapp/utils/internet_speed_checker.dart';
+import 'package:biblebookapp/utils/network_error_message.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/images.dart';
@@ -21,10 +22,12 @@ class QuoteScreen extends HookConsumerWidget {
     final quotesState = ref.watch(quotesCategoryBloc).quotesCategoryState;
     final hasShownToast = useRef(false);
     final hasCheckedNetwork = useRef(false);
+    final emptyStateMessage = useState<String?>(null);
     final screenSize = MediaQuery.of(context).size;
     final screenWidth = screenSize.width;
-    final isVintageTheme = p.Provider.of<ThemeProvider>(context).currentCustomTheme ==
-        AppCustomTheme.vintage;
+    final themeProvider = p.Provider.of<ThemeProvider>(context);
+    final isVintageTheme =
+        themeProvider.currentCustomTheme == AppCustomTheme.vintage;
     
     useMemoized(() {
       WidgetsBinding.instance.addPostFrameCallback((callback) {
@@ -34,6 +37,7 @@ class QuoteScreen extends HookConsumerWidget {
         // Reset toast flag when starting to load
         hasShownToast.value = false;
         hasCheckedNetwork.value = false;
+        emptyStateMessage.value = null;
       });
     });
     
@@ -46,9 +50,15 @@ class QuoteScreen extends HookConsumerWidget {
         Future.delayed(const Duration(seconds: 1), () {
           if (!cancelled && quotesState.isLoading && !hasShownToast.value) {
             // Then wait additional 5 seconds before showing toast (total 6 seconds)
-            Future.delayed(const Duration(seconds: 5), () {
+            Future.delayed(const Duration(seconds: 5), () async {
               if (!cancelled && quotesState.isLoading && !hasShownToast.value) {
-                Constants.showToast('Check Your Internet Connection');
+                final hasInternet =
+                    await InternetConnection().hasInternetAccess;
+                if (!hasInternet) {
+                  Constants.showToast('No internet connection');
+                } else {
+                  Constants.showToast(kCheckInternetConnectionMessage);
+                }
                 hasShownToast.value = true;
               }
             });
@@ -71,9 +81,7 @@ class QuoteScreen extends HookConsumerWidget {
                   fit: BoxFit.fill,
                 ),
               )
-            : BoxDecoration(
-                color: CommanColor.Blackwhite(context),
-              ),
+            : BoxDecoration(color: themeProvider.backgroundColor),
         child: SafeArea(
           child: Column(
             children: [
@@ -92,11 +100,11 @@ class QuoteScreen extends HookConsumerWidget {
                       child: Icon(
                         Icons.arrow_back_ios,
                         size: 20,
-                        color: CommanColor.whiteBlack(context),
+                        color: CommanColor.contentTextColor(context),
                       ),
                     ),
                   ),
-                  Text("Quotes", style: CommanStyle.appBarStyle(context)),
+                  Text("Quotes", style: CommanStyle.themedAppBarStyle(context)),
                   const SizedBox(width: 20)
                 ],
               ),
@@ -112,7 +120,8 @@ class QuoteScreen extends HookConsumerWidget {
                     WidgetsBinding.instance.addPostFrameCallback((_) async {
                       final hasInternet = await InternetConnection().hasInternetAccess;
                       if (!hasInternet) {
-                        Constants.showToast('No Internet Connection');
+                        emptyStateMessage.value = 'No internet connection';
+                        Constants.showToast('No internet connection');
                         return;
                       }
                       
@@ -125,15 +134,31 @@ class QuoteScreen extends HookConsumerWidget {
                         final isSlowConnection = connectionSpeed == null || connectionSpeed > 5000;
                         
                         if (isSlowConnection) {
-                          Constants.showToast('Check Your Internet Connection');
+                          emptyStateMessage.value = kCheckInternetConnectionMessage;
+                          Constants.showToast(kCheckInternetConnectionMessage);
                         }
                       } catch (e) {
                         // On error, assume slow connection
-                        Constants.showToast('Check Your Internet Connection');
+                        emptyStateMessage.value = kCheckInternetConnectionMessage;
+                        Constants.showToast(kCheckInternetConnectionMessage);
                       }
                     });
                   }
                   
+                  if (data.isEmpty) {
+                    return Center(
+                      child: Text(
+                        emptyStateMessage.value ??
+                            kCheckInternetConnectionMessage,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: CommanColor.contentTextColor(context),
+                          fontSize: 16,
+                        ),
+                      ),
+                    );
+                  }
+
                   return GridView.builder(
                     physics: const BouncingScrollPhysics(),
                     itemCount: data.length,
@@ -153,7 +178,12 @@ class QuoteScreen extends HookConsumerWidget {
                   );
                 },
                 error: (error, st) {
-                  return Center(child: Text('Check your Internet connection'));
+                  return Center(
+                    child: Text(
+                      userFacingNetworkMessage(error),
+                      textAlign: TextAlign.center,
+                    ),
+                  );
                 },
                 loading: () => Center(
                   child: Column(
@@ -168,7 +198,7 @@ class QuoteScreen extends HookConsumerWidget {
                       Text(
                         "Loading...",
                         style: TextStyle(
-                          color: CommanColor.whiteBlack(context)
+                          color: CommanColor.contentTextColor(context)
                               .withOpacity(0.85),
                           fontSize: 14,
                           fontWeight: FontWeight.w500,

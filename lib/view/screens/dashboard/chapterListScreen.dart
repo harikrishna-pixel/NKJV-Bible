@@ -33,12 +33,40 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   int selectedChangeChapter = 0;
   List<VerseBookContentModel> selectedVersesContent = [];
   bool loader = false;
+  bool? _chapterNumIsZeroBased;
   // var allChapterlist = {};
   @override
   void initState() {
     super.initState();
     loadChapter();
     selectedChapter = int.parse(widget.selectedChapter.toString()) - 1;
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    loadChapter();
+  }
+
+  /// DB stores chapter_num 0-based (ch.1 = 0) or 1-based (ch.1 = 1).
+  bool _usesZeroBasedChapterNums() {
+    if (_chapterNumIsZeroBased != null) return _chapterNumIsZeroBased!;
+    _chapterNumIsZeroBased =
+        selectedVersesContent.any((v) => (v.chapterNum ?? -1) == 0);
+    return _chapterNumIsZeroBased!;
+  }
+
+  int _storedChapterNumForUiIndex(int index) {
+    return _usesZeroBasedChapterNums() ? index : index + 1;
+  }
+
+  bool _isUiChapterRead(int index) {
+    final storedChapter = _storedChapterNumForUiIndex(index);
+    final chapterVerses = selectedVersesContent.where((v) {
+      return v.chapterNum?.toInt() == storedChapter;
+    }).toList();
+    if (chapterVerses.isEmpty) return false;
+    return chapterVerses.any((v) => v.isRead == 'yes');
   }
 
   Future<void> loadChapter() async {
@@ -54,6 +82,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
 
       if (!mounted) return;
       setState(() {
+        _chapterNumIsZeroBased = null;
         selectedVersesContent = rows
             .map<VerseBookContentModel>(
                 (e) => VerseBookContentModel.fromJson(e))
@@ -143,16 +172,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                       scrollDirection: Axis.vertical,
                       physics: const ClampingScrollPhysics(),
                       itemBuilder: (context, index) {
-                        var chapterRead = 'no';
-                        for (var i = 0; i < selectedVersesContent.length; i++) {
-                          if (index + 1 ==
-                              selectedVersesContent[i].chapterNum) {
-                            chapterRead =
-                                selectedVersesContent[i].isRead.toString();
-                            break;
-                          }
-                        }
-                        final isChapterRead = chapterRead != 'no';
+                        final isChapterRead = _isUiChapterRead(index);
                         final isSelected = selectedChapter == index;
                         final progressColor =
                             CommanColor.progressFillColor(context);

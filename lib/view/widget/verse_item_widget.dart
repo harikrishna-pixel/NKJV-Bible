@@ -109,6 +109,8 @@ class _VerseItemWidgetState extends State<VerseItemWidget> {
       ) {
     final baseStyle = TextStyle(
       letterSpacing: BibleInfo.letterSpacing,
+      wordSpacing: 1.2,
+      height: 1.45,
       fontSize: screenWidth > 450
           ? BibleInfo.fontSizeScale * widget.controller.fontSize.value
           : BibleInfo.fontSizeScale * widget.controller.fontSize.value,

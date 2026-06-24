@@ -20,6 +20,7 @@ import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../Model/dailyVerseList.dart';
 import '../../constants/constant.dart';
 import '../../constants/images.dart';
@@ -152,8 +153,18 @@ class _DailyVerseState extends State<DailyVerse> {
     // Ensure the verses are loaded
     await provider.loadDailyVerses();
 
+    var allVerses = provider.dailyVerseList;
+    if (allVerses.isEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      final cats = prefs.getStringList('selected_categories') ?? [];
+      if (cats.isNotEmpty) {
+        await prefs.setBool('dataIsChanged', true);
+        await provider.loadDailyVerses();
+        allVerses = provider.dailyVerseList;
+      }
+    }
+
     final todayOnly = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final allVerses = provider.dailyVerseList;
 
     dailyVerseList = allVerses
         .where((verse) {
@@ -166,6 +177,10 @@ class _DailyVerseState extends State<DailyVerse> {
           }
         })
         .toList();
+
+    if (dailyVerseList.isEmpty && allVerses.isNotEmpty) {
+      dailyVerseList = List<DailyVerseList>.from(allVerses);
+    }
 
     // Stable ordering: newest (latest date) first so "first" is deterministic.
     dailyVerseList.sort((a, b) {
@@ -509,10 +524,10 @@ class _DailyVerseState extends State<DailyVerse> {
                                 appid = BibleInfo.apple_AppId;
                                 if (Platform.isAndroid) {
                                   message =
-                                      "${html.parse("${data.verse}").body?.text ?? ''}. \n   You can read more at:\nhttps://play.google.com/store/apps/details?id=$appPackageName";
+                                      "${html.parse("${data.verse}").body?.text ?? ''}.\n\nYou can read more at:\nhttps://play.google.com/store/apps/details?id=$appPackageName";
                                 } else if (Platform.isIOS) {
                                   message =
-                                      '${html.parse("${data.verse}").body?.text ?? ''}.\n ${data.book} ${data.chapter! + 1}:${data.verseNum! + 1} \n You can read more at:\nhttps://itunes.apple.com/app/id$appid'; // Example iTunes URL
+                                      '${html.parse("${data.verse}").body?.text ?? ''}.\n${data.book} ${data.chapter! + 1}:${data.verseNum! + 1}\n\nYou can read more at:\nhttps://itunes.apple.com/app/id$appid'; // Example iTunes URL
                                 }
 
                                 if (message.isNotEmpty) {
@@ -526,6 +541,13 @@ class _DailyVerseState extends State<DailyVerse> {
                               },
                               onShareAsImage: () async {
                                 Navigator.of(context).pop();
+                                final appPackageName =
+                                    (await PackageInfo.fromPlatform())
+                                        .packageName;
+                                final appid = BibleInfo.apple_AppId;
+                                final shareFooterMessage = Platform.isAndroid
+                                    ? '\n\nYou can read more at:\nhttps://play.google.com/store/apps/details?id=$appPackageName'
+                                    : '\n\nYou can read more at:\nhttps://itunes.apple.com/app/id$appid';
                                 final controller = DashBoardController();
                                 await showModalBottomSheet(
                                   isScrollControlled: true,
@@ -540,6 +562,7 @@ class _DailyVerseState extends State<DailyVerse> {
                                           "${int.parse(data.chapter.toString()) + 1}",
                                       selectedVerseView:
                                           "${int.parse(data.verseNum.toString()) + 1}",
+                                      shareFooterMessage: shareFooterMessage,
                                       // data.verseNum.toString(),
                                     );
                                   },
@@ -661,7 +684,7 @@ class _DailyVerseState extends State<DailyVerse> {
                     Padding(
                       padding: const EdgeInsets.only(right: 20.0),
                       child: Text(
-                        "Daily Verse",
+                        "Daily Verses",
                         style: CommanStyle.appBarStyle(context).copyWith(
                             fontSize: screenWidth > 450
                                 ? BibleInfo.fontSizeScale * 30
@@ -684,18 +707,28 @@ class _DailyVerseState extends State<DailyVerse> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
-                            color:
-                                Provider.of<ThemeProvider>(context, listen: false)
-                                            .themeMode ==
-                                        ThemeMode.dark
-                                    ? CommanColor.lightDarkPrimary(context)
-                                        .withOpacity(0.92)
-                                    : CommanColor.lightDarkPrimary(context)
-                                        .withOpacity(0.14),
+                            color: Provider.of<ThemeProvider>(context,
+                                            listen: false)
+                                        .themeMode ==
+                                    ThemeMode.dark
+                                ? Colors.transparent
+                                : CommanColor.lightDarkPrimary(context)
+                                    .withOpacity(0.14),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: CommanColor.lightDarkPrimary(context)
-                                  .withOpacity(0.28),
+                              color: Provider.of<ThemeProvider>(context,
+                                              listen: false)
+                                          .themeMode ==
+                                      ThemeMode.dark
+                                  ? Colors.white
+                                  : CommanColor.lightDarkPrimary(context)
+                                      .withOpacity(0.45),
+                              width: Provider.of<ThemeProvider>(context,
+                                              listen: false)
+                                          .themeMode ==
+                                      ThemeMode.dark
+                                  ? 1.2
+                                  : 1,
                             ),
                           ),
                           child: Row(
@@ -713,7 +746,7 @@ class _DailyVerseState extends State<DailyVerse> {
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                'Choose Verse Topics',
+                                'Topics',
                                 style: TextStyle(
                                   fontSize: screenWidth > 450 ? 14 : 12,
                                   fontWeight: FontWeight.w600,

@@ -20,7 +20,7 @@ class CalendarScreen extends StatefulHookConsumerWidget {
 }
 
 class _CalendarScreenState extends ConsumerState<CalendarScreen> {
-  static const Color _tanCircle = Color(0xFFE5D3B3);
+  static const Color _tanCircle = Color(0xFFD4A96A);
 
   @override
   void initState() {
@@ -115,20 +115,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             label: 'Event /\nReminder',
             textColor: textColor,
           ),
-          _legendDivider(brown),
-          _legendItem(
-            icon: Text(
-              '1',
-              style: TextStyle(
-                fontFamily: 'Georgia',
-                fontSize: BibleInfo.fontSizeScale * 14,
-                color: CommanColor.progressUnFillColor(context).withOpacity(0.6),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            label: 'Other Month\nDays',
-            textColor: textColor,
-          ),
         ],
       ),
     );
@@ -143,8 +129,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     });
 
     final calendarBloc = ref.watch(calendarDataBloc);
+    final themeProvider = p.Provider.of<ThemeProvider>(context);
+    final isVintageTheme =
+        themeProvider.currentCustomTheme == AppCustomTheme.vintage;
     final brown = CommanColor.calendarSelectedColor(context);
-    final textColor = CommanColor.whiteBlack(context);
+    final textColor = CommanColor.contentTextColor(context);
 
     Widget cellWidget(DateTime day, {bool isOutside = false}) {
       final bool isSunday = day.weekday == DateTime.sunday;
@@ -155,7 +144,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           hasEvents && events.any((event) => !event.canEdit);
 
       final bool showTanCircle =
-          !isSelected && (isSunday || isSpecialDay);
+          !isOutside && !isSelected && (isSunday || isSpecialDay);
 
       return GestureDetector(
         onTap: () {
@@ -172,11 +161,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 width: 34,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: showTanCircle ? _tanCircle.withOpacity(0.9) : null,
+                  color: showTanCircle ? _tanCircle : null,
                   borderRadius: BorderRadius.circular(isSelected ? 8 : 17),
                   border: isSelected
                       ? Border.all(color: brown, width: 1.5)
-                      : null,
+                      : showTanCircle
+                          ? Border.all(
+                              color: brown.withOpacity(0.45), width: 1.2)
+                          : null,
                 ),
                 child: Text(
                   day.day.toString(),
@@ -219,14 +211,15 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           child: Container(
             height: MediaQuery.of(context).size.height,
             width: MediaQuery.of(context).size.width,
-            decoration: BoxDecoration(
-                image:
-                    p.Provider.of<ThemeProvider>(context).currentCustomTheme ==
-                            AppCustomTheme.vintage
-                        ? DecorationImage(
-                            image: AssetImage(Images.bgImage(context)),
-                            fit: BoxFit.cover)
-                        : null),
+            color: isVintageTheme ? null : themeProvider.backgroundColor,
+            decoration: isVintageTheme
+                ? BoxDecoration(
+                    image: DecorationImage(
+                      image: AssetImage(Images.bgImage(context)),
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                : null,
             child: Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -296,7 +289,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                               isSameDay(day, calendarBloc.selectedDay),
                           eventLoader: (day) => calendarBloc.kEvents[day] ?? [],
                           calendarStyle: CalendarStyle(
-                            outsideDaysVisible: true,
+                            outsideDaysVisible: false,
                             markersMaxCount: 0,
                             defaultTextStyle: TextStyle(
                               fontFamily: 'Georgia',

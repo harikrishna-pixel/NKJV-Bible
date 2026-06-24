@@ -343,7 +343,8 @@ class ExportDb {
       await Future.delayed(const Duration(seconds: 3));
       await SharPreferences.setString('OpenAd', '1');
       Constants.showToast(
-          "Data Imported Successfully. Please restart app to see the changes");
+          "Data Imported Successfully. Please restart app to see the changes",
+          3000);
       return null;
     } catch (e, st) {
       log('Error: $e,$st');
@@ -372,7 +373,8 @@ class ExportDb {
           await Future.delayed(Duration(seconds: 3));
           await SharPreferences.setString('OpenAd', '1');
           Constants.showToast(
-              "Data Imported Successfully. Please restart app to see the changes");
+              "Data Imported Successfully. Please restart app to see the changes",
+              3000);
         } else {
           Constants.showToast("File is not selected");
           await SharPreferences.setString('OpenAd', '1');

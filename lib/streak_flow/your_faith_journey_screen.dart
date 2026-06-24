@@ -251,23 +251,29 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: ['S', 'M', 'T', 'W', 'T', 'F', 'S']
-                .map((d) => SizedBox(
-                      width: 32,
-                      child: Text(
-                        d,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: textColor,
-                          fontFamily: 'Georgia',
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final cellW = constraints.maxWidth / 7;
+              return Row(
+                children: ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+                    .map(
+                      (d) => SizedBox(
+                        width: cellW,
+                        child: Text(
+                          d,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: textColor,
+                            fontFamily: 'Georgia',
+                          ),
                         ),
                       ),
-                    ))
-                .toList(),
+                    )
+                    .toList(),
+              );
+            },
           ),
           const SizedBox(height: 8),
           LayoutBuilder(
@@ -298,24 +304,26 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
                     SizedBox(
                       width: cellW,
                       height: cellH,
-                      child: Container(
-                        // Don't auto-highlight a week row. Only special dates should stand out.
-                        child: Center(
-                          child: _dayCell(
-                            day: day,
-                            isToday: isToday,
-                            isCompleted: isCompleted,
-                            isStartedNotFinished: isStartedNotFinished,
-                            isFuture: date.isAfter(today),
-                            textColor: textColor,
-                          ),
+                      child: Center(
+                        child: _dayCell(
+                          day: day,
+                          isToday: isToday,
+                          isCompleted: isCompleted,
+                          isStartedNotFinished: isStartedNotFinished,
+                          isFuture: date.isAfter(today),
+                          textColor: textColor,
                         ),
                       ),
                     ),
                   );
                   day++;
                 }
-                rows.add(Row(children: rowChildren));
+                rows.add(
+                  SizedBox(
+                    width: constraints.maxWidth,
+                    child: Row(children: rowChildren),
+                  ),
+                );
               }
               return Column(
                 mainAxisSize: MainAxisSize.min,
@@ -408,16 +416,14 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
         ),
       );
     }
-    if (!isFuture) {
-      return Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: textColor.withOpacity(0.28), width: 1.5),
-        ),
+    if (isFuture) {
+      return Icon(
+        Icons.lock_outline_rounded,
+        size: iconSize + 2,
+        color: textColor.withOpacity(0.42),
       );
     }
+    // Past days without activity — keep indicator invisible.
     return SizedBox(width: size, height: size);
   }
 
@@ -438,14 +444,16 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
     required Color textColor,
   }) {
     return SizedBox(
-      width: 28,
+      width: double.infinity,
       height: 40,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
             '$day',
+            textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 11,
               height: 1.0,
@@ -510,11 +518,11 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
               isCompleted: false,
               isStartedNotFinished: false,
               isToday: false,
-              isFuture: false,
+              isFuture: true,
               textColor: textColor,
             ),
             const SizedBox(width: 6),
-            Text('Missed day',
+            Text('Upcoming',
                 style: TextStyle(fontSize: 11, color: textColor, fontFamily: 'Georgia')),
           ],
         ),

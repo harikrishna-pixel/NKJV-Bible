@@ -15,6 +15,9 @@ import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/main.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
 import 'package:biblebookapp/utils/emoji_text_style.dart';
+import 'package:biblebookapp/utils/internet_speed_checker.dart';
+import 'package:biblebookapp/utils/network_error_message.dart';
+import 'package:biblebookapp/view/widget/thanks_for_love_rating_dialog_content.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
@@ -1352,9 +1355,10 @@ class _HomeScreenState extends State<HomeScreen>
     );
     final arrowSize = screenWidth > 450 ? 39.0 : 24.0;
     final barWidth = MediaQuery.sizeOf(context).width;
-    final maxNameWidth = barWidth > 0
-        ? (barWidth - arrowSize - 130).clamp(48.0, barWidth * 0.5)
-        : 120.0;
+    final leadingReserve = screenWidth > 450 ? 128.0 : 104.0;
+    final actionsReserve = screenWidth > 450 ? 210.0 : 168.0;
+    final maxNameWidth = (barWidth - leadingReserve - actionsReserve - arrowSize)
+        .clamp(72.0, barWidth * 0.36);
 
     return InkWell(
       onTap: onTap,
@@ -1433,8 +1437,14 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _checkAndShowDailyWelcomeToast() async {
     if (!mounted) return;
 
-    // Only show on Reading screen (From == "Read")
-    if (widget.From != "Read") return;
+    final pendingStreakCelebration = await SharPreferences.getInt(
+            SharPreferences.pendingStreakCompleteCelebration) ??
+        0;
+    final isReadEntry = widget.From == "Read";
+    final isPostStreakHome =
+        widget.From == "splash" && pendingStreakCelebration >= 1;
+
+    if (!isReadEntry && !isPostStreakHome) return;
 
     final today = DateTime.now();
     final todayKey = today.toIso8601String().split('T')[0]; // YYYY-MM-DD format
@@ -1453,14 +1463,19 @@ class _HomeScreenState extends State<HomeScreen>
       String message;
 
       if (!firstTimeShown) {
-        // Very first time - show welcome message only once
+        if (isReadEntry) {
+          final streakCompleted = await SharPreferences.getString(
+              SharPreferences.streakFlowLastShownDate);
+          if (streakCompleted == null || streakCompleted.isEmpty) {
+            // Streak flow comes first — defer welcome until after streak completes.
+            return;
+          }
+        }
+
         message = "Welcome You. God's Word is always with you.";
 
-        // Mark first-time message as shown
         await SharPreferences.setBoolean(
             SharPreferences.dailyWelcomeFirstTimeShown, true);
-
-        // Initialize message index to 1 (skip the first message for future rotations)
         await SharPreferences.setInt(
             SharPreferences.dailyWelcomeMessageIndex, 1);
       } else {
@@ -1914,9 +1929,9 @@ class _HomeScreenState extends State<HomeScreen>
                       child: Stack(
                         children: [
                           FramedVerseContainer(
-                            backgroundImagePath: randomBgImage,
+                            backgroundImagePath: 'assets/verse_image_bg.png',
                             showFrame: false,
-                            useBackgroundImage: false,
+                            useBackgroundImage: true,
                             child: Padding(
                               padding: const EdgeInsets.all(12),
                               child: Column(
@@ -3147,8 +3162,11 @@ class _HomeScreenState extends State<HomeScreen>
         builder: (controller) {
           return Scaffold(
             key: _scaffoldKey,
-            appBar: controller.selectedChapter.value.isNotEmpty && _showUI
-                ? AppBar(
+            appBar: controller.selectedChapter.value.isNotEmpty
+                ? _SmoothReaderAppBar(
+                    visible: _showUI,
+                    height: screenWidth > 450 ? 115.0 : 85.0,
+                    child: AppBar(
                     toolbarHeight: screenWidth > 450 ? 70 : 55,
                     iconTheme:
                         IconThemeData(color: CommanColor.whiteBlack(context)),
@@ -3596,7 +3614,8 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                     centerTitle: true,
                     elevation: 2,
-                  )
+                  ),
+                )
                 : null,
             body: WillPopScope(
               onWillPop: () async {
@@ -4701,7 +4720,13 @@ class _HomeScreenState extends State<HomeScreen>
                     maintainAnimation: true,
                     child: IgnorePointer(
                       ignoring: !_showUI,
-                      child: Row(
+                      child: SizedBox(
+                      width: double.infinity,
+                      child: Stack(
+                        alignment: Alignment.bottomCenter,
+                        clipBehavior: Clip.none,
+                        children: [
+                          Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -4803,47 +4828,6 @@ class _HomeScreenState extends State<HomeScreen>
                             ),
                         ],
                       ),
-                      if (_showBackToTop &&
-                          controller.selectedBookContent.isNotEmpty)
-                        Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () {
-                              final scrollController =
-                                  controller.autoScrollController.value;
-                              if (!scrollController.hasClients) return;
-                              scrollController.animateTo(
-                                0,
-                                duration: const Duration(milliseconds: 450),
-                                curve: Curves.easeOutCubic,
-                              );
-                            },
-                            borderRadius: BorderRadius.circular(24),
-                            child: Container(
-                              padding: EdgeInsets.all(
-                                screenWidth > 450 ? 12 : 10,
-                              ),
-                              decoration: BoxDecoration(
-                                color: CommanColor.whiteLightModePrimary(
-                                    context),
-                                borderRadius: BorderRadius.circular(24),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Colors.black26,
-                                    blurRadius: 6,
-                                    offset: Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Icon(
-                                Icons.keyboard_arrow_up_rounded,
-                                size: screenWidth > 450 ? 24 : 22,
-                                color: CommanColor.darkModePrimaryWhite(
-                                    context),
-                              ),
-                            ),
-                          ),
-                        ),
                       floatingButton(
                         chapterNum: controller.selectedChapter.value,
                         bookName: controller.selectedBook.value,
@@ -4857,6 +4841,9 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                     ],
                       ),
+                        ],
+                      ),
+                    ),
                     ),
                   ),
             drawer: controller.isFetchContent.value
@@ -5082,25 +5069,23 @@ class _HomeScreenState extends State<HomeScreen>
                             final hasInternet =
                                 await InternetConnection().hasInternetAccess;
                             if (!hasInternet) {
-                              Constants.showToast(
-                                  'Check Your Internet Connection');
+                              Constants.showToast('No internet connection');
                               return;
                             }
-                            // Check if connection is slow (mobile only, likely 2G)
-                            final connectivity = Connectivity();
-                            final connectivityResult =
-                                await connectivity.checkConnectivity();
-                            final isMobileOnly = connectivityResult
-                                    .contains(ConnectivityResult.mobile) &&
-                                !connectivityResult
-                                    .contains(ConnectivityResult.wifi) &&
-                                !connectivityResult
-                                    .contains(ConnectivityResult.ethernet);
-                            if (isMobileOnly) {
-                              // Show toast after a delay if still loading (slow connection)
-                              Future.delayed(const Duration(seconds: 2), () {
-                                Constants.showToast('Internet is Slow');
-                              });
+                            try {
+                              final connectionSpeed =
+                                  await InternetSpeedChecker.checkSpeed(
+                                timeout: const Duration(seconds: 5),
+                              );
+                              final isSlowConnection = connectionSpeed == null ||
+                                  connectionSpeed > 5000;
+                              if (isSlowConnection) {
+                                Constants.showToast(
+                                    kCheckInternetConnectionMessage);
+                              }
+                            } catch (_) {
+                              Constants.showToast(
+                                  kCheckInternetConnectionMessage);
                             }
                             Get.to(() => const WallpaperScreen(),
                                 transition: Transition.cupertinoDialog,
@@ -5130,25 +5115,23 @@ class _HomeScreenState extends State<HomeScreen>
                             final hasInternet =
                                 await InternetConnection().hasInternetAccess;
                             if (!hasInternet) {
-                              Constants.showToast(
-                                  'Check Your Internet Connection');
+                              Constants.showToast('No internet connection');
                               return;
                             }
-                            // Check if connection is slow (mobile only, likely 2G)
-                            final connectivity = Connectivity();
-                            final connectivityResult =
-                                await connectivity.checkConnectivity();
-                            final isMobileOnly = connectivityResult
-                                    .contains(ConnectivityResult.mobile) &&
-                                !connectivityResult
-                                    .contains(ConnectivityResult.wifi) &&
-                                !connectivityResult
-                                    .contains(ConnectivityResult.ethernet);
-                            if (isMobileOnly) {
-                              // Show toast after a delay if still loading (slow connection)
-                              Future.delayed(const Duration(seconds: 2), () {
-                                Constants.showToast('Internet is Slow');
-                              });
+                            try {
+                              final connectionSpeed =
+                                  await InternetSpeedChecker.checkSpeed(
+                                timeout: const Duration(seconds: 5),
+                              );
+                              final isSlowConnection = connectionSpeed == null ||
+                                  connectionSpeed > 5000;
+                              if (isSlowConnection) {
+                                Constants.showToast(
+                                    kCheckInternetConnectionMessage);
+                              }
+                            } catch (_) {
+                              Constants.showToast(
+                                  kCheckInternetConnectionMessage);
                             }
                             Get.to(() => const QuoteScreen(),
                                 transition: Transition.cupertinoDialog,
@@ -5524,25 +5507,23 @@ class _HomeScreenState extends State<HomeScreen>
                               final hasInternet =
                                   await InternetConnection().hasInternetAccess;
                               if (!hasInternet) {
-                                Constants.showToast(
-                                    'Check Your Internet Connection');
+                                Constants.showToast('No internet connection');
                                 return;
                               }
-                              // Check if connection is slow (mobile only, likely 2G)
-                              final connectivity = Connectivity();
-                              final connectivityResult =
-                                  await connectivity.checkConnectivity();
-                              final isMobileOnly = connectivityResult
-                                      .contains(ConnectivityResult.mobile) &&
-                                  !connectivityResult
-                                      .contains(ConnectivityResult.wifi) &&
-                                  !connectivityResult
-                                      .contains(ConnectivityResult.ethernet);
-                              if (isMobileOnly) {
-                                // Show toast after a delay if still loading (slow connection)
-                                Future.delayed(const Duration(seconds: 2), () {
-                                  Constants.showToast('Internet is Slow');
-                                });
+                              try {
+                                final connectionSpeed =
+                                    await InternetSpeedChecker.checkSpeed(
+                                  timeout: const Duration(seconds: 5),
+                                );
+                                final isSlowConnection = connectionSpeed == null ||
+                                    connectionSpeed > 5000;
+                                if (isSlowConnection) {
+                                  Constants.showToast(
+                                      kCheckInternetConnectionMessage);
+                                }
+                              } catch (_) {
+                                Constants.showToast(
+                                    kCheckInternetConnectionMessage);
                               }
                               Get.to(
                                   () => BooksScreen(
@@ -5609,25 +5590,23 @@ class _HomeScreenState extends State<HomeScreen>
                             final hasInternet =
                                 await InternetConnection().hasInternetAccess;
                             if (!hasInternet) {
-                              Constants.showToast(
-                                  'Check Your Internet Connection');
+                              Constants.showToast('No internet connection');
                               return;
                             }
-                            final connectivity = Connectivity();
-                            final connectivityResult =
-                                await connectivity.checkConnectivity();
-                            // Check if connection is slow (mobile only, likely 2G)
-                            final isMobileOnly = connectivityResult
-                                    .contains(ConnectivityResult.mobile) &&
-                                !connectivityResult
-                                    .contains(ConnectivityResult.wifi) &&
-                                !connectivityResult
-                                    .contains(ConnectivityResult.ethernet);
-                            if (isMobileOnly) {
-                              // Show toast after a delay if still loading (slow connection)
-                              Future.delayed(const Duration(seconds: 2), () {
-                                Constants.showToast('Internet is Slow');
-                              });
+                            try {
+                              final connectionSpeed =
+                                  await InternetSpeedChecker.checkSpeed(
+                                timeout: const Duration(seconds: 5),
+                              );
+                              final isSlowConnection = connectionSpeed == null ||
+                                  connectionSpeed > 5000;
+                              if (isSlowConnection) {
+                                Constants.showToast(
+                                    kCheckInternetConnectionMessage);
+                              }
+                            } catch (_) {
+                              Constants.showToast(
+                                  kCheckInternetConnectionMessage);
                             }
                             if (controller.adFree.value == false) {
                               controller.bannerAd?.dispose();
@@ -6266,97 +6245,31 @@ class _HomeScreenState extends State<HomeScreen>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
-        final isTablet = MediaQuery.of(context).size.width > 600;
+      builder: (dialogContext) {
+        final isTablet = MediaQuery.of(dialogContext).size.width > 600;
         final dialogWidth = isTablet ? 400.0 : double.infinity;
-        double screenWidth = MediaQuery.of(context).size.width;
         return Dialog(
           backgroundColor: CommanColor.white,
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           child: Container(
             width: dialogWidth,
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      GestureDetector(
-                          onTap: () {
-                            Navigator.of(context).pop();
-                          },
-                          child: Icon(
-                            Icons.close,
-                            color: Colors.grey,
-                          )),
-                    ],
-                  ),
-                ),
-                emojiText('😍', fontSize: 40),
-                const SizedBox(height: 15),
-                textWithTrailingEmoji(
-                  prefix: 'Thanks for the love! ',
-                  emoji: '💛',
-                  emojiFontSize: isTablet ? 19 : 16,
-                  prefixStyle: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: isTablet ? 19 : 16,
-                    color: CommanColor.black,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  "Leave us a quick rating to help others\nexperience God's Word too!",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: isTablet
-                        ? 19
-                        : screenWidth < 380
-                            ? 12.5
-                            : 14,
-                    color: CommanColor.black,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () async {
-                    Navigator.pop(context);
-                    // Rate us: only block when connectivity explicitly reports none (avoid false "no internet" on 5G etc.)
-                    final connectivityResult =
-                        await Connectivity().checkConnectivity();
-                    if (connectivityResult.isNotEmpty &&
-                        connectivityResult.first == ConnectivityResult.none) {
-                      Constants.showToast("Check your Internet connection");
-                      return;
-                    }
-                    await SharPreferences.setString('OpenAd', '1');
-                    _requestReview();
-                  },
-                  style:
-                      ElevatedButton.styleFrom(backgroundColor: Colors.brown),
-                  child: Text(
-                    "Rate the app",
-                    style: TextStyle(
-                      color: CommanColor.white,
-                      fontSize: isTablet ? 17 : null,
-                    ),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(
-                    "Later",
-                    style: TextStyle(
-                      color: CommanColor.black,
-                      fontSize: isTablet ? 17 : null,
-                    ),
-                  ),
-                ),
-              ],
+            child: ThanksForLoveRatingDialogContent(
+              onClose: () => Navigator.of(dialogContext).pop(),
+              onRate: () async {
+                Navigator.pop(dialogContext);
+                // Rate us: only block when connectivity explicitly reports none (avoid false "no internet" on 5G etc.)
+                final connectivityResult =
+                    await Connectivity().checkConnectivity();
+                if (connectivityResult.isNotEmpty &&
+                    connectivityResult.first == ConnectivityResult.none) {
+                  Constants.showToast("Check your Internet connection");
+                  return;
+                }
+                await SharPreferences.setString('OpenAd', '1');
+                _requestReview();
+              },
+              onMaybeLater: () => Navigator.pop(dialogContext),
             ),
           ),
         );
@@ -7299,6 +7212,46 @@ Future<bool> isTrackingAllowed() async {
   } catch (e) {
     // DebugConsole.log("Consent check error: $e");
     return false; // Fail-safe to non-personalized
+  }
+}
+
+class _SmoothReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
+  const _SmoothReaderAppBar({
+    required this.visible,
+    required this.height,
+    required this.child,
+  });
+
+  final bool visible;
+  final double height;
+  final Widget child;
+
+  @override
+  Size get preferredSize => Size.fromHeight(visible ? height : 0);
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(end: visible ? 1.0 : 0.0),
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeInOutCubic,
+      builder: (context, value, appBarChild) {
+        return ClipRect(
+          child: Align(
+            alignment: Alignment.topCenter,
+            heightFactor: value.clamp(0.0, 1.0),
+            child: Opacity(
+              opacity: value.clamp(0.0, 1.0),
+              child: Transform.translate(
+                offset: Offset(0, -8 * (1 - value)),
+                child: appBarChild,
+              ),
+            ),
+          ),
+        );
+      },
+      child: child,
+    );
   }
 }
 

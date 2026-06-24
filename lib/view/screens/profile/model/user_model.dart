@@ -7,28 +7,49 @@ class UserModel {
   final String? email;
   final String? appId;
   final String? token;
-  UserModel(
-      {this.address,
-      required this.uid,
-      this.displayName,
-      this.email,
-      this.phoneNumber,
-      this.appId,
-      this.token,
-      this.photoURL});
-  // Factory constructor to create an instance from a JSON object (Map)
+  final String? referralCode;
+  final String? referredBy;
+  final int? referralCount;
+  final int? referralRewardClaimed;
+
+  UserModel({
+    this.address,
+    required this.uid,
+    this.displayName,
+    this.email,
+    this.phoneNumber,
+    this.appId,
+    this.token,
+    this.photoURL,
+    this.referralCode,
+    this.referredBy,
+    this.referralCount,
+    this.referralRewardClaimed,
+  });
+
+  static int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    return int.tryParse(value.toString());
+  }
+
   factory UserModel.fromJson(Map<String, dynamic> json, String token) {
     return UserModel(
-        uid: json['user_id'] as String,
-        address: json['address'] as String?,
-        displayName: json['name'] as String?,
-        email: json['email'] as String?,
-        phoneNumber: json['phoneNumber'] as String?,
-        photoURL: json['photoURL'] as String?,
-        appId: json['app_id'] as String?,
-        token: token);
+      uid: json['user_id'] as String,
+      address: json['address'] as String?,
+      displayName: json['name'] as String?,
+      email: json['email'] as String?,
+      phoneNumber: json['phoneNumber'] as String?,
+      photoURL: json['photoURL'] as String?,
+      appId: json['app_id'] as String?,
+      token: token,
+      referralCode: json['referral_code'] as String?,
+      referredBy: json['referred_by'] as String?,
+      referralCount: _parseInt(json['referral_count']),
+      referralRewardClaimed: _parseInt(json['referral_reward_claimed']),
+    );
   }
-  // Method to convert the instance to a JSON object (Map)
+
   Map<String, dynamic> toJson() {
     return {
       'user_id': uid,
@@ -38,7 +59,11 @@ class UserModel {
       'phoneNumber': phoneNumber,
       'photoURL': photoURL,
       'app_id': appId,
-      'token': token
+      'token': token,
+      'referral_code': referralCode,
+      'referred_by': referredBy,
+      'referral_count': referralCount,
+      'referral_reward_claimed': referralRewardClaimed,
     };
   }
 }

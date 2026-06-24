@@ -1,3 +1,4 @@
+import 'package:biblebookapp/controller/api_service.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +13,7 @@ import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/authenitcation/bloc/signup_bloc.dart';
+import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/login_screen.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/social_auth_widget.dart';
 import 'package:biblebookapp/view/screens/authenitcation/widgets/text_form_field.dart';
@@ -298,9 +300,41 @@ class SignupScreen extends HookConsumerWidget {
                                           FocusScope.of(context).unfocus();
                                           try {
                                             if (!signupState.isLoading) {
-                                              await signupState.createAccount();
-
-                                              //Get.offAll(() => const SplashScreen());
+                                              var referralCode =
+                                                  await signupState
+                                                      .createAccount();
+                                              if (!context.mounted) return;
+                                              if (referralCode == null ||
+                                                  referralCode
+                                                      .trim()
+                                                      .isEmpty) {
+                                                try {
+                                                  final user =
+                                                      await loginUser(
+                                                    email: signupState
+                                                        .emailCon.text
+                                                        .trim(),
+                                                    password:
+                                                        signupState.passCon.text,
+                                                  );
+                                                  referralCode =
+                                                      user.referralCode;
+                                                } catch (_) {}
+                                              }
+                                              if (!context.mounted) return;
+                                              if (referralCode != null &&
+                                                  referralCode
+                                                      .trim()
+                                                      .isNotEmpty) {
+                                                await OwnReferralCodeDialog.show(
+                                                  context: context,
+                                                  referralCode: referralCode,
+                                                );
+                                              }
+                                              if (!context.mounted) return;
+                                              Get.to(() => LoginScreen(
+                                                    hasSkip: false,
+                                                  ));
                                             }
                                           } catch (e) {
                                             Constants.showToast(e.toString());

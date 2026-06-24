@@ -218,7 +218,12 @@ class PrayerShareScreen extends StatelessWidget {
           decoration: BoxDecoration(
             color: tileBg,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withValues(alpha: 0.22)),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.45)
+                  : color.withValues(alpha: 0.22),
+              width: isDark ? 1.2 : 1,
+            ),
           ),
           child: Row(
             children: [
@@ -226,10 +231,19 @@ class PrayerShareScreen extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.16)
+                      : color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
+                  border: isDark
+                      ? Border.all(color: Colors.white.withValues(alpha: 0.35))
+                      : null,
                 ),
-                child: Icon(icon, color: color, size: 24),
+                child: Icon(
+                  icon,
+                  color: isDark ? Colors.white : color,
+                  size: 24,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -256,8 +270,6 @@ class PrayerShareScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right,
-                  color: isDark ? Colors.white54 : Colors.grey.shade600),
             ],
           ),
         ),

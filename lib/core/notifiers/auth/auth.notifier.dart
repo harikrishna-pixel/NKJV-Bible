@@ -14,6 +14,7 @@ import '../../../constant/size_config.dart';
 import '../../../view/constants/colors.dart';
 import '../../../view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/core/library_backup_upload_service.dart';
+import 'package:biblebookapp/utils/referral_api_logger.dart';
 import '../../api/auth/profile_update.api.dart';
 import '../../api/auth/register.api.dart';
 
@@ -205,6 +206,8 @@ class AuthNotifier extends ChangeNotifier {
 
       final datafn = jsonDecode(appdata);
 
+      logAuthApiReferralFields('LOGIN API (auth notifier)', datafn);
+
       // final statuscode = datafn['status_code'];
 
       final status = datafn['status'];
@@ -356,11 +359,15 @@ class AuthNotifier extends ChangeNotifier {
           print(
               "AUTH NOTIFIER: ERROR - Server returned error: $msg (Status Code: $statuscode)");
 
-          // Provide more helpful error message based on status code
-          String errorMessage = msg;
-          if (statuscode == 500) {
-            errorMessage =
-                "Server error: $msg\n\nPossible reasons:\n• Email not registered in system\n• Please contact support if this persists";
+          // User-friendly message — avoid exposing raw server errors.
+          String errorMessage =
+              'No account found with this email. Please check and try again.';
+          if (statuscode != 500 && statuscode != 404 && msg != null) {
+            final raw = msg.toString().trim();
+            if (raw.isNotEmpty &&
+                !raw.toLowerCase().contains('unable to perform')) {
+              errorMessage = raw;
+            }
           }
 
           print("AUTH NOTIFIER: Showing error snackbar to user");
@@ -572,6 +579,7 @@ class AuthNotifier extends ChangeNotifier {
           await profileUpdateApi.updateprofile(email: email, name: name);
 
       final datafn = jsonDecode(appdata);
+      logAuthApiReferralFields('PROFILE UPDATE API (auth notifier)', datafn);
 
       // final statuscode = datafn['status_code'];
 

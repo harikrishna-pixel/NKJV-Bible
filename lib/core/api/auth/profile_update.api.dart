@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:developer' as devtools show log;
 
 import 'package:biblebookapp/core/api/auth/temp_token.api.dart';
+import 'package:biblebookapp/utils/referral_api_logger.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 
@@ -58,6 +60,10 @@ class ProfileUpdateApi {
       devtools.log("profile update api msg is $statuscode - $body");
 
       if (body.isNotEmpty) {
+        try {
+          final parsed = jsonDecode(body);
+          logAuthApiReferralFields('PROFILE UPDATE API', parsed);
+        } catch (_) {}
         return body;
       } else {
         devtools.log("lprofile update api  is not found");
@@ -74,6 +80,48 @@ class ProfileUpdateApi {
     } catch (e) {
       Constants.showToast('Check your Internet connection');
       devtools.log("profile update api error is $e");
+      return null;
+    }
+  }
+
+  Future<String?> updateReferralRewardClaimed({required int value}) async {
+    final Uri uri =
+        Uri.parse(AppApiConstant.baseurl + AppApiConstant.updateprofleapi);
+    final userid = await cacheNotifier.readCache(key: 'userid');
+    final authtoken = await cacheNotifier.readCache(key: 'authtoken');
+
+    try {
+      final payload = {
+        'action': '1',
+        'key': 'referral_reward_claimed',
+        'value': value.toString(),
+        'user_id': userid.toString(),
+        'app_id': BibleInfo.appID,
+      };
+      devtools.log('profile update referral_reward_claimed request: $payload');
+
+      final response = await CustomHttp().postwithtoken(
+        path: uri,
+        token: authtoken,
+        data: payload,
+      );
+
+      final statuscode = response?.statusCode;
+      final body = response?.body ?? '';
+      devtools.log(
+          'profile update referral_reward_claimed response: $statuscode - $body');
+
+      if (body.isNotEmpty) {
+        try {
+          final parsed = jsonDecode(body);
+          logAuthApiReferralFields(
+              'PROFILE UPDATE API (referral_reward_claimed)', parsed);
+        } catch (_) {}
+        return body;
+      }
+      return null;
+    } catch (e) {
+      devtools.log('profile update referral_reward_claimed error: $e');
       return null;
     }
   }

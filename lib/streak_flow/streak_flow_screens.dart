@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 
@@ -215,8 +216,45 @@ Color _streakPanelColor(BuildContext context) =>
     _isStreakDark(context) ? Colors.white.withOpacity(0.12) : _kStreakCream;
 
 /// Verse / Devotional / Prayer streak content — plain on background (no card box).
-Widget _streakStepContentBox(BuildContext context, Widget child) {
-  return child;
+Widget _streakStepContentBox(
+  BuildContext context,
+  Widget child, {
+  bool useContentScrim = true,
+}) {
+  if (!useContentScrim) return child;
+  return _streakPhotoContentBackdrop(child: child);
+}
+
+/// Soft radial scrim so white verse/devotional text reads clearly on photos.
+Widget _streakPhotoContentBackdrop({required Widget child}) {
+  return Stack(
+    alignment: Alignment.center,
+    clipBehavior: Clip.none,
+    children: [
+      Positioned(
+        left: -28,
+        right: -28,
+        top: -20,
+        bottom: -20,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment.center,
+              radius: 0.95,
+              colors: [
+                Colors.black.withOpacity(0.52),
+                Colors.black.withOpacity(0.32),
+                Colors.black.withOpacity(0.08),
+                Colors.transparent,
+              ],
+              stops: const [0.0, 0.42, 0.72, 1.0],
+            ),
+          ),
+        ),
+      ),
+      child,
+    ],
+  );
 }
 
 /// ~10% lower contrast on rocky foreground photos so verse text reads easier.
@@ -263,11 +301,129 @@ Widget _streakPhotoBackgroundImage(String assetPath) {
   );
 }
 
+/// Verse screen background — image shifted up so the cross sits above the verse area.
+Widget _streakPhotoVerseBackgroundImage(String assetPath) {
+  return Positioned.fill(
+    child: Stack(
+      fit: StackFit.expand,
+      children: [
+        const ColoredBox(color: _kStreakPhotoPlaceholder),
+        ColorFiltered(
+          colorFilter: _streakPhotoContrastFilter,
+          child: Image.asset(
+            assetPath,
+            fit: BoxFit.cover,
+            alignment: const Alignment(0, -0.22),
+            gaplessPlayback: true,
+            filterQuality: FilterQuality.medium,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Verse screen overlays — top fade, center verse shadow, bottom fade (reference mockup).
+Widget _streakPhotoVerseReadabilityOverlay(BuildContext context) {
+  final h = MediaQuery.sizeOf(context).height;
+  final topH = h * 0.22;
+  final bottomH = h * 0.58;
+  final centerH = h * 0.55;
+
+  return Positioned.fill(
+    child: IgnorePointer(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: topH,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.60),
+                    Colors.black.withOpacity(0.28),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 0.55, 1.0],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: h * 0.28,
+            left: 0,
+            right: 0,
+            height: centerH,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.20),
+                    Colors.black.withOpacity(0.38),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 0.35, 0.68, 1.0],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: bottomH,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.92),
+                    Colors.black.withOpacity(0.72),
+                    Colors.black.withOpacity(0.38),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 0.38, 0.68, 1.0],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _streakPhotoVerseBackgroundStack({
+  required BuildContext context,
+  required String assetPath,
+  required Widget child,
+}) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      _streakPhotoVerseBackgroundImage(assetPath),
+      _streakPhotoVerseReadabilityOverlay(context),
+      child,
+    ],
+  );
+}
+
 /// Top/bottom vignette for readable white text on photo backgrounds (UI only).
 Widget _streakPhotoReadabilityOverlays(BuildContext context) {
   final h = MediaQuery.sizeOf(context).height;
-  final topH = h * 0.18;
-  final bottomH = h * 0.55;
+  final topH = h * 0.22;
+  final bottomH = h * 0.58;
+  final centerH = h * 0.55;
 
   return Stack(
     fit: StackFit.expand,
@@ -283,11 +439,32 @@ Widget _streakPhotoReadabilityOverlays(BuildContext context) {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Colors.black.withOpacity(0.5),
-                Colors.black.withOpacity(0.22),
+                Colors.black.withOpacity(0.58),
+                Colors.black.withOpacity(0.28),
                 Colors.transparent,
               ],
               stops: const [0.0, 0.55, 1.0],
+            ),
+          ),
+        ),
+      ),
+      Positioned(
+        top: h * 0.18,
+        left: 0,
+        right: 0,
+        height: centerH,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.transparent,
+                Colors.black.withOpacity(0.18),
+                Colors.black.withOpacity(0.34),
+                Colors.transparent,
+              ],
+              stops: const [0.0, 0.35, 0.68, 1.0],
             ),
           ),
         ),
@@ -303,8 +480,8 @@ Widget _streakPhotoReadabilityOverlays(BuildContext context) {
               begin: Alignment.bottomCenter,
               end: Alignment.topCenter,
               colors: [
-                Colors.black.withOpacity(0.82),
-                Colors.black.withOpacity(0.5),
+                Colors.black.withOpacity(0.88),
+                Colors.black.withOpacity(0.58),
                 Colors.transparent,
               ],
               stops: const [0.0, 0.48, 1.0],
@@ -334,13 +511,14 @@ Widget _streakPhotoBackgroundStack({
 const Color _kStreakPhotoGold = Color(0xFFC59434);
 
 const List<Shadow> _kStreakPhotoTextShadows = [
-  Shadow(color: Color(0xE6000000), blurRadius: 14, offset: Offset(0, 2)),
-  Shadow(color: Color(0x99000000), blurRadius: 6, offset: Offset(0, 1)),
+  Shadow(color: Color(0xF0000000), blurRadius: 18, offset: Offset(0, 2)),
+  Shadow(color: Color(0xCC000000), blurRadius: 8, offset: Offset(0, 1)),
+  Shadow(color: Color(0x80000000), blurRadius: 2, offset: Offset(0, 0)),
 ];
 
 const List<Shadow> _kStreakPhotoSoftTextShadows = [
-  Shadow(color: Color(0xCC000000), blurRadius: 10, offset: Offset(0, 1)),
-  Shadow(color: Color(0x66000000), blurRadius: 4, offset: Offset(0, 1)),
+  Shadow(color: Color(0xE6000000), blurRadius: 14, offset: Offset(0, 1)),
+  Shadow(color: Color(0x99000000), blurRadius: 6, offset: Offset(0, 1)),
 ];
 
 TextStyle _streakPhotoTitleStyle(BuildContext context) => TextStyle(
@@ -349,15 +527,16 @@ TextStyle _streakPhotoTitleStyle(BuildContext context) => TextStyle(
       color: Colors.white,
       fontFamily: 'Georgia',
       shadows: _kStreakPhotoTextShadows,
+      height: 1.15,
     );
 
 TextStyle _streakPhotoSubtitleStyle(BuildContext context) => TextStyle(
       fontSize: MediaQuery.of(context).size.width > 450 ? 15 : 13,
-      fontWeight: FontWeight.w500,
-      color: Colors.white.withOpacity(0.95),
+      fontWeight: FontWeight.w600,
+      color: Colors.white,
       fontFamily: 'Georgia',
       height: 1.4,
-      shadows: _kStreakPhotoSoftTextShadows,
+      shadows: _kStreakPhotoTextShadows,
     );
 
 TextStyle _streakPhotoBodyStyle(BuildContext context) => TextStyle(
@@ -398,35 +577,28 @@ Widget _streakPhotoSubtitleText(BuildContext context, String subtitle) {
   );
 }
 
+const List<Shadow> _kStreakVerseHeaderShadows = [
+  Shadow(color: Color(0xAA000000), blurRadius: 8, offset: Offset(0, 2)),
+  Shadow(color: Color(0x77000000), blurRadius: 3, offset: Offset(0, 1)),
+];
+
 TextStyle _streakPhotoVerseTitleStyle(BuildContext context) => TextStyle(
       fontSize: MediaQuery.of(context).size.width > 450 ? 30 : 26,
       fontWeight: FontWeight.w700,
-      color: _kInkBrown,
+      color: Colors.white,
       fontFamily: 'Georgia',
       height: 1.15,
       letterSpacing: 0.15,
-      shadows: [
-        Shadow(
-          color: Colors.white.withOpacity(0.7),
-          blurRadius: 8,
-          offset: const Offset(0, 0),
-        ),
-      ],
+      shadows: _kStreakVerseHeaderShadows,
     );
 
 TextStyle _streakPhotoVerseSubtitleStyle(BuildContext context) => TextStyle(
       fontSize: MediaQuery.of(context).size.width > 450 ? 15 : 14,
-      fontWeight: FontWeight.w400,
-      color: _kInkSepia,
+      fontWeight: FontWeight.w500,
+      color: Colors.white.withOpacity(0.94),
       fontFamily: 'Georgia',
       height: 1.35,
-      shadows: [
-        Shadow(
-          color: Colors.white.withOpacity(0.55),
-          blurRadius: 6,
-          offset: const Offset(0, 0),
-        ),
-      ],
+      shadows: _kStreakVerseHeaderShadows,
     );
 
 Widget _streakPhotoShortGoldLine({double width = 52}) {
@@ -455,15 +627,15 @@ Widget _streakPhotoVerseHeader({
           textAlign: TextAlign.center,
           style: _streakPhotoVerseTitleStyle(context),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         Text(
           subtitle,
           textAlign: TextAlign.center,
           style: _streakPhotoVerseSubtitleStyle(context),
         ),
-        const SizedBox(height: 12),
-        _streakPhotoShortGoldLine(),
         const SizedBox(height: 18),
+        _streakPhotoShortGoldLine(),
+        const SizedBox(height: 22),
       ],
     ),
   );
@@ -873,7 +1045,7 @@ Widget _streakPhotoVerseSaveShareRow({
         width: 1,
         height: 18,
         margin: const EdgeInsets.symmetric(horizontal: 16),
-        color: Colors.white.withOpacity(0.4),
+        color: Colors.white.withOpacity(0.55),
       ),
       action(
         icon: Icons.share,
@@ -955,6 +1127,7 @@ Widget _streakPhotoPrimaryButton({
   required String label,
   required VoidCallback onPressed,
   IconData? leadingIcon,
+  bool showShadow = true,
 }) {
   return Material(
     color: Colors.transparent,
@@ -967,13 +1140,15 @@ Widget _streakPhotoPrimaryButton({
         decoration: BoxDecoration(
           color: _kStreakPhotoGold,
           borderRadius: BorderRadius.circular(30),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.28),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          boxShadow: showShadow
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.28),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1025,6 +1200,7 @@ Widget _streakShareCardForCapture(
 }) {
   final screenWidth = MediaQuery.sizeOf(context).width;
   final cardWidth = screenWidth > 450 ? 400.0 : screenWidth.clamp(300.0, 400.0);
+  const footerHeight = 56.0;
   return SizedBox(
     width: cardWidth,
     height: cardWidth * 1.35,
@@ -1040,14 +1216,19 @@ Widget _streakShareCardForCapture(
           ),
           Container(color: Colors.black.withOpacity(0.42)),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
-            child: Column(
-              children: [
-                Expanded(
-                  child: Center(child: content),
-                ),
-                const SizedBox(height: 14),
-                Row(
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, footerHeight + 20),
+            child: Center(child: content),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: footerHeight,
+            child: ColoredBox(
+              color: Colors.black,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Image.asset(
@@ -1059,29 +1240,104 @@ Widget _streakShareCardForCapture(
                     Text(
                       BibleInfo.bible_shortName,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.92),
+                        color: Colors.white,
                         letterSpacing: BibleInfo.letterSpacing,
                         fontSize: BibleInfo.fontSizeScale * 12,
                         fontWeight: FontWeight.w600,
                         height: 1.2,
-                        shadows: const [
-                          Shadow(
-                            color: Colors.black87,
-                            blurRadius: 8,
-                            offset: Offset(0, 1),
-                          ),
-                        ],
                       ),
                       textAlign: TextAlign.center,
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
         ],
       ),
     ),
+  );
+}
+
+Widget _streakCompleteShareContent(int streakDays) {
+  final creditsEarned = streakDays * 20;
+  return Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.center,
+    children: [
+      Container(
+        width: 88,
+        height: 88,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: _kStreakPhotoGold.withOpacity(0.75),
+            width: 2.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: _kStreakPhotoGold.withOpacity(0.35),
+              blurRadius: 24,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: const Icon(
+          Icons.local_fire_department_rounded,
+          size: 42,
+          color: Colors.white,
+        ),
+      ),
+      const SizedBox(height: 18),
+      RichText(
+        textAlign: TextAlign.center,
+        text: TextSpan(
+          style: const TextStyle(
+            fontSize: 30,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+            fontFamily: 'Georgia',
+            height: 1.15,
+            shadows: _kStreakPhotoTextShadows,
+          ),
+          children: [
+            TextSpan(
+              text: streakDays > 0 ? 'Day $streakDays ' : '',
+            ),
+            const TextSpan(
+              text: 'Streak!',
+              style: TextStyle(color: _kStreakPhotoGold),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 10),
+      Text(
+        'Streak Completed!',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: Colors.white.withOpacity(0.95),
+          fontFamily: 'Georgia',
+          shadows: _kStreakPhotoSoftTextShadows,
+        ),
+      ),
+      const SizedBox(height: 10),
+      Text(
+        'You\'re building a beautiful habit of seeking God daily.',
+        textAlign: TextAlign.center,
+        style: _streakShareBodyStyle().copyWith(fontSize: 14),
+      ),
+      if (streakDays > 0) ...[
+        const SizedBox(height: 14),
+        Text(
+          '+$creditsEarned Faith Credits',
+          textAlign: TextAlign.center,
+          style: _streakShareReferenceStyle(),
+        ),
+      ],
+    ],
   );
 }
 
@@ -1139,15 +1395,21 @@ Future<void> _shareAsImage(
 }) async {
   if (imageBytes != null && imageBytes.isNotEmpty) {
     try {
+      final directory = await getTemporaryDirectory();
+      final imageFile = File(
+        '${directory.path}/streak_share_${DateTime.now().millisecondsSinceEpoch}.png',
+      );
+      await imageFile.writeAsBytes(imageBytes, flush: true);
+
       final box = context.findRenderObject() as RenderBox?;
       await Share.shareXFiles(
         [
-          XFile.fromData(
-            imageBytes,
+          XFile(
+            imageFile.path,
             mimeType: 'image/png',
-            name: 'streak_share.png',
           ),
         ],
+        text: _shareTextWithAppUrl(fallbackText),
         sharePositionOrigin: box != null
             ? box.localToGlobal(Offset.zero) & box.size
             : null,
@@ -1624,7 +1886,6 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final panelColor = _streakPanelColor(context);
     final isTablet = MediaQuery.of(context).size.width > 450;
     final isDark = _isStreakDark(context);
     final warmText = isDark ? Colors.white : const Color(0xFF4A2F1D);
@@ -1648,287 +1909,326 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
           ),
         ),
         child: SafeArea(
-          child: Stack(
+          child: Column(
             children: [
-              // Add a subtle dark overlay so top pause icon and bottom note remain readable.
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withOpacity(0.22),
-                        Colors.transparent,
-                        Colors.black.withOpacity(0.18),
-                      ],
-                      stops: const [0.0, 0.55, 1.0],
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  isTablet ? 22 : 14,
+                  4,
+                  isTablet ? 22 : 14,
+                  0,
+                ),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => _goToHome(context),
+                      borderRadius: BorderRadius.circular(24),
+                      child: SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: Center(
+                          child: Icon(
+                            Icons.close,
+                            size: 26,
+                            color: warmText.withOpacity(0.85),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
-              // Scroll content first so the close control stays above and receives taps.
-              SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(
-                    isTablet ? 30 : 22, 60, isTablet ? 30 : 22, 20),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 430),
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 10),
-                        Container(
-                          width: isTablet ? 92 : 86,
-                          height: isTablet ? 92 : 86,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.black.withOpacity(0.14),
-                            border: Border.all(
-                                color: _kStreakGold.withOpacity(0.9), width: 1.6),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.28),
-                                blurRadius: 18,
-                                offset: const Offset(0, 10),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(
+                    isTablet ? 30 : 22,
+                    8,
+                    isTablet ? 30 : 22,
+                    12,
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 430),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: isTablet ? 80 : 74,
+                            height: isTablet ? 80 : 74,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFF4A2F1D).withOpacity(0.88),
+                              border: Border.all(
+                                color: _kStreakGold.withOpacity(0.95),
+                                width: 1.6,
                               ),
-                              BoxShadow(
-                                color: _kStreakGold.withOpacity(0.28),
-                                blurRadius: 22,
-                                spreadRadius: 1,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _kStreakGold.withOpacity(0.4),
+                                  blurRadius: 22,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.pause,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          Text(
+                            'Your Streak Paused',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: isTablet ? 38 : 32,
+                              fontWeight: FontWeight.w700,
+                              color: warmText,
+                              fontFamily: 'Georgia',
+                              height: 1.05,
+                              shadows: const [
+                                Shadow(
+                                  color: Colors.black26,
+                                  blurRadius: 6,
+                                  offset: Offset(0, 1),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Divider(
+                                  color: warmText.withOpacity(0.28),
+                                  thickness: 1,
+                                ),
+                              ),
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 10),
+                                child: Icon(
+                                  Icons.favorite,
+                                  color: _kStreakGold.withOpacity(0.9),
+                                  size: 14,
+                                ),
+                              ),
+                              Expanded(
+                                child: Divider(
+                                  color: warmText.withOpacity(0.28),
+                                  thickness: 1,
+                                ),
                               ),
                             ],
                           ),
-                          child: Center(
-                            child: Container(
-                              width: isTablet ? 58 : 52,
-                              height: isTablet ? 58 : 52,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.black.withOpacity(0.55),
-                                border: Border.all(
-                                    color: _kStreakGold.withOpacity(0.9),
-                                    width: 1.6),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.25),
-                                    blurRadius: 14,
-                                    offset: const Offset(0, 6),
-                                  ),
-                                  BoxShadow(
-                                    color: _kStreakGold.withOpacity(0.25),
-                                    blurRadius: 14,
-                                    spreadRadius: 0.5,
-                                  ),
-                                ],
-                              ),
-                              child: Icon(
-                                Icons.pause,
-                                color: Colors.white,
-                                size: isTablet ? 30 : 28,
-                              ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'You missed a day - and that\'s okay.\nEvery journey has pauses.\nWhat matters is starting again.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: isTablet ? 16 : 14.5,
+                              height: 1.45,
+                              color: warmText.withOpacity(0.92),
+                              fontFamily: 'Georgia',
                             ),
                           ),
-                        ),
-                    const SizedBox(height: 22),
-                    Text(
-                      'Your Streak Paused',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: isTablet ? 52 : 50,
-                        fontWeight: FontWeight.w700,
-                        color: warmText,
-                        fontFamily: 'Georgia',
-                        height: 0.95,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'You missed a day - and that\'s okay.\nEvery journey has pauses.\nWhat matters is starting again.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: isTablet ? 18 : 16,
-                        height: 1.45,
-                        color: warmText.withOpacity(0.9),
-                        fontFamily: 'Georgia',
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    FutureBuilder<int?>(
-                      future:
-                          SharPreferences.getInt(SharPreferences.streakCount),
-                      builder: (context, snap) {
-                        final v = (snap.data ?? 0).clamp(0, 9999);
-                        return Column(
-                          children: [
-                            RichText(
-                              textAlign: TextAlign.center,
-                              text: TextSpan(
-                                style: TextStyle(
-                                  fontSize: isTablet ? 25 : 22,
-                                  fontWeight: FontWeight.w700,
-                                  color: warmText,
-                                  fontFamily: 'Georgia',
+                          const SizedBox(height: 20),
+                          Container(
+                            width: isTablet ? 68 : 62,
+                            height: isTablet ? 68 : 62,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFFF8F1E4).withOpacity(0.95),
+                              border: Border.all(
+                                color: _kStreakGold.withOpacity(0.55),
+                                width: 1.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _kStreakGold.withOpacity(0.35),
+                                  blurRadius: 16,
+                                  spreadRadius: 1,
                                 ),
+                              ],
+                            ),
+                            child: Icon(
+                              Icons.local_fire_department_rounded,
+                              color: _kStreakGold,
+                              size: isTablet ? 34 : 30,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          FutureBuilder<int?>(
+                            future: SharPreferences.getInt(
+                                SharPreferences.streakCount),
+                            builder: (context, snap) {
+                              final v = (snap.data ?? 0).clamp(0, 9999);
+                              return Column(
                                 children: [
-                                  const TextSpan(text: 'You built a '),
-                                  TextSpan(
-                                    text: '$v Day Faith Habit.',
-                                    style: const TextStyle(color: _kStreakGold),
+                                  Text(
+                                    'You built a',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: isTablet ? 20 : 18,
+                                      fontWeight: FontWeight.w600,
+                                      color: warmText,
+                                      fontFamily: 'Georgia',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '$v Day Faith Habit',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: isTablet ? 26 : 24,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                      fontFamily: 'Georgia',
+                                      height: 1.2,
+                                      shadows: const [
+                                        Shadow(
+                                          color: Color(0xE6000000),
+                                          blurRadius: 16,
+                                          offset: Offset(0, 2),
+                                        ),
+                                        Shadow(
+                                          color: Color(0x99000000),
+                                          blurRadius: 8,
+                                          offset: Offset(0, 1),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Continue your streak from yesterday',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: isTablet ? 14 : 13,
+                                      color: Colors.white.withOpacity(0.95),
+                                      fontFamily: 'Georgia',
+                                      fontStyle: FontStyle.italic,
+                                      shadows: const [
+                                        Shadow(
+                                          color: Colors.black45,
+                                          blurRadius: 6,
+                                          offset: Offset(0, 1),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Continue your streak from yesterday',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: isTablet ? 16 : 14,
-                                color: warmText.withOpacity(0.85),
-                                fontFamily: 'Georgia',
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Divider(
-                              color: warmText.withOpacity(0.24), thickness: 1),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          child: Icon(Icons.auto_awesome,
-                              color: _kStreakGold.withOpacity(0.7), size: 14),
-                        ),
-                        Expanded(
-                          child: Divider(
-                              color: warmText.withOpacity(0.24), thickness: 1),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                      decoration: BoxDecoration(
-                        color: panelColor.withOpacity(0.72),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                            color: warmText.withOpacity(0.16), width: 1.2),
-                      ),
-                      child: Column(
-                        children: [
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 22),
                           _buildParchmentButton(
                             context: context,
                             label:
                                 _busy ? 'Please wait...' : 'Restore Yesterday',
+                            leadingIcon: Icons.history,
                             onTap: _busy ? () {} : _tryRestore,
                             isSecondary: false,
                           ),
                           const SizedBox(height: 10),
-                          Text(
-                            'Uses 50 Faith Credits',
-                            style: TextStyle(
-                              color: const Color(0xFFA94442).withOpacity(0.95),
-                              fontSize: isTablet ? 17 : 16,
-                              fontFamily: 'Georgia',
-                              fontWeight: FontWeight.w600,
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.star,
+                                color: _kStreakGold.withOpacity(0.95),
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              RichText(
+                                text: TextSpan(
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.95),
+                                    fontSize: isTablet ? 15 : 14,
+                                    fontFamily: 'Georgia',
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  children: const [
+                                    TextSpan(text: 'Uses '),
+                                    TextSpan(
+                                      text: '50',
+                                      style: TextStyle(color: _kStreakGold),
+                                    ),
+                                    TextSpan(text: ' Faith Credits'),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 14),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.shield_outlined,
+                                color: _kStreakGold.withOpacity(0.9),
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: RichText(
+                                  textAlign: TextAlign.left,
+                                  text: TextSpan(
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.92),
+                                      fontSize: isTablet ? 13 : 12.5,
+                                      fontFamily: 'Georgia',
+                                      height: 1.35,
+                                    ),
+                                    children: const [
+                                      TextSpan(
+                                        text:
+                                            'Note: Yesterday Streaks can be restored within ',
+                                      ),
+                                      TextSpan(
+                                        text: '24 hours',
+                                        style: TextStyle(
+                                          color: _kStreakGold,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      TextSpan(text: '.'),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.52),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.16),
-                          width: 1,
-                        ),
-                      ),
-                      child: Text(
-                        'Note: Yesterday Streaks can Restored within 24 hours',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.95),
-                          fontSize: isTablet ? 15 : 14,
-                          fontFamily: 'Georgia',
-                          fontStyle: FontStyle.italic,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                            child: Divider(
-                                color: warmText.withOpacity(0.28),
-                                thickness: 1)),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Text(
-                            'OR',
-                            style: TextStyle(
-                              color: warmText.withOpacity(0.82),
-                              fontFamily: 'Georgia',
-                              fontSize: isTablet ? 22 : 20,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                            child: Divider(
-                                color: warmText.withOpacity(0.28),
-                                thickness: 1)),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _buildParchmentButton(
+                  ),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  isTablet ? 30 : 22,
+                  4,
+                  isTablet ? 30 : 22,
+                  10,
+                ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 430),
+                    child: _buildParchmentButton(
                       context: context,
                       label: 'Start New Journey',
                       onTap: () => _goToHome(context),
                       isSecondary: true,
                     ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: 8,
-            right: isTablet ? 30 : 22,
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () => _goToHome(context),
-                borderRadius: BorderRadius.circular(24),
-                child: SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: Center(
-                    child: Icon(Icons.close,
-                        size: 28, color: warmText.withOpacity(0.7)),
                   ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
-    ),
-    ),
     );
   }
 }
@@ -1955,12 +2255,14 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
   // UI shows 5 stops (Very Far/Far/Growing/Close/Very Close),
   // but we still map it into the existing 3 buckets for content selection.
   double _value = 0.5;
+  bool _sliderInteracted = false;
 
   @override
   void initState() {
     super.initState();
     if (widget.initialSliderValue != null) {
       _value = _snap(widget.initialSliderValue!.clamp(0.0, 1.0));
+      _sliderInteracted = true;
     }
     if (!widget.viewOnly) {
       _markStreakFlowStartedToday();
@@ -2001,6 +2303,128 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
 
   double _snap(double v) => (v * 4).round() / 4;
 
+  Widget _connectionHonestyCard(BuildContext context) {
+    final textColor = _streakTextColor(context);
+    final isDark = _isStreakDark(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isDark
+                ? [
+                    Colors.white.withOpacity(0.1),
+                    Colors.white.withOpacity(0.06),
+                  ]
+                : const [
+                    _kParchmentLight,
+                    _kParchmentMid,
+                  ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withOpacity(0.14)
+                : _kInkSepia.withOpacity(0.22),
+          ),
+          boxShadow: isDark
+              ? null
+              : [
+                  BoxShadow(
+                    color: _kInkBrown.withOpacity(0.08),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.white.withOpacity(0.12)
+                    : _kStreakCream,
+                shape: BoxShape.circle,
+                border: Border.all(color: _kStreakGold, width: 1.5),
+              ),
+              child: const Icon(
+                Icons.favorite_border,
+                color: _kStreakGold,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Thank you for being honest.',
+                    style: TextStyle(
+                      fontSize: MediaQuery.of(context).size.width > 450 ? 16 : 15,
+                      fontWeight: FontWeight.w700,
+                      height: 1.3,
+                      color: textColor,
+                      fontFamily: 'Georgia',
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'This helps us show you verses, devotions and prayers that speak to your heart today.',
+                    style: TextStyle(
+                      fontSize: MediaQuery.of(context).size.width > 450 ? 14 : 13,
+                      height: 1.4,
+                      color: textColor.withOpacity(0.82),
+                      fontFamily: 'Georgia',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _connectionPrivacyNote(BuildContext context) {
+    final textColor = _streakTextColor(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.verified_user_outlined,
+            size: 16,
+            color: textColor.withOpacity(0.55),
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              'Your reflection is private and secure.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: MediaQuery.of(context).size.width > 450 ? 13 : 12,
+                color: textColor.withOpacity(0.55),
+                fontFamily: 'Georgia',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -2040,197 +2464,247 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                   tooltip: 'Close',
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+                child: Column(
+                  children: [
+                    Text(
+                      'How is your connection with God today?',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: MediaQuery.of(context).size.width > 450
+                            ? 28
+                            : 22,
+                        fontWeight: FontWeight.w600,
+                        color: _streakTextColor(context),
+                        fontFamily: 'Georgia',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Choose what feels closest to your heart.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: MediaQuery.of(context).size.width > 450
+                            ? 18
+                            : 15,
+                        color: _streakTextColor(context).withOpacity(0.9),
+                        fontFamily: 'Georgia',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               Expanded(
                 child: Center(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 60),
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
                     child: Column(
-                      mainAxisSize: MainAxisSize.max,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          'How is your connection with God today?',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: MediaQuery.of(context).size.width > 450
-                                ? 28
-                                : 22,
-                            fontWeight: FontWeight.w600,
-                            color: _streakTextColor(context),
-                            fontFamily: 'Georgia',
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Pause and reflect for a moment.',
-                          style: TextStyle(
-                            fontSize: MediaQuery.of(context).size.width > 450
-                                ? 18
-                                : 15,
-                            color: _streakTextColor(context).withOpacity(0.9),
-                            fontFamily: 'Georgia',
-                          ),
-                        ),
-                        const SizedBox(height: 140),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Column(
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        child: Text('Very Far',
-                                            textAlign: TextAlign.center,
-                                            style: _labelStyle(context,
-                                                active:
-                                                    _activeLabelIndex == 0)),
-                                      ),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text('Very Far',
+                                          textAlign: TextAlign.center,
+                                          style: _labelStyle(context,
+                                              active: _activeLabelIndex == 0)),
                                     ),
                                   ),
-                                  Expanded(
-                                    child: Align(
-                                      alignment: Alignment.center,
-                                      child: AnimatedOpacity(
-                                        opacity: _activeLabelIndex == 1 ? 1.0 : 0.0,
-                                        duration: const Duration(milliseconds: 160),
-                                        child: FittedBox(
-                                          fit: BoxFit.scaleDown,
-                                          child: Text(
-                                            'Far',
-                                            textAlign: TextAlign.center,
-                                            style: _labelStyle(context,
-                                                active: _activeLabelIndex == 1),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Align(
-                                      alignment: Alignment.center,
-                                      child: FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        child: Text('Growing',
-                                            textAlign: TextAlign.center,
-                                            style: _labelStyle(context,
-                                                active:
-                                                    _activeLabelIndex == 2)),
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Align(
-                                      alignment: Alignment.center,
-                                      child: AnimatedOpacity(
-                                        opacity: _activeLabelIndex == 3 ? 1.0 : 0.0,
-                                        duration: const Duration(milliseconds: 160),
-                                        child: FittedBox(
-                                          fit: BoxFit.scaleDown,
-                                          child: Text(
-                                            'Close',
-                                            textAlign: TextAlign.center,
-                                            style: _labelStyle(context,
-                                                active: _activeLabelIndex == 3),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Align(
-                                      alignment: Alignment.centerRight,
-                                      child: FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        child: Text('Very Close',
-                                            textAlign: TextAlign.center,
-                                            style: _labelStyle(context,
-                                                active:
-                                                    _activeLabelIndex == 4)),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              SliderTheme(
-                                data: SliderTheme.of(context).copyWith(
-                                  activeTrackColor: _streakTextColor(context),
-                                  inactiveTrackColor:
-                                      _streakPanelColor(context),
-                                  trackShape: const _FullWidthSliderTrackShape(),
-                                  thumbColor: _streakTextColor(context),
-                                  overlayColor: _streakTextColor(context)
-                                      .withOpacity(0.2),
-                                  trackHeight: 6,
-                                  thumbShape: const RoundSliderThumbShape(
-                                      enabledThumbRadius: 12),
-                                  overlayShape: const RoundSliderOverlayShape(
-                                      overlayRadius: 20),
-                                  activeTickMarkColor: Colors.transparent,
-                                  inactiveTickMarkColor: Colors.transparent,
                                 ),
-                                child: LayoutBuilder(
-                                  builder: (context, constraints) {
-                                    const double smallR = 4.0;
-                                    final trackW = constraints.maxWidth;
-                                    final usable = trackW - (smallR * 2);
-                                    return Stack(
+                                Expanded(
+                                  child: Align(
+                                    alignment: Alignment.center,
+                                    child: AnimatedOpacity(
+                                      opacity:
+                                          _activeLabelIndex == 1 ? 1.0 : 0.0,
+                                      duration:
+                                          const Duration(milliseconds: 160),
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          'Far',
+                                          textAlign: TextAlign.center,
+                                          style: _labelStyle(context,
+                                              active:
+                                                  _activeLabelIndex == 1),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Align(
+                                    alignment: Alignment.center,
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text('Growing',
+                                          textAlign: TextAlign.center,
+                                          style: _labelStyle(context,
+                                              active:
+                                                  _activeLabelIndex == 2)),
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Align(
+                                    alignment: Alignment.center,
+                                    child: AnimatedOpacity(
+                                      opacity:
+                                          _activeLabelIndex == 3 ? 1.0 : 0.0,
+                                      duration:
+                                          const Duration(milliseconds: 160),
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          'Close',
+                                          textAlign: TextAlign.center,
+                                          style: _labelStyle(context,
+                                              active:
+                                                  _activeLabelIndex == 3),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Align(
+                                    alignment: Alignment.centerRight,
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text('Very Close',
+                                          textAlign: TextAlign.center,
+                                          style: _labelStyle(context,
+                                              active:
+                                                  _activeLabelIndex == 4)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                activeTrackColor: _isStreakDark(context)
+                                    ? Colors.white.withOpacity(0.85)
+                                    : _kStreakBrown,
+                                inactiveTrackColor: _streakPanelColor(context),
+                                trackShape: const _FullWidthSliderTrackShape(),
+                                thumbColor: _isStreakDark(context)
+                                    ? Colors.white
+                                    : _kStreakBrown,
+                                overlayColor: (_isStreakDark(context)
+                                        ? Colors.white
+                                        : _kStreakBrown)
+                                    .withOpacity(0.12),
+                                trackHeight: 5,
+                                thumbShape: const RoundSliderThumbShape(
+                                  enabledThumbRadius: 11,
+                                ),
+                                overlayShape: const RoundSliderOverlayShape(
+                                  overlayRadius: 18,
+                                ),
+                                activeTickMarkColor: Colors.transparent,
+                                inactiveTickMarkColor: Colors.transparent,
+                              ),
+                              child: LayoutBuilder(
+                                builder: (context, constraints) {
+                                  const double dotSize = 8.0;
+                                  const double dotRadius = dotSize / 2;
+                                  final trackW = constraints.maxWidth;
+                                  final dotFill = _isStreakDark(context)
+                                      ? Colors.white.withOpacity(0.5)
+                                      : const Color(0xFFF0E8DC);
+                                  final dotBorder = (_isStreakDark(context)
+                                          ? Colors.white
+                                          : const Color(0xFF8B7355))
+                                      .withOpacity(0.5);
+
+                                  // Match Material Slider thumb centers on full-width track:
+                                  // thumb x = trackLeft + trackWidth * (i / divisions).
+                                  double dotLeftForIndex(int i) {
+                                    return (trackW * (i / 4)) - dotRadius;
+                                  }
+
+                                  return SizedBox(
+                                    height: 48,
+                                    child: Stack(
                                       clipBehavior: Clip.none,
+                                      alignment: Alignment.centerLeft,
                                       children: [
                                         Slider(
                                           value: _value,
                                           divisions: 4,
                                           onChanged: widget.viewOnly
                                               ? null
-                                              : (v) => setState(
-                                                  () => _value = _snap(v)),
+                                              : (v) => setState(() {
+                                                    _sliderInteracted = true;
+                                                    _value = _snap(v);
+                                                  }),
                                         ),
-                                        for (int i = 0; i < 5; i++) ...[
+                                        for (int i = 0; i < 5; i++)
                                           Positioned(
-                                            left: usable * (i / 4),
+                                            left: dotLeftForIndex(i),
                                             top: 0,
                                             bottom: 0,
                                             child: Center(
-                                              child: Container(
-                                                width: smallR * 2,
-                                                height: smallR * 2,
-                                                decoration: BoxDecoration(
-                                                  shape: BoxShape.circle,
-                                                  color:
-                                                      _streakTextColor(context)
-                                                          .withOpacity(0.35),
+                                              child: IgnorePointer(
+                                                child: Container(
+                                                  width: dotSize,
+                                                  height: dotSize,
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    color: dotFill,
+                                                    border: Border.all(
+                                                      color: dotBorder,
+                                                      width: 1,
+                                                    ),
+                                                  ),
                                                 ),
                                               ),
                                             ),
                                           ),
-                                        ],
                                       ],
-                                    );
-                                  },
-                                ),
+                                    ),
+                                  );
+                                },
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
+              ),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 280),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                child: _sliderInteracted
+                    ? Padding(
+                        key: const ValueKey('honesty-card'),
+                        padding: const EdgeInsets.only(top: 28),
+                        child: _connectionHonestyCard(context),
+                      )
+                    : const SizedBox(
+                        key: ValueKey('honesty-spacer'),
+                        height: 28,
+                      ),
               ),
               Padding(
-                padding: const EdgeInsets.only(bottom: 32),
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
                 child: widget.viewOnly
                     ? const SizedBox.shrink()
                     : Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          _parchmentButton(
-                            context,
-                            label: 'Take the Next Step',
+                          _streakPhotoPrimaryButton(
+                            context: context,
+                            label: 'Continue',
+                            showShadow: false,
                             onPressed: () async {
                               final dayKey =
                                   await _currentStreakFlowProgressDayKey();
@@ -2257,7 +2731,9 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                               Get.to(() => StreakVerseScreen(item: item!));
                             },
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 10),
+                          _connectionPrivacyNote(context),
+                          const SizedBox(height: 8),
                           TextButton(
                             onPressed: () async {
                               final today = DateTime.now()
@@ -2357,10 +2833,11 @@ Widget _buildParchmentButton({
   required String label,
   required VoidCallback onTap,
   bool isSecondary = false,
+  IconData? leadingIcon,
 }) {
   final isDark = _isStreakDark(context);
-  final warmText = isDark ? Colors.white : const Color(0xFF4A2F1D);
-  
+  final primaryIcon = leadingIcon ?? Icons.local_fire_department;
+
   return Material(
     color: Colors.transparent,
     child: InkWell(
@@ -2370,22 +2847,34 @@ Widget _buildParchmentButton({
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 13),
         decoration: BoxDecoration(
-          color: isSecondary 
-              ? (isDark ? Colors.white.withOpacity(0.15) : Colors.white.withOpacity(0.42))
-              : (isDark ? const Color(0xFF3B2A1A) : _kStreakGold),
+          gradient: isSecondary
+              ? null
+              : const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFFD4AF37),
+                    Color(0xFFC9A227),
+                    Color(0xFFB8860B),
+                  ],
+                ),
+          color: isSecondary
+              ? Colors.black.withOpacity(0.38)
+              : null,
           borderRadius: BorderRadius.circular(30),
           border: Border.all(
-            color: isSecondary 
-                ? _kStreakGold.withOpacity(0.55)
+            color: isSecondary
+                ? _kStreakGold.withOpacity(0.85)
                 : (isDark ? _kStreakGold : Colors.transparent),
             width: isSecondary ? 1.5 : (isDark ? 1.5 : 0),
           ),
           boxShadow: [
             if (!isSecondary)
               BoxShadow(
-                color: _kStreakGold.withOpacity(isDark ? 0.3 : 0.22),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
+                color: _kStreakGold.withOpacity(isDark ? 0.35 : 0.28),
+                blurRadius: 14,
+                spreadRadius: 1,
+                offset: const Offset(0, 4),
               ),
           ],
         ),
@@ -2393,16 +2882,18 @@ Widget _buildParchmentButton({
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (!isSecondary) ...[
-              const Icon(Icons.local_fire_department,
-                  color: Colors.white, size: 20),
+              Icon(primaryIcon, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+            ] else ...[
+              Icon(Icons.eco_outlined, color: _kStreakGold, size: 18),
               const SizedBox(width: 8),
             ],
             Text(
               label,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: isSecondary ? warmText : Colors.white,
-                fontSize: MediaQuery.of(context).size.width > 450 ? 22 : 20,
+                color: Colors.white,
+                fontSize: MediaQuery.of(context).size.width > 450 ? 20 : 18,
                 fontWeight: FontWeight.w700,
                 fontFamily: 'Georgia',
               ),
@@ -2514,7 +3005,7 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
   Widget build(BuildContext context) {
     final item = widget.item;
     return Scaffold(
-      body: _streakPhotoBackgroundStack(
+      body: _streakPhotoVerseBackgroundStack(
         context: context,
         assetPath: 'assets/back1.png',
         child: SafeArea(
@@ -2531,6 +3022,13 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                 title: 'Verse of the Day',
                 subtitle: 'God\'s Word for your heart today.',
               ),
+              Image.asset(
+                'assets/verse-streak-book.png',
+                width: MediaQuery.of(context).size.width > 450 ? 72 : 64,
+                height: MediaQuery.of(context).size.width > 450 ? 72 : 64,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(height: 8),
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
@@ -2588,6 +3086,7 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                                   ),
                                 ],
                               ),
+                              useContentScrim: false,
                             ),
                           ),
                         ),
@@ -2660,7 +3159,7 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                             }
                           },
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 24),
                         _streakPhotoPrimaryButton(
                           context: context,
                           label: 'Read Devotional',
@@ -2677,7 +3176,7 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                                 ));
                           },
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 20),
                         Text(
                           'Explore deeper insights and grow in your faith.',
                           textAlign: TextAlign.center,
@@ -2820,75 +3319,76 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                 ),
               ),
               if (!widget.viewOnly)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _streakDevotionalReflectionPrompt(context),
-                      _streakPhotoPrimaryButton(
-                        context: context,
-                        label: 'Continue to Prayer',
-                        onPressed: () async {
-                          await SharPreferences.setInt(
-                              SharPreferences.streakFlowStepsCompletedToday, 3);
-                          await _storeActiveStreakFlowSteps(3);
-                          if (!mounted) return;
-                          await precacheStreakPhotoBackgrounds(context);
-                          if (!mounted) return;
-                          Get.to(() => StreakPrayerScreen(
-                                item: item,
-                                viewOnly: widget.viewOnly,
+                _streakPhotoVerseBottomShadow(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _streakPhotoSaveShareRow(
+                          saved: _saved,
+                          saveLabel: _saved ? 'Saved' : 'Save',
+                          onSave: () async {
+                            const title = 'Devotional Moment';
+                            if (_saved) {
+                              await StreakSavedStorage.remove(
+                                  'devotional', title, item.devotionalText);
+                              if (mounted) setState(() => _saved = false);
+                              if (context.mounted) {
+                                _showSavedToast(context, saved: false);
+                              }
+                            } else {
+                              await StreakSavedStorage.add(StreakSavedItem(
+                                type: 'devotional',
+                                title: title,
+                                body: item.devotionalText,
+                                savedAt: DateTime.now().toIso8601String(),
                               ));
-                        },
-                      ),
-                      const SizedBox(height: 14),
-                      _streakPhotoSaveShareRow(
-                        saved: _saved,
-                        saveLabel: _saved ? 'Saved' : 'Save',
-                        onSave: () async {
-                          const title = 'Devotional Moment';
-                          if (_saved) {
-                            await StreakSavedStorage.remove(
-                                'devotional', title, item.devotionalText);
-                            if (mounted) setState(() => _saved = false);
-                            if (context.mounted) {
-                              _showSavedToast(context, saved: false);
+                              if (mounted) setState(() => _saved = true);
+                              if (context.mounted) {
+                                _showSavedToast(context, saved: true);
+                              }
                             }
-                          } else {
-                            await StreakSavedStorage.add(StreakSavedItem(
-                              type: 'devotional',
-                              title: title,
-                              body: item.devotionalText,
-                              savedAt: DateTime.now().toIso8601String(),
-                            ));
-                            if (mounted) setState(() => _saved = true);
-                            if (context.mounted) {
-                              _showSavedToast(context, saved: true);
-                            }
-                          }
-                        },
-                        onShare: () async {
-                          final shareContext = context;
-                          final image = await _captureStreakShareImage(
-                            shareContext,
-                            backgroundAsset: 'assets/back2.png',
-                            content: Text(
-                              item.devotionalText,
-                              textAlign: TextAlign.center,
-                              style: _streakShareBodyStyle(),
-                            ),
-                          );
-                          if (shareContext.mounted) {
-                            await _shareAsImage(
+                          },
+                          onShare: () async {
+                            final shareContext = context;
+                            final image = await _captureStreakShareImage(
                               shareContext,
-                              imageBytes: image,
-                              fallbackText: item.devotionalText,
+                              backgroundAsset: 'assets/back2.png',
+                              content: Text(
+                                item.devotionalText,
+                                textAlign: TextAlign.center,
+                                style: _streakShareBodyStyle(),
+                              ),
                             );
-                          }
-                        },
-                      ),
-                    ],
+                            if (shareContext.mounted) {
+                              await _shareAsImage(
+                                shareContext,
+                                imageBytes: image,
+                                fallbackText: item.devotionalText,
+                              );
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        _streakPhotoPrimaryButton(
+                          context: context,
+                          label: 'Continue to Prayer',
+                          onPressed: () async {
+                            await SharPreferences.setInt(
+                                SharPreferences.streakFlowStepsCompletedToday, 3);
+                            await _storeActiveStreakFlowSteps(3);
+                            if (!mounted) return;
+                            await precacheStreakPhotoBackgrounds(context);
+                            if (!mounted) return;
+                            Get.to(() => StreakPrayerScreen(
+                                  item: item,
+                                  viewOnly: widget.viewOnly,
+                                ));
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 )
               else
@@ -3024,11 +3524,58 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                 ),
               ),
               if (!widget.viewOnly)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+                _streakPhotoVerseBottomShadow(
+                  child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      _streakPhotoSaveShareRow(
+                        saved: _saved,
+                        saveLabel: _saved ? 'Saved' : 'Save',
+                        onSave: () async {
+                          const title = 'Today\'s Prayer';
+                          if (_saved) {
+                            await StreakSavedStorage.remove(
+                                'prayer', title, item.prayerText);
+                            if (mounted) setState(() => _saved = false);
+                            if (context.mounted) {
+                              _showSavedToast(context, saved: false);
+                            }
+                          } else {
+                            await StreakSavedStorage.add(StreakSavedItem(
+                              type: 'prayer',
+                              title: title,
+                              body: item.prayerText,
+                              savedAt: DateTime.now().toIso8601String(),
+                            ));
+                            if (mounted) setState(() => _saved = true);
+                            if (context.mounted) {
+                              _showSavedToast(context, saved: true);
+                            }
+                          }
+                        },
+                        onShare: () async {
+                          final shareContext = context;
+                          final image = await _captureStreakShareImage(
+                            shareContext,
+                            backgroundAsset: 'assets/back1.png',
+                            content: Text(
+                              item.prayerText,
+                              textAlign: TextAlign.center,
+                              style: _streakShareBodyStyle(),
+                            ),
+                          );
+                          if (shareContext.mounted) {
+                            await _shareAsImage(
+                              shareContext,
+                              imageBytes: image,
+                              fallbackText: item.prayerText,
+                            );
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 16),
                       _streakPhotoPrimaryButton(
                         context: context,
                         label: 'Amen',
@@ -3248,54 +3795,9 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                             Get.offAll(() => const StreakCompletedScreen());
                           },
                       ),
-                      const SizedBox(height: 14),
-                      _streakPhotoSaveShareRow(
-                        saved: _saved,
-                        saveLabel: _saved ? 'Saved' : 'Save Prayer',
-                        onSave: () async {
-                          const title = 'Today\'s Prayer';
-                          if (_saved) {
-                            await StreakSavedStorage.remove(
-                                'prayer', title, item.prayerText);
-                            if (mounted) setState(() => _saved = false);
-                            if (context.mounted) {
-                              _showSavedToast(context, saved: false);
-                            }
-                          } else {
-                            await StreakSavedStorage.add(StreakSavedItem(
-                              type: 'prayer',
-                              title: title,
-                              body: item.prayerText,
-                              savedAt: DateTime.now().toIso8601String(),
-                            ));
-                            if (mounted) setState(() => _saved = true);
-                            if (context.mounted) {
-                              _showSavedToast(context, saved: true);
-                            }
-                          }
-                        },
-                        onShare: () async {
-                          final shareContext = context;
-                          final image = await _captureStreakShareImage(
-                            shareContext,
-                            backgroundAsset: 'assets/back1.png',
-                            content: Text(
-                              item.prayerText,
-                              textAlign: TextAlign.center,
-                              style: _streakShareBodyStyle(),
-                            ),
-                          );
-                          if (shareContext.mounted) {
-                            await _shareAsImage(
-                              shareContext,
-                              imageBytes: image,
-                              fallbackText: item.prayerText,
-                            );
-                          }
-                        },
-                      ),
                     ],
                   ),
+                ),
                 )
               else
                 const SizedBox(height: 24),
@@ -3321,53 +3823,6 @@ class StreakCompletedScreen extends StatefulWidget {
 
 class _StreakCompletedScreenState extends State<StreakCompletedScreen>
     with TickerProviderStateMixin {
-  bool _isStreakDark(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark;
-
-  Color _streakTextColor(BuildContext context) =>
-      _isStreakDark(context) ? _kParchmentLight : _kInkBrown;
-
-  Color _streakPanelColor(BuildContext context) =>
-      _isStreakDark(context) ? const Color(0xFF2A1F12) : _kParchmentMid;
-
-  Widget _parchmentButton(
-    BuildContext context, {
-    required String label,
-    required VoidCallback onPressed,
-  }) {
-    final isDark = _isStreakDark(context);
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF3B2A1A) : _kInkBrown,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _kCandleGold, width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: _kCandleGold.withOpacity(0.25),
-              blurRadius: 12,
-              spreadRadius: 1,
-            ),
-          ],
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFFF5EAC6),
-              fontFamily: 'Georgia',
-              letterSpacing: 0.8,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   void _goToHome(BuildContext context) {
     Get.offAll(
       () => HomeScreen(
@@ -3607,353 +4062,570 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
   }
 
   // ── PARCHMENT TEXTURE OVERLAY ─────────────────────────────────────────────
-  // Subtle aged-paper grain via semi-transparent lines (no external assets).
   @override
   Widget build(BuildContext context) {
-    final isDark = _isStreakDark(context);
-    final textColor = _streakTextColor(context);
+    final screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/back1.png'),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'assets/back1.png',
             fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
           ),
-        ),
-        child: SafeArea(
-          child: Stack(
-            children: [
-              if (isDark)
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withOpacity(0.62),
-                          Colors.black.withOpacity(0.45),
-                          Colors.black.withOpacity(0.58),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              // 1. Candlelight rays (same logic, parchment palette)
-              _lightRaysOverlay(isDark),
-              // 2. Ink-bleed celebration burst (same logic, parchment palette)
-              _celebrationBurstOverlay(isDark),
-              Positioned(
-                top: 0,
-                right: 0,
-                child: IconButton(
-                  icon: Icon(
-                    Icons.close,
-                    color: isDark
-                        ? Colors.white.withOpacity(0.9)
-                        : textColor.withOpacity(0.85),
-                  ),
-                  onPressed: () => _goToHome(context),
-                  tooltip: 'Close',
-                ),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withOpacity(0.42),
+                  Colors.black.withOpacity(0.28),
+                  Colors.black.withOpacity(0.55),
+                ],
               ),
-
-            Column(
+            ),
+          ),
+          _streakPhotoReadabilityOverlays(context),
+          _lightRaysOverlay(true),
+          _celebrationBurstOverlay(true),
+          SafeArea(
+            child: Column(
               children: [
-                const SizedBox(height: 40),
-
-                // ── Illuminated Flame Badge ──────────────────────────────────
-                FutureBuilder<int?>(
-                  future: SharPreferences.getInt(
-                      SharPreferences.pendingStreakCompleteCelebration),
-                  builder: (context, snap) {
-                    final streakDays = (snap.data ?? 0).clamp(0, 9999);
-                    return FadeTransition(
-                      opacity: _fade,
-                      child: ScaleTransition(
-                        scale: _scale,
-                        child: Column(
-                          children: [
-                            AnimatedBuilder(
-                              animation: _twinkleCtrl,
-                              builder: (context, child) {
-                                final pulse = 1 + (_twinkleCtrl.value * 0.08);
-                                return Transform.scale(
-                                  scale: pulse,
-                                  child: Container(
-                                    width: 108,
-                                    height: 108,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      // Parchment circle bg
-                                      color: isDark
-                                          ? const Color(0xFF2E1E0A)
-                                          : _kParchmentMid,
-                                      // Ink-drawn border
-                                      border: Border.all(
-                                          color: _kInkSepia, width: 2.5),
-                                      boxShadow: [
-                                        // Strong outer glow - flame effect
-                                        BoxShadow(
-                                          color: _kCandleGold.withOpacity(0.40 +
-                                              (_twinkleCtrl.value * 0.35)),
-                                          blurRadius:
-                                              35 + (_twinkleCtrl.value * 25),
-                                          spreadRadius:
-                                              8 + (_twinkleCtrl.value * 8),
-                                        ),
-                                        // Medium glow layer
-                                        BoxShadow(
-                                          color: _kCandleGold.withOpacity(0.25 +
-                                              (_twinkleCtrl.value * 0.25)),
-                                          blurRadius:
-                                              22 + (_twinkleCtrl.value * 18),
-                                          spreadRadius:
-                                              4 + (_twinkleCtrl.value * 4),
-                                        ),
-                                        // Inner warm halo
-                                        BoxShadow(
-                                          color: _kCandleGlow.withOpacity(0.20 +
-                                              (_twinkleCtrl.value * 0.30)),
-                                          blurRadius:
-                                              12 + (_twinkleCtrl.value * 12),
-                                          spreadRadius: _twinkleCtrl.value * 3,
-                                        ),
-                                      ],
-                                    ),
-                                    child: Center(
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          // No extra icon shadow (keep clean like design)
-                                        ),
-                                        child: const Icon(
-                                          Icons.local_fire_department_rounded,
-                                          size: 58,
-                                          color: Color(0xFFC9A227),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 14),
-
-                            // Decorative manuscript rule above title
-                            _ManuscriptRule(color: _kInkSepia.withOpacity(0.5)),
-                            const SizedBox(height: 8),
-
-                            Text(
-                              streakDays > 0
-                                  ? 'Day $streakDays Streak'
-                                  : 'Streak Completed!',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize:
-                                    MediaQuery.of(context).size.width > 450
-                                        ? 30
-                                        : 24,
-                                fontWeight: FontWeight.w800,
-                                color: isDark ? Colors.white : textColor,
-                                fontFamily: 'Georgia',
-                                letterSpacing: 1.0,
-                                shadows: isDark
-                                    ? const [
-                                        Shadow(
-                                          color: Colors.black87,
-                                          blurRadius: 10,
-                                          offset: Offset(0, 2),
-                                        ),
-                                      ]
-                                    : null,
-                              ),
-                            ),
-
-                            const SizedBox(height: 8),
-                            _ManuscriptRule(
-                                color: (isDark ? Colors.white : _kInkSepia)
-                                    .withOpacity(0.5)),
-                          ],
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Text(
+                        'Streak Completed!',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: screenWidth > 450 ? 18 : 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white.withOpacity(0.95),
+                          fontFamily: 'Georgia',
+                          shadows: _kStreakPhotoSoftTextShadows,
                         ),
                       ),
-                    );
-                  },
-                ),
-
-                const SizedBox(height: 12),
-                const SizedBox(height: 8),
-
-                // Scripture-style subtitle
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 28),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? Colors.black.withOpacity(0.35)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      child: Column(
-                        children: [
-                          Text(
-                            'You\'re walking faithfully today.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 15,
-                              color: isDark
-                                  ? Colors.white.withOpacity(0.95)
-                                  : textColor.withOpacity(0.85),
-                              fontFamily: 'Georgia',
-                              fontStyle: FontStyle.italic,
-                              shadows: isDark
-                                  ? const [
-                                      Shadow(
-                                        color: Colors.black87,
-                                        blurRadius: 8,
-                                        offset: Offset(0, 1),
-                                      ),
-                                    ]
-                                  : null,
-                            ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: IconButton(
+                          icon: const Icon(
+                            Icons.share_outlined,
+                            color: Colors.white,
+                            size: 22,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black87,
+                                blurRadius: 6,
+                                offset: Offset(0, 1),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Keep the light alive.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 15,
-                              color: isDark
-                                  ? Colors.white.withOpacity(0.95)
-                                  : textColor.withOpacity(0.85),
-                              fontFamily: 'Georgia',
-                              fontStyle: FontStyle.italic,
-                              shadows: isDark
-                                  ? const [
-                                      Shadow(
-                                        color: Colors.black87,
-                                        blurRadius: 8,
-                                        offset: Offset(0, 1),
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                          ),
-                        ],
+                          onPressed: () async {
+                            final streakDays = await SharPreferences.getInt(
+                                    SharPreferences
+                                        .pendingStreakCompleteCelebration) ??
+                                0;
+                            if (!context.mounted) return;
+                            final shareContext = context;
+                            final image = await _captureStreakShareImage(
+                              shareContext,
+                              backgroundAsset: 'assets/back1.png',
+                              content: _streakCompleteShareContent(streakDays),
+                            );
+                            if (!shareContext.mounted) return;
+                            await _shareAsImage(
+                              shareContext,
+                              imageBytes: image,
+                              fallbackText: streakDays > 0
+                                  ? 'Day $streakDays Streak! I completed my daily streak today.'
+                                  : 'Streak Completed! I finished my daily streak today.',
+                            );
+                          },
+                          tooltip: 'Share',
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+                    child: FutureBuilder<int?>(
+                      future: SharPreferences.getInt(
+                          SharPreferences.pendingStreakCompleteCelebration),
+                      builder: (context, snap) {
+                        final streakDays = (snap.data ?? 0).clamp(0, 9999);
+                        final creditsEarned = streakDays * 20;
 
-                const SizedBox(height: 32),
-
-                // ── Reward Scroll Card ────────────────────────────────────────
-                SlideTransition(
-                  position: _cardSlide,
-                  child: FadeTransition(
-                    opacity: _fade,
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 32),
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 20, horizontal: 24),
-                      decoration: BoxDecoration(
-                        color: _streakPanelColor(context).withOpacity(0.85),
-                        borderRadius: BorderRadius.circular(6),
-                        // Double ink border — like a manuscript frame
-                        border: Border.all(color: _kInkSepia, width: 1.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _kInkBrown.withOpacity(isDark ? 0.40 : 0.18),
-                            blurRadius: 18,
-                            offset: const Offset(0, 4),
-                          ),
-                          // Inner candle-glow
-                          BoxShadow(
-                            color:
-                                _kCandleGold.withOpacity(isDark ? 0.12 : 0.10),
-                            blurRadius: 10,
-                            spreadRadius: -2,
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          // Scroll top ornament line
-                          _ScrollOrnament(color: _kInkSepia),
-                          const SizedBox(height: 10),
-
-                          Text(
-                            'REWARD  EARNED',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 2.4,
-                              color: textColor.withOpacity(0.7),
-                              fontFamily: 'Georgia',
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                        return FadeTransition(
+                          opacity: _fade,
+                          child: Column(
                             children: [
-                              Icon(Icons.monetization_on,
-                                  color: _kCandleGold, size: 26),
-                              const SizedBox(width: 8),
+                              ScaleTransition(
+                                scale: _scale,
+                                child: _StreakCompleteFlameBadge(
+                                  twinkleCtrl: _twinkleCtrl,
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+                              RichText(
+                                textAlign: TextAlign.center,
+                                text: TextSpan(
+                                  style: TextStyle(
+                                    fontSize: screenWidth > 450 ? 34 : 28,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                    fontFamily: 'Georgia',
+                                    height: 1.15,
+                                    shadows: _kStreakPhotoTextShadows,
+                                  ),
+                                  children: [
+                                    TextSpan(
+                                      text: streakDays > 0
+                                          ? 'Day $streakDays '
+                                          : '',
+                                    ),
+                                    const TextSpan(
+                                      text: 'Streak!',
+                                      style: TextStyle(
+                                        color: _kStreakPhotoGold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 10),
                               Text(
-                                '+20 Faith Credits',
+                                'You\'re building a beautiful habit of seeking God daily.',
+                                textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w700,
-                                  color: textColor,
+                                  fontSize: screenWidth > 450 ? 15 : 14,
+                                  height: 1.45,
+                                  color: Colors.white.withOpacity(0.92),
                                   fontFamily: 'Georgia',
+                                  shadows: _kStreakPhotoSoftTextShadows,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              _streakGoldDivider(center: _streakDividerHeart()),
+                              const SizedBox(height: 18),
+                              SlideTransition(
+                                position: _cardSlide,
+                                child: _StreakCompleteRewardCard(
+                                  creditsLabel: '+20 Faith Credits',
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              SlideTransition(
+                                position: _cardSlide,
+                                child: _StreakCompleteMotivationCard(),
+                              ),
+                              const SizedBox(height: 14),
+                              SlideTransition(
+                                position: _cardSlide,
+                                child: _StreakCompleteStatsBar(
+                                  daysStreak: streakDays,
+                                  versesRead: streakDays,
+                                  prayersOffered: streakDays,
+                                  faithCreditsEarned: creditsEarned,
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Added to your Wallet',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: textColor.withOpacity(0.75),
-                              fontFamily: 'Georgia',
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          // Scroll bottom ornament line
-                          _ScrollOrnament(color: _kInkSepia),
-                        ],
-                      ),
+                        );
+                      },
                     ),
                   ),
                 ),
-
-                const Spacer(),
-
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: _parchmentButton(
-                      context,
-                      label: 'Continue My Journey',
-                      onPressed: () => _goToHome(context),
-                    ),
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                  child: _streakPhotoPrimaryButton(
+                    context: context,
+                    label: 'Continue My Journey',
+                    onPressed: () => _goToHome(context),
                   ),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-      )
+    );
+  }
+}
+
+class _StreakCompleteFlameBadge extends StatelessWidget {
+  const _StreakCompleteFlameBadge({required this.twinkleCtrl});
+
+  final AnimationController twinkleCtrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 148,
+      height: 148,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(
+            top: 8,
+            left: 18,
+            child: Icon(
+              Icons.auto_awesome,
+              size: 14,
+              color: Colors.white.withOpacity(0.75),
+            ),
+          ),
+          Positioned(
+            top: 22,
+            right: 12,
+            child: Icon(
+              Icons.auto_awesome,
+              size: 12,
+              color: _kStreakPhotoGold.withOpacity(0.85),
+            ),
+          ),
+          Positioned(
+            bottom: 18,
+            left: 10,
+            child: Icon(
+              Icons.auto_awesome,
+              size: 11,
+              color: Colors.white.withOpacity(0.65),
+            ),
+          ),
+          Positioned(
+            bottom: 10,
+            right: 20,
+            child: Icon(
+              Icons.auto_awesome,
+              size: 13,
+              color: _kStreakPhotoGold.withOpacity(0.8),
+            ),
+          ),
+          AnimatedBuilder(
+            animation: twinkleCtrl,
+            builder: (context, child) {
+              final pulse = 1 + (twinkleCtrl.value * 0.05);
+              return Transform.scale(
+                scale: pulse,
+                child: Container(
+                  width: 118,
+                  height: 118,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _kStreakPhotoGold.withOpacity(0.55),
+                      width: 3,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _kStreakPhotoGold.withOpacity(
+                          0.35 + (twinkleCtrl.value * 0.25),
+                        ),
+                        blurRadius: 28 + (twinkleCtrl.value * 16),
+                        spreadRadius: 4 + (twinkleCtrl.value * 4),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 92,
+                      height: 92,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.black.withOpacity(0.28),
+                        border: Border.all(
+                          color: _kStreakPhotoGold.withOpacity(0.75),
+                          width: 2,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.local_fire_department_rounded,
+                        size: 46,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StreakCompleteRewardCard extends StatelessWidget {
+  const _StreakCompleteRewardCard({required this.creditsLabel});
+
+  final String creditsLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 16, 12, 16),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.48),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'REWARD EARNED',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.6,
+                    color: _kStreakPhotoGold.withOpacity(0.95),
+                    fontFamily: 'Georgia',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.add_circle_outline,
+                      color: _kStreakPhotoGold,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        creditsLabel,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          fontFamily: 'Georgia',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Added to your wallet',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white.withOpacity(0.72),
+                    fontFamily: 'Georgia',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Image.asset(
+            'assets/gold-treasure-icon.png',
+            width: 78,
+            height: 72,
+            fit: BoxFit.contain,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StreakCompleteMotivationCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.34),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.favorite_border,
+            color: _kStreakPhotoGold.withOpacity(0.95),
+            size: 22,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: TextStyle(
+                  fontSize: MediaQuery.of(context).size.width > 450 ? 15 : 14,
+                  height: 1.45,
+                  color: Colors.white.withOpacity(0.92),
+                  fontFamily: 'Georgia',
+                ),
+                children: const [
+                  TextSpan(
+                    text: 'Keep going! ',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  TextSpan(
+                    text:
+                        'Your consistency is preparing you for something ',
+                  ),
+                  TextSpan(
+                    text: 'greater.',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StreakCompleteStatsBar extends StatelessWidget {
+  const _StreakCompleteStatsBar({
+    required this.daysStreak,
+    required this.versesRead,
+    required this.prayersOffered,
+    required this.faithCreditsEarned,
+  });
+
+  final int daysStreak;
+  final int versesRead;
+  final int prayersOffered;
+  final int faithCreditsEarned;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.48),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _StreakCompleteStatItem(
+              icon: Icons.calendar_today_outlined,
+              iconColor: _kStreakPhotoGold,
+              value: '$daysStreak',
+              label: 'Days Streak',
+            ),
+          ),
+          Expanded(
+            child: _StreakCompleteStatItem(
+              icon: Icons.menu_book_outlined,
+              iconColor: const Color(0xFFB39DDB),
+              value: '$versesRead',
+              label: 'Verses Read',
+            ),
+          ),
+          Expanded(
+            child: _StreakCompleteStatItem(
+              iconAsset: 'assets/prayer_guidance_icons/Thanksgiving.png',
+              tintIconAsset: false,
+              iconDisplaySize: 22,
+              iconColor: const Color(0xFF81C784),
+              value: '$prayersOffered',
+              label: 'Prayers Offered',
+            ),
+          ),
+          Expanded(
+            child: _StreakCompleteStatItem(
+              icon: Icons.star_outline,
+              iconColor: const Color(0xFF64B5F6),
+              value: '$faithCreditsEarned',
+              label: 'Faith Credits Earned',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StreakCompleteStatItem extends StatelessWidget {
+  const _StreakCompleteStatItem({
+    this.icon,
+    this.iconAsset,
+    this.tintIconAsset = true,
+    this.iconDisplaySize,
+    required this.iconColor,
+    required this.value,
+    required this.label,
+  }) : assert(icon != null || iconAsset != null);
+
+  final IconData? icon;
+  final String? iconAsset;
+  final bool tintIconAsset;
+  final double? iconDisplaySize;
+  final Color iconColor;
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = MediaQuery.of(context).size.width < 360;
+    final iconSize = iconDisplaySize ?? (compact ? 18.0 : 20.0);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (iconAsset != null)
+          Image.asset(
+            iconAsset!,
+            width: iconSize,
+            height: iconSize,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+            color: tintIconAsset ? iconColor : null,
+            colorBlendMode: tintIconAsset ? BlendMode.srcIn : null,
+            errorBuilder: (_, __, ___) => Icon(
+              Icons.volunteer_activism_outlined,
+              color: iconColor,
+              size: iconSize,
+            ),
+          )
+        else
+          Icon(icon!, color: iconColor, size: iconSize),
+        const SizedBox(height: 6),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: compact ? 18 : 20,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+            fontFamily: 'Georgia',
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          style: TextStyle(
+            fontSize: compact ? 9 : 10,
+            height: 1.2,
+            color: Colors.white.withOpacity(0.72),
+            fontFamily: 'Georgia',
+          ),
+        ),
+      ],
     );
   }
 }

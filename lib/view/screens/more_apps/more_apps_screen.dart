@@ -3,6 +3,7 @@ import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
+import 'package:biblebookapp/utils/network_error_message.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/more_apps/bloc/more_app_bloc.dart';
 
@@ -38,9 +39,9 @@ class MoreAppsScreen extends HookConsumerWidget {
           if (!cancelled && appState.isLoading && appState.apps.isEmpty && !hasShownToast.value) {
             final hasInternet = await InternetConnection().hasInternetAccess;
             if (!hasInternet) {
-              Constants.showToast('No Internet Connection');
+              Constants.showToast('No internet connection');
             } else {
-              Constants.showToast('Check Your Internet Connection');
+              Constants.showToast(kCheckInternetConnectionMessage);
             }
             hasShownToast.value = true;
           }

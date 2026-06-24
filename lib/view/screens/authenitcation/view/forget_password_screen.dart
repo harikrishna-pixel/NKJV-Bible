@@ -118,7 +118,9 @@ class ForgetPasswordScreen extends HookConsumerWidget {
                               } catch (e) {
                                 print("UI: Exception caught: $e");
                                 print("UI: Exception type: ${e.runtimeType}");
-                                Constants.showToast("Error: ${e.toString()}");
+                                Constants.showToast(
+                                  'No account found with this email. Please check and try again.',
+                                );
                               }
                             } else {
                               print("UI: Form validation failed");

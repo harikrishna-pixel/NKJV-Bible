@@ -2509,7 +2509,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildPaywallHeroWithCard(context, size),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 8),
                   if (widget.checkad == 'image')
                     Padding(
                       padding: const EdgeInsets.only(left: 8),
@@ -2523,7 +2523,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       ),
                     ),
                   _buildPaywallSectionTitle(),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 8),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: AnimatedSwitcher(
@@ -2589,7 +2589,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               ),
                             ],
                           ),
-                          child: Container(
+                            child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             alignment: Alignment.center,
                             child: const Row(
@@ -2773,13 +2773,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   static const double _kPlanPriceBlockHeight = 40;
 
   Widget _buildPaywallHeroWithCard(BuildContext context, Size size) {
-    final imageHeight = (size.height * 0.40).clamp(280.0, 360.0);
-    const cardTopFactor = 0.70;
-    const valueCardHeightEstimate = 168.0;
+    final imageHeight = (size.height * 0.34).clamp(240.0, 300.0);
+    const cardTopFactor = 0.62;
+    const valueCardHeightEstimate = 148.0;
     final cardTop = imageHeight * cardTopFactor;
 
     return SizedBox(
-      height: cardTop + valueCardHeightEstimate + 6,
+      height: cardTop + valueCardHeightEstimate + 2,
       width: double.infinity,
       child: Stack(
         clipBehavior: Clip.none,
@@ -2795,7 +2795,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 Image.asset(
                   'assets/paywall_icons/man_sitting.png',
                   fit: BoxFit.cover,
-                  alignment: const Alignment(0, -0.15),
+                  alignment: const Alignment(0.82, 0.06),
                   filterQuality: FilterQuality.high,
                   gaplessPlayback: true,
                   errorBuilder: (_, __, ___) => Container(
@@ -2844,27 +2844,36 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   child: SafeArea(
                     bottom: false,
                     child: Padding(
-                      padding: const EdgeInsets.only(top: 52),
+                      padding: const EdgeInsets.only(top: 44),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           RichText(
                             textAlign: TextAlign.left,
-                            text: const TextSpan(
-                              style: TextStyle(
+                            text: TextSpan(
+                              style: const TextStyle(
                                 fontSize: 34,
                                 fontWeight: FontWeight.w800,
                                 color: _paywallInk,
                                 height: 1.1,
                                 letterSpacing: -0.3,
                               ),
-                              children: [
+                              children: const [
                                 TextSpan(text: 'Grow Closer\n'),
                                 TextSpan(text: 'to '),
                                 TextSpan(
                                   text: 'God Daily',
-                                  style: TextStyle(color: Colors.brown),
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    shadows: [
+                                      Shadow(
+                                        color: Color(0x99000000),
+                                        blurRadius: 10,
+                                        offset: Offset(0, 1.5),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
@@ -2901,7 +2910,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   Widget _buildPaywallValueCard(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(6, 10, 6, 14),
+      padding: const EdgeInsets.fromLTRB(6, 8, 6, 10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -3049,7 +3058,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   Widget _buildPaywallSectionTitle() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 2, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
       child: Row(
         children: [
           Expanded(
@@ -3276,8 +3285,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       if (fakeOfferValue != null && fakeOfferValue > 0) {
         return 'Save ${fakeOfferValue.toStringAsFixed(0)}%';
       }
-      // Fallback for cases where API value is missing.
-      return 'Save 50%';
+      return null;
     }
     if (_isTwoYearProductId(_products[index].id)) {
       if (fakeOfferValue != null && fakeOfferValue > 0) {
@@ -3352,18 +3360,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     final border = isSelected ? themedAccent : Colors.grey.shade300;
 
     String? bottomBanner;
-    if (isSelected) {
-      if (isOneYear && badgeText != null) {
-        bottomBanner = badgeText.toUpperCase().contains('SAVE')
-            ? badgeText.toUpperCase()
-            : 'SAVE 50%';
-      } else if (isTwoYear || isLifetime) {
-        bottomBanner = 'LOWEST COST';
-      }
+    if (isTwoYear) {
+      bottomBanner = 'LOWEST COST';
+    } else if (isOneYear && badgeText != null) {
+      bottomBanner = badgeText.toUpperCase();
+    } else if (isSelected && isLifetime) {
+      bottomBanner = 'LOWEST COST';
     }
 
     final borderWidth = isSelected ? 2.0 : 1.0;
     final hasBadge = badgeLabel.isNotEmpty;
+    final bannerAccent = isTwoYear ? themedAccent : accent;
 
     Widget? badgeWidget;
     if (hasBadge) {
@@ -3517,8 +3524,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         ? DecoratedBox(
                             decoration: BoxDecoration(
                               color: isOneYear
-                                  ? accent
-                                  : accent.withValues(alpha: 0.14),
+                                  ? themedAccent
+                                  : bannerAccent.withValues(alpha: 0.14),
                               borderRadius: const BorderRadius.only(
                                 bottomLeft: Radius.circular(12),
                                 bottomRight: Radius.circular(12),
@@ -3531,7 +3538,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w800,
-                                  color: isOneYear ? Colors.white : accent,
+                                  color: isOneYear ? Colors.white : bannerAccent,
                                   letterSpacing: 0.5,
                                 ),
                               ),
@@ -3721,7 +3728,7 @@ class _ExitOfferBottomSheetContentState
                   topRight: Radius.circular(24),
                 ),
                 child: SizedBox(
-                  height: widget.screenWidth > 450 ? 140 : 120,
+                  height: widget.screenWidth > 450 ? 160 : 140,
                   width: double.infinity,
                   child: Stack(
                     fit: StackFit.expand,

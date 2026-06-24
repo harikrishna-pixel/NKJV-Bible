@@ -3250,6 +3250,7 @@ Future saveAndShare(Uint8List bytes, String imgname, String mesage,
         name: '$imgname.png',
       ),
     ],
+    text: mesage.trim().isNotEmpty ? mesage : null,
     sharePositionOrigin:
         Rect.fromPoints(const Offset(2, 2), const Offset(3, 3)),
   );
@@ -6274,221 +6275,244 @@ class ImageBottomSheet extends StatelessWidget {
 
   const ImageBottomSheet({super.key, required this.controller});
 
+  static const double _kActionBarHeight = 52;
+
   @override
   Widget build(BuildContext context) {
-    double screenWidth = MediaQuery.of(context).size.width;
+    final media = MediaQuery.of(context);
+    final screenWidth = media.size.width;
+    final bottomInset = media.padding.bottom;
+    final actionBarTotalHeight = _kActionBarHeight + bottomInset + 16;
+    final topGap = media.padding.top + kToolbarHeight;
+    final availableBelowAppBar = media.size.height - topGap;
+    final sheetHeight = screenWidth < 380
+        ? availableBelowAppBar * 0.84
+        : screenWidth > 450
+            ? availableBelowAppBar * 0.80
+            : availableBelowAppBar * 0.82;
+
     return Consumer<HomeContentEditProvider>(
       builder: (context, bookmarkProvider, child) {
         return SizedBox(
-          height: MediaQuery.of(context).size.height * 0.88,
-          child: Column(
-          children: [
-            controller.isImageBannerAdLoaded.value &&
-                    controller.imageBannerAd != null &&
-                    controller.adFree.value == false
-                ? IgnorePointer(
-                    child: SizedBox(
-                      height: controller.imageBannerAd?.size.height.toDouble(),
-                      width: controller.imageBannerAd?.size.width.toDouble(),
+          height: media.size.height,
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: SizedBox(
+              height: sheetHeight,
+              child: Column(
+            children: [
+              controller.isImageBannerAdLoaded.value &&
+                      controller.imageBannerAd != null &&
+                      controller.adFree.value == false
+                  ? IgnorePointer(
+                      child: SizedBox(
+                        height:
+                            controller.imageBannerAd?.size.height.toDouble(),
+                        width: controller.imageBannerAd?.size.width.toDouble(),
+                        child: const Padding(
+                          padding: EdgeInsets.only(top: 5),
+                          child: MyAdBanner(),
+                        ),
+                      ),
+                    )
+                  : const SizedBox(height: 4),
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Screenshot(
+                      controller: controller.screenshotController.value,
+                      child: GestureDetector(
+                        onTap: () {
+                          controller.selectedBgImage.value == 9
+                              ? controller.selectedBgImage.value = 0
+                              : controller.selectedBgImage.value += 1;
+                        },
+                        child: Obx(
+                          () => VerseShareImageCard(
+                            backgroundImagePath: controller.bgImagesList[
+                                controller.selectedBgImage.value],
+                            verseHtml: controller
+                                .selectedBookContent[
+                                    controller.selectedVerseView.value]
+                                .content,
+                            verseReference:
+                                "${controller.selectedBook.value} ${controller.selectedChapter.value}:${controller.selectedVerseView.value + 1}",
+                            screenWidth: screenWidth,
+                            maxVerseFontSize: screenWidth < 380
+                                ? BibleInfo.fontSizeScale * 18
+                                : screenWidth > 450
+                                    ? BibleInfo.fontSizeScale * 30
+                                    : BibleInfo.fontSizeScale * 24,
+                            minVerseFontSize:
+                                screenWidth < 380 ? 14 : 16,
+                            actionBarReserve: actionBarTotalHeight,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 12,
+                      bottom: actionBarTotalHeight + 8,
+                      child: _verseNavButton(
+                        screenWidth: screenWidth,
+                        icon: Icons.chevron_left,
+                        onTap: () async {
+                          if (controller.selectedVerseView.value == 0) {
+                            controller.selectedVerseView.value = 0;
+                          } else {
+                            controller.selectedVerseView.value -= 1;
+                          }
+                          try {
+                            await SharPreferences.setString('OpenAd', '1');
+                            if (controller.adFree.value == false) {
+                              final adProvider =
+                                  context.read<DownloadProvider>();
+                              await adProvider
+                                  .updateAdCount(adProvider.adCount + 1);
+                              await adProvider.checkAndShowAd(
+                                  context, controller.adFree.value);
+                            }
+                          } catch (e) {
+                            DebugConsole.log("image priv error - $e");
+                          }
+                        },
+                      ),
+                    ),
+                    Positioned(
+                      right: 12,
+                      bottom: actionBarTotalHeight + 8,
+                      child: _verseNavButton(
+                        screenWidth: screenWidth,
+                        icon: Icons.chevron_right,
+                        onTap: () async {
+                          if (controller.selectedVerseView.value ==
+                              controller.selectedBookContent.length - 1) {
+                            Constants.showToast("Reached End");
+                            return;
+                          }
+                          controller.selectedVerseView.value += 1;
+                          if (controller.adFree.value == false) {
+                            final adProvider =
+                                context.read<DownloadProvider>();
+                            await SharPreferences.setString('OpenAd', '1');
+                            await adProvider
+                                .updateAdCount(adProvider.adCount + 1);
+                            try {
+                              if (context.mounted) {
+                                await adProvider.checkAndShowAd(
+                                    context, controller.adFree.value);
+                              }
+                            } catch (e) {
+                              debugPrint(e.toString());
+                            }
+                          }
+                        },
+                      ),
+                    ),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: actionBarTotalHeight + 68,
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withOpacity(0.1),
+                                Colors.black.withOpacity(0.34),
+                                Colors.black.withOpacity(0.5),
+                              ],
+                              stops: const [0.0, 0.38, 0.72, 1.0],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
                       child: Padding(
-                          padding: const EdgeInsets.only(top: 5),
-                          child: MyAdBanner()
-                          //AdWidget(ad: controller.imageBannerAd!),
-                          ),
-                    ),
-                  )
-                : const SizedBox(height: 4),
-            Expanded(
-              child: Container(
-                  decoration: const BoxDecoration(
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(0),
-                      topRight: Radius.circular(0),
-                    ),
-                    color: Colors.white,
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 6),
-                      // GestureDetector(
-                      //   onTap: () {
-                      //     Navigator.of(context).pop();
-                      //   },
-                      //   child: Row(
-                      //     mainAxisAlignment: MainAxisAlignment.end,
-                      //     children: [
-                      //       const Text(
-                      //         "Close",
-                      //         style: TextStyle(
-                      //             fontSize: 17, color: CommanColor.black),
-                      //       ),
-                      //     ],
-                      //   ),
-                      // ),
-                      // const SizedBox(height: 2),
-                      Expanded(
-                        child: Stack(
-                        children: [
-                          Screenshot(
-                            controller: controller.screenshotController.value,
-                            child: GestureDetector(
-                              onTap: () {
-                                controller.selectedBgImage.value == 9
-                                    ? controller.selectedBgImage.value = 0
-                                    : controller.selectedBgImage.value += 1;
-                              },
-                              child: Obx(
-                                () => VerseShareImageCard(
-                                  backgroundImagePath: controller
-                                      .bgImagesList[
-                                          controller.selectedBgImage.value],
-                                  verseHtml: controller
-                                      .selectedBookContent[
-                                          controller.selectedVerseView.value]
-                                      .content,
-                                  verseReference:
-                                      "${controller.selectedBook.value} ${controller.selectedChapter.value}:${controller.selectedVerseView.value + 1}",
-                                  screenWidth: screenWidth,
-                                  maxVerseFontSize: screenWidth < 380
-                                      ? BibleInfo.fontSizeScale * 18
-                                      : screenWidth > 450
-                                          ? BibleInfo.fontSizeScale * 30
-                                          : BibleInfo.fontSizeScale * 24,
-                                  minVerseFontSize:
-                                      screenWidth < 380 ? 14 : 16,
-                                ),
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            right: 10,
-                            bottom: 25,
-                            child: InkWell(
-                              onTap: () async {
-                                // Check if already at last verse
-                                if (controller.selectedVerseView.value ==
-                                    controller.selectedBookContent.length - 1) {
-                                  // User is at last verse and tapped again - show "Reached End" toast
-                                  Constants.showToast("Reached End");
-                                  return;
-                                } else {
-                                  controller.selectedVerseView.value += 1;
-                                }
-                                if (controller.adFree.value == false) {
-                                  final adProvider =
-                                      context.read<DownloadProvider>();
-                                  await SharPreferences.setString(
-                                      'OpenAd', '1');
-                                  await adProvider
-                                      .updateAdCount(adProvider.adCount + 1);
-                                  try {
-                                    if (context.mounted) {
-                                      await adProvider.checkAndShowAd(
-                                          context, controller.adFree.value);
-                                    }
-                                  } catch (e) {
-                                    debugPrint(e.toString());
-                                  }
-                                }
-                              },
-                              child: Container(
-                                height: screenWidth > 450 ? 45 : 25,
-                                width: screenWidth > 450 ? 45 : 25,
-                                decoration: const BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.black38,
-                                ),
-                                child: Center(
-                                  child: Image.asset(
-                                    "assets/next.png",
-                                    color: Colors.white,
-                                    height: 15,
-                                    width: 15,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            left: 10,
-                            bottom: 25,
-                            child: InkWell(
-                              onTap: () async {
-                                if (controller.selectedVerseView.value == 0) {
-                                  controller.selectedVerseView.value = 0;
-                                } else {
-                                  controller.selectedVerseView.value -= 1;
-                                }
-                                try {
-                                  await SharPreferences.setString(
-                                      'OpenAd', '1');
-                                  if (controller.adFree.value == false) {
-                                    final adProvider =
-                                        context.read<DownloadProvider>();
-                                    await adProvider
-                                        .updateAdCount(adProvider.adCount + 1);
-                                    await adProvider.checkAndShowAd(
-                                        context, controller.adFree.value);
-                                  }
-                                } catch (e) {
-                                  DebugConsole.log("image priv error - $e");
-                                }
-                              },
-                              child: Container(
-                                height: screenWidth > 450 ? 45 : 25,
-                                width: screenWidth > 450 ? 45 : 25,
-                                decoration: const BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.black38,
-                                ),
-                                child: Center(
-                                  child: Image.asset(
-                                    "assets/priv.png",
-                                    color: Colors.white,
-                                    height: 15,
-                                    width: 15,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      ),
-                      Padding(
                         padding: EdgeInsets.fromLTRB(
-                          0,
-                          8,
-                          0,
-                          MediaQuery.of(context).padding.bottom + 6,
+                          12,
+                          14,
+                          12,
+                          bottomInset + 10,
                         ),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
-                            _buildShareImageButton(context, "Share"),
-                            _buildShareImageButton(context, "Save"),
-                            _buildShareImageButton(context, "Close"),
+                            Expanded(
+                              child: _buildShareImageButton(context, "Share"),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _buildShareImageButton(context, "Save"),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _buildShareImageButton(context, "Close"),
+                            ),
                           ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+              ),
+            ],
+          ),
             ),
-          ],
           ),
         );
       },
     );
   }
 
+  Widget _verseNavButton({
+    required double screenWidth,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    final size = screenWidth > 450 ? 45.0 : 36.0;
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        height: size,
+        width: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.black.withOpacity(0.22),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.85),
+            width: 1.4,
+          ),
+        ),
+        child: Icon(
+          icon,
+          color: Colors.white.withOpacity(0.95),
+          size: screenWidth > 450 ? 22 : 18,
+        ),
+      ),
+    );
+  }
+
   Widget _buildShareImageButton(BuildContext context, String label) {
     return Consumer<HomeContentEditProvider>(
       builder: (context, bookmarkProvider, child) {
+        final icon = switch (label) {
+          'Share' => Icons.share_outlined,
+          'Save' => Icons.bookmark_border,
+          _ => Icons.close,
+        };
+
         return SizedBox(
-          width: 100,
-          height: MediaQuery.of(context).size.width > 450 ? 60 : null,
+          width: double.infinity,
+          height: MediaQuery.of(context).size.width > 450 ? 48 : 44,
           child: ElevatedButton(
             onPressed: () async {
               await SharPreferences.setString('OpenAd', '1');
@@ -6535,20 +6559,42 @@ class ImageBottomSheet extends StatelessWidget {
             },
             style: ButtonStyle(
               backgroundColor: WidgetStatePropertyAll(
-                CommanColor.lightDarkPrimary(context),
+                const Color(0xFF5C4033).withOpacity(0.72),
               ),
-            ),
-            child: Center(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: Colors.white,
-                  letterSpacing: BibleInfo.letterSpacing,
-                  fontSize: MediaQuery.of(context).size.width > 450
-                      ? BibleInfo.fontSizeScale * 17
-                      : BibleInfo.fontSizeScale * 14,
+              elevation: const WidgetStatePropertyAll(0),
+              padding: WidgetStatePropertyAll(
+                EdgeInsets.symmetric(
+                  horizontal: MediaQuery.of(context).size.width > 450 ? 14 : 10,
+                  vertical: 10,
                 ),
               ),
+              shape: WidgetStatePropertyAll(
+                RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: MediaQuery.of(context).size.width > 450 ? 18 : 16,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Colors.white,
+                    letterSpacing: BibleInfo.letterSpacing,
+                    fontSize: MediaQuery.of(context).size.width > 450
+                        ? BibleInfo.fontSizeScale * 15
+                        : BibleInfo.fontSizeScale * 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ),
         );
@@ -6904,8 +6950,8 @@ class ImageBottomSheet extends StatelessWidget {
 //   }
 // }
 
-const Color _kVerseRose = Color(0xFFC28E8F);
-const Color _kVerseInk = Color(0xFF3E2723);
+const Color _kVerseInk = Color(0xFF2E2118);
+const String _kVerseImageBg = 'assets/verse_image_bg.png';
 
 /// Decorative verse share card used when capturing verse wallpaper images.
 class VerseShareImageCard extends StatelessWidget {
@@ -6917,6 +6963,7 @@ class VerseShareImageCard extends StatelessWidget {
     required this.screenWidth,
     required this.maxVerseFontSize,
     required this.minVerseFontSize,
+    this.actionBarReserve = 0,
   });
 
   final String backgroundImagePath;
@@ -6925,32 +6972,37 @@ class VerseShareImageCard extends StatelessWidget {
   final double screenWidth;
   final double maxVerseFontSize;
   final double minVerseFontSize;
+  final double actionBarReserve;
 
   @override
   Widget build(BuildContext context) {
-    final iconSize =
-        screenWidth < 380 ? 34.0 : screenWidth > 450 ? 48.0 : 40.0;
     final referenceSize = screenWidth < 380
-        ? BibleInfo.fontSizeScale * 9
+        ? BibleInfo.fontSizeScale * 13
         : screenWidth > 450
-            ? BibleInfo.fontSizeScale * 12
-            : BibleInfo.fontSizeScale * 10;
-    final verseMaxSize = maxVerseFontSize - 2;
-    final verseMinSize = (minVerseFontSize - 2).clamp(10.0, verseMaxSize);
-    final footerReserve = screenWidth < 380 ? 62.0 : 70.0;
+            ? BibleInfo.fontSizeScale * 16
+            : BibleInfo.fontSizeScale * 14;
+    final verseMaxSize = maxVerseFontSize;
+    final verseMinSize = minVerseFontSize.clamp(10.0, verseMaxSize);
+    final footerReserve =
+        (screenWidth < 380 ? 62.0 : 70.0) + actionBarReserve;
 
     return Stack(
       fit: StackFit.expand,
       children: [
         Image.asset(
-          backgroundImagePath,
+          _kVerseImageBg,
           fit: BoxFit.cover,
+          alignment: const Alignment(0, -0.33),
+          width: double.infinity,
+          height: double.infinity,
+          filterQuality: FilterQuality.high,
+          gaplessPlayback: true,
         ),
         Positioned(
-          left: 10,
-          right: 10,
-          top: 8,
-          bottom: footerReserve,
+          left: 22,
+          right: 22,
+          top: screenWidth < 380 ? 20 : 28,
+          bottom: footerReserve + 12,
           child: LayoutBuilder(
             builder: (context, constraints) {
               return SingleChildScrollView(
@@ -6958,50 +7010,37 @@ class VerseShareImageCard extends StatelessWidget {
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
                     minHeight: constraints.maxHeight,
-                    maxWidth: constraints.maxWidth,
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Image.asset(
-                        'assets/complete_image.png',
-                        height: iconSize,
-                        width: iconSize,
-                        fit: BoxFit.contain,
-                      ),
-                      SizedBox(height: screenWidth < 380 ? 6 : 8),
-                      Text(
-                        verseReference.toUpperCase(),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: 'Georgia',
-                          color: _kVerseInk,
-                          fontSize: referenceSize,
-                          letterSpacing: 2.2,
-                          fontWeight: FontWeight.w600,
-                          height: 1.2,
-                        ),
-                      ),
-                      SizedBox(height: screenWidth < 380 ? 6 : 8),
-                      _verseRoseDivider(center: _verseDiamond()),
-                      SizedBox(height: screenWidth < 380 ? 8 : 12),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
                         child: AutoSizeHtmlWidget(
                           html: verseHtml,
                           maxLines: 16,
                           maxFontSize: verseMaxSize,
                           minFontSize: verseMinSize,
                           color: _kVerseInk,
-                          fontFamily: 'Georgia',
                           textAlign: TextAlign.center,
-                          height: 1.45,
-                          fontWeight: FontWeight.w500,
+                          height: 1.55,
+                          fontWeight: FontWeight.w400,
                         ),
                       ),
-                      SizedBox(height: screenWidth < 380 ? 8 : 12),
-                      _verseRoseDivider(center: _verseLeaf()),
+                      SizedBox(height: screenWidth < 380 ? 12 : 16),
+                      Text(
+                        verseReference,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: _kVerseInk,
+                          fontSize: referenceSize,
+                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.w400,
+                          height: 1.35,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -7012,107 +7051,112 @@ class VerseShareImageCard extends StatelessWidget {
         Positioned(
           left: 0,
           right: 0,
-          bottom: 7,
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Image.asset(
-                    'assets/Icon-1024.png',
-                    height: 22,
-                    width: 22,
+          bottom: actionBarReserve,
+          height: screenWidth < 380 ? 68.0 : 76.0,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.0),
+                      Colors.black.withOpacity(0.10),
+                      Colors.black.withOpacity(0.22),
+                    ],
+                    stops: const [0.0, 0.45, 1.0],
                   ),
-                  const SizedBox(width: 8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        BibleInfo.bible_shortName,
-                        style: TextStyle(
-                          color: _kVerseInk,
-                          letterSpacing: BibleInfo.letterSpacing,
-                          fontSize: BibleInfo.fontSizeScale * 12,
-                          fontWeight: FontWeight.w700,
-                          height: 1.2,
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.16),
+                              blurRadius: 3,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Image.asset(
+                          'assets/Icon-1024.png',
+                          height: 22,
+                          width: 22,
                         ),
                       ),
-                      if (Platform.isAndroid)
-                        Text(
-                          'Search in Playstore',
-                          style: TextStyle(
-                            color: _kVerseInk.withOpacity(0.78),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
+                      const SizedBox(width: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            BibleInfo.bible_shortName,
+                            style: TextStyle(
+                              color: _kVerseInk,
+                              letterSpacing: BibleInfo.letterSpacing,
+                              fontSize: BibleInfo.fontSizeScale * 12,
+                              fontWeight: FontWeight.w700,
+                              height: 1.2,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black.withOpacity(0.18),
+                                  blurRadius: 3,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ],
+                            ),
                           ),
-                        )
-                      else if (Platform.isIOS)
-                        Text(
-                          'Search in Appstore',
-                          style: TextStyle(
-                            color: _kVerseInk.withOpacity(0.78),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                          if (Platform.isAndroid)
+                            Text(
+                              'Search in Playstore',
+                              style: TextStyle(
+                                color: _kVerseInk.withOpacity(0.82),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black.withOpacity(0.14),
+                                    blurRadius: 2,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else if (Platform.isIOS)
+                            Text(
+                              'Search in Appstore',
+                              style: TextStyle(
+                                color: _kVerseInk.withOpacity(0.82),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black.withOpacity(0.14),
+                                    blurRadius: 2,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
                     ],
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ],
     );
   }
-}
-
-Widget _verseRoseDivider({required Widget center}) {
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 18),
-    child: Row(
-      children: [
-        Expanded(
-          child: Container(
-            height: 1,
-            color: _kVerseRose.withOpacity(0.75),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: center,
-        ),
-        Expanded(
-          child: Container(
-            height: 1,
-            color: _kVerseRose.withOpacity(0.75),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _verseDiamond() {
-  return Transform.rotate(
-    angle: 0.785398,
-    child: Container(
-      width: 6,
-      height: 6,
-      decoration: BoxDecoration(
-        color: _kVerseRose,
-        border: Border.all(color: _kVerseRose.withOpacity(0.8)),
-      ),
-    ),
-  );
-}
-
-Widget _verseLeaf() {
-  return Icon(
-    Icons.eco_outlined,
-    size: 13,
-    color: _kVerseRose,
-  );
 }

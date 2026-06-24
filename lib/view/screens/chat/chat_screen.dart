@@ -13,6 +13,7 @@ import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/utils/rating_dialog_helper.dart';
+import 'package:biblebookapp/utils/network_error_message.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/chat/chat_history_screen.dart';
@@ -20,6 +21,7 @@ import 'package:biblebookapp/view/screens/chat/chat_translations.dart';
 import 'package:biblebookapp/services/milestone_lifetime_paywall_coordinator.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
+import 'package:biblebookapp/view/screens/paywall/feature_credits_paywall_screen.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/services/analytics/analytics_service.dart';
@@ -1606,7 +1608,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final creditDebitShown =
           prefs.getBool('chat_credit_debit_shown') ?? false;
       if (!creditDebitShown) {
-        Constants.showToast('Used $chatCost credits for this response', 5000);
+        Constants.showToast('Used $chatCost credits for this response', 1500);
         await prefs.setBool('chat_credit_debit_shown', true);
       }
       // Refresh credits display immediately after deduction
@@ -1615,61 +1617,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _showInsufficientCreditsDialog() async {
-    final credits = await WalletService.getCredits();
-    final chatCost = await WalletService.getChatCost();
-    final isDark =
-        Provider.of<ThemeProvider>(context, listen: false).themeMode ==
-            ThemeMode.dark;
-
     if (!mounted) return;
 
-    await showCupertinoDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return CupertinoAlertDialog(
-          title: const Text(
-            'Insufficient Credits',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          content: Text(
-            'You need $chatCost credits to send a message. You currently have $credits credits.\n\nGet more credits from the wallet!',
-            style: const TextStyle(
-              fontSize: 14,
-            ),
-          ),
-          actions: [
-            CupertinoDialogAction(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-            ),
-            CupertinoDialogAction(
-              isDefaultAction: true,
-              onPressed: () {
-                Navigator.pop(context);
-                Get.to(
-                  () => const WalletScreen(),
-                  transition: Transition.cupertinoDialog,
-                  duration: const Duration(milliseconds: 300),
-                );
-              },
-              child: const Text(
-                'Get Credits',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => const FeatureCreditsPaywallScreen(
+          kind: FeatureCreditsPaywallKind.chat,
+        ),
+      ),
     );
   }
 
@@ -2278,9 +2234,14 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
           }
         }
 
+        final displayError = userFacingNetworkMessage(
+          errorMessage,
+          fallback: 'Something went wrong. Please try again.',
+        );
+
         setState(() {
           _messages.add(ChatMessage(
-            text: 'Error: $errorMessage',
+            text: displayError,
             isUser: false,
             timestamp: DateTime.now(),
           ));
@@ -2310,7 +2271,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
       debugPrint('Stack trace: $stackTrace');
       setState(() {
         _messages.add(ChatMessage(
-          text: 'Error: ${e.toString()}',
+          text: userFacingNetworkMessage(e),
           isUser: false,
           timestamp: DateTime.now(),
         ));

@@ -7,6 +7,7 @@ import 'package:biblebookapp/utils/custom_share.dart';
 import 'package:biblebookapp/view/screens/chat/chat_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
+import 'package:biblebookapp/view/widget/library_empty_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
@@ -19,7 +20,6 @@ import 'package:share_plus/share_plus.dart';
 import '../../../controller/dpProvider.dart';
 import '../../constants/colors.dart';
 import '../../constants/constant.dart';
-import '../../constants/images.dart';
 import '../../constants/share_preferences.dart';
 
 class HighLightScreen extends StatefulWidget {
@@ -1421,77 +1421,13 @@ class _HighLightScreenState extends State<HighLightScreen> {
                 },
               );
             } else {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Image.asset(
-                        Images.highlightsPlaceHolder(context),
-                        height: 80,
-                        width: 80,
-                        color: Colors.transparent.withOpacity(0.3),
-                      ),
-                      SizedBox(
-                        height: 20,
-                      ),
-                      Text(
-                        "No relevant content",
-                        style: CommanStyle.placeholderText(context),
-                      ),
-                      SizedBox(
-                        height: 40,
-                      ),
-                      InkWell(
-                        onTap: () {
-                          // Navigator.push(context, MaterialPageRoute(builder: (context) => );
-                          Get.offAll(
-                              () => HomeScreen(
-                                  From: "Go to Read",
-                                  selectedVerseNumForRead: "",
-                                  selectedBookForRead: "",
-                                  selectedChapterForRead: "",
-                                  selectedBookNameForRead: "",
-                                  selectedVerseForRead: ""),
-                              transition: Transition.cupertinoDialog,
-                              duration: const Duration(milliseconds: 300));
-                        },
-                        child: Column(
-                          children: [
-                            Container(
-                                padding: const EdgeInsets.all(8),
-                                height: 40,
-                                width: 40,
-                                decoration: BoxDecoration(
-                                    border: Border.all(
-                                        color: CommanColor.lightDarkPrimary300(
-                                            context),
-                                        width: 1.2),
-                                    borderRadius: BorderRadius.circular(3)),
-                                child: Image.asset(
-                                  "assets/reading_book.png",
-                                  height: 25,
-                                  width: 15,
-                                  color:
-                                      CommanColor.lightDarkPrimary300(context),
-                                )),
-                            const SizedBox(
-                              height: 15,
-                            ),
-                            Text("Go to Read",
-                                style: CommanStyle.placeholderText(context)),
-                          ],
-                        ),
-                      ),
-                      SizedBox(
-                        height: 20,
-                      ),
-                    ],
-                  ),
-                ],
+              return const SizedBox.expand(
+                child: LibraryEmptyState(
+                  icon: Icons.brush,
+                  title: 'No Highlights Yet',
+                  subtitle:
+                      'Highlight verses while reading to access them anytime.',
+                ),
               );
             }
           }),
