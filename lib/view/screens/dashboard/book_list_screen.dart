@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math' as math;
 
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
@@ -58,10 +57,16 @@ class _BookListScreenState extends State<BookListScreen> {
 
   void _splitTestaments() {
     newTestmentBookList.clear();
-    for (var i = testament_num; i < bookList.length; i++) {
-      newTestmentBookList.add(bookList[i]);
+    for (final book in bookList) {
+      if ((book.bookNum ?? 0) >= testament_num) {
+        newTestmentBookList.add(book);
+      }
     }
   }
+
+  List<MainBookListModel> get _oldTestamentBooks => bookList
+      .where((book) => (book.bookNum ?? 0) < testament_num)
+      .toList();
 
   Future<void> _loadBooksFromDatabase() async {
     final db = await DBHelper().db;
@@ -152,7 +157,7 @@ class _BookListScreenState extends State<BookListScreen> {
   @override
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
-    final oldTestamentCount = math.min(testament_num, bookList.length);
+    final oldTestamentCount = _oldTestamentBooks.length;
     debugPrint("sz current width - $screenWidth ");
     return Scaffold(
       appBar: AppBar(
@@ -286,10 +291,10 @@ class _BookListScreenState extends State<BookListScreen> {
                                   padding: EdgeInsets.symmetric(horizontal: 15),
                                   physics: ScrollPhysics(),
                                   itemBuilder: (context, index) {
-                                    if (index >= bookList.length) {
+                                    if (index >= _oldTestamentBooks.length) {
                                       return const SizedBox.shrink();
                                     }
-                                    var data = bookList[index];
+                                    var data = _oldTestamentBooks[index];
                                     return Padding(
                                       padding: const EdgeInsets.only(
                                           top: 20.0, bottom: 2),

@@ -1194,6 +1194,8 @@ class _HomeScreenState extends State<HomeScreen>
   final Stopwatch _stopwatch = Stopwatch();
   Timer? _checkerTimer;
   bool _verseShown = false;
+  bool _readingScreenWasHidden = false;
+  bool _feedbackPendingAtSessionStart = false;
   StreamSubscription<Uri?>? _widgetClickSubscription;
 
   @override
@@ -1216,32 +1218,55 @@ class _HomeScreenState extends State<HomeScreen>
     // _exitOfferCooldownRefreshTimer = Timer.periodic(
     //     const Duration(minutes: 1), (_) => _refreshExitOfferCooldown());
 
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-//  await _checkAndShowVerse();
-      await _handleAppLaunchCount();
-      await checkUserLoggedIn();
-      await _checkAndShowDailyWelcomeToast();
-      await _handlePendingNotificationAction();
-      await _showStreakCompleteCelebrationIfNeeded();
-      SmartNotificationHelper.recordAppOpen();
-      await StreakNotificationHelper.rescheduleStreakNotificationsIfEnabled();
-      await ScenarioNotificationHelper.rescheduleScenarioNotificationsIfEnabled();
-      SmartNotificationHelper.scheduleSmartNotificationIfNeeded();
-      // iOS Home Widgets: update launcher widgets and handle widget tap
-      await updateAllLauncherWidgets();
-      final initialUri = await HomeWidget.initiallyLaunchedFromHomeWidget();
-      if (!mounted) return;
-      _navigateForWidgetRoute(getBibleWidgetRouteFromUri(initialUri));
-      if (!mounted) return;
-      _widgetClickSubscription ??=
-          HomeWidget.widgetClicked.listen((uri) {
-        if (!mounted) return;
-        _navigateForWidgetRoute(getBibleWidgetRouteFromUri(uri));
-      });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final downloadProvider =
+          Provider.of<DownloadProvider>(context, listen: false);
+      unawaited(downloadProvider.preloadBibleDataFromDatabaseIfNeeded());
+      _runDeferredHomeStartupTasks();
     });
 
     // _initializeAds();
     loadAds();
+  }
+
+  Future<void> _runDeferredHomeStartupTasks() async {
+    final startupPrefs = await SharedPreferences.getInstance();
+    _feedbackPendingAtSessionStart =
+        (startupPrefs.getBool(SharPreferences.mainFeedbackPending) ?? false) &&
+            (startupPrefs.getBool(SharPreferences.mainFeedbackFromVerseActions) ??
+                false);
+
+    await Future.wait([
+      _handleAppLaunchCount(),
+      checkUserLoggedIn(),
+    ]);
+    if (!mounted) return;
+
+    await _checkAndShowDailyWelcomeToast();
+    if (!mounted) return;
+
+    await Future.wait([
+      _handlePendingNotificationAction(),
+      _showStreakCompleteCelebrationIfNeeded(),
+      StreakNotificationHelper.rescheduleStreakNotificationsIfEnabled(),
+      ScenarioNotificationHelper.rescheduleScenarioNotificationsIfEnabled(),
+    ]);
+    if (!mounted) return;
+
+    SmartNotificationHelper.recordAppOpen();
+    SmartNotificationHelper.scheduleSmartNotificationIfNeeded();
+    await updateAllLauncherWidgets();
+    if (!mounted) return;
+
+    final initialUri = await HomeWidget.initiallyLaunchedFromHomeWidget();
+    if (!mounted) return;
+    _navigateForWidgetRoute(getBibleWidgetRouteFromUri(initialUri));
+    if (!mounted) return;
+    _widgetClickSubscription ??=
+        HomeWidget.widgetClicked.listen((uri) {
+      if (!mounted) return;
+      _navigateForWidgetRoute(getBibleWidgetRouteFromUri(uri));
+    });
   }
 
   Future<void> _showStreakCompleteCelebrationIfNeeded() async {
@@ -1258,6 +1283,9 @@ class _HomeScreenState extends State<HomeScreen>
     }
     await SharPreferences.setString(
         SharPreferences.streakCelebrationShownDate, today);
+    if (count == 1) {
+      await _requestReview();
+    }
     await SharPreferences.setInt(
         SharPreferences.pendingStreakCompleteCelebration, 0);
   }
@@ -1479,23 +1507,14 @@ class _HomeScreenState extends State<HomeScreen>
         await SharPreferences.setInt(
             SharPreferences.dailyWelcomeMessageIndex, 1);
       } else {
-        // After first time - rotate through other messages (excluding first one)
         final messageIndex = await SharPreferences.getInt(
                 SharPreferences.dailyWelcomeMessageIndex) ??
             1;
 
-        // Rotating messages (excluding the first-time welcome)
-        final welcomeMessages = [
-          "Take a moment. Let God's Word speak to you.",
-          "Grace and peace as you read today.",
-          "You're never alone. God's Word is here.",
-        ];
-
-        // Get the message for today (rotate through messages 1-3)
-        message = welcomeMessages[(messageIndex - 1) % welcomeMessages.length];
+        message = "Welcome You. God's Word is always with you.";
 
         // Rotate to next message index for tomorrow (keep in range 1-3)
-        final nextIndex = messageIndex % welcomeMessages.length + 1;
+        final nextIndex = messageIndex % 3 + 1;
         await SharPreferences.setInt(
             SharPreferences.dailyWelcomeMessageIndex, nextIndex);
       }
@@ -2436,6 +2455,7 @@ class _HomeScreenState extends State<HomeScreen>
         mounted &&
         ModalRoute.of(context)?.isCurrent == true) {
       _onVisible();
+      _maybeShowPendingFeedbackAfterReadingResume();
     }
   }
 
@@ -2465,6 +2485,7 @@ class _HomeScreenState extends State<HomeScreen>
         mounted &&
         ModalRoute.of(context)?.isCurrent == true) {
       _onVisible();
+      _maybeShowPendingFeedbackAfterReadingResume();
     }
   }
 
@@ -2487,8 +2508,33 @@ class _HomeScreenState extends State<HomeScreen>
       // only resume if this route is still current
       if (ModalRoute.of(context)?.isCurrent == true) {
         _onVisible();
+        _maybeShowPendingFeedbackAfterReadingResume();
       }
     }
+  }
+
+  Future<void> _maybeShowPendingFeedbackAfterReadingResume() async {
+    if (widget.From.toString() != "Read" || !mounted) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    if (!(prefs.getBool(SharPreferences.mainFeedbackFromVerseActions) ??
+        false)) {
+      return;
+    }
+    if (!(prefs.getBool(SharPreferences.mainFeedbackPending) ?? false)) {
+      return;
+    }
+
+    if (_feedbackPendingAtSessionStart) {
+      _feedbackPendingAtSessionStart = false;
+    } else if (!_readingScreenWasHidden) {
+      return;
+    }
+
+    _readingScreenWasHidden = false;
+    await prefs.setBool(SharPreferences.mainFeedbackPending, false);
+    if (!mounted) return;
+    showMainFeedbackDialog(context);
   }
 
   // ---------- Pause/Resume helpers ----------
@@ -2519,6 +2565,9 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _onHidden() {
     debugPrint("Hidden HomeScreen!");
+    if (widget.From.toString() == "Read") {
+      _readingScreenWasHidden = true;
+    }
     // pause stopwatch and cancel checker (but keep elapsed time)
     if (_stopwatch.isRunning) {
       _stopwatch.stop();
@@ -3146,11 +3195,11 @@ class _HomeScreenState extends State<HomeScreen>
           //     }
           //   },
           // );
-          await _initializeRatingDialog(state);
           _attachScrollListener(state);
           _initializeControllerState(state);
-          _handleAdExpiration(state);
           _loadInitialData(state);
+          _handleAdExpiration(state);
+          _initializeRatingDialog(state);
           final prefs = await SharedPreferences.getInstance();
           if (widget.From.toString() == 'premium') {
             final data = prefs.getString("premiumalrt") ?? "1";
@@ -3741,7 +3790,20 @@ class _HomeScreenState extends State<HomeScreen>
                         ))
                       : controller.selectedBookContent.isEmpty
                           ? _buildEmptyContentWithChapters(controller)
-                          : ListView.builder(
+                          : NotificationListener<UserScrollNotification>(
+                              onNotification: (notification) {
+                                final scrollController =
+                                    controller.autoScrollController.value;
+                                if (!scrollController.hasClients) {
+                                  return false;
+                                }
+                                _updateReaderAppBarVisibility(
+                                  notification.direction,
+                                  scrollController.position.pixels,
+                                );
+                                return false;
+                              },
+                              child: ListView.builder(
                               scrollDirection: controller.scrollDirection,
                               controller: controller.autoScrollController.value,
                               itemCount: controller.selectedBookContent.length,
@@ -3777,7 +3839,8 @@ class _HomeScreenState extends State<HomeScreen>
                                               controller.selectedVerseView
                                                   .value = index;
                                               controller.printText.value =
-                                                  '${parse(data.content).body?.text ?? data.content}';
+                                                  parseVerseContent(
+                                                      data.content);
                                             });
 
                                             await homeContentEditBottomSheet(
@@ -4709,6 +4772,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 );
                               },
                             ),
+                          ),
                 ),
               ),
             ),
@@ -6634,6 +6698,32 @@ class _HomeScreenState extends State<HomeScreen>
     Get.to(const FeedbackWebView());
   }
 
+  void _updateReaderAppBarVisibility(
+    ScrollDirection direction,
+    double currentOffset,
+  ) {
+    if (direction == ScrollDirection.reverse) {
+      // Scroll down — hide immediately (no offset threshold).
+      if (_showUI && mounted) {
+        setState(() => _showUI = false);
+      }
+      return;
+    }
+
+    if (direction == ScrollDirection.forward) {
+      // Scroll up — show app bar.
+      if (!_showUI && mounted) {
+        setState(() => _showUI = true);
+      }
+      return;
+    }
+
+    // At the very top when scroll settles, keep app bar visible.
+    if (currentOffset <= 0 && !_showUI && mounted) {
+      setState(() => _showUI = true);
+    }
+  }
+
   void _attachScrollListener(GetXState<DashBoardController> state) {
     Future.delayed(const Duration(milliseconds: 600), () {
       if (!_scrollListenerAttached) {
@@ -6648,43 +6738,29 @@ class _HomeScreenState extends State<HomeScreen>
           final direction = scrollController.position.userScrollDirection;
           final currentOffset = scrollController.position.pixels;
 
-          // Show scroll-to-top when scrolling down (into content); hide when scrolling up.
-          const backToTopThreshold = 320.0;
-          var showBackToTop = _showBackToTop;
-          if (currentOffset <= backToTopThreshold) {
-            showBackToTop = false;
-          } else if (direction == ScrollDirection.forward) {
-            showBackToTop = true;
-          } else if (direction == ScrollDirection.reverse) {
-            showBackToTop = false;
-          }
-          if (_showBackToTop != showBackToTop && mounted) {
-            setState(() => _showBackToTop = showBackToTop);
+          if (direction == ScrollDirection.reverse) {
+            _updateReaderAppBarVisibility(direction, currentOffset);
+          } else if (currentOffset <= 0) {
+            _updateReaderAppBarVisibility(direction, currentOffset);
           }
 
-          // If at the top, always show UI
+          // Back-to-top only; app bar uses UserScrollNotification on the list.
           if (currentOffset <= 0) {
-            if (!_showUI && mounted) {
-              setState(() {
-                _showUI = true;
-              });
+            if (_showBackToTop && mounted) {
+              setState(() => _showBackToTop = false);
             }
           } else {
-            // Update UI visibility based on scroll direction
-            if (direction == ScrollDirection.reverse) {
-              // Scrolling up - hide UI
-              if (_showUI && mounted) {
-                setState(() {
-                  _showUI = false;
-                });
-              }
+            const backToTopThreshold = 320.0;
+            var showBackToTop = _showBackToTop;
+            if (currentOffset <= backToTopThreshold) {
+              showBackToTop = false;
             } else if (direction == ScrollDirection.forward) {
-              // Scrolling down - show UI
-              if (!_showUI && mounted) {
-                setState(() {
-                  _showUI = true;
-                });
-              }
+              showBackToTop = true;
+            } else if (direction == ScrollDirection.reverse) {
+              showBackToTop = false;
+            }
+            if (_showBackToTop != showBackToTop && mounted) {
+              setState(() => _showBackToTop = showBackToTop);
             }
           }
 
@@ -6752,29 +6828,43 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _ensureHomeContentLoaded(
       GetXState<DashBoardController> state) async {
+    final controller = state.controller;
+    if (controller == null || !mounted) return;
+
+    await controller.getSelectedChapterAndBook();
+    if (!mounted || state.controller == null) return;
+
+    final chapter = int.tryParse(controller.selectedChapter.value) ?? 1;
+
+    if (controller.selectedBookContent.isNotEmpty) {
+      setState(() {});
+      return;
+    }
+
     final downloadProvider =
         Provider.of<DownloadProvider>(context, listen: false);
-    await downloadProvider.preloadBibleDataFromDatabaseIfNeeded();
 
-    final chapter =
-        int.tryParse(state.controller!.selectedChapter.value) ?? 1;
+    final preloadFuture =
+        downloadProvider.preloadBibleDataFromDatabaseIfNeeded();
 
-    for (var attempt = 0; attempt < 8; attempt++) {
-      if (!mounted) return;
-      if (state.controller!.selectedBookContent.isNotEmpty) return;
+    for (var attempt = 0; attempt < 5; attempt++) {
+      if (!mounted || state.controller == null) return;
+      if (controller.selectedBookContent.isNotEmpty) return;
 
       if (attempt > 0) {
-        await Future.delayed(Duration(milliseconds: 200 * attempt));
-        await downloadProvider.preloadBibleDataFromDatabaseIfNeeded();
+        await Future.delayed(Duration(milliseconds: 150 * attempt));
       }
 
-      if (!mounted) return;
-      await state.controller!.getSelectedChapterAndBook();
+      await preloadFuture;
+      if (!mounted || state.controller == null) return;
 
-      if (state.controller!.selectedBookContent.isEmpty &&
+      if (controller.selectedBookContent.isEmpty) {
+        await controller.getSelectedChapterAndBook();
+      }
+
+      if (controller.selectedBookContent.isEmpty &&
           downloadProvider.verseList.isNotEmpty) {
-        final hydrated =
-            await state.controller!.hydrateChapterFromCachedVerses(
+        final hydrated = await controller.hydrateChapterFromCachedVerses(
           downloadProvider.verseList,
           chapter,
         );
@@ -6785,17 +6875,22 @@ class _HomeScreenState extends State<HomeScreen>
       }
     }
 
-    if (!mounted) return;
-    if (state.controller!.selectedBookContent.isEmpty) {
+    if (!mounted || state.controller == null) return;
+    if (controller.selectedBookContent.isEmpty) {
       _attemptedProviderChapterFallback = false;
       if (mounted) setState(() {});
     }
   }
 
   void _loadInitialData(GetXState<DashBoardController> state) {
-    state.controller!.selectedIndex.value = -1;
+    final controller = state.controller;
+    if (controller == null) return;
 
-    Future.delayed(Duration.zero, () async {
+    controller.selectedIndex.value = -1;
+
+    () async {
+      if (state.controller == null || !mounted) return;
+
       final hasReadSelection =
           widget.selectedBookForRead.toString().isNotEmpty &&
               widget.selectedChapterForRead.toString().isNotEmpty &&
@@ -6810,13 +6905,14 @@ class _HomeScreenState extends State<HomeScreen>
 
       if (isReadOrDaily || isFromChat) {
         // Use getBookContentForRead for Read, Daily, and chat to properly load content
-        state.controller!.getBookContentForRead();
+        await state.controller!.getBookContentForRead();
       } else {
         // Use normal chapter loading for other flows
         await state.controller!.getSelectedChapterAndBook();
         await _ensureHomeContentLoaded(state);
       }
 
+      if (state.controller == null || !mounted) return;
       await state.controller!.getFont();
       // When opened from Search, use default reading font instead of user-selected font
       if (widget.fromSearch) {
@@ -6824,7 +6920,7 @@ class _HomeScreenState extends State<HomeScreen>
         state.controller!.fontSize.value =
             MediaQuery.of(context).size.width > 450 ? 25.0 : 19.0;
       }
-    });
+    }();
 
     Future.delayed(const Duration(seconds: 6), () {
       state.controller?.readHighlight.value = false;
@@ -7471,92 +7567,169 @@ class _MyAdBanner2State extends State<MyAdBanner2> {
 }
 
 class PremiumWelcomeAlert {
+  static const Color _ink = Color(0xFF3D2914);
+  static const Color _brown = Color(0xFF5C4033);
+  static const Color _cardFill = Color(0xFFF5F0E6);
+
+  static const String _heroIcon =
+      'assets/gold-premium-icons/Premium active icon.png';
+  static const String _bookIcon =
+      'assets/gold-premium-icons/Gold book icon.png';
+  static const String _audioIcon =
+      'assets/gold-premium-icons/Gold Earphone icon.png';
+  static const String _calendarIcon =
+      'assets/gold-premium-icons/Gold Calendar icon.png';
+  static const String _shieldIcon =
+      'assets/gold-premium-icons/Gold Shield icon.png';
+
   static Future<void> show(BuildContext context) async {
     final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600; // detect iPad
+    final isTablet = size.width > 600;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('premiumalrt', '2');
     showDialog(
       context: context,
-      barrierDismissible: false, // must tap button
-      builder: (context) {
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        void close() => Navigator.of(dialogContext).pop();
+
         return Dialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
+          backgroundColor: Colors.transparent,
           insetPadding: EdgeInsets.symmetric(
-            horizontal: isTablet ? size.width * 0.2 : 24,
-            vertical: isTablet ? size.height * 0.2 : 24,
+            horizontal: isTablet ? size.width * 0.18 : 20,
+            vertical: isTablet ? size.height * 0.08 : 28,
           ),
-          child: Padding(
-            padding: EdgeInsets.all(isTablet ? 32 : 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: Stack(
               children: [
-                // Top Image
-                Image.asset(
-                  "assets/welcomeb.png", // replace with your "Welcome" board image
-                  height: isTablet ? 110 : 95,
-                  fit: BoxFit.contain,
-                ),
-                const SizedBox(height: 20),
-
-                // Title
-                Text(
-                  "Welcome to the\nPremium Faith Family!",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: isTablet ? 24 : 18,
-                    fontWeight: FontWeight.bold,
-                    fontStyle: FontStyle.italic,
-                    color: Colors.black,
+                Positioned.fill(
+                  child: Image.asset(
+                    'assets/premium-bg.png',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        const ColoredBox(color: Color(0xFFF8F4EB)),
                   ),
                 ),
-
-                const SizedBox(height: 14),
-
-                // Description
-                Text(
-                  "You now have full access to tools\n and verses that'll guide you daily.\n"
-                  "Let's walk closer with Jesus together.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: isTablet ? 18 : 14,
-                    height: 1.5,
-                    color: Colors.black,
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: IconButton(
+                    onPressed: close,
+                    icon: Icon(
+                      Icons.close,
+                      color: _ink.withValues(alpha: 0.72),
+                      size: 22,
+                    ),
+                    splashRadius: 20,
                   ),
                 ),
-
-                const SizedBox(height: 28),
-
-                // Join Now Button
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 35),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF7B5C3D),
-                        padding: EdgeInsets.symmetric(
-                          vertical: isTablet ? 18 : 14,
+                  padding: EdgeInsets.fromLTRB(
+                    isTablet ? 28 : 20,
+                    isTablet ? 28 : 24,
+                    isTablet ? 28 : 20,
+                    isTablet ? 24 : 20,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Image.asset(
+                          _heroIcon,
+                          height: isTablet ? 118 : 96,
+                          fit: BoxFit.contain,
                         ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                        SizedBox(height: isTablet ? 14 : 10),
+                        Text(
+                          'Premium Unlocked',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'Georgia',
+                            fontSize: isTablet ? 28 : 24,
+                            fontWeight: FontWeight.w700,
+                            color: _ink,
+                            letterSpacing: -0.2,
+                          ),
                         ),
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).pop(); // close dialog
-                        // TODO: add navigation logic
-                      },
-                      child: Text(
-                        "Join now",
-                        style: TextStyle(
-                          fontSize: isTablet ? 20 : 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                        SizedBox(height: isTablet ? 12 : 10),
+                        _premiumDivider(),
+                        SizedBox(height: isTablet ? 12 : 10),
+                        Text(
+                          'Your premium access is now active. Enjoy deeper Bible study, audio features, devotionals, and a richer reading experience to support your walk with God.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'Georgia',
+                            fontSize: isTablet ? 16 : 13.5,
+                            height: 1.45,
+                            color: _ink.withValues(alpha: 0.88),
+                          ),
                         ),
-                      ),
+                        SizedBox(height: isTablet ? 18 : 14),
+                        _premiumFeatureGrid(isTablet),
+                        SizedBox(height: isTablet ? 22 : 18),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: close,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _brown,
+                              elevation: 0,
+                              padding: EdgeInsets.symmetric(
+                                vertical: isTablet ? 16 : 14,
+                                horizontal: 18,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(28),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Text(
+                                  '✨',
+                                  style: TextStyle(
+                                    fontSize: isTablet ? 18 : 16,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Start Exploring',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: isTablet ? 18 : 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.chevron_right,
+                                  color: Colors.white,
+                                  size: isTablet ? 24 : 22,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: isTablet ? 10 : 8),
+                        TextButton(
+                          onPressed: close,
+                          style: TextButton.styleFrom(
+                            foregroundColor: _ink.withValues(alpha: 0.85),
+                          ),
+                          child: Text(
+                            'Continue Reading',
+                            style: TextStyle(
+                              fontFamily: 'Georgia',
+                              fontSize: isTablet ? 16 : 14,
+                              fontWeight: FontWeight.w600,
+                              decoration: TextDecoration.underline,
+                              decorationColor: _ink.withValues(alpha: 0.85),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -7565,6 +7738,135 @@ class PremiumWelcomeAlert {
           ),
         );
       },
+    );
+  }
+
+  static Widget _premiumDivider() {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 1,
+            color: _ink.withValues(alpha: 0.18),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Icon(
+            Icons.diamond_outlined,
+            size: 10,
+            color: _ink.withValues(alpha: 0.45),
+          ),
+        ),
+        Expanded(
+          child: Container(
+            height: 1,
+            color: _ink.withValues(alpha: 0.18),
+          ),
+        ),
+      ],
+    );
+  }
+
+  static Widget _premiumFeatureGrid(bool isTablet) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _premiumFeatureCard(
+                isTablet: isTablet,
+                iconPath: _bookIcon,
+                title: 'Study Tools',
+                subtitle: 'Powerful tools to understand Scripture better.',
+              ),
+            ),
+            SizedBox(width: isTablet ? 12 : 8),
+            Expanded(
+              child: _premiumFeatureCard(
+                isTablet: isTablet,
+                iconPath: _audioIcon,
+                title: 'Audio Bible',
+                subtitle: "Listen to God's Word anytime, anywhere.",
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: isTablet ? 12 : 8),
+        Row(
+          children: [
+            Expanded(
+              child: _premiumFeatureCard(
+                isTablet: isTablet,
+                iconPath: _calendarIcon,
+                title: 'Devotionals',
+                subtitle: 'Daily devotionals to encourage your faith.',
+              ),
+            ),
+            SizedBox(width: isTablet ? 12 : 8),
+            Expanded(
+              child: _premiumFeatureCard(
+                isTablet: isTablet,
+                iconPath: _shieldIcon,
+                title: 'Ad-Free Reading',
+                subtitle: 'Enjoy a peaceful, distraction-free experience.',
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  static Widget _premiumFeatureCard({
+    required bool isTablet,
+    required String iconPath,
+    required String title,
+    required String subtitle,
+  }) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: isTablet ? 10 : 8,
+        vertical: isTablet ? 12 : 10,
+      ),
+      decoration: BoxDecoration(
+        color: _cardFill,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _ink.withValues(alpha: 0.12)),
+      ),
+      child: Column(
+        children: [
+          Image.asset(
+            iconPath,
+            height: isTablet ? 34 : 28,
+            fit: BoxFit.contain,
+          ),
+          SizedBox(height: isTablet ? 8 : 6),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'Georgia',
+              fontSize: isTablet ? 14 : 12,
+              fontWeight: FontWeight.w700,
+              color: _ink,
+            ),
+          ),
+          SizedBox(height: isTablet ? 4 : 3),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: 'Georgia',
+              fontSize: isTablet ? 11.5 : 10,
+              height: 1.3,
+              color: _ink.withValues(alpha: 0.72),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -143,15 +143,17 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
       body: Container(
         height: MediaQuery.of(context).size.height,
         width: MediaQuery.of(context).size.width,
-        decoration: p.Provider.of<ThemeProvider>(context).currentCustomTheme ==
-                AppCustomTheme.vintage
-            ? BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage(Images.bgImage(context)),
-                  fit: BoxFit.fill,
-                ),
-              )
-            : null,
+        decoration: CommanColor.isDarkTheme(context)
+            ? BoxDecoration(color: CommanColor.darkPrimaryColor)
+            : (p.Provider.of<ThemeProvider>(context).currentCustomTheme ==
+                    AppCustomTheme.vintage
+                ? BoxDecoration(
+                    image: DecorationImage(
+                      image: AssetImage(Images.bgImage(context)),
+                      fit: BoxFit.fill,
+                    ),
+                  )
+                : null),
         child: SafeArea(
           child: Column(
             children: [

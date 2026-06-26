@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/analytics/analytics_service.dart';
@@ -7,12 +5,10 @@ import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/utils/rating_dialog_helper.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
-import 'package:biblebookapp/view/screens/dashboard/setting_screen.dart';
 import 'package:biblebookapp/view/widget/home_content_edit_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:screenshot/screenshot.dart';
 
@@ -147,6 +143,8 @@ class ImageBottomSheets extends StatelessWidget {
   final String selectedChapter;
   final String selectedVerseView;
   final String shareFooterMessage;
+  final bool showNavButtons;
+  final double verseTextNudgeDown;
   const ImageBottomSheets(
       {super.key,
       required this.controller,
@@ -154,7 +152,30 @@ class ImageBottomSheets extends StatelessWidget {
       required this.selectedBook,
       required this.selectedChapter,
       required this.selectedVerseView,
-      this.shareFooterMessage = ''});
+      this.shareFooterMessage = '',
+      this.showNavButtons = true,
+      this.verseTextNudgeDown = 0});
+
+  /// Daily Verses share preview: no background arrows, verse text sits lower.
+  factory ImageBottomSheets.dailyVerse({
+    required DashBoardController controller,
+    required String content,
+    required String selectedBook,
+    required String selectedChapter,
+    required String selectedVerseView,
+    String shareFooterMessage = '',
+  }) {
+    return ImageBottomSheets(
+      controller: controller,
+      content: content,
+      selectedBook: selectedBook,
+      selectedChapter: selectedChapter,
+      selectedVerseView: selectedVerseView,
+      shareFooterMessage: shareFooterMessage,
+      showNavButtons: false,
+      verseTextNudgeDown: 1,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -216,45 +237,48 @@ class ImageBottomSheets extends StatelessWidget {
                                 : BibleInfo.fontSizeScale * 24,
                         minVerseFontSize: screenWidth < 380 ? 14 : 16,
                         actionBarReserve: actionBarTotalHeight,
+                        verseTextNudgeDown: verseTextNudgeDown,
                       ),
                     ),
                   ),
                 ),
-                Positioned(
-                  left: 12,
-                  bottom: actionBarTotalHeight + 8,
-                  child: _verseNavButton(
-                    screenWidth: screenWidth,
-                    icon: Icons.chevron_left,
-                    onTap: () async {
-                      try {
+                if (showNavButtons) ...[
+                  Positioned(
+                    left: 12,
+                    bottom: actionBarTotalHeight + 8,
+                    child: _verseNavButton(
+                      screenWidth: screenWidth,
+                      icon: Icons.chevron_left,
+                      onTap: () async {
+                        try {
+                          await SharPreferences.setString('OpenAd', '1');
+                          controller.selectedBgImage.value == 9
+                              ? controller.selectedBgImage.value = 0
+                              : controller.selectedBgImage.value += 1;
+                        } catch (_) {}
+                      },
+                    ),
+                  ),
+                  Positioned(
+                    right: 12,
+                    bottom: actionBarTotalHeight + 8,
+                    child: _verseNavButton(
+                      screenWidth: screenWidth,
+                      icon: Icons.chevron_right,
+                      onTap: () async {
                         await SharPreferences.setString('OpenAd', '1');
                         controller.selectedBgImage.value == 9
                             ? controller.selectedBgImage.value = 0
                             : controller.selectedBgImage.value += 1;
-                      } catch (_) {}
-                    },
+                      },
+                    ),
                   ),
-                ),
-                Positioned(
-                  right: 12,
-                  bottom: actionBarTotalHeight + 8,
-                  child: _verseNavButton(
-                    screenWidth: screenWidth,
-                    icon: Icons.chevron_right,
-                    onTap: () async {
-                      await SharPreferences.setString('OpenAd', '1');
-                      controller.selectedBgImage.value == 9
-                          ? controller.selectedBgImage.value = 0
-                          : controller.selectedBgImage.value += 1;
-                    },
-                  ),
-                ),
+                ],
                 Positioned(
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  height: actionBarTotalHeight + 68,
+                  height: actionBarTotalHeight,
                   child: IgnorePointer(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
@@ -263,11 +287,10 @@ class ImageBottomSheets extends StatelessWidget {
                           end: Alignment.bottomCenter,
                           colors: [
                             Colors.transparent,
-                            Colors.black.withOpacity(0.1),
-                            Colors.black.withOpacity(0.34),
-                            Colors.black.withOpacity(0.5),
+                            Colors.black.withOpacity(0.03),
+                            Colors.black.withOpacity(0.08),
                           ],
-                          stops: const [0.0, 0.38, 0.72, 1.0],
+                          stops: const [0.0, 0.55, 1.0],
                         ),
                       ),
                     ),
@@ -346,50 +369,66 @@ class ImageBottomSheets extends StatelessWidget {
       _ => Icons.close,
     };
 
+    void onClose() {
+      Navigator.of(context).pop();
+      SharPreferences.setString('OpenAd', '1');
+      SharPreferences.setString('bottom', '0');
+    }
+
+    Future<void> onShareOrSave() async {
+      await Future.wait([
+        SharPreferences.setString('OpenAd', '1'),
+        SharPreferences.setString('bottom', '1'),
+      ]);
+      if (controller.adFree.value == false) {
+        final countprovider =
+            Provider.of<DownloadProvider>(context, listen: false);
+        await countprovider.decrementCount(context);
+      }
+      final image = await controller.screenshotController.value.capture(
+        delay: const Duration(milliseconds: 10),
+        pixelRatio: MediaQuery.of(context).devicePixelRatio * 2,
+      );
+
+      if (image == null) {
+        await SharPreferences.setString('bottom', '0');
+        return;
+      }
+
+      if (label == "Share") {
+        // Check and show rating dialog on first share
+        final ratingShown =
+            await RatingDialogHelper.showRatingDialogOnFirstShare(context);
+        if (ratingShown) {
+          // Give the rating flow a moment before opening the share sheet
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
+
+        // Image-only share; branding is on the image. Use verse ref as filename for iOS preview.
+        final imageShareName =
+            '${selectedBook}_${selectedChapter}_$selectedVerseView'
+                .replaceAll(RegExp(r'[^\w\-. ]+'), '_')
+                .trim();
+        saveAndShare(
+          image,
+          imageShareName.isNotEmpty ? imageShareName : 'bible_verse',
+          '',
+          context: context,
+        );
+        // Track Share event
+        AnalyticsService.trackShare();
+      } else if (label == "Save") {
+        await saveImageIntoLocal(image, context);
+      }
+
+      await SharPreferences.setString('bottom', '0');
+    }
+
     return SizedBox(
       width: double.infinity,
       height: MediaQuery.of(context).size.width > 450 ? 48 : 44,
       child: ElevatedButton(
-        onPressed: () async {
-          await SharPreferences.setString('OpenAd', '1');
-          await SharPreferences.setString('bottom', '1');
-          if (controller.adFree.value == false) {
-            final countprovider =
-                Provider.of<DownloadProvider>(context, listen: false);
-            await countprovider.decrementCount(context);
-          }
-          final image = await controller.screenshotController.value.capture(
-            delay: const Duration(milliseconds: 400),
-            pixelRatio: MediaQuery.of(context).devicePixelRatio * 2,
-          );
-
-          if (image == null) {
-            await SharPreferences.setString('bottom', '0');
-            return;
-          }
-
-          if (label == "Share") {
-            // Check and show rating dialog on first share
-            final ratingShown =
-            await RatingDialogHelper.showRatingDialogOnFirstShare(context);
-            if (ratingShown) {
-              // Give the rating flow a moment before opening the share sheet
-              await Future.delayed(const Duration(milliseconds: 400));
-            }
-            
-            // Image-only share (same as home Verse of the Day); branding is on the image.
-            saveAndShare(image, "bible", shareFooterMessage, context: context);
-            // Track Share event
-            AnalyticsService.trackShare();
-          } else if (label == "Save") {
-            await saveImageIntoLocal(image, context);
-          } else {
-            await SharPreferences.setString('bottom', '0');
-            Navigator.of(context).pop();
-          }
-
-          await SharPreferences.setString('bottom', '0');
-        },
+        onPressed: label == "Close" ? onClose : () => onShareOrSave(),
         style: ButtonStyle(
           backgroundColor: WidgetStatePropertyAll(
             const Color(0xFF5C4033).withOpacity(0.72),

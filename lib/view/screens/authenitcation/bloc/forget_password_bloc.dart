@@ -44,7 +44,8 @@ class ForgetPasswordBloc extends ChangeNotifier {
     // if (await userExists()) {
     try {
       print("BLOC: Calling authNotifier.forgotsendotp...");
-      await authNotifier.forgotsendotp(email: emailCon.text, context: context);
+      await authNotifier.forgotsendotp(
+          email: emailCon.text.trim(), context: context);
       print("BLOC: forgotsendotp completed");
       isLoading = false;
       // await FirebaseAuth.instance

@@ -404,6 +404,19 @@ class floatingButtonState extends State<floatingButton>
         return;
       }
 
+      // Loop mode: repeat the current verse only (manual next/prev still works).
+      if (isTTSLoop) {
+        if (!mounted) return;
+        if (curretNo >= 0 && curretNo < selectedChapterContent.length) {
+          _newVoiceText = selectedChapterContent[curretNo].content;
+        }
+        await Future.delayed(const Duration(milliseconds: 80));
+        if (mounted && !isManuallyPaused && isSpeech) {
+          await _speak();
+        }
+        return;
+      }
+
       // Only auto-advance if not manually stopped or navigated
       if (!shouldAutoAdvance) {
         return;
@@ -483,11 +496,6 @@ class floatingButtonState extends State<floatingButton>
               }
             }
           }
-        }
-      } else {
-        // Loop mode - repeat current verse
-        if (mounted) {
-          _speak();
         }
       }
     });
@@ -3361,6 +3369,9 @@ class floatingButtonState extends State<floatingButton>
                               onTap: () {
                                 setState(() {
                                   isTTSLoop = !isTTSLoop;
+                                  if (isTTSLoop) {
+                                    shouldAutoAdvance = true;
+                                  }
                                 });
                               },
                               child: Stack(children: [

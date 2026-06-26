@@ -156,6 +156,7 @@ flutter:
     - assets/home-widgets/
     - assets/export_backup/
     - assets/paywall_icons/
+    - assets/gold-premium-icons/
     - assets/splash_welcome_icons/
     - assets/home-widgets/light-home_1.png
     - assets/home-widgets/light-home_2.png

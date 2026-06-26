@@ -38,8 +38,10 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
   List<String> _imagePathsForTheme(bool isDark) =>
       isDark ? _darkImagePaths : _lightImagePaths;
 
+  int _pageCount(bool isDark) => _imagePathsForTheme(isDark).length;
+
   bool _isLastPage(bool isDark) =>
-      _currentPage >= _imagePathsForTheme(isDark).length - 1;
+      _currentPage >= _pageCount(isDark) - 1;
 
   Widget _buildFullScreenSlide(String path) {
     final isDark = Provider.of<ThemeProvider>(context, listen: false)
@@ -128,6 +130,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
     final isDark = themeProvider.themeMode == ThemeMode.dark;
     final imagePaths = _imagePathsForTheme(isDark);
     final isLastPage = _isLastPage(isDark);
+    final pageCount = _pageCount(isDark);
 
     return Scaffold(
       backgroundColor: isDark
@@ -136,8 +139,6 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Keep all slides mounted so dark-mode page changes don't flash the
-          // light scaffold while the next asset decodes.
           IndexedStack(
             index: _currentPage,
             sizing: StackFit.expand,
@@ -151,7 +152,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
             alignment: Alignment.topCenter,
             child: Padding(
               padding: const EdgeInsets.only(bottom: 700),
-              child: _buildPageDots(context, imagePaths.length, isDark),
+              child: _buildPageDots(context, pageCount, isDark),
             ),
           ),
 

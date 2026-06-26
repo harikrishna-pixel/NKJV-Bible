@@ -31,7 +31,7 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
 
   /// Internet Connectivity checker
   final Connectivity _connectivity = Connectivity();
-  late StreamSubscription<List<ConnectivityResult>> _connectivitySubscription;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   var connectionStatus = <ConnectivityResult>[].obs; // Updated to List
   // final connectionStatus = ConnectivityResult.none.obs;
   // final _connectivity = Connectivity().obs;
@@ -1404,9 +1404,9 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
 
   @override
   onInit() async {
-    await initConnectivity();
     _connectivitySubscription =
         _connectivity.onConnectivityChanged.listen(_updateConnectionStatus);
+    await initConnectivity();
     await SharPreferences.getString(SharPreferences.isRewardAdViewTime)
         .then((value) async {
       if (value != null) {
@@ -1426,7 +1426,7 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
 
   @override
   onClose() {
-    _connectivitySubscription.cancel();
+    _connectivitySubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.onClose();
   }

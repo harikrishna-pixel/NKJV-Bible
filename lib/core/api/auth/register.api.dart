@@ -192,21 +192,45 @@ class RegisterApi {
   }) async {
     final Uri uri =
         Uri.parse(AppApiConstant.baseurl + AppApiConstant.forgotsendotp);
+    final trimmedEmail = email.toString().trim();
 
     print("========== FORGOT PASSWORD DEBUG ==========");
     print("forgotsendotp - Request URL: $uri");
-    print("forgotsendotp - Email: $email");
+    print("forgotsendotp - Email: $trimmedEmail");
     print("forgotsendotp - AppID: ${BibleInfo.appID}");
     print(
         "forgotsendotp - Full URL: ${AppApiConstant.baseurl}${AppApiConstant.forgotsendotp}");
 
     try {
+      print("forgotsendotp - Getting temp token...");
+      var tokendata = await temptokenapi.gettokenaccess();
+      if (tokendata == null) {
+        print("forgotsendotp - temp token response is null");
+        return null;
+      }
+
+      final tokenModel = Temptoken.fromJson(jsonDecode(tokendata));
+      if (tokenModel.statusCode != 200 ||
+          tokenModel.data?.tempAccessToken == null) {
+        print("forgotsendotp - temp token unavailable");
+        return null;
+      }
+
       print("forgotsendotp - Starting HTTP request...");
 
-      final response = await CustomHttp().postwithout(
-        uri,
-        data: {"email": email, "app_id": BibleInfo.appID},
+      final response = await CustomHttp().postwithtoken(
+        path: uri,
+        token: tokenModel.data!.tempAccessToken.toString(),
+        data: {
+          "email": trimmedEmail,
+          "app_id": BibleInfo.appID,
+        },
       );
+
+      if (response == null) {
+        print("forgotsendotp - HTTP response is null");
+        return null;
+      }
 
       final statuscode = response.statusCode;
       final body = response.body;

@@ -7,6 +7,7 @@ import 'package:biblebookapp/Model/dailyVersesMainListModel.dart';
 import 'package:biblebookapp/Model/mainBookListModel.dart';
 import 'package:biblebookapp/Model/verseBookContentModel.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
+import 'package:biblebookapp/core/bible_extract_paths.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/view/constants/assets_constants.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
@@ -327,8 +328,6 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
     final saveProvider = Provider.of<DownloadProvider>(context, listen: false);
     await saveProvider.saveInBackground(
         selectedCategories: _selectedCategories.toList());
-
-    // if (widget.isSetting) {
     //   Constants.showToast("Saved successfully");
     //   Get.back();
     // } else {
@@ -352,6 +351,45 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
     // }
   }
 
+  Future<void> _ensureDailyVerseCatalogReady() async {
+    final db = await DBHelper().db;
+    if (db == null) return;
+
+    final countRows =
+        await db.rawQuery('SELECT COUNT(*) AS c FROM dailyVersesMainList');
+    final mainCount = int.tryParse('${countRows.first['c']}') ?? 0;
+    if (mainCount == 0) {
+      final verseRows = await db.rawQuery('SELECT COUNT(*) AS c FROM verse');
+      final verseCount = int.tryParse('${verseRows.first['c']}') ?? 0;
+      if (verseCount > 0) {
+        await loadDailyVerseData();
+      }
+    }
+  }
+
+  Future<void> _finalizeBibleSetupAndPreloadHomeData() async {
+    if (BibleInfo.folders.isNotEmpty) {
+      final folder = BibleInfo.folders.first;
+      final db = await DBHelper().db;
+      if (db != null) {
+        final verseRows = await db.rawQuery('SELECT COUNT(*) AS c FROM verse');
+        final verseCount = int.tryParse('${verseRows.first['c']}') ?? 0;
+        if (verseCount == 0) {
+          final verseFile = await BibleExtractPaths.resolveVerseJsonFile(folder);
+          if (verseFile != null) {
+            await loadBookContent(folder);
+          }
+        }
+      }
+    }
+
+    await _ensureDailyVerseCatalogReady();
+    await _savePreferences();
+    if (!mounted) return;
+    await Provider.of<DownloadProvider>(context, listen: false)
+        .preloadAndCacheBibleDataFromDatabase();
+  }
+
   void _toggleSelection(String category) {
     setState(() {
       if (_selectedCategories.contains(category)) {
@@ -373,11 +411,13 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
       // Step 1: Clear existing data
       await db.delete('verse');
       debugPrint("testapp: Verse table cleared.");
-      final appDocDir = await getApplicationDocumentsDirectory();
-      final filePath =
-          '${appDocDir.path}/$foldername-extracted/verse_json.json';
-      // Step 2: Extract JSON from zip
-      final String response = await File(filePath).readAsString();
+      final verseFile = await BibleExtractPaths.resolveVerseJsonFile(foldername);
+      if (verseFile == null) {
+        debugPrint("testapp: verse JSON not found in extracted folder.");
+        return;
+      }
+      // Step 2: Read JSON from extracted file
+      final String response = await verseFile.readAsString();
 
       // Step 3: Parse JSON in background isolate
       final tempList = await compute(_parseVerseContent, response);
@@ -469,9 +509,6 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
 
       // Define file paths
       final file1 = File('${directory.path}/$foldername-extracted/book.json');
-      final file2 =
-          File('${directory.path}/$foldername-extracted/verse_json.json');
-
       // Check and delete file1
       if (await file1.exists()) {
         await file1.delete();
@@ -480,12 +517,13 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
         debugPrint('file1.txt does not exist');
       }
 
-      // Check and delete file2
-      if (await file2.exists()) {
-        await file2.delete();
-        debugPrint('file2.txt deleted successfully');
+      final verseFile =
+          await BibleExtractPaths.resolveVerseJsonFile(foldername);
+      if (verseFile != null && await verseFile.exists()) {
+        await verseFile.delete();
+        debugPrint('verse_json deleted successfully');
       } else {
-        debugPrint('file2.txt does not exist');
+        debugPrint('verse_json does not exist');
       }
     } catch (e) {
       debugPrint('Error deleting files: $e');
@@ -826,8 +864,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                                   await loadBookContent(
                                       BibleInfo.folders.first);
                                   await loadBookList(BibleInfo.folders.first);
-                                  // await loadDailyVerseData();
-                                  await _savePreferences();
+                                  await _finalizeBibleSetupAndPreloadHomeData();
                                   await DBHelper().db.then((db) async {
                                     if (db != null) {
                                       final result = await db.rawQuery(
@@ -860,7 +897,6 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                                     }
                                   });
                                   await deleteFiles(BibleInfo.folders.first);
-                                  await Future.delayed(Duration(seconds: 2));
                                   if (!mounted) return;
                                   setState(() {
                                     isLoading = false;
@@ -872,8 +908,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                                 } else {
                                   await loadBookContent(widget.selectedbible);
                                   await loadBookList(widget.selectedbible);
-                                  // await loadDailyVerseData();
-                                  await _savePreferences();
+                                  await _finalizeBibleSetupAndPreloadHomeData();
                                   await DBHelper().db.then((db) async {
                                     if (db != null) {
                                       final result = await db.rawQuery(
@@ -906,7 +941,6 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                                     }
                                   });
                                   await deleteFiles(widget.selectedbible);
-                                  await Future.delayed(Duration(seconds: 2));
                                   if (!mounted) return;
                                   setState(() {
                                     isLoading = false;
@@ -1066,7 +1100,9 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
         }
 
         final appDocDir = await getApplicationDocumentsDirectory();
-        final filePath = '${appDocDir.path}/$folderName-extracted/${file.name}';
+        final outputName = BibleExtractPaths.outputNameForZipAsset(zipPath);
+        final filePath =
+            '${appDocDir.path}/${BibleExtractPaths.extractedDirName(folderName)}/$outputName';
 
         List<int> rawData = file.content is Uint8List
             ? List<int>.from(file.content)
@@ -1082,7 +1118,6 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
         // setState(() {
         //   progressMap[folderName] = processed / filesInFolder.length;
         // });
-        await Future.delayed(const Duration(seconds: 1));
       }
       // if (from.toString() != "home") {
       //   setState(() {

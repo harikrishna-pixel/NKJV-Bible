@@ -1020,10 +1020,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
-                              color: isDark ? Colors.white12 : Colors.white,
+                              color: isDark
+                                  ? Colors.white.withOpacity(0.12)
+                                  : Colors.white,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: CommanColor.lightDarkPrimary(ctx),
+                                color: isDark
+                                    ? Colors.white.withOpacity(0.55)
+                                    : CommanColor.lightDarkPrimary(ctx),
                                 width: 1.5,
                               ),
                             ),
@@ -1033,7 +1037,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: CommanColor.lightDarkPrimary(ctx),
+                                color: isDark
+                                    ? Colors.white
+                                    : CommanColor.lightDarkPrimary(ctx),
                               ),
                             ),
                           ),
@@ -5238,8 +5244,10 @@ Your 3 questions (exactly 3 lines):''';
                                 : ChatTranslations.get(
                                     'ask_anything', _uiLang)),
                         hintStyle: TextStyle(
-                          color:
-                              CommanColor.whiteBlack(context).withOpacity(0.5),
+                          color: isDark
+                              ? Colors.white.withOpacity(0.62)
+                              : CommanColor.whiteBlack(context)
+                                  .withOpacity(0.5),
                           fontSize: screenWidth > 450 ? 15 : 14,
                         ),
                         border: InputBorder.none,

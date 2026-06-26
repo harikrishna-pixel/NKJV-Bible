@@ -312,7 +312,7 @@ class AuthNotifier extends ChangeNotifier {
     try {
       print("AUTH NOTIFIER: Making API call...");
       var appdata = await registerApi.forgotsendotp(
-        email: email,
+        email: email.toString().trim(),
       );
 
       print(
@@ -359,15 +359,27 @@ class AuthNotifier extends ChangeNotifier {
           print(
               "AUTH NOTIFIER: ERROR - Server returned error: $msg (Status Code: $statuscode)");
 
-          // User-friendly message — avoid exposing raw server errors.
-          String errorMessage =
-              'No account found with this email. Please check and try again.';
-          if (statuscode != 500 && statuscode != 404 && msg != null) {
-            final raw = msg.toString().trim();
-            if (raw.isNotEmpty &&
-                !raw.toLowerCase().contains('unable to perform')) {
-              errorMessage = raw;
-            }
+          // Show the API message when available; only use "no account" for real not-found cases.
+          final raw = msg?.toString().trim() ?? '';
+          final lower = raw.toLowerCase();
+          final code = int.tryParse(statuscode?.toString() ?? '') ?? 0;
+          final String errorMessage;
+          if (code == 404 ||
+              lower.contains('not found') ||
+              lower.contains('no account') ||
+              lower.contains('does not exist') ||
+              lower.contains('not registered')) {
+            errorMessage = raw.isNotEmpty
+                ? raw
+                : 'No account found with this email. Please check and try again.';
+          } else if (raw.isNotEmpty) {
+            errorMessage = raw;
+          } else if (code >= 500) {
+            errorMessage =
+                'Unable to process your request. Please try again later.';
+          } else {
+            errorMessage =
+                'Unable to reset password. Please check your email and try again.';
           }
 
           print("AUTH NOTIFIER: Showing error snackbar to user");

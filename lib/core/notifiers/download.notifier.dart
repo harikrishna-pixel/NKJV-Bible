@@ -623,10 +623,31 @@ class DownloadProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> _trackVerseActionClickForFeedback() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(SharPreferences.mainFeedbackFromVerseActions) ?? false) {
+      return;
+    }
+
+    final total =
+        (prefs.getInt(SharPreferences.totalVerseActionClickCount) ?? 0) + 1;
+    await prefs.setInt(SharPreferences.totalVerseActionClickCount, total);
+
+    if (total >= 20) {
+      await prefs.setBool(SharPreferences.mainFeedbackPending, true);
+      await prefs.setBool(SharPreferences.mainFeedbackFromVerseActions, true);
+    }
+  }
+
   void incrementBookmarkCount(BuildContext context) async {
-    if (_hasShown) return;
     CacheNotifier cacheNotifier = CacheNotifier();
     final data = await cacheNotifier.readCache(key: 'user');
+
+    if (data == null) {
+      await _trackVerseActionClickForFeedback();
+    }
+
+    if (_hasShown) return;
 
     if (data == null) {
       _bookmarkCount++;
@@ -907,20 +928,30 @@ class DownloadProvider with ChangeNotifier {
   List<DailyVerseList> dailyVerseList = [];
 
   Future<void> loadDailyVerses() async {
-    isLoadingDailyVerse = true;
-    // notifyListeners();
-
     final prefs = await SharedPreferences.getInstance();
 
     final bool dataIsChanged = prefs.getBool('dataIsChanged') ?? true;
     final String? cachedJson = prefs.getString('cachedDailyVerseList');
 
-    // Already loaded at splash/home — skip redundant local reload.
+    // Already in memory from splash/home/preference preload.
     if (!dataIsChanged && dailyVerseList.isNotEmpty) {
       isLoadingDailyVerse = false;
       notifyListeners();
       return;
     }
+
+    // Instant path: prefs JSON cache (no DB round-trip before first paint).
+    if (!dataIsChanged &&
+        cachedJson != null &&
+        cachedJson.isNotEmpty &&
+        await _hydrateDailyVersesFromPrefsJson(cachedJson)) {
+      isLoadingDailyVerse = false;
+      notifyListeners();
+      return;
+    }
+
+    isLoadingDailyVerse = true;
+    notifyListeners();
 
     if (!dataIsChanged && cachedJson != null) {
       final selectedForCache =
@@ -1002,6 +1033,8 @@ class DownloadProvider with ChangeNotifier {
       'verses': dailyVerses,
       'today': todayString,
     });
+    final verseRows =
+        result.isNotEmpty ? result : List<Map<String, dynamic>>.from(dailyVerses);
 
     // Fetch book names (single query — same titles as per-verse lookups).
     final bookRows = await dbClient.rawQuery("SELECT book_num, title FROM book");
@@ -1012,10 +1045,12 @@ class DownloadProvider with ChangeNotifier {
 
     final List<DailyVerseList> enrichedList = [];
 
-    for (var verse in result) {
+    for (var verse in verseRows) {
       final bookIdStored = int.parse(verse['Book_Id'].toString());
       final bookNum = bookIdStored > 0 ? bookIdStored - 1 : bookIdStored;
-      final bookName = bookTitleByNum[bookNum] ?? 'Unknown';
+      final bookName = _resolveDailyVerseBookTitle(bookTitleByNum, bookIdStored) ??
+          _resolveDailyVerseBookTitle(bookTitleByNum, bookNum) ??
+          'Unknown';
 
       enrichedList.add(DailyVerseList(
         categoryName: verse['Category_Name'],
@@ -1183,6 +1218,69 @@ class DownloadProvider with ChangeNotifier {
       return false;
     }
   }
+
+  /// Mirrors splash [loadLocal]: memory cache + book list prefs for Home/Search.
+  Future<bool> preloadAndCacheBibleDataFromDatabase() async {
+    final loaded = await preloadBibleDataFromDatabaseIfNeeded();
+    if (!loaded && verseList.isEmpty) return false;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        'otBookList',
+        jsonEncode(otBookList.map((e) => e.toJson()).toList()),
+      );
+      await prefs.setString(
+        'ntBookList',
+        jsonEncode(ntBookList.map((e) => e.toJson()).toList()),
+      );
+      await prefs.setString(
+        'bookList',
+        jsonEncode(bookList.map((e) => e.toJson()).toList()),
+      );
+    } catch (e) {
+      debugPrint('preloadAndCacheBibleDataFromDatabase prefs error: $e');
+    }
+    return verseList.isNotEmpty;
+  }
+
+  /// Reads [cachedDailyVerseList] prefs only — for instant Daily Verse UI.
+  Future<bool> tryHydrateDailyVersesFromLocalCache() async {
+    if (dailyVerseList.isNotEmpty) return true;
+
+    final prefs = await SharedPreferences.getInstance();
+    final dataIsChanged = prefs.getBool('dataIsChanged') ?? true;
+    if (dataIsChanged) return false;
+
+    final cachedJson = prefs.getString('cachedDailyVerseList');
+    if (cachedJson == null || cachedJson.isEmpty) return false;
+
+    return _hydrateDailyVersesFromPrefsJson(cachedJson);
+  }
+
+  Future<bool> _hydrateDailyVersesFromPrefsJson(String cachedJson) async {
+    try {
+      final decoded = jsonDecode(cachedJson);
+      if (decoded is! List || decoded.isEmpty) return false;
+
+      dailyVerseList = decoded
+          .map((e) => DailyVerseList.fromJson(e as Map<String, dynamic>))
+          .toSet()
+          .toList();
+      return dailyVerseList.isNotEmpty;
+    } catch (e) {
+      debugPrint('hydrateDailyVersesFromPrefsJson error: $e');
+      return false;
+    }
+  }
+
+  /// Warm bible + daily verse caches before opening Home (no UI change).
+  Future<void> warmDataBeforeHomeScreen() async {
+    await preloadAndCacheBibleDataFromDatabase();
+    if (dailyVerseList.isEmpty) {
+      await loadDailyVerses();
+    }
+  }
 }
 
 /// One verse per selected topic per day (round-robin), not all from one category.
@@ -1320,9 +1418,10 @@ Map<String, List<VerseBookContentModel>> splitVerses(
     List<VerseBookContentModel> all) {
   List<VerseBookContentModel> ot = [];
   List<VerseBookContentModel> nt = [];
+  final otCount = BibleInfo.old_testament_count;
 
   for (var v in all) {
-    if (v.bookNum!.clamp(0, 38) == v.bookNum) {
+    if ((v.bookNum ?? 0) < otCount) {
       ot.add(v);
     } else {
       nt.add(v);
@@ -1339,7 +1438,30 @@ List<MainBookListModel> parseBooks(dynamic data) {
 }
 
 Map<String, List<MainBookListModel>> splitBooks(List<MainBookListModel> books) {
-  List<MainBookListModel> ot = books.take(39).toList();
-  List<MainBookListModel> nt = books.skip(39).toList();
+  final otCount = BibleInfo.old_testament_count;
+  List<MainBookListModel> ot = [];
+  List<MainBookListModel> nt = [];
+
+  for (final book in books) {
+    if ((book.bookNum ?? 0) < otCount) {
+      ot.add(book);
+    } else {
+      nt.add(book);
+    }
+  }
+
   return {'ot': ot, 'nt': nt};
+}
+
+String? _resolveDailyVerseBookTitle(
+    Map<int, String> bookTitleByNum, int bookKey) {
+  final direct = bookTitleByNum[bookKey];
+  if (direct != null && direct.isNotEmpty) return direct;
+  if (bookKey > 0) {
+    final legacy = bookTitleByNum[bookKey - 1];
+    if (legacy != null && legacy.isNotEmpty) return legacy;
+  }
+  final next = bookTitleByNum[bookKey + 1];
+  if (next != null && next.isNotEmpty) return next;
+  return null;
 }

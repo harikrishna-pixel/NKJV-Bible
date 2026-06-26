@@ -25,7 +25,6 @@ class SignupScreen extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final agree = useState(false);
-    final agree1 = useState(false);
     final signupState = ref.watch(signupBloc);
 
     // Fresh form each time this screen is opened (bloc controllers outlive the route).
@@ -36,7 +35,6 @@ class SignupScreen extends HookConsumerWidget {
       bloc.passCon.clear();
       bloc.confirmPassCon.clear();
       agree.value = false;
-      agree1.value = false;
       return null;
     }, const []);
     double screenWidth = MediaQuery.of(context).size.width;
@@ -252,40 +250,6 @@ class SignupScreen extends HookConsumerWidget {
                                                       },
                                               ),
                                             ],
-                                          ),
-                                        ),
-                                      )
-                                    ],
-                                  ),
-                                  SizedBox(height: screenWidth > 450 ? 17 : 12),
-                                  Row(
-                                    children: [
-                                      Checkbox(
-                                          value: agree1.value,
-                                          onChanged: (value) {
-                                            agree1.value = !agree1.value;
-                                          }),
-                                      Expanded(
-                                        child: RichText(
-                                          text: TextSpan(
-                                            text:
-                                                'Subscribe to receive daily Bible verses, special gifts, and updates. Unsubscribe any time. ',
-                                            style: CommanStyle.appBarStyle(
-                                                    context)
-                                                .copyWith(
-                                                    letterSpacing:
-                                                        BibleInfo.letterSpacing,
-                                                    fontSize: screenWidth >
-                                                            450
-                                                        ? BibleInfo
-                                                                .fontSizeScale *
-                                                            23
-                                                        : BibleInfo
-                                                                .fontSizeScale *
-                                                            14,
-                                                    fontWeight:
-                                                        FontWeight.w400),
-                                            children: [],
                                           ),
                                         ),
                                       )

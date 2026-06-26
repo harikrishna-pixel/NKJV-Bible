@@ -107,7 +107,7 @@ class BibleInfo {
   static String thankyoutitle = " 🙏 Help Us Keep the Bible App Free ";
 
   static int old_testament_count =
-      39; //book count 65 - olt 39, book count 72 - olt 45
+      45; //book count 65 - olt 39, book count 72 - olt 45
   static String new_testament_count = "27";
 
   static String exportText =

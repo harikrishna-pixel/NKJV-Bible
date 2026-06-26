@@ -582,6 +582,91 @@ String? _referralCodeFromAuthResponse(dynamic response) {
   return null;
 }
 
+Map<String, dynamic>? _userFromAuthResponse(Map<String, dynamic> response) {
+  final data = response['data'];
+  if (data is Map && data['user'] is Map) {
+    return Map<String, dynamic>.from(data['user'] as Map);
+  }
+  if (response['user'] is Map) {
+    return Map<String, dynamic>.from(response['user'] as Map);
+  }
+  return null;
+}
+
+String? _readStringField(Map<String, dynamic>? map, List<String> keys) {
+  if (map == null) return null;
+  for (final key in keys) {
+    final value = map[key]?.toString().trim();
+    if (value != null && value.isNotEmpty) return value;
+  }
+  return null;
+}
+
+bool _referralWasAcceptedByApi(
+  Map<String, dynamic> response, {
+  required String enteredCode,
+  String? initialReferredBy,
+}) {
+  final code = enteredCode.trim();
+  final user = _userFromAuthResponse(response);
+  final data = response['data'];
+  final dataMap = data is Map<String, dynamic> ? data : null;
+
+  final referredBy = _readStringField(user, ['referred_by', 'referredBy']) ??
+      _readStringField(dataMap, ['referred_by', 'referredBy']);
+
+  final hadReferrer =
+      initialReferredBy != null && initialReferredBy.trim().isNotEmpty;
+  final hasReferrerNow =
+      referredBy != null && referredBy.trim().isNotEmpty;
+
+  if (!hadReferrer && hasReferrerNow) {
+    return true;
+  }
+
+  if (hasReferrerNow &&
+      referredBy.toUpperCase() == code.toUpperCase()) {
+    return true;
+  }
+
+  for (final container in [user, dataMap, response]) {
+    if (container == null) continue;
+    for (final key in [
+      'used_referral_code',
+      'applied_referral_code',
+      'referral_code_used',
+    ]) {
+      final value = container[key]?.toString().trim();
+      if (value != null &&
+          value.isNotEmpty &&
+          value.toUpperCase() == code.toUpperCase()) {
+        return true;
+      }
+    }
+  }
+
+  for (final container in [user, dataMap, response]) {
+    if (container == null) continue;
+    final applied = container['referral_applied'];
+    if (applied == true ||
+        applied == 1 ||
+        applied == '1' ||
+        applied == 'true') {
+      return true;
+    }
+  }
+
+  final message = response['message']?.toString().toLowerCase() ?? '';
+  if (message.contains('referral') &&
+      (message.contains('applied') ||
+          message.contains('success') ||
+          message.contains('accepted'))) {
+    return true;
+  }
+
+  return false;
+}
+
 Future<String?> registerUser(
     {required String email,
     required String name,
@@ -793,6 +878,25 @@ Future<void> applyReferralViaLogin({
           ? apiMessage
           : 'Invalid referral code';
     }
+
+    if (!_referralWasAcceptedByApi(
+      data,
+      enteredCode: code,
+      initialReferredBy: initialReferredBy,
+    )) {
+      debugPrint(
+        'applyReferralViaLogin: login succeeded but referral not confirmed in API response',
+      );
+      throw 'Invalid referral code';
+    }
+
+    final user =
+        UserModel.fromJson(data['data']['user'], data['data']['token']);
+    debugPrint('applyReferralViaLogin parsed referral fields:');
+    debugPrint('  referred_by              → ${user.referredBy ?? ''}');
+    debugPrint('  referral_count           → ${user.referralCount}');
+    debugPrint(
+        '  referral_reward_claimed  → ${user.referralRewardClaimed}');
 
     await cacheNotifier.writeCache(
         key: 'user', value: '${data['data']['user']['email']}');

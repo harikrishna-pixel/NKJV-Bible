@@ -176,18 +176,18 @@ class NotificationsServices {
       setTime,
       NotificationDetails(
         android: AndroidNotificationDetails(
-          'daily_verse_channel',
+          'daily_verse_channel_church',
           'Daily Verse Notifications',
           channelDescription: 'Notifications for daily Bible verses',
           importance: Importance.max,
           priority: Priority.max,
           icon: '@mipmap/ic_launcher',
-          sound: const RawResourceAndroidNotificationSound('bell'),
+          sound: const RawResourceAndroidNotificationSound('church_bell'),
           playSound: true,
           enableVibration: true,
         ),
         iOS: const DarwinNotificationDetails(
-          sound: 'bell.mp3',
+          sound: 'church_bell.mp3',
           presentSound: true,
         ),
       ),
@@ -220,19 +220,19 @@ class NotificationsServices {
       setTime,
       NotificationDetails(
         android: AndroidNotificationDetails(
-          'scenario_notification_channel',
+          'scenario_notification_channel_church',
           'Scenario Notifications',
           channelDescription:
               'Personalized Bible reminders based on your journey',
           importance: Importance.max,
           priority: Priority.max,
           icon: '@mipmap/ic_launcher',
-          sound: const RawResourceAndroidNotificationSound('bell'),
+          sound: const RawResourceAndroidNotificationSound('church_bell'),
           playSound: true,
           enableVibration: true,
         ),
         iOS: const DarwinNotificationDetails(
-          sound: 'bell.mp3',
+          sound: 'church_bell.mp3',
           presentSound: true,
         ),
       ),

@@ -27,7 +27,12 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
   int _totalDays = 0;
   List<String> _completedDates = [];
   String? _startedNotFinishedDate;
+  DateTime? _installDateOnly;
+  bool _restoreActive = false;
+  String? _restoreDate;
   DateTime _viewMonth = DateTime.now();
+
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
   @override
   void initState() {
@@ -45,6 +50,16 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
     final stepsCompletedToday =
         await SharPreferences.getInt(SharPreferences.streakFlowStepsCompletedToday) ??
             0;
+    final installRaw =
+        await SharPreferences.getString(SharPreferences.appInstalledDate);
+    final installDate = (installRaw == null || installRaw.trim().isEmpty)
+        ? DateTime.now()
+        : DateTime.tryParse(installRaw) ?? DateTime.now();
+    final restoreActive =
+        await SharPreferences.getBoolean(SharPreferences.streakFlowRestoreActive) ??
+            false;
+    final restoreDate =
+        await SharPreferences.getString(SharPreferences.streakFlowRestoreDate);
     final today = DateTime.now().toIso8601String().split('T')[0];
     final best = _computeBestStreak(dates);
     if (mounted) {
@@ -57,8 +72,26 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
             (started == today && !dates.contains(today) && stepsCompletedToday > 0)
             ? today
             : null;
+        _installDateOnly = _dateOnly(installDate);
+        _restoreActive = restoreActive;
+        _restoreDate = restoreDate;
       });
     }
+  }
+
+  bool _isMissedDay(DateTime date, String key, DateTime today) {
+    final d = _dateOnly(date);
+    final todayOnly = _dateOnly(today);
+    if (d.isAfter(todayOnly) || d == todayOnly) return false;
+    if (_completedDates.contains(key)) return false;
+    if (_installDateOnly != null && d.isBefore(_installDateOnly!)) return false;
+    if (_restoreActive &&
+        _restoreDate != null &&
+        _restoreDate!.isNotEmpty &&
+        _restoreDate == key) {
+      return false;
+    }
+    return true;
   }
 
   int _computeBestStreak(List<String> sortedDates) {
@@ -300,6 +333,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
                       date.day == today.day;
                   final isCompleted = _completedDates.contains(key);
                   final isStartedNotFinished = _startedNotFinishedDate == key;
+                  final isMissed = _isMissedDay(date, key, today);
                   rowChildren.add(
                     SizedBox(
                       width: cellW,
@@ -310,6 +344,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
                           isToday: isToday,
                           isCompleted: isCompleted,
                           isStartedNotFinished: isStartedNotFinished,
+                          isMissed: isMissed,
                           isFuture: date.isAfter(today),
                           textColor: textColor,
                         ),
@@ -362,6 +397,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
     required bool isCompleted,
     required bool isStartedNotFinished,
     required bool isToday,
+    required bool isMissed,
     required bool isFuture,
     required Color textColor,
     bool compact = false,
@@ -423,7 +459,22 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
         color: textColor.withOpacity(0.42),
       );
     }
-    // Past days without activity — keep indicator invisible.
+    if (isMissed) {
+      final double borderW = compact ? 1.0 : 1.2;
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.transparent,
+          border: Border.all(
+            color: textColor.withOpacity(0.42),
+            width: borderW,
+          ),
+        ),
+      );
+    }
+    // Before install or days with no streak activity yet.
     return SizedBox(width: size, height: size);
   }
 
@@ -440,6 +491,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
     required bool isToday,
     required bool isCompleted,
     required bool isStartedNotFinished,
+    required bool isMissed,
     required bool isFuture,
     required Color textColor,
   }) {
@@ -466,6 +518,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
             isCompleted: isCompleted,
             isStartedNotFinished: isStartedNotFinished,
             isToday: isToday,
+            isMissed: isMissed,
             isFuture: isFuture,
             textColor: textColor,
             compact: true,
@@ -488,6 +541,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
               isCompleted: true,
               isStartedNotFinished: false,
               isToday: false,
+              isMissed: false,
               isFuture: false,
               textColor: textColor,
             ),
@@ -503,6 +557,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
               isCompleted: false,
               isStartedNotFinished: true,
               isToday: false,
+              isMissed: false,
               isFuture: false,
               textColor: textColor,
             ),
@@ -518,6 +573,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
               isCompleted: false,
               isStartedNotFinished: false,
               isToday: false,
+              isMissed: false,
               isFuture: true,
               textColor: textColor,
             ),
@@ -533,11 +589,28 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
               isCompleted: false,
               isStartedNotFinished: false,
               isToday: true,
+              isMissed: false,
               isFuture: false,
               textColor: textColor,
             ),
             const SizedBox(width: 6),
             Text('Today',
+                style: TextStyle(fontSize: 11, color: textColor, fontFamily: 'Georgia')),
+          ],
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _statusIcon(
+              isCompleted: false,
+              isStartedNotFinished: false,
+              isToday: false,
+              isMissed: true,
+              isFuture: false,
+              textColor: textColor,
+            ),
+            const SizedBox(width: 6),
+            Text('Missed',
                 style: TextStyle(fontSize: 11, color: textColor, fontFamily: 'Georgia')),
           ],
         ),

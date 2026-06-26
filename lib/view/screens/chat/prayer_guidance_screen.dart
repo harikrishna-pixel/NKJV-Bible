@@ -459,11 +459,13 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
                               color: isDark
-                                  ? Colors.white12
+                                  ? Colors.white.withOpacity(0.12)
                                   : Colors.white,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: CommanColor.lightDarkPrimary(ctx),
+                                color: isDark
+                                    ? Colors.white.withOpacity(0.55)
+                                    : CommanColor.lightDarkPrimary(ctx),
                                 width: 1.5,
                               ),
                             ),
@@ -473,7 +475,9 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: CommanColor.lightDarkPrimary(ctx),
+                                color: isDark
+                                    ? Colors.white
+                                    : CommanColor.lightDarkPrimary(ctx),
                               ),
                             ),
                           ),

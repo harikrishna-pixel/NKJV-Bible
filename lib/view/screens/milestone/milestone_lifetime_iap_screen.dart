@@ -45,7 +45,7 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
           oneYearPlan: oneYear,
           lifeTimePlan: lifeTime,
           checkad: checkad,
-          initialSelectedPlanIndex: 2,
+          initialSelectedPlanIndex: 1,
           autoStartSelectedPlanPurchase: true,
           invisiblePurchaseHost: true,
         ),
@@ -207,7 +207,7 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
                         child: Column(
                           children: [
                             Text(
-                              'LIFETIME ACCESS',
+                              '1 YEAR ACCESS',
                               style: TextStyle(
                                 fontFamily: 'Georgia',
                                 fontSize: 18,
@@ -217,7 +217,7 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'One Time Payment',
+                              'Annual Plan',
                               textAlign: TextAlign.center,
                               style: subtitleStyle,
                             ),
@@ -327,7 +327,7 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
                       ),
                     ),
                     child: const Text(
-                      'Unlock Lifetime Access',
+                      'Unlock 1 Year Access',
                       style: TextStyle(
                         fontFamily: 'Georgia',
                         fontSize: 16,

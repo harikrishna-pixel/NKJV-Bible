@@ -11,6 +11,12 @@ import 'package:html_unescape/html_unescape.dart';
 
 import '../constants/colors.dart';
 
+String parseVerseContent(dynamic content) {
+  final raw = content?.toString() ?? '';
+  if (raw.isEmpty) return '';
+  return parse(raw).body?.text ?? raw;
+}
+
 class VerseItemWidget extends StatefulWidget {
   const VerseItemWidget({
     super.key,
@@ -43,8 +49,7 @@ class _VerseItemWidgetState extends State<VerseItemWidget> {
   }
 
   void _checkTempHighlight() {
-    final parsedText =
-        parse(widget.data.content).body?.text ?? widget.data.content;
+    final parsedText = parseVerseContent(widget.data.content);
     if (widget.controller.readHighlight.value &&
         parsedText == widget.selectedVerseForRead) {
       if (mounted) {
@@ -135,8 +140,7 @@ class _VerseItemWidgetState extends State<VerseItemWidget> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final parsedText =
-        parse(widget.data.content).body?.text ?? widget.data.content;
+    final parsedText = parseVerseContent(widget.data.content);
     final verseLabel =
         displayVerseNumber(widget.data, listIndex: widget.index);
     final isHighlighted = widget.data.isHighlighted != "no";
@@ -147,7 +151,9 @@ class _VerseItemWidgetState extends State<VerseItemWidget> {
     //  final normalized = normalizeHtml(widget.data.content);
 
     return FutureBuilder<String?>(
-      future: DBHelper().getColorByContent(widget.data.content),
+      future: DBHelper().getColorByContent(
+        widget.data.content?.toString() ?? '',
+      ),
       builder: (context, snapshot) {
         final highlightColor =
             widget.data.isHighlighted ?? widget.selectedColor;
@@ -168,7 +174,6 @@ class _VerseItemWidgetState extends State<VerseItemWidget> {
                   alignment: PlaceholderAlignment.top,
                   child: HtmlWidget(
                     "$verseLabel. $parsedText",
-                    // "And the earth was without form, and void; and darkness <em>was</em> upon the face of the deep. And the Spirit of God moved upon the face of the waters.",
                     textStyle: _getTextStyle(
                       context,
                       screenWidth,
@@ -178,18 +183,6 @@ class _VerseItemWidgetState extends State<VerseItemWidget> {
                     ),
                   ),
                 ),
-                // TextSpan(
-                //   text: // "And the earth was without form, and void; and darkness <em>was</em> upon the face of the deep. And the Spirit of God moved upon the face of the waters.",
-                //"${widget.index + 1}. $parsedText",
-
-                //   style: _getTextStyle(
-                //     context,
-                //     screenWidth,
-                //     showTempHighlight,
-                //     isHighlighted,
-                //     isUnderlined,
-                //   ),
-                // ),
                 if (isBookmarked)
                   WidgetSpan(
                     alignment: PlaceholderAlignment.middle,

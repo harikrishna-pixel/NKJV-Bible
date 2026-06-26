@@ -288,6 +288,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       Navigator.of(context).pop(invisibleHostPopValue);
       return;
     }
+    try {
+      final provider = Provider.of<DownloadProvider>(context, listen: false);
+      await provider.warmDataBeforeHomeScreen();
+    } catch (e) {
+      debugPrint('warmDataBeforeHomeScreen error: $e');
+    }
+    if (!mounted) return;
     Get.offAll(
       () => HomeScreen(
         From: "premium",
@@ -2509,7 +2516,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildPaywallHeroWithCard(context, size),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   if (widget.checkad == 'image')
                     Padding(
                       padding: const EdgeInsets.only(left: 8),
@@ -2773,138 +2780,125 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   static const double _kPlanPriceBlockHeight = 40;
 
   Widget _buildPaywallHeroWithCard(BuildContext context, Size size) {
-    final imageHeight = (size.height * 0.34).clamp(240.0, 300.0);
-    const cardTopFactor = 0.62;
-    const valueCardHeightEstimate = 148.0;
-    final cardTop = imageHeight * cardTopFactor;
+    final topPadding = MediaQuery.paddingOf(context).top;
+    final imageHeight = (size.height * 0.32).clamp(235.0, 285.0);
+    const cardOverlap = 22.0;
 
-    return SizedBox(
-      height: cardTop + valueCardHeightEstimate + 2,
-      width: double.infinity,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: imageHeight,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.asset(
-                  'assets/paywall_icons/man_sitting.png',
-                  fit: BoxFit.cover,
-                  alignment: const Alignment(0.82, 0.06),
-                  filterQuality: FilterQuality.high,
-                  gaplessPlayback: true,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: const Color(0xFFE8D5C4),
-                  ),
-                ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  height: imageHeight * 0.55,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.white.withValues(alpha: 0.25),
-                          Colors.white.withValues(alpha: 0.82),
-                          Colors.white,
-                        ],
-                        stops: const [0.0, 0.4, 0.78, 1.0],
-                      ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          height: imageHeight,
+          width: double.infinity,
+          child: Stack(
+            clipBehavior: Clip.none,
+            fit: StackFit.expand,
+            children: [
+              Positioned.fill(
+                child: Transform.translate(
+                  offset: const Offset(0, 14),
+                  child: Image.asset(
+                    'assets/paywall_icons/man_sitting.png',
+                    fit: BoxFit.cover,
+                    alignment: const Alignment(0.72, -0.18),
+                    filterQuality: FilterQuality.high,
+                    gaplessPlayback: true,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: const Color(0xFFE8D5C4),
                     ),
                   ),
                 ),
-                SafeArea(
-                  bottom: false,
-                  child: Align(
-                    alignment: Alignment.topLeft,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 16, top: 6),
-                      child: Image.asset(
-                        _paywallIconPremium,
-                        height: _kPaywallPremiumBadgeHeight,
-                        fit: BoxFit.contain,
-                      ),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: imageHeight * 0.36,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.white.withValues(alpha: 0.18),
+                        Colors.white.withValues(alpha: 0.7),
+                        Colors.white,
+                      ],
+                      stops: const [0.0, 0.4, 0.75, 1.0],
                     ),
                   ),
                 ),
-                Positioned(
-                  left: 16,
-                  right: 16,
-                  top: 0,
-                  child: SafeArea(
-                    bottom: false,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 44),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
+              ),
+              SafeArea(
+                bottom: false,
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 16, top: 6),
+                    child: Image.asset(
+                      _paywallIconPremium,
+                      height: _kPaywallPremiumBadgeHeight,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 16,
+                right: 16,
+                top: topPadding + 48,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    RichText(
+                      textAlign: TextAlign.left,
+                      text: const TextSpan(
+                        style: TextStyle(
+                          fontSize: 34,
+                          fontWeight: FontWeight.w800,
+                          color: _paywallInk,
+                          height: 1.12,
+                          letterSpacing: -0.3,
+                        ),
                         children: [
-                          RichText(
-                            textAlign: TextAlign.left,
-                            text: TextSpan(
-                              style: const TextStyle(
-                                fontSize: 34,
-                                fontWeight: FontWeight.w800,
-                                color: _paywallInk,
-                                height: 1.1,
-                                letterSpacing: -0.3,
-                              ),
-                              children: const [
-                                TextSpan(text: 'Grow Closer\n'),
-                                TextSpan(text: 'to '),
-                                TextSpan(
-                                  text: 'God Daily',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    shadows: [
-                                      Shadow(
-                                        color: Color(0x99000000),
-                                        blurRadius: 10,
-                                        offset: Offset(0, 1.5),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
+                          TextSpan(text: 'Grow Closer\n'),
+                          TextSpan(text: 'to '),
+                          TextSpan(
+                            text: 'God',
+                            style: TextStyle(color: _paywallTitleGold),
                           ),
-                          const SizedBox(height: 10),
-                          const Text(
-                            'Guidance, prayer, and encouragement \n whenever you need it.',
-                            textAlign: TextAlign.left,
-                            style: TextStyle(
-                              fontSize: 14,
-                              height: 1.45,
-                              color: _paywallSubtitle,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
+                          TextSpan(text: ' Daily'),
                         ],
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Guidance, prayer, and encouragement whenever you need it.',
+                      textAlign: TextAlign.left,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.4,
+                        color: _paywallSubtitle,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          Positioned(
-            left: 16,
-            right: 16,
-            top: cardTop,
+        ),
+        Transform.translate(
+          offset: const Offset(0, -cardOverlap),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: _buildPaywallValueCard(context),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

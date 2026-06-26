@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:biblebookapp/controller/api_service.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
@@ -13,6 +12,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:get/get.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
 class FeedbackWebView extends StatefulWidget {
@@ -31,7 +31,49 @@ class _FeedbackWebViewState extends State<FeedbackWebView> {
       cacheMode: CacheMode.LOAD_NO_CACHE,
       mediaPlaybackRequiresUserGesture: false,
       allowsInlineMediaPlayback: true,
-      iframeAllowFullscreen: true);
+      iframeAllowFullscreen: true,
+      forceDark: ForceDark.OFF,
+      algorithmicDarkeningAllowed: false);
+
+  static const String _feedbackInputStyleJs = '''
+(function() {
+  var style = document.createElement('style');
+  style.id = 'feedback-form-input-fix';
+  style.textContent =
+    'input, textarea, select {' +
+    'color: #1a1a1a !important;' +
+    '-webkit-text-fill-color: #1a1a1a !important;' +
+    'caret-color: #1a1a1a !important;' +
+    '}';
+  if (!document.getElementById('feedback-form-input-fix')) {
+    document.head.appendChild(style);
+  }
+  document.querySelectorAll('input, textarea').forEach(function(el) {
+    if (el.dataset.feedbackLogAttached === '1') return;
+    el.dataset.feedbackLogAttached = '1';
+    el.addEventListener('input', function() {
+      var label = el.name || el.id || el.type || 'field';
+      console.log('feedback_input|' + label + '|' + (el.value || ''));
+    });
+  });
+})();
+''';
+
+  static const String _feedbackFieldsDumpJs = '''
+(function() {
+  var fields = document.querySelectorAll('input, textarea, select');
+  var out = [];
+  for (var i = 0; i < fields.length; i++) {
+    var f = fields[i];
+    out.push({
+      name: f.name || f.id || ('field_' + i),
+      type: f.type || f.tagName.toLowerCase(),
+      value: f.value || ''
+    });
+  }
+  return JSON.stringify(out);
+})();
+''';
 
   PullToRefreshController? pullToRefreshController;
   String? url;
@@ -53,6 +95,25 @@ class _FeedbackWebViewState extends State<FeedbackWebView> {
     final msg = uri.queryParameters['r_msg'];
     if (msg == null || msg.trim().isEmpty) return null;
     return msg;
+  }
+
+  void _handleFeedbackSuccess(Uri uri) {
+    debugPrint('=== Feedback Submit Success ===');
+    for (final entry in uri.queryParameters.entries) {
+      debugPrint('  ${entry.key}: ${entry.value}');
+    }
+    debugPrint('  full_url: $uri');
+    debugPrint('===============================');
+    Get.back();
+    Constants.showToast(
+      _feedbackSuccessMessage(uri) ?? 'Thank you for the valuable feedback!',
+    );
+  }
+
+  bool _isInterruptedSuccessLoad(WebResourceError error) {
+    return error.type == WebResourceErrorType.CANCELLED ||
+        error.description.contains('Frame load interrupted') ||
+        error.description.contains('code=102');
   }
 
   @override
@@ -92,35 +153,107 @@ class _FeedbackWebViewState extends State<FeedbackWebView> {
     }
   }
 
+  /// Build feedback URL with Uri.https so every value is encoded correctly.
+  Future<Uri> _buildFeedbackFormUri() async {
+    final pkg = await PackageInfo.fromPlatform();
+    final locale = WidgetsBinding.instance.platformDispatcher.locale;
+    final deviceInfo = DeviceInfoPlugin();
+
+    const groupId = '1';
+    const appType = 'lite';
+
+    final params = <String, String>{
+      'group_id': groupId,
+      'app_version': pkg.version,
+      'package_name': pkg.packageName,
+      'app_name':
+          pkg.appName.isNotEmpty ? pkg.appName : BibleInfo.bible_shortName,
+      'app_type': appType,
+      'language': locale.languageCode,
+      'country_code': locale.countryCode ?? '',
+    };
+
+    if (Platform.isIOS) {
+      final ios = await deviceInfo.iosInfo;
+      params.addAll({
+        'device_type': 'ios',
+        'device_id': ios.identifierForVendor ?? '',
+        'device_name': ios.name,
+        'device_model': ios.utsname.machine,
+        'os_version': ios.systemVersion,
+        'ios_apple_id': BibleInfo.apple_AppId,
+      });
+    } else if (Platform.isAndroid) {
+      final android = await deviceInfo.androidInfo;
+      params.addAll({
+        'device_type': 'android',
+        'device_id': android.id,
+        'device_name': android.device,
+        'device_model': android.model,
+        'os_version': android.version.release,
+      });
+    } else {
+      params['device_type'] = 'unknown';
+      params['device_id'] = '';
+      params['device_name'] = '';
+      params['device_model'] = '';
+      params['os_version'] = '';
+    }
+
+    final uri = Uri.https(
+      'bibleoffice.com',
+      '/m_feedback/API/feedback_form/index.php',
+      params,
+    );
+
+    debugPrint('=== Feedback Form URL (verify before load) ===');
+    debugPrint(uri.toString());
+    for (final entry in params.entries) {
+      final marker =
+          entry.value.trim().isEmpty ? ' *** EMPTY — check source ***' : '';
+      debugPrint('  ${entry.key}: ${entry.value}$marker');
+    }
+    debugPrint('==============================================');
+
+    return uri;
+  }
+
   /// Load feedback form URL (bibleoffice.com) with device params.
   Future<void> _loadFeedbackFormUrl() async {
     await SharPreferences.setString('OpenAd', '1');
-    String deviceType = 'ios';
-    String packageName = Api.packageName;
-    String appName = BibleInfo.bible_shortName;
-    String deviceId = '';
-    String deviceModel = '';
-    const String groupId = '1';
-    final DeviceInfoPlugin deviceInfoPlugin = DeviceInfoPlugin();
-    if (Platform.isAndroid) {
-      final androidInfo = await deviceInfoPlugin.androidInfo;
-      deviceType = 'Android';
-      deviceId = androidInfo.id;
-      deviceModel = androidInfo.model;
-      packageName = BibleInfo.android_Package_Name;
-    } else if (Platform.isIOS) {
-      final iosInfo = await deviceInfoPlugin.iosInfo;
-      deviceType = 'iOS';
-      packageName = BibleInfo.ios_Bundle_Id;
-      deviceId = iosInfo.identifierForVendor ?? '';
-      deviceModel = iosInfo.utsname.machine;
+    try {
+      final feedbackUri = await _buildFeedbackFormUri();
+      if (mounted) {
+        setState(() {
+          url = feedbackUri.toString();
+        });
+      }
+    } catch (e, st) {
+      debugPrint('FeedbackWebView: failed to build feedback URL: $e');
+      debugPrint('$st');
     }
-    final String feedbackUrl =
-        '${Api.feedbackApi}?device_type=$deviceType&group_id=$groupId&package_name=$packageName&app_name=$appName&device_id=$deviceId&device_model=$deviceModel';
-    if (mounted) {
-      setState(() {
-        url = feedbackUrl;
-      });
+  }
+
+  Future<void> _logFeedbackFormFields(String source) async {
+    final controller = webViewController;
+    if (controller == null) return;
+    try {
+      final result = await controller.evaluateJavascript(
+        source: _feedbackFieldsDumpJs,
+      );
+      debugPrint('Feedback form fields ($source): $result');
+    } catch (e) {
+      debugPrint('Feedback form field dump failed ($source): $e');
+    }
+  }
+
+  Future<void> _ensureFeedbackInputVisible() async {
+    final controller = webViewController;
+    if (controller == null) return;
+    try {
+      await controller.evaluateJavascript(source: _feedbackInputStyleJs);
+    } catch (e) {
+      debugPrint('Feedback input style injection failed: $e');
     }
   }
 
@@ -169,11 +302,14 @@ class _FeedbackWebViewState extends State<FeedbackWebView> {
                         });
                         final uri = Uri.tryParse(url.toString());
                         if (uri != null && _isFeedbackSuccessUrl(uri)) {
-                          Get.back();
-                          Constants.showToast(
-                              _feedbackSuccessMessage(uri) ??
-                                  'Thank you for the valuable feedback!');
+                          _handleFeedbackSuccess(uri);
                           return;
+                        }
+                        if (uri != null &&
+                            uri.toString().contains('m_feedback/Save_feedback')) {
+                          debugPrint('=== Feedback Submitting (POST) ===');
+                          debugPrint('  submit_url: $uri');
+                          _logFeedbackFormFields('onLoadStart_submit');
                         }
                       },
                       shouldOverrideUrlLoading:
@@ -181,11 +317,17 @@ class _FeedbackWebViewState extends State<FeedbackWebView> {
                         var uri = navigationAction.request.url!;
 
                         if (_isFeedbackSuccessUrl(Uri.parse(uri.toString()))) {
-                          Get.back();
-                          Constants.showToast(
-                              _feedbackSuccessMessage(Uri.parse(uri.toString())) ??
-                                  'Thank you for the valuable feedback!');
+                          _handleFeedbackSuccess(Uri.parse(uri.toString()));
                           return NavigationActionPolicy.CANCEL;
+                        }
+
+                        if (uri.toString().contains('m_feedback/Save_feedback')) {
+                          debugPrint('=== Feedback Submitting ===');
+                          debugPrint('  submit_url: ${uri.toString()}');
+                          debugPrint(
+                              '  method: ${navigationAction.request.method}');
+                          await _logFeedbackFormFields('before_submit');
+                          debugPrint('============================');
                         }
 
                         if (![
@@ -206,6 +348,8 @@ class _FeedbackWebViewState extends State<FeedbackWebView> {
                       onLoadStop: (controller, url) async {
                         pullToRefreshController?.endRefreshing();
                         await SharPreferences.setString('OpenAd', '1');
+                        await _ensureFeedbackInputVisible();
+                        await _logFeedbackFormFields('onLoadStop');
                         setState(() {
                           this.url = url.toString();
                           isLoading = false;
@@ -213,6 +357,11 @@ class _FeedbackWebViewState extends State<FeedbackWebView> {
                       },
                       onReceivedError: (controller, request, error) async {
                         pullToRefreshController?.endRefreshing();
+                        if (_isInterruptedSuccessLoad(error)) {
+                          debugPrint(
+                              'FeedbackWebView: ignored interrupted load after success');
+                          return;
+                        }
                         if (error.description ==
                             "The Internet connection appears to be offline.") {
                           try {
@@ -247,7 +396,19 @@ class _FeedbackWebViewState extends State<FeedbackWebView> {
                           isLoading = false;
                         });
                       },
-                      onConsoleMessage: (controller, consoleMessage) {},
+                      onConsoleMessage: (controller, consoleMessage) {
+                        final message = consoleMessage.message;
+                        if (message.startsWith('feedback_input|')) {
+                          final parts = message.split('|');
+                          if (parts.length >= 3) {
+                            debugPrint(
+                                'Feedback typed [${parts[1]}]: ${parts.sublist(2).join('|')}');
+                          }
+                        } else {
+                          debugPrint(
+                              'FeedbackWebView console [${consoleMessage.messageLevel}]: $message');
+                        }
+                      },
                     )
                   : isLoading
                       ? Align(

@@ -1,10 +1,19 @@
 # iOS Home Screen Widget Setup (Xcode)
 
-This app supports three **iOS-only** Home Screen widgets:
+This app supports **iOS-only** Home Screen widgets with old-paper styling:
 
-1. **Verse of the Day** – shows today’s verse (updated when daily verses load in the app).
-2. **Bible Prayer** – opens Prayer Guidance when tapped.
-3. **Bible Chat** – opens AI Bible Chat when tapped.
+1. **Daily Verse** – today's verse (updated when daily verses load in the app).
+2. **Continue Reading** – resume reading progress.
+3. **Reading Plan** – today's reading checklist.
+4. **Weekly Reading Streak** – streak calendar.
+5. **Favorite Verse** – saved favorite verse.
+6. **Hourly Verse** – hourly verse refresh.
+7. **Random Bible Verse** – tap for a new verse.
+8. **Verse Image** – scenic verse image.
+9. **Bible Trivia** – question of the day.
+10. **Prayer Reminder** – opens Prayer Guidance when tapped.
+
+Legacy widgets (still available): **Bible Prayer**, **Bible Chat**.
 
 The following are **already done in code**:
 
@@ -30,7 +39,7 @@ open Runner.xcworkspace
 
 1. Select the **Runner** scheme and an iOS device or simulator (iOS 14+).
 2. Build and run (**⌘R**). The BibleHomeWidget extension will be built and embedded automatically.
-3. On the device, long-press the home screen → **+** (Add Widget) → find **Verse of the Day**, **Bible Prayer**, and **Bible Chat** under your app → add them.
+3. On the device, long-press the home screen → **+** (Add Widget) → find the Bible widgets under your app → add them (Daily Verse, Continue Reading, Reading Plan, etc.).
 
 ---
 

@@ -1452,7 +1452,7 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
 
   Widget _signedInStatusBox() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
         color: _greenBox,
         borderRadius: BorderRadius.circular(14),
@@ -1462,10 +1462,10 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: _backupIcon(_assetEncryption, size: 48),
+            padding: const EdgeInsets.only(top: 8),
+            child: _backupIcon(_assetEncryption, size: 44),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1475,28 +1475,25 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    height: 1.25,
+                    height: 1.3,
                     color: _greenText,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
                   'Your library is synced securely to the cloud because you\'re signed in.',
                   style: TextStyle(
                     fontSize: 12.5,
-                    height: 1.45,
-                    color: _brownMuted.withValues(alpha: 0.85),
+                    height: 1.4,
+                    color: _greenText.withValues(alpha: 0.82),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 1),
-                      child: Icon(Icons.schedule,
-                          size: 14, color: _brownMuted.withValues(alpha: 0.7)),
-                    ),
+                    Icon(Icons.schedule,
+                        size: 14, color: _brownMuted.withValues(alpha: 0.7)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -1510,15 +1507,12 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 1),
-                      child: Icon(Icons.update,
-                          size: 14, color: _brownMuted.withValues(alpha: 0.7)),
-                    ),
+                    Icon(Icons.update,
+                        size: 14, color: _brownMuted.withValues(alpha: 0.7)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -1532,12 +1526,12 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Text(
                   '*Your latest cloud backup replaces the previous one.*',
                   style: TextStyle(
                     fontSize: 11,
-                    height: 1.4,
+                    height: 1.35,
                     color: _brownMuted.withValues(alpha: 0.75),
                     fontStyle: FontStyle.italic,
                   ),

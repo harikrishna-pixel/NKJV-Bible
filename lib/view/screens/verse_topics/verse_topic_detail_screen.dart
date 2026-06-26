@@ -30,7 +30,8 @@ class VerseTopicDetailScreen extends StatefulWidget {
   State<VerseTopicDetailScreen> createState() => _VerseTopicDetailScreenState();
 }
 
-class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen> {
+class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
+    with WidgetsBindingObserver {
   static const Color _ink = Color(0xFF3D2914);
   static const Color _card = Color(0xFFF8F4EB);
   static const Color _gold = Color(0xFF8B6914);
@@ -44,14 +45,25 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadVerses();
     _searchController.addListener(_applyFilter);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _searchController.removeListener(_applyFilter);
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      FocusManager.instance.primaryFocus?.unfocus();
+    }
   }
 
   Future<void> _loadVerses() async {
@@ -66,6 +78,7 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen> {
   }
 
   void _applyFilter() {
+    if (!mounted) return;
     final query = _searchController.text.trim().toLowerCase();
     if (query.isEmpty) {
       setState(() => _filteredVerses = _allVerses);

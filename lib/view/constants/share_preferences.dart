@@ -63,6 +63,7 @@ class SharPreferences {
   static const dailyWelcomeMessageIndex = 'dailyWelcomeMessageIndex';
   static const dailyWelcomeFirstTimeShown =
       'dailyWelcomeFirstTimeShown'; // Track if first message was shown
+  static const searchGuideSubtextShown = 'searchGuideSubtextShown';
   static const prayerAmenMessageIndex = 'prayerAmenMessageIndex';
   static const prayerAmenAdCounter =
       'prayerAmenAdCounter'; // Counter for AMEN ad rotation (every 10 taps)
@@ -128,6 +129,10 @@ class SharPreferences {
   static const mainFeedbackPending = 'main_feedback_pending';
   /// Set when app-open ad flow completes (dismissed, failed, or skipped).
   static const openAdFlowComplete = 'open_ad_flow_complete';
+  /// Total verse-action clicks (same counter path as sign-in prompt at 5).
+  static const totalVerseActionClickCount = 'total_verse_action_click_count';
+  /// Main feedback dialog was queued from verse-action count (20).
+  static const mainFeedbackFromVerseActions = 'main_feedback_from_verse_actions';
 
   static Future<bool?> getBoolean(String key) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();

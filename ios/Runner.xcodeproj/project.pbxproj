@@ -12,7 +12,9 @@
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		B15A371D2F29E552006454BA /* bell.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B15A371C2F29E552006454BA /* bell.mp3 */; };
+		B15A371E2F29E552006454BA /* church_bell.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B15A371F2F29E552006454BA /* church_bell.mp3 */; };
 		B1D7E0010001000000010001 /* BibleHomeWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D7E0010001000000010002 /* BibleHomeWidget.swift */; };
+		B1D7E0020001000000010001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B1D7E0020001000000010002 /* Assets.xcassets */; };
 		B1D7E0010001000000050002 /* BibleHomeWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B1D7E0010001000000010003 /* BibleHomeWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		C1EA71597E67699CD62D1CC5 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 413BDC41C4F0F89A62B893A3 /* Pods_Runner.framework */; };
 		D46DC1882CB8003400AC7AD7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = D46DC1872CB8003300AC7AD7 /* GoogleService-Info.plist */; };
@@ -71,10 +73,12 @@
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B10D01082FD6880F00FD0523 /* BibleHomeWidgetDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BibleHomeWidgetDebug.entitlements; sourceTree = "<group>"; };
 		B15A371C2F29E552006454BA /* bell.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = bell.mp3; sourceTree = "<group>"; };
+		B15A371F2F29E552006454BA /* church_bell.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = church_bell.mp3; sourceTree = "<group>"; };
 		B1D7E0010001000000010002 /* BibleHomeWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleHomeWidget.swift; sourceTree = "<group>"; };
 		B1D7E0010001000000010003 /* BibleHomeWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BibleHomeWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B1D7E0010001000000010004 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B1D7E0010001000000010005 /* BibleHomeWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BibleHomeWidget.entitlements; sourceTree = "<group>"; };
+		B1D7E0020001000000010002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D26F2C5DAD1D80C6510EDE6B /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
 		D46DC1872CB8003300AC7AD7 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		D4A3F9322CA1909300866824 /* Runner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
@@ -146,6 +150,7 @@
 			children = (
 				D4A3F9322CA1909300866824 /* Runner.entitlements */,
 				B15A371C2F29E552006454BA /* bell.mp3 */,
+				B15A371F2F29E552006454BA /* church_bell.mp3 */,
 				D46DC1872CB8003300AC7AD7 /* GoogleService-Info.plist */,
 				D4A3F9342CA194B000866824 /* LaunchScreen.storyboard */,
 				D4A3F9332CA194B000866824 /* Main.storyboard */,
@@ -163,6 +168,7 @@
 			isa = PBXGroup;
 			children = (
 				B10D01082FD6880F00FD0523 /* BibleHomeWidgetDebug.entitlements */,
+				B1D7E0020001000000010002 /* Assets.xcassets */,
 				B1D7E0010001000000010002 /* BibleHomeWidget.swift */,
 				B1D7E0010001000000010004 /* Info.plist */,
 				B1D7E0010001000000010005 /* BibleHomeWidget.entitlements */,
@@ -274,6 +280,7 @@
 				3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */,
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
 				B15A371D2F29E552006454BA /* bell.mp3 in Resources */,
+				B15A371E2F29E552006454BA /* church_bell.mp3 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -281,6 +288,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B1D7E0020001000000010001 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

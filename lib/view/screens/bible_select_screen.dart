@@ -6,6 +6,7 @@ import 'package:biblebookapp/Model/dailyVersesMainListModel.dart';
 import 'package:biblebookapp/Model/mainBookListModel.dart';
 import 'package:biblebookapp/Model/verseBookContentModel.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
+import 'package:biblebookapp/core/bible_extract_paths.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/main.dart';
 import 'package:biblebookapp/utils/emoji_text_style.dart';
@@ -220,7 +221,9 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
         }
 
         final appDocDir = await getApplicationDocumentsDirectory();
-        final filePath = '${appDocDir.path}/$folderName-extracted/${file.name}';
+        final outputName = BibleExtractPaths.outputNameForZipAsset(zipPath);
+        final filePath =
+            '${appDocDir.path}/${BibleExtractPaths.extractedDirName(folderName)}/$outputName';
 
         List<int> rawData = file.content is Uint8List
             ? List<int>.from(file.content)
@@ -236,7 +239,6 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
         setState(() {
           progressMap[folderName] = processed / filesInFolder.length;
         });
-        await Future.delayed(const Duration(seconds: 1));
       }
       if (from.toString() != "home") {
         setState(() {
@@ -1273,11 +1275,13 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
       // Step 1: Clear existing data
       await db.delete('verse');
       debugPrint("testapp: Verse table cleared.");
-      final appDocDir = await getApplicationDocumentsDirectory();
-      final filePath =
-          '${appDocDir.path}/$foldername-extracted/verse_json.json';
-      // Step 2: Extract JSON from zip
-      final String response = await File(filePath).readAsString();
+      final verseFile = await BibleExtractPaths.resolveVerseJsonFile(foldername);
+      if (verseFile == null) {
+        debugPrint("testapp: verse JSON not found in extracted folder.");
+        return;
+      }
+      // Step 2: Read JSON from extracted file
+      final String response = await verseFile.readAsString();
 
       // Step 3: Parse JSON in background isolate
       final tempList = await compute(_parseVerseContent, response);
@@ -1369,9 +1373,6 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
 
       // Define file paths
       final file1 = File('${directory.path}/$foldername-extracted/book.json');
-      final file2 =
-          File('${directory.path}/$foldername-extracted/verse_json.json');
-
       // Check and delete file1
       if (await file1.exists()) {
         await file1.delete();
@@ -1380,12 +1381,13 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
         debugPrint('file1.txt does not exist');
       }
 
-      // Check and delete file2
-      if (await file2.exists()) {
-        await file2.delete();
-        debugPrint('file2.txt deleted successfully');
+      final verseFile =
+          await BibleExtractPaths.resolveVerseJsonFile(foldername);
+      if (verseFile != null && await verseFile.exists()) {
+        await verseFile.delete();
+        debugPrint('verse_json deleted successfully');
       } else {
-        debugPrint('file2.txt does not exist');
+        debugPrint('verse_json does not exist');
       }
     } catch (e) {
       debugPrint('Error deleting files: $e');

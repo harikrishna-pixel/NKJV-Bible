@@ -28,6 +28,7 @@ class QuoteScreen extends HookConsumerWidget {
     final themeProvider = p.Provider.of<ThemeProvider>(context);
     final isVintageTheme =
         themeProvider.currentCustomTheme == AppCustomTheme.vintage;
+    final isDark = CommanColor.isDarkTheme(context);
     
     useMemoized(() {
       WidgetsBinding.instance.addPostFrameCallback((callback) {
@@ -74,14 +75,16 @@ class QuoteScreen extends HookConsumerWidget {
       body: Container(
         height: screenSize.height,
         width: screenSize.width,
-        decoration: isVintageTheme
-            ? BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage(Images.bgImage(context)),
-                  fit: BoxFit.fill,
-                ),
-              )
-            : BoxDecoration(color: themeProvider.backgroundColor),
+        decoration: isDark
+            ? BoxDecoration(color: CommanColor.darkPrimaryColor)
+            : (isVintageTheme
+                ? BoxDecoration(
+                    image: DecorationImage(
+                      image: AssetImage(Images.bgImage(context)),
+                      fit: BoxFit.fill,
+                    ),
+                  )
+                : BoxDecoration(color: themeProvider.backgroundColor)),
         child: SafeArea(
           child: Column(
             children: [

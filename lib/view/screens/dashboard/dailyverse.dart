@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:biblebookapp/constant/size_config.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
@@ -142,13 +143,59 @@ class _DailyVerseState extends State<DailyVerse> {
   void initState() {
     super.initState();
     final provider = Provider.of<DownloadProvider>(context, listen: false);
-    if (provider.dailyVerseList.isNotEmpty) {
-      _applyDailyVersesFromAll(provider.dailyVerseList);
-    }
+    _showCachedDailyVersesImmediately(provider);
     loaddata();
     getFont();
     // Track Daily Verses event
     AnalyticsService.trackDailyVerses();
+  }
+
+  void _showCachedDailyVersesImmediately(DownloadProvider provider) {
+    if (provider.dailyVerseList.isNotEmpty) {
+      _applyDailyVersesFromAll(provider.dailyVerseList);
+      provider.isLoadingDailyVerse = false;
+      return;
+    }
+
+    Future.microtask(() async {
+      final loaded = await provider.tryHydrateDailyVersesFromLocalCache();
+      if (!mounted || !loaded) return;
+      _applyDailyVersesFromAll(provider.dailyVerseList);
+      provider.isLoadingDailyVerse = false;
+      setState(() {});
+    });
+  }
+
+  Future<void> _applyWidgetVerseOrderingIfNeeded() async {
+    if (!widget.fromWidget || dailyVerseList.isEmpty) return;
+
+    final widgetData = await getVerseOfTheDayWidgetData();
+    final widgetRef = (widgetData['reference'] ?? '')
+        .trim()
+        .replaceAll(RegExp(r'\s+'), ' ');
+    if (widgetRef.isEmpty) return;
+
+    var idx = _indexOfVerseMatchingWidgetRef(dailyVerseList, widgetRef);
+    if (idx < 0) {
+      final widgetPlain =
+          stripHtmlTagsForWidgetVerse(widgetData['text'] ?? '');
+      final plain = widgetPlain.trim();
+      if (plain.length >= 12) {
+        final prefixLen = plain.length < 28 ? plain.length : 28;
+        final prefix = plain.substring(0, prefixLen).toLowerCase();
+        idx = dailyVerseList.indexWhere((v) {
+          final t = stripHtmlTagsForWidgetVerse(v.verse ?? '').toLowerCase();
+          if (t.startsWith(prefix)) return true;
+          if (t.isEmpty) return false;
+          final headLen = t.length < prefixLen ? t.length : prefixLen;
+          return prefix.startsWith(t.substring(0, headLen));
+        });
+      }
+    }
+    if (idx > 0) {
+      final item = dailyVerseList.removeAt(idx);
+      dailyVerseList.insert(0, item);
+    }
   }
 
   void _applyDailyVersesFromAll(List<DailyVerseList> allVerses) {
@@ -183,8 +230,22 @@ class _DailyVerseState extends State<DailyVerse> {
 
   void loaddata() async {
     final provider = Provider.of<DownloadProvider>(context, listen: false);
+    final hadVisibleContent = dailyVerseList.isNotEmpty;
 
-    // Ensure the verses are loaded
+    if (!hadVisibleContent) {
+      await provider.tryHydrateDailyVersesFromLocalCache();
+      if (provider.dailyVerseList.isNotEmpty) {
+        _applyDailyVersesFromAll(provider.dailyVerseList);
+        provider.isLoadingDailyVerse = false;
+        if (mounted) setState(() {});
+      }
+    }
+
+    if (dailyVerseList.isNotEmpty) {
+      unawaited(_refreshDailyVersesInBackground(provider));
+      return;
+    }
+
     await provider.loadDailyVerses();
 
     var allVerses = provider.dailyVerseList;
@@ -196,48 +257,36 @@ class _DailyVerseState extends State<DailyVerse> {
         await provider.loadDailyVerses();
         allVerses = provider.dailyVerseList;
       }
-    }
-
-    _applyDailyVersesFromAll(allVerses);
-
-    // When opened from Verse of the Day widget, show the same verse as on the widget first
-    if (widget.fromWidget && dailyVerseList.isNotEmpty) {
-      final widgetData = await getVerseOfTheDayWidgetData();
-      final widgetRef = (widgetData['reference'] ?? '')
-          .trim()
-          .replaceAll(RegExp(r'\s+'), ' ');
-      if (widgetRef.isNotEmpty) {
-        var idx = _indexOfVerseMatchingWidgetRef(dailyVerseList, widgetRef);
-        if (idx < 0) {
-          final widgetPlain =
-              stripHtmlTagsForWidgetVerse(widgetData['text'] ?? '');
-          final plain = widgetPlain.trim();
-          if (plain.length >= 12) {
-            final prefixLen = plain.length < 28 ? plain.length : 28;
-            final prefix = plain.substring(0, prefixLen).toLowerCase();
-            idx = dailyVerseList.indexWhere((v) {
-              final t = stripHtmlTagsForWidgetVerse(v.verse ?? '').toLowerCase();
-              if (t.startsWith(prefix)) return true;
-              if (t.isEmpty) return false;
-              final headLen = t.length < prefixLen ? t.length : prefixLen;
-              return prefix.startsWith(t.substring(0, headLen));
-            });
-          }
-        }
-        if (idx > 0) {
-          final item = dailyVerseList.removeAt(idx);
-          dailyVerseList.insert(0, item);
-          if (mounted) setState(() {});
-        }
+      if (allVerses.isEmpty) {
+        await prefs.setBool('dataIsChanged', true);
+        await provider.loadDailyVerses();
+        allVerses = provider.dailyVerseList;
       }
     }
 
-    // dailyVerseList.sort((a, b) {
-    //   final dateA = DateTime.parse(a.date.toString());
-    //   final dateB = DateTime.parse(b.date.toString());
-    //   return dateB.compareTo(dateA);
-    // });
+    _applyDailyVersesFromAll(allVerses);
+    await _applyWidgetVerseOrderingIfNeeded();
 
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _refreshDailyVersesInBackground(
+      DownloadProvider provider) async {
+    await provider.loadDailyVerses();
+    if (!mounted) return;
+
+    var allVerses = provider.dailyVerseList;
+    if (allVerses.isEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('dataIsChanged', true);
+      await provider.loadDailyVerses();
+      allVerses = provider.dailyVerseList;
+    }
+
+    if (allVerses.isEmpty) return;
+
+    _applyDailyVersesFromAll(allVerses);
+    await _applyWidgetVerseOrderingIfNeeded();
     if (mounted) setState(() {});
   }
 
@@ -561,7 +610,7 @@ class _DailyVerseState extends State<DailyVerse> {
                                   backgroundColor: Colors.transparent,
                                   context: context,
                                   builder: (context) {
-                                    return ImageBottomSheets(
+                                    return ImageBottomSheets.dailyVerse(
                                       controller: controller,
                                       content: data.verse.toString(),
                                       selectedBook: data.book.toString(),
@@ -570,7 +619,6 @@ class _DailyVerseState extends State<DailyVerse> {
                                       selectedVerseView:
                                           "${int.parse(data.verseNum.toString()) + 1}",
                                       shareFooterMessage: shareFooterMessage,
-                                      // data.verseNum.toString(),
                                     );
                                   },
                                 );

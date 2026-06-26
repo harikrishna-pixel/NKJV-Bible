@@ -74,6 +74,13 @@ class _SearchScreenState extends State<SearchScreen> {
   bool isLoading = false;
   bool _isBookNameSearchMode = false;
   bool _hasPerformedSearch = false;
+  bool _searchGuideSubtextShown = false;
+
+  bool get _hasSearchResults =>
+      _hasPerformedSearch && filterSelectedVersesContent.isNotEmpty;
+
+  bool get _showSearchGuideSubtext =>
+      !_searchGuideSubtextShown && !_hasSearchResults;
 
   double fontSize = Sizecf.scrnWidth! > 450 ? 25.0 : 15.0;
   var fontSizeS = "";
@@ -101,6 +108,7 @@ class _SearchScreenState extends State<SearchScreen> {
     getFont();
     _loadRecentSearches();
     _loadFaithCredits();
+    _loadSearchGuideSubtextPref();
     searchController.addListener(() {
       if (mounted) {
         setState(() {
@@ -167,6 +175,24 @@ class _SearchScreenState extends State<SearchScreen> {
     if (mounted) {
       setState(() => _recentSearches = list);
     }
+  }
+
+  Future<void> _loadSearchGuideSubtextPref() async {
+    final shown = await SharPreferences.getBoolean(
+            SharPreferences.searchGuideSubtextShown) ??
+        false;
+    if (mounted) {
+      setState(() => _searchGuideSubtextShown = shown);
+    } else {
+      _searchGuideSubtextShown = shown;
+    }
+  }
+
+  Future<void> _markSearchGuideSubtextSeen() async {
+    if (_searchGuideSubtextShown) return;
+    _searchGuideSubtextShown = true;
+    await SharPreferences.setBoolean(
+        SharPreferences.searchGuideSubtextShown, true);
   }
 
   Future<void> _saveRecentSearch(String query) async {
@@ -470,6 +496,9 @@ class _SearchScreenState extends State<SearchScreen> {
       isLoading = false;
       _hasPerformedSearch = query.isNotEmpty;
     });
+    if (query.isNotEmpty && filterSelectedVersesContent.isNotEmpty) {
+      await _markSearchGuideSubtextSeen();
+    }
   }
 
   bool _showExploreTopicsBanner() {
@@ -1129,6 +1158,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    if (_showSearchGuideSubtext) {
+      _markSearchGuideSubtextSeen();
+    }
     super.dispose();
   }
 
@@ -1271,57 +1303,61 @@ class _SearchScreenState extends State<SearchScreen> {
 
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Divider(
-                            color: lightText
-                                ? Colors.white.withOpacity(0.35)
-                                : CommanColor.lightDarkPrimary(context)
-                                    .withOpacity(0.35),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          child: Text(
-                            '◆',
-                            style: TextStyle(
+                  if (_showSearchGuideSubtext) ...[
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Divider(
                               color: lightText
-                                  ? Colors.white.withOpacity(0.75)
+                                  ? Colors.white.withOpacity(0.35)
                                   : CommanColor.lightDarkPrimary(context)
-                                      .withOpacity(0.7),
-                              fontSize: screenWidth > 450 ? 14 : 12,
+                                      .withOpacity(0.35),
                             ),
                           ),
-                        ),
-                        Expanded(
-                          child: Divider(
-                            color: lightText
-                                ? Colors.white.withOpacity(0.35)
-                                : CommanColor.lightDarkPrimary(context)
-                                    .withOpacity(0.35),
+                          Padding(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 10),
+                            child: Text(
+                              '◆',
+                              style: TextStyle(
+                                color: lightText
+                                    ? Colors.white.withOpacity(0.75)
+                                    : CommanColor.lightDarkPrimary(context)
+                                        .withOpacity(0.7),
+                                fontSize: screenWidth > 450 ? 14 : 12,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Text(
-                      'Search for prayers, topics, verses or guidance to grow your faith.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: screenWidth > 450 ? 16 : 14,
-                        height: 1.4,
-                        color: mutedText,
+                          Expanded(
+                            child: Divider(
+                              color: lightText
+                                  ? Colors.white.withOpacity(0.35)
+                                  : CommanColor.lightDarkPrimary(context)
+                                      .withOpacity(0.35),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
+                    const SizedBox(height: 10),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(
+                        'Search for prayers, topics, verses or guidance to grow your faith.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: screenWidth > 450 ? 16 : 14,
+                          height: 1.4,
+                          color: mutedText,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ] else
+                    const SizedBox(height: 8),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 15),
                     child: Container(

@@ -9,6 +9,7 @@ import 'package:biblebookapp/streak_flow/streak_saved_storage.dart';
 import 'package:biblebookapp/streak/streak_service.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
@@ -1648,18 +1649,27 @@ Future<void> _recordStreakActivityForDay(String dayKey) async {
 }
 
 void _goToHome(BuildContext context) {
-  Get.offAll(
-    () => HomeScreen(
-      From: "splash",
-      selectedVerseNumForRead: "",
-      selectedBookForRead: "",
-      selectedChapterForRead: "",
-      selectedBookNameForRead: "",
-      selectedVerseForRead: "",
-    ),
-    transition: Transition.cupertino,
-    duration: const Duration(milliseconds: 350),
-  );
+  Future.microtask(() async {
+    try {
+      final provider = Provider.of<DownloadProvider>(context, listen: false);
+      await provider.warmDataBeforeHomeScreen();
+    } catch (e) {
+      debugPrint('warmDataBeforeHomeScreen error: $e');
+    }
+    if (!context.mounted) return;
+    Get.offAll(
+      () => HomeScreen(
+        From: "splash",
+        selectedVerseNumForRead: "",
+        selectedBookForRead: "",
+        selectedChapterForRead: "",
+        selectedBookNameForRead: "",
+        selectedVerseForRead: "",
+      ),
+      transition: Transition.cupertino,
+      duration: const Duration(milliseconds: 350),
+    );
+  });
 }
 
 /// Entry point for streak flow. Call when navigating to Home; shows flow once per day first.
@@ -2029,8 +2039,25 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
                             style: TextStyle(
                               fontSize: isTablet ? 16 : 14.5,
                               height: 1.45,
-                              color: warmText.withOpacity(0.92),
+                              fontWeight: FontWeight.w600,
+                              color: isDark
+                                  ? Colors.white
+                                  : warmText.withOpacity(0.92),
                               fontFamily: 'Georgia',
+                              shadows: isDark
+                                  ? const [
+                                      Shadow(
+                                        color: Color(0xE6000000),
+                                        blurRadius: 16,
+                                        offset: Offset(0, 2),
+                                      ),
+                                      Shadow(
+                                        color: Color(0x99000000),
+                                        blurRadius: 8,
+                                        offset: Offset(0, 1),
+                                      ),
+                                    ]
+                                  : null,
                             ),
                           ),
                           const SizedBox(height: 20),
@@ -3256,7 +3283,7 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
   Widget build(BuildContext context) {
     final item = widget.item;
     return Scaffold(
-      body: _streakPhotoBackgroundStack(
+      body: _streakPhotoVerseBackgroundStack(
         context: context,
         assetPath: 'assets/back2.png',
         child: SafeArea(
@@ -3310,6 +3337,7 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                                   ),
                                 ],
                               ),
+                              useContentScrim: false,
                             ),
                           ),
                         ),
@@ -3461,7 +3489,7 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
   Widget build(BuildContext context) {
     final item = widget.item;
     return Scaffold(
-      body: _streakPhotoBackgroundStack(
+      body: _streakPhotoVerseBackgroundStack(
         context: context,
         assetPath: 'assets/back1.png',
         child: SafeArea(
@@ -3515,6 +3543,7 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                                   ),
                                 ],
                               ),
+                              useContentScrim: false,
                             ),
                           ),
                         ),
@@ -3824,18 +3853,27 @@ class StreakCompletedScreen extends StatefulWidget {
 class _StreakCompletedScreenState extends State<StreakCompletedScreen>
     with TickerProviderStateMixin {
   void _goToHome(BuildContext context) {
-    Get.offAll(
-      () => HomeScreen(
-        From: "splash",
-        selectedVerseNumForRead: "",
-        selectedBookForRead: "",
-        selectedChapterForRead: "",
-        selectedBookNameForRead: "",
-        selectedVerseForRead: "",
-      ),
-      transition: Transition.cupertino,
-      duration: const Duration(milliseconds: 350),
-    );
+    Future.microtask(() async {
+      try {
+        final provider = Provider.of<DownloadProvider>(context, listen: false);
+        await provider.warmDataBeforeHomeScreen();
+      } catch (e) {
+        debugPrint('warmDataBeforeHomeScreen error: $e');
+      }
+      if (!context.mounted) return;
+      Get.offAll(
+        () => HomeScreen(
+          From: "splash",
+          selectedVerseNumForRead: "",
+          selectedBookForRead: "",
+          selectedChapterForRead: "",
+          selectedBookNameForRead: "",
+          selectedVerseForRead: "",
+        ),
+        transition: Transition.cupertino,
+        duration: const Duration(milliseconds: 350),
+      );
+    });
   }
 
   // ── Unchanged controllers (kept identical) ─────────────────────────────────
@@ -4540,7 +4578,7 @@ class _StreakCompleteStatsBar extends StatelessWidget {
             child: _StreakCompleteStatItem(
               iconAsset: 'assets/prayer_guidance_icons/Thanksgiving.png',
               tintIconAsset: false,
-              iconDisplaySize: 22,
+              iconDisplaySize: 24,
               iconColor: const Color(0xFF81C784),
               value: '$prayersOffered',
               label: 'Prayers Offered',

@@ -85,6 +85,8 @@ class _SplashScreenState extends State<SplashScreen>
   final bool _isLoading = true;
   String _loaderMessage = "Loading God's Word...";
   late final AnimationController _splashProgressController;
+  bool _initComplete = false;
+  bool _hasNavigated = false;
 
   // Platform messages are asynchronous, so we initialize in an async method.
 
@@ -113,11 +115,38 @@ class _SplashScreenState extends State<SplashScreen>
     splashProgressAnim.addListener(() {
       if (!mounted) return;
       setState(() {
-        _progress = splashProgressAnim.value * 0.92;
+        _progress = splashProgressAnim.value;
       });
+    });
+    _splashProgressController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _tryLeaveSplash();
+      }
     });
     _splashProgressController.forward();
     _initialize();
+  }
+
+  Future<void> _leaveSplash() async {
+    if (_hasNavigated || !mounted) return;
+    _hasNavigated = true;
+    setState(() {
+      _progress = 1.0;
+    });
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+    await handleNavigation();
+  }
+
+  void _tryLeaveSplash() {
+    if (_hasNavigated || !_initComplete || !mounted) return;
+    if (!_splashProgressController.isCompleted) return;
+    _leaveSplash();
+  }
+
+  Future<void> _markInitCompleteAndTryLeave() async {
+    _initComplete = true;
+    _tryLeaveSplash();
   }
 
   @override
@@ -317,11 +346,11 @@ class _SplashScreenState extends State<SplashScreen>
         }
         print('SPLASH before navigation');
 
-        await handleNavigation();
+        await _markInitCompleteAndTryLeave();
       } catch (e) {
         print('SPLASH init error - $e');
         // Even if there's an error, try to navigate
-        await handleNavigation();
+        await _markInitCompleteAndTryLeave();
       }
     });
   }
@@ -551,6 +580,14 @@ class _SplashScreenState extends State<SplashScreen>
     } else {
       _schedulePostSplashAtt();
       await SharPreferences.setBoolean(SharPreferences.isLoadBookContent, true);
+      try {
+        final provider =
+            Provider.of<DownloadProvider>(context, listen: false);
+        await provider.warmDataBeforeHomeScreen();
+      } catch (e) {
+        debugPrint('warmDataBeforeHomeScreen error: $e');
+      }
+      if (!mounted) return;
       await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
     }
   }
@@ -1776,23 +1813,26 @@ class UpgradeCheckWrapper extends StatefulWidget {
 class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
   bool shouldShowAd = false;
   AppOpenAd? _appOpenAd;
-
-  Future<void> _markOpenAdFlowComplete() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(SharPreferences.openAdFlowComplete, true);
-  }
+  late final Upgrader _upgrader;
+  bool _upgradeAlertReady = false;
 
   @override
   void initState() {
     super.initState();
+    _upgrader = Upgrader(
+      debugLogging: true,
+      durationUntilAlertAgain: const Duration(days: 1),
+    );
+    if (widget.check == 'home') {
+      Future.delayed(const Duration(milliseconds: 2500), () {
+        if (mounted) setState(() => _upgradeAlertReady = true);
+      });
+    } else {
+      _upgradeAlertReady = true;
+    }
 
     Future.microtask(() async {
-      final upgrader = Upgrader(
-        debugLogging: true,
-        durationUntilAlertAgain: const Duration(days: 1),
-      );
-
-      final updateAvailable = upgrader.isUpdateAvailable();
+      final updateAvailable = _upgrader.isUpdateAvailable();
 
       final prefs = await SharedPreferences.getInstance();
 
@@ -1811,6 +1851,11 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
         debugPrint('Update is available. Skipping open ad.');
       }
     });
+  }
+
+  Future<void> _markOpenAdFlowComplete() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(SharPreferences.openAdFlowComplete, true);
   }
 
   loadOpenAd() async {
@@ -1924,7 +1969,11 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_upgradeAlertReady) {
+      return widget.child;
+    }
     return UpgradeAlert(
+      upgrader: _upgrader,
       child: widget.child,
     );
   }

@@ -1,5 +1,5 @@
 // Home Screen Widget support for iOS only.
-// Provides: Verse of the day, Bible Prayer, Bible Chat.
+// Provides 10 old-paper widget designs (+ legacy Bible Prayer / Bible Chat).
 // Uses the home_widget package; native Widget Extension must be set up in Xcode.
 
 import 'dart:io';
