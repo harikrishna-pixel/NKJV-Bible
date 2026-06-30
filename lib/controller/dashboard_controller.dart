@@ -1016,6 +1016,12 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
 
   Future<void> getBookContentForRead() async {
     try {
+      if (selectedBookContent.isNotEmpty &&
+          selectedChapter.value == selectedChapterForRead.value &&
+          selectedBookNum.value == selectedBookNumForRead.value) {
+        return;
+      }
+
       selectedBookContent.clear();
       selectedVersesContent.clear();
       isFetchContent.value = true;
@@ -1131,6 +1137,24 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
 
   Future<void> getSelectedChapterAndBook() async {
     try {
+      final selectedBookValue =
+          await SharPreferences.getString(SharPreferences.selectedBookNum);
+      final getChapter =
+          await SharPreferences.getString(SharPreferences.selectedChapter) ??
+              "1";
+      final parsedStoredBookNum = int.tryParse(selectedBookValue ?? '');
+      final storedBookNum = (selectedBookValue == null ||
+              selectedBookValue.trim().isEmpty ||
+              parsedStoredBookNum == null)
+          ? '0'
+          : selectedBookValue.toString();
+
+      if (selectedBookContent.isNotEmpty &&
+          selectedChapter.value == getChapter &&
+          selectedBookNum.value == storedBookNum) {
+        return;
+      }
+
       selectedBookContent.clear();
       selectedVersesContent.clear();
       isFetchContent.value = true;
@@ -1138,9 +1162,6 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
       selectedBook.value =
           await SharPreferences.getString(SharPreferences.selectedBook) ?? "";
 
-      final selectedBookValue =
-          await SharPreferences.getString(SharPreferences.selectedBookNum);
-      final parsedStoredBookNum = int.tryParse(selectedBookValue ?? '');
       if (selectedBookValue == null ||
           selectedBookValue.trim().isEmpty ||
           parsedStoredBookNum == null) {
@@ -1150,9 +1171,7 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         selectedBookNum.value = selectedBookValue.toString();
       }
 
-      final getChapter =
-          await SharPreferences.getString(SharPreferences.selectedChapter);
-      selectedChapter.value = getChapter ?? "1";
+      selectedChapter.value = getChapter;
       final rawChapter = int.tryParse(selectedChapter.value) ?? 1;
       final safeChapter = rawChapter <= 0 ? 1 : rawChapter;
       if (safeChapter.toString() != selectedChapter.value) {

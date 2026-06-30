@@ -36,15 +36,25 @@ class ReferralCodeBottomSheet extends StatefulWidget {
       isDismissible: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: ReferralCodeBottomSheet(
-            email: email,
-            password: password,
-            ownReferralCode: ownReferralCode,
-            initialReferredBy: initialReferredBy,
+        final mediaQuery = MediaQuery.of(context);
+        final keyboardHeight = mediaQuery.viewInsets.bottom;
+        final availableHeight =
+            mediaQuery.size.height - mediaQuery.padding.top - 8;
+
+        return AnimatedPadding(
+          padding: EdgeInsets.only(bottom: keyboardHeight),
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: availableHeight - keyboardHeight,
+            ),
+            child: ReferralCodeBottomSheet(
+              email: email,
+              password: password,
+              ownReferralCode: ownReferralCode,
+              initialReferredBy: initialReferredBy,
+            ),
           ),
         );
       },
@@ -59,10 +69,37 @@ class ReferralCodeBottomSheet extends StatefulWidget {
 class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
   final _formKey = GlobalKey<FormState>();
   final _referralController = TextEditingController();
+  final _referralFocusNode = FocusNode();
+  final _referralFieldKey = GlobalKey();
   bool _isSubmitting = false;
 
   @override
+  void initState() {
+    super.initState();
+    _referralFocusNode.addListener(_scrollReferralFieldIntoView);
+  }
+
+  void _scrollReferralFieldIntoView() {
+    if (!_referralFocusNode.hasFocus) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 280), () {
+        if (!mounted || !_referralFocusNode.hasFocus) return;
+        final fieldContext = _referralFieldKey.currentContext;
+        if (fieldContext == null) return;
+        Scrollable.ensureVisible(
+          fieldContext,
+          alignment: 0.35,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      });
+    });
+  }
+
+  @override
   void dispose() {
+    _referralFocusNode.removeListener(_scrollReferralFieldIntoView);
+    _referralFocusNode.dispose();
     _referralController.dispose();
     super.dispose();
   }
@@ -130,11 +167,14 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
         ),
         child: SafeArea(
           top: false,
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                 Container(
                   width: double.infinity,
                   decoration: BoxDecoration(
@@ -318,13 +358,17 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      CustomTextFormField(
-                        controller: _referralController,
-                        hintText: 'Enter referral ID',
-                        validator: FormBuilderValidators.compose([
-                          FormBuilderValidators.required(
-                              errorText: 'Please enter a referral ID'),
-                        ]),
+                      KeyedSubtree(
+                        key: _referralFieldKey,
+                        child: CustomTextFormField(
+                          controller: _referralController,
+                          focusNode: _referralFocusNode,
+                          hintText: 'Enter referral ID',
+                          validator: FormBuilderValidators.compose([
+                            FormBuilderValidators.required(
+                                errorText: 'Please enter a referral ID'),
+                          ]),
+                        ),
                       ),
                       const SizedBox(height: 24),
                       GestureDetector(
@@ -389,7 +433,8 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
                     ],
                   ),
                 ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

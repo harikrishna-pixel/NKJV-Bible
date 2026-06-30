@@ -72,6 +72,8 @@ class SharPreferences {
   static const chatLanguage =
       'chatLanguage'; // EN, HI, TN - for Prayer Guidance & Chat
   static const aiDisclaimerAgreed = 'aiDisclaimerAgreed'; // User agreed to AI disclaimer
+  /// AI Gemini privacy notice shown from intro bottom-sheet banner.
+  static const aiGeminiPrivacyNoticeSeen = 'ai_gemini_privacy_notice_seen';
   /// Last time back interstitial was shown (Chat or Prayer). Used to limit to once per 3 minutes.
   static const lastBackInterstitialTime = 'lastBackInterstitialTime';
   /// Streak: last calendar day (YYYY-MM-DD) user used AI Chat or Prayer Guidance.
@@ -133,6 +135,10 @@ class SharPreferences {
   static const totalVerseActionClickCount = 'total_verse_action_click_count';
   /// Main feedback dialog was queued from verse-action count (20).
   static const mainFeedbackFromVerseActions = 'main_feedback_from_verse_actions';
+  /// Home: hold update alert until streak day-1 rating is dismissed.
+  static const deferUpgradeAlert = 'defer_upgrade_alert';
+  /// Intro update popup: user tapped Remind Later (show full popup after 3 days).
+  static const upgradeIntroRemindLaterAt = 'upgrade_intro_remind_later_at';
 
   static Future<bool?> getBoolean(String key) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();

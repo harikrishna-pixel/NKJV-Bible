@@ -295,6 +295,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       debugPrint('warmDataBeforeHomeScreen error: $e');
     }
     if (!mounted) return;
+    await SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, true);
     Get.offAll(
       () => HomeScreen(
         From: "premium",
@@ -2505,7 +2506,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         _navigateAwayFromPaywall();
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFFDFBF7),
+        backgroundColor: _paywallCream,
         body: Stack(
           children: [
             SingleChildScrollView(
@@ -2516,7 +2517,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildPaywallHeroWithCard(context, size),
-                  const SizedBox(height: 4),
                   if (widget.checkad == 'image')
                     Padding(
                       padding: const EdgeInsets.only(left: 8),
@@ -2537,7 +2537,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       duration: const Duration(milliseconds: 200),
                       child: isPurchaseLoading
                           ? Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 24),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 24),
                               child: Column(
                                 children: [
                                   const CircularProgressIndicator.adaptive(),
@@ -2747,9 +2748,30 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     );
   }
 
-  static const Color _paywallGold = Color(0xFFC5A059);
+  static const Color _paywallGold = Color(0xFF9E7340);
   static const Color _paywallInk = Color(0xFF2D2D3A);
   static const Color _paywallTitleGold = Color(0xFF9E7340);
+  static const Color _paywallCream = Color(0xFFFFFBF7);
+  static const List<Shadow> _paywallHeroTextShadow = [
+    Shadow(
+      color: Color(0x59FFFFFF),
+      blurRadius: 4,
+      offset: Offset(0, 1),
+    ),
+  ];
+  static const TextStyle _paywallHeroHighlightStyle = TextStyle(
+    color: _paywallTitleGold,
+    fontWeight: FontWeight.w800,
+    shadows: _paywallHeroTextShadow,
+  );
+  static const TextStyle _paywallHeroTitleBaseStyle = TextStyle(
+    fontSize: 34,
+    fontWeight: FontWeight.w800,
+    color: _paywallInk,
+    height: 1.12,
+    letterSpacing: -0.3,
+    shadows: _paywallHeroTextShadow,
+  );
   static const Color _paywallSubtitle = Color(0xFF5C534C);
 
   static const String _paywallIconPremium = 'assets/paywall_icons/premium.png';
@@ -2758,10 +2780,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   static const String _paywallIconScripture =
       'assets/paywall_icons/read_scripture.png';
   static const String _paywallIconPeace = 'assets/paywall_icons/finepaeace.png';
-  static const String _paywallIconPlant = 'assets/paywall_icons/image__6_-removebg-preview.png';
-  static const String _paywallIconCrown = 'assets/paywall_icons/image__7_-removebg-preview.png';
+  static const String _paywallIconPlant = 'assets/paywall_icons/leaf_icon.png';
+  static const String _paywallIconCrown = 'assets/paywall_icons/crown_icon.png';
   static const String _paywallIconLowerCost =
-      'assets/paywall_icons/lower_cost.png';
+      'assets/paywall_icons/shield_icon.png';
+  static const String _paywallHeroBg = 'assets/img.png';
 
   static const double _kPaywallPremiumBadgeHeight = 52;
   static const double _kPaywallValueIconSlotSize = 56;
@@ -2775,33 +2798,44 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   static const double _kPaywallLowerCostIconPadding = 4;
   static const double _kPaywallTrustIconSize = 24;
   static const Color _paywallTrustIconColor = Color(0xFF6B6B6B);
+  static const double _kPaywallCardOverlap = 94.0;
+  static const double _kPaywallValueCardLayoutHeight = 130.0;
+  static const double _kPaywallValueCardSectionGap = 30.0;
   static const double _kPlanBottomBannerHeight = 30;
   static const double _kPlanSubtitleBlockHeight = 33;
   static const double _kPlanPriceBlockHeight = 40;
 
   Widget _buildPaywallHeroWithCard(BuildContext context, Size size) {
     final topPadding = MediaQuery.paddingOf(context).top;
-    final imageHeight = (size.height * 0.32).clamp(235.0, 285.0);
-    const cardOverlap = 22.0;
+    final imageHeight = (size.height * 0.42).clamp(280.0, 340.0);
+    final sectionHeight = imageHeight +
+        (_kPaywallValueCardLayoutHeight - _kPaywallCardOverlap) +
+        _kPaywallValueCardSectionGap;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: imageHeight,
-          width: double.infinity,
-          child: Stack(
-            clipBehavior: Clip.none,
-            fit: StackFit.expand,
-            children: [
+    return SizedBox(
+      height: sectionHeight,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: imageHeight,
+            child: Stack(
+              clipBehavior: Clip.none,
+              fit: StackFit.expand,
+              children: [
               Positioned.fill(
-                child: Transform.translate(
-                  offset: const Offset(0, 14),
+                child: ColorFiltered(
+                  colorFilter: ColorFilter.mode(
+                    Colors.white.withOpacity(0.14),
+                    BlendMode.lighten,
+                  ),
                   child: Image.asset(
-                    'assets/paywall_icons/man_sitting.png',
+                    _paywallHeroBg,
                     fit: BoxFit.cover,
-                    alignment: const Alignment(0.72, -0.18),
+                    alignment: Alignment.topCenter,
                     filterQuality: FilterQuality.high,
                     gaplessPlayback: true,
                     errorBuilder: (_, __, ___) => Container(
@@ -2810,23 +2844,40 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   ),
                 ),
               ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                height: imageHeight * 0.36,
-                child: DecoratedBox(
+              Positioned.fill(
+                child: Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Colors.transparent,
-                        Colors.white.withValues(alpha: 0.18),
-                        Colors.white.withValues(alpha: 0.7),
-                        Colors.white,
+                        _paywallCream.withOpacity(0.06),
+                        _paywallCream.withOpacity(0.22),
+                        _paywallCream.withOpacity(0.72),
+                        _paywallCream,
                       ],
-                      stops: const [0.0, 0.4, 0.75, 1.0],
+                      stops: const [0.0, 0.30, 0.64, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: topPadding + 40,
+                left: 0,
+                right: 0,
+                child: Container(
+                  height: 180,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        _paywallCream.withOpacity(0.26),
+                        _paywallCream.withOpacity(0.14),
+                        _paywallCream.withOpacity(0.03),
+                        _paywallCream.withOpacity(0.0),
+                      ],
+                      stops: const [0.0, 0.35, 0.70, 1.0],
                     ),
                   ),
                 ),
@@ -2856,33 +2907,31 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     RichText(
                       textAlign: TextAlign.left,
                       text: const TextSpan(
-                        style: TextStyle(
-                          fontSize: 34,
-                          fontWeight: FontWeight.w800,
-                          color: _paywallInk,
-                          height: 1.12,
-                          letterSpacing: -0.3,
-                        ),
+                        style: _paywallHeroTitleBaseStyle,
                         children: [
                           TextSpan(text: 'Grow Closer\n'),
                           TextSpan(text: 'to '),
                           TextSpan(
                             text: 'God',
-                            style: TextStyle(color: _paywallTitleGold),
+                            style: _paywallHeroHighlightStyle,
                           ),
-                          TextSpan(text: ' Daily'),
+                          TextSpan(
+                            text: ' Daily',
+                            style: _paywallHeroHighlightStyle,
+                          ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Guidance, prayer, and encouragement whenever you need it.',
+                      'Guidance, prayer, and encouragement\n whenever you need it.',
                       textAlign: TextAlign.left,
                       style: TextStyle(
                         fontSize: 14,
                         height: 1.4,
                         color: _paywallSubtitle,
                         fontWeight: FontWeight.w500,
+                        shadows: _paywallHeroTextShadow,
                       ),
                     ),
                   ],
@@ -2890,15 +2939,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               ),
             ],
           ),
-        ),
-        Transform.translate(
-          offset: const Offset(0, -cardOverlap),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
+            top: imageHeight - _kPaywallCardOverlap,
             child: _buildPaywallValueCard(context),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

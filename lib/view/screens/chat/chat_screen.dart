@@ -33,6 +33,7 @@ import 'package:biblebookapp/view/constants/images.dart';
 import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
+import 'package:biblebookapp/view/widget/ai_gemini_privacy_banner.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -196,13 +197,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _showChatIntroIfNeeded() async {
-    // Show Important Notice first when entering chat; only then show intro bottom sheet.
-    final agreed = await _showPleaseNoteDialog();
-    if (!agreed || !mounted) {
-      if (mounted) Navigator.of(context).pop();
-      return;
-    }
-
     final prefs = await SharedPreferences.getInstance();
     final seenIntro = prefs.getBool('chat_intro_seen') ?? false;
     if (seenIntro || !mounted) return;
@@ -212,8 +206,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     setState(() {
       _introAnswerLength = length;
     });
-    // Brief delay so the dialog route is fully popped before showing bottom sheet.
-    await Future.delayed(const Duration(milliseconds: 150));
     if (!mounted) return;
     await _showChatIntroDialog();
   }
@@ -227,6 +219,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
     // Load initial credits to display
     final initialCredits = await WalletService.getCredits();
+    final noticeSeen = await SharPreferences.getBoolean(
+            SharPreferences.aiGeminiPrivacyNoticeSeen) ??
+        false;
+    var showGeminiBanner = !noticeSeen;
 
     await showModalBottomSheet(
       context: context,
@@ -234,23 +230,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       enableDrag: false,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      sheetAnimationStyle: const AnimationStyle(
+        duration: Duration(milliseconds: 750),
+        curve: Curves.easeOutCubic,
+        reverseDuration: Duration(milliseconds: 400),
+        reverseCurve: Curves.easeInCubic,
+      ),
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setBottomSheetState) {
-            return TweenAnimationBuilder<double>(
-                duration: const Duration(milliseconds: 800),
-                curve: Curves.easeOutCubic,
-                tween: Tween(begin: 0.0, end: 1.0),
-                builder: (context, value, child) {
-                  return Transform.translate(
-                    offset: Offset(0, (1 - value) * 50),
-                    child: Opacity(
-                      opacity: value,
-                      child: child,
-                    ),
-                  );
-                },
-                child: ConstrainedBox(
+            return ConstrainedBox(
                     constraints: BoxConstraints(
                       maxHeight: MediaQuery.of(context).size.height * 0.9,
                     ),
@@ -486,9 +475,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           Padding(
                             padding: EdgeInsets.fromLTRB(
                               screenWidth > 450 ? 24 : 20,
-                              8,
+                              10,
                               screenWidth > 450 ? 24 : 20,
-                              MediaQuery.of(context).viewInsets.bottom + 16,
+                              0,
                             ),
                             child: SizedBox(
                               width: double.infinity,
@@ -543,9 +532,28 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                               ),
                             ),
                           ),
+                          if (showGeminiBanner)
+                            Padding(
+                              padding: EdgeInsets.fromLTRB(
+                                screenWidth > 450 ? 24 : 20,
+                                12,
+                                screenWidth > 450 ? 24 : 20,
+                                0,
+                              ),
+                              child: AiGeminiPrivacyBanner(
+                                onNoticeSeen: () {
+                                  setBottomSheetState(() {
+                                    showGeminiBanner = false;
+                                  });
+                                },
+                              ),
+                            ),
+                          SizedBox(
+                            height: MediaQuery.of(context).viewInsets.bottom + 16,
+                          ),
                         ],
                       ),
-                    )));
+                    ));
           },
         );
       },
@@ -924,170 +932,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Future<void> _handlePermissionError() async {
     // This is called from onError callback when permission error occurs
     await _checkAndHandlePermissionIssue();
-  }
-
-  Future<bool> _showPleaseNoteDialog() async {
-    final agreed =
-        await SharPreferences.getBoolean(SharPreferences.aiDisclaimerAgreed);
-    if (agreed == true) return true;
-
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    final isDark = themeProvider.themeMode == ThemeMode.dark;
-
-    final bodyColor = isDark ? Colors.white70 : const Color(0xFF4A3728);
-    return await showDialog<bool>(
-          context: context,
-          barrierDismissible: false,
-          builder: (ctx) => Dialog(
-            backgroundColor: isDark
-                ? CommanColor.darkPrimaryColor
-                : CommanColor.backgrondcolor,
-            insetPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Important Notice',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: CommanColor.whiteBlack(ctx),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'AI Chat allows you to ask questions and receive Bible-based guidance.\n\n'
-                    'To generate responses, the message you type may be securely sent to Google Gemini for processing.\n\n'
-                    'The following data may be transmitted:\n'
-                    '• Your chat message\n'
-                    '• Device type\n'
-                    '• App version\n\n'
-                    'This data is used only to generate AI responses.\n\n'
-                    'We do not collect personal identity information such as your name, email, contacts, or location.\n\n'
-                    'By tapping "Agree & Continue", you allow your chat input to be processed by the AI service according to our Privacy Policy.',
-                    textAlign: TextAlign.left,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: bodyColor,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () async {
-                            await SharPreferences.setBoolean(
-                                SharPreferences.aiDisclaimerAgreed, true);
-                            if (ctx.mounted) Navigator.pop(ctx, true);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? Colors.white
-                                  : CommanColor.lightDarkPrimary(ctx),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              'Agree & Continue',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: isDark
-                                    ? CommanColor.darkPrimaryColor
-                                    : Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            if (ctx.mounted) Navigator.pop(ctx, false);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? Colors.white.withOpacity(0.12)
-                                  : Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: isDark
-                                    ? Colors.white.withOpacity(0.55)
-                                    : CommanColor.lightDarkPrimary(ctx),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Text(
-                              'Cancel',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: isDark
-                                    ? Colors.white
-                                    : CommanColor.lightDarkPrimary(ctx),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      GestureDetector(
-                        onTap: () => launchUrlString(
-                            'https://bibleoffice.com/terms_conditions.html'),
-                        child: Text(
-                          'Terms',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: CommanColor.whiteBlack(ctx),
-                          ),
-                        ),
-                      ),
-                      Text(
-                        ' | ',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: CommanColor.whiteBlack(ctx),
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => launchUrlString(
-                            'https://bibleoffice.com/privacy_policy.html'),
-                        child: Text(
-                          'Privacy',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: CommanColor.whiteBlack(ctx),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ) ??
-        false;
   }
 
   void _showMicrophonePermissionDialog() {
@@ -1888,10 +1732,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final message = _messageController.text.trim();
     if (message.isEmpty || _isLoading) return;
 
-    // Show Please Note dialog before first response (must agree to continue)
-    final agreed = await _showPleaseNoteDialog();
-    if (!agreed || !mounted) return;
-
     // Check internet connection
     final bool isConnected = await InternetConnection().hasInternetAccess;
     if (!isConnected) {
@@ -2247,8 +2087,6 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
           ));
         }
 
-        // Scroll to top when answer comes to show at top of answer
-        _scrollToTop();
         await _saveChatHistory();
 
         // Ensure keyboard stays dismissed after response - additional safeguard
@@ -2297,8 +2135,6 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
         FocusScope.of(context).unfocus();
         _messageFocusNode.unfocus();
 
-        // Scroll to top when answer comes to show at top of answer
-        _scrollToTop();
         await _saveChatHistory();
 
         // Keep keyboard dismissed after error response - additional safeguard
@@ -2327,8 +2163,6 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
       FocusScope.of(context).unfocus();
       _messageFocusNode.unfocus();
 
-      // Scroll to top when answer comes to show at top of answer
-      _scrollToTop();
       await _saveChatHistory();
 
       // Keep keyboard dismissed after error - additional safeguard
@@ -2341,20 +2175,12 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
     }
   }
 
-  void _scrollToTop() {
-    // Use double post-frame callback to ensure ListView has fully rendered the new message
+  void _revealFollowUpSuggestionsFooter() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients &&
-            _scrollController.position.maxScrollExtent > 0) {
-          // Scroll to bottom to show the latest response
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
-      });
+      if (!mounted || !_scrollController.hasClients) return;
+      final maxExtent = _scrollController.position.maxScrollExtent;
+      if (maxExtent <= 0) return;
+      _scrollController.jumpTo(maxExtent);
     });
   }
 
@@ -3545,6 +3371,7 @@ Your 3 questions (exactly 3 lines):''';
         _geminiFollowUpSuggestions = three;
         _geminiFollowUpsMessageHash = hash;
       });
+      _revealFollowUpSuggestionsFooter();
     } catch (e) {
       debugPrint('Gemini follow-up suggestions failed: $e');
     }
@@ -3655,7 +3482,7 @@ Your 3 questions (exactly 3 lines):''';
       padding: EdgeInsets.only(
         left: screenWidth > 450 ? 20 : 16,
         right: screenWidth > 450 ? 20 : 16,
-        top: 115,
+        top: 12,
         bottom: 4,
       ),
       child: Column(
@@ -4885,14 +4712,16 @@ Your 3 questions (exactly 3 lines):''';
         mainAxisAlignment:
             isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment:
-            CrossAxisAlignment.end, // Changed to .end for bottom alignment
+            isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           if (!isUser) ...[
-            Image.asset(
-              "assets/Mask group.png",
-              width: 30,
-              height: 30,
-              // color: Colors.white,
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Image.asset(
+                "assets/Mask group.png",
+                width: 30,
+                height: 30,
+              ),
             ),
             const SizedBox(width: 8),
           ],

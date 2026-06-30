@@ -27,6 +27,7 @@ class VerseTopicVerse {
 
 class VerseTopicsData {
   static const String backgroundAsset = 'assets/verse-topics-bg.png';
+  static final Map<String, List<VerseTopicVerse>> _categoryVersesCache = {};
 
   static Future<List<String>> loadCategories() async {
     final icons = await _loadCategoryIcons();
@@ -125,6 +126,9 @@ class VerseTopicsData {
   static Future<List<VerseTopicVerse>> loadVersesForCategory(
     String categoryName,
   ) async {
+    final cached = _categoryVersesCache[categoryName];
+    if (cached != null) return cached;
+
     final db = await DBHelper().db;
     if (db == null) return [];
 
@@ -141,8 +145,23 @@ class VerseTopicsData {
       );
     }
 
-    final verses = <VerseTopicVerse>[];
-    final seen = <String>{};
+    if (rows.isEmpty) {
+      _categoryVersesCache[categoryName] = const [];
+      return _categoryVersesCache[categoryName]!;
+    }
+
+    final bookRows = await db.rawQuery(
+      'SELECT DISTINCT book_num, title FROM book',
+    );
+    final bookTitleByNum = <int, String>{
+      for (final row in bookRows)
+        if (int.tryParse(row['book_num']?.toString() ?? '') != null)
+          int.parse(row['book_num'].toString()):
+              row['title']?.toString() ?? '',
+    };
+
+    final chapterKeys = <String>{};
+    final pendingRows = <_PendingTopicVerseRow>[];
 
     for (final row in rows) {
       final bookId = int.tryParse(row['Book_Id']?.toString() ?? '') ?? 0;
@@ -150,32 +169,73 @@ class VerseTopicsData {
       final verseRaw = row['Verse']?.toString() ?? '';
       if (bookId <= 0 || chapterStored <= 0 || verseRaw.isEmpty) continue;
 
-      final verseStored = verseRaw.length == 2
-          ? int.parse(verseRaw) - 1
-          : int.parse(verseRaw.split('-').first) - 1;
+      int verseStored;
+      try {
+        verseStored = verseRaw.length == 2
+            ? int.parse(verseRaw) - 1
+            : int.parse(verseRaw.split('-').first) - 1;
+      } catch (_) {
+        continue;
+      }
 
-      final selectedVerse = await db.rawQuery(
-        "SELECT * FROM verse WHERE book_num = ? AND chapter_num = ? AND verse_num = ?",
-        [bookId - 1, chapterStored - 1, verseStored],
+      final bookNum = bookId - 1;
+      final chapterNum = chapterStored - 1;
+      chapterKeys.add('$bookNum-$chapterNum');
+      pendingRows.add(
+        _PendingTopicVerseRow(
+          row: row,
+          bookId: bookId,
+          bookNum: bookNum,
+          chapterStored: chapterStored,
+          chapterNum: chapterNum,
+          verseRaw: verseRaw,
+          verseStored: verseStored,
+        ),
       );
-      if (selectedVerse.isEmpty) continue;
+    }
 
-      final contentHtml = selectedVerse.first['content']?.toString() ?? '';
+    final verseContentByKey = <String, String>{};
+    for (final chapterKey in chapterKeys) {
+      final parts = chapterKey.split('-');
+      if (parts.length != 2) continue;
+      final bookNum = int.tryParse(parts[0]);
+      final chapterNum = int.tryParse(parts[1]);
+      if (bookNum == null || chapterNum == null) continue;
+
+      final chapterVerses = await db.rawQuery(
+        'SELECT verse_num, content FROM verse WHERE book_num = ? AND chapter_num = ?',
+        [bookNum, chapterNum],
+      );
+      for (final verseRow in chapterVerses) {
+        final verseNum = int.tryParse(verseRow['verse_num']?.toString() ?? '');
+        if (verseNum == null) continue;
+        verseContentByKey['$bookNum-$chapterNum-$verseNum'] =
+            verseRow['content']?.toString() ?? '';
+      }
+    }
+
+    final verses = <VerseTopicVerse>[];
+    final seen = <String>{};
+
+    for (final pending in pendingRows) {
+      final contentHtml = verseContentByKey[
+              '${pending.bookNum}-${pending.chapterNum}-${pending.verseStored}'] ??
+          '';
+      if (contentHtml.isEmpty) continue;
+
       final plainText = html.parse(contentHtml).body?.text ?? '';
       if (plainText.trim().isEmpty) continue;
 
-      final bookData = await db.rawQuery(
-        'SELECT DISTINCT title FROM book WHERE book_num = ? LIMIT 1',
-        [bookId - 1],
-      );
-      final bookName = bookData.isNotEmpty
-          ? bookData.first['title']?.toString() ?? row['Book']?.toString() ?? ''
-          : row['Book']?.toString() ?? '';
+      final cachedTitle = bookTitleByNum[pending.bookNum];
+      final bookName = cachedTitle != null && cachedTitle.isNotEmpty
+          ? cachedTitle
+          : pending.row['Book']?.toString() ?? '';
 
-      final displayChapter = chapterStored;
-      final displayVerse = verseStored + 1;
+      final displayChapter = pending.chapterStored;
+      final displayVerse = pending.verseStored + 1;
       final reference = '$bookName $displayChapter:$displayVerse';
-      final dedupeKey = '$bookId-$chapterStored-$verseRaw';
+      final dedupeKey =
+          '${pending.bookId}-${pending.chapterStored}-${pending.verseRaw}';
       if (seen.contains(dedupeKey)) continue;
       seen.add(dedupeKey);
 
@@ -185,13 +245,14 @@ class VerseTopicsData {
           contentHtml: contentHtml,
           plainText: plainText,
           bookName: bookName,
-          bookNum: bookId - 1,
-          chapterNum: chapterStored - 1,
-          verseNum: verseStored,
+          bookNum: pending.bookNum,
+          chapterNum: pending.chapterNum,
+          verseNum: pending.verseStored,
         ),
       );
     }
 
+    _categoryVersesCache[categoryName] = verses;
     return verses;
   }
 
@@ -202,4 +263,24 @@ class VerseTopicsData {
   static String subtitleForCategory(String categoryName) {
     return 'Verses about ${categoryName.toLowerCase()} to inspire your journey.';
   }
+}
+
+class _PendingTopicVerseRow {
+  const _PendingTopicVerseRow({
+    required this.row,
+    required this.bookId,
+    required this.bookNum,
+    required this.chapterStored,
+    required this.chapterNum,
+    required this.verseRaw,
+    required this.verseStored,
+  });
+
+  final Map<String, dynamic> row;
+  final int bookId;
+  final int bookNum;
+  final int chapterStored;
+  final int chapterNum;
+  final String verseRaw;
+  final int verseStored;
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/verse_topics/verse_topic_detail_screen.dart';
 import 'package:biblebookapp/view/screens/verse_topics/verse_topics_data.dart';
@@ -30,6 +32,15 @@ class _VerseTopicsScreenState extends State<VerseTopicsScreen> {
     setState(() {
       _categories = categories;
       _loading = false;
+    });
+    _warmVersesCacheInBackground(categories);
+  }
+
+  void _warmVersesCacheInBackground(List<String> categories) {
+    Future<void>(() async {
+      for (final category in categories) {
+        await VerseTopicsData.loadVersesForCategory(category);
+      }
     });
   }
 

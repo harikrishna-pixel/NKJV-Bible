@@ -404,16 +404,24 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
               onTap: onBackToReading,
               borderRadius: BorderRadius.circular(8),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 child: Text(
                   'Back to Reading',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: _kMarkAsReadBrown,
+                    color: _kMarkAsReadCardCream,
+                    shadows: const [
+                      Shadow(
+                        color: Color(0x99000000),
+                        blurRadius: 8,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
                     decoration: TextDecoration.underline,
-                    decorationColor: _kMarkAsReadBrown,
+                    decorationColor: _kMarkAsReadGold,
                     decorationThickness: 1.5,
                   ),
                 ),

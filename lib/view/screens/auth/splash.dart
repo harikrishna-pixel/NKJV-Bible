@@ -22,6 +22,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:biblebookapp/view/widget/bible_upgrade_alert.dart';
 import 'package:upgrader/upgrader.dart';
 
 import 'package:biblebookapp/Model/bookMarkModel.dart';
@@ -1824,9 +1825,7 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
       durationUntilAlertAgain: const Duration(days: 1),
     );
     if (widget.check == 'home') {
-      Future.delayed(const Duration(milliseconds: 2500), () {
-        if (mounted) setState(() => _upgradeAlertReady = true);
-      });
+      _scheduleUpgradeAlertForHome();
     } else {
       _upgradeAlertReady = true;
     }
@@ -1856,6 +1855,34 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
   Future<void> _markOpenAdFlowComplete() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(SharPreferences.openAdFlowComplete, true);
+  }
+
+  /// Wait until rating / premium dialogs finish, then show update alert.
+  Future<void> _scheduleUpgradeAlertForHome() async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    final deadline = DateTime.now().add(const Duration(seconds: 120));
+    DateTime? deferClearedAt;
+
+    while (DateTime.now().isBefore(deadline)) {
+      if (!mounted) return;
+      final defer =
+          await SharPreferences.getBoolean(SharPreferences.deferUpgradeAlert) ??
+              false;
+      if (defer) {
+        deferClearedAt = null;
+        await Future.delayed(const Duration(milliseconds: 100));
+        continue;
+      }
+
+      deferClearedAt ??= DateTime.now();
+      final sinceClear = DateTime.now().difference(deferClearedAt);
+      if (sinceClear >= const Duration(milliseconds: 300)) {
+        break;
+      }
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+    if (!mounted) return;
+    if (mounted) setState(() => _upgradeAlertReady = true);
   }
 
   loadOpenAd() async {
@@ -1972,7 +1999,7 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
     if (!_upgradeAlertReady) {
       return widget.child;
     }
-    return UpgradeAlert(
+    return BibleUpgradeAlert(
       upgrader: _upgrader,
       child: widget.child,
     );

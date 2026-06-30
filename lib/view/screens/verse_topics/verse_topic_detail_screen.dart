@@ -239,11 +239,17 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
                           padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                           children: [
                             Center(
-                              child: Image.asset(
-                                Images.searchPlaceHolder(context),
-                                width: isWide ? 88 : 72,
-                                height: isWide ? 88 : 72,
-                                fit: BoxFit.contain,
+                              child: ColorFiltered(
+                                colorFilter: const ColorFilter.mode(
+                                  _ink,
+                                  BlendMode.srcIn,
+                                ),
+                                child: Image.asset(
+                                  Images.searchPlaceHolder(context),
+                                  width: isWide ? 88 : 72,
+                                  height: isWide ? 88 : 72,
+                                  fit: BoxFit.contain,
+                                ),
                               ),
                             ),
                             const SizedBox(height: 12),

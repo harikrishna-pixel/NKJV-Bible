@@ -221,11 +221,19 @@ class ImageBottomSheets extends StatelessWidget {
                 Screenshot(
                   controller: controller.screenshotController.value,
                   child: GestureDetector(
-                    onTap: () {},
+                    onTap: () async {
+                      try {
+                        await SharPreferences.setString('OpenAd', '1');
+                        controller.selectedBgImage.value == 9
+                            ? controller.selectedBgImage.value = 0
+                            : controller.selectedBgImage.value += 1;
+                      } catch (_) {}
+                    },
                     child: Obx(
                       () => VerseShareImageCard(
                         backgroundImagePath: controller
                             .bgImagesList[controller.selectedBgImage.value],
+                        backgroundIndex: controller.selectedBgImage.value,
                         verseHtml: content,
                         verseReference:
                             "$selectedBook ${int.parse(selectedChapter.toString())}:${int.parse(selectedVerseView.toString())}",
@@ -376,6 +384,10 @@ class ImageBottomSheets extends StatelessWidget {
     }
 
     Future<void> onShareOrSave() async {
+      if (label == 'Share') {
+        await RatingDialogHelper.showRatingDialogOnFirstShare(context);
+      }
+
       await Future.wait([
         SharPreferences.setString('OpenAd', '1'),
         SharPreferences.setString('bottom', '1'),
@@ -396,14 +408,6 @@ class ImageBottomSheets extends StatelessWidget {
       }
 
       if (label == "Share") {
-        // Check and show rating dialog on first share
-        final ratingShown =
-            await RatingDialogHelper.showRatingDialogOnFirstShare(context);
-        if (ratingShown) {
-          // Give the rating flow a moment before opening the share sheet
-          await Future.delayed(const Duration(milliseconds: 100));
-        }
-
         // Image-only share; branding is on the image. Use verse ref as filename for iOS preview.
         final imageShareName =
             '${selectedBook}_${selectedChapter}_$selectedVerseView'

@@ -1,7 +1,7 @@
 import 'package:biblebookapp/streak_flow/take_moment_intro_screen.dart';
+import 'package:biblebookapp/streak_flow/take_moment_rest_screen.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
-import 'package:biblebookapp/view/constants/images.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
@@ -41,77 +41,76 @@ class _PourOutWorriesScreenState extends State<PourOutWorriesScreen> {
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width > 450;
     final isDark = Provider.of<ThemeProvider>(context, listen: false).themeMode == ThemeMode.dark;
-    final List<Color> gradientColors = isDark
-        ? [CommanColor.darkPrimaryColor, CommanColor.darkPrimaryColor, CommanColor.darkPrimaryColor]
-        : [const Color(0xFFF5F0E6), const Color(0xFFEDE6D8), const Color(0xFFE5DCC8)];
     final Color textColor = isDark ? Colors.white : _brown;
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       behavior: HitTestBehavior.opaque,
       child: Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage(Images.bgImage(context)),
-            fit: BoxFit.cover,
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  icon: Icon(Icons.arrow_back_ios, color: textColor, size: 24),
-                  onPressed: () => Get.back(),
-                ),
+        resizeToAvoidBottomInset: false,
+        body: TakeMomentRestScreen.peaceBackgroundStack(
+          isDark: isDark,
+          child: SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
               ),
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final content = _buildMainContent(
-                      context,
-                      isTablet: isTablet,
-                      isDark: isDark,
-                      textColor: textColor,
-                    );
-                    if (!isTablet) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const SizedBox(height: 16),
-                          Padding(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      icon: Icon(Icons.arrow_back_ios,
+                          color: textColor, size: 24),
+                      onPressed: () => Get.back(),
+                    ),
+                  ),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final content = _buildMainContent(
+                          context,
+                          isTablet: isTablet,
+                          isDark: isDark,
+                          textColor: textColor,
+                        );
+                        if (!isTablet) {
+                          return SingleChildScrollView(
                             padding:
                                 const EdgeInsets.symmetric(horizontal: 24),
-                            child: content,
-                          ),
-                          const Spacer(),
-                        ],
-                      );
-                    }
-                    return SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: ConstrainedBox(
-                        constraints:
-                            BoxConstraints(minHeight: constraints.maxHeight),
-                        child: Center(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                const SizedBox(height: 16),
+                                content,
+                                const SizedBox(height: 24),
+                              ],
+                            ),
+                          );
+                        }
+                        return SingleChildScrollView(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 24),
                           child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 520),
-                            child: content,
+                            constraints: BoxConstraints(
+                                minHeight: constraints.maxHeight),
+                            child: Center(
+                              child: ConstrainedBox(
+                                constraints:
+                                    const BoxConstraints(maxWidth: 520),
+                                child: content,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }

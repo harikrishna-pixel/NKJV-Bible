@@ -9,7 +9,43 @@ import 'package:provider/provider.dart';
 class TakeMomentRestScreen extends StatefulWidget {
   const TakeMomentRestScreen({super.key});
 
-  static const String doveBackground = 'assets/dove_faith.png';
+  static const String peaceBackground = 'assets/peace-bg.png';
+  static const String birdAsset = 'assets/bird.png';
+
+  /// Find Peace flow background: parchment scene + dove overlay (UI only).
+  static Widget peaceBackgroundStack({
+    required Widget child,
+    bool isDark = false,
+  }) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage(peaceBackground),
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final birdWidth = constraints.maxWidth * 0.52;
+            return Align(
+              alignment: const Alignment(0, 0.38),
+              child: Image.asset(
+                birdAsset,
+                width: birdWidth,
+                fit: BoxFit.contain,
+              ),
+            );
+          },
+        ),
+        if (isDark) Container(color: Colors.black.withOpacity(0.58)),
+        child,
+      ],
+    );
+  }
 
   @override
   State<TakeMomentRestScreen> createState() => _TakeMomentRestScreenState();
@@ -99,20 +135,9 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
     final Color secondaryText = isDark ? Colors.white70 : _deepStone;
 
     return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage(TakeMomentRestScreen.doveBackground),
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-          if (isDark)
-            Container(color: Colors.black.withOpacity(0.58)),
-          SafeArea(
+      body: TakeMomentRestScreen.peaceBackgroundStack(
+        isDark: isDark,
+        child: SafeArea(
           child: Column(
             children: [
               Padding(
@@ -262,7 +287,6 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
             ],
           ),
         ),
-        ],
       ),
     );
   }

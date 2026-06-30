@@ -3978,8 +3978,19 @@ Future<void> showGiftDialog(BuildContext context, GetBookOfferData data) async {
 class PremiumAccessDialog extends StatelessWidget {
   const PremiumAccessDialog({super.key});
 
-  static const Color _gold = Color(0xFFC9A227);
+  static const Color _titleGold = Color(0xFF9E7340);
   static const Color _ink = Color(0xFF2D2D3A);
+  static const TextStyle _heroHighlightStyle = TextStyle(
+    color: _titleGold,
+    fontWeight: FontWeight.w800,
+    shadows: [
+      Shadow(
+        color: Colors.black,
+        offset: Offset(0, 1),
+        blurRadius: 2,
+      ),
+    ],
+  );
 
   Future<void> _dismissOffer(BuildContext context) async {
     await SharPreferences.setString('premium', 'yes');
@@ -4073,7 +4084,7 @@ class PremiumAccessDialog extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.workspace_premium,
-                                color: _gold, size: 14),
+                                color: _titleGold, size: 14),
                             SizedBox(width: 5),
                             Text(
                               'PREMIUM',
@@ -4110,20 +4121,24 @@ class PremiumAccessDialog extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           RichText(
-                            text: const TextSpan(
-                              style: TextStyle(
+                            text: TextSpan(
+                              style: const TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w800,
                                 color: _ink,
                                 height: 1.1,
                               ),
-                              children: [
+                              children: const [
                                 TextSpan(text: 'Grow Closer '),
+                                TextSpan(text: 'to '),
                                 TextSpan(
-                                  text: 'to God',
-                                  style: TextStyle(color: _gold),
+                                  text: 'God',
+                                  style: _heroHighlightStyle,
                                 ),
-                                TextSpan(text: ' Daily'),
+                                TextSpan(
+                                  text: ' Daily',
+                                  style: _heroHighlightStyle,
+                                ),
                               ],
                             ),
                           ),
@@ -6333,6 +6348,7 @@ class ImageBottomSheet extends StatelessWidget {
                           () => VerseShareImageCard(
                             backgroundImagePath: controller.bgImagesList[
                                 controller.selectedBgImage.value],
+                            backgroundIndex: controller.selectedBgImage.value,
                             verseHtml: controller
                                 .selectedBookContent[
                                     controller.selectedVerseView.value]
@@ -6517,6 +6533,10 @@ class ImageBottomSheet extends StatelessWidget {
         }
 
         Future<void> onShareOrSave() async {
+          if (label == 'Share') {
+            await RatingDialogHelper.showRatingDialogOnFirstShare(context);
+          }
+
           await Future.wait([
             SharPreferences.setString('OpenAd', '1'),
             SharPreferences.setString('bottom', '1'),
@@ -6957,8 +6977,26 @@ class ImageBottomSheet extends StatelessWidget {
 //   }
 // }
 
-const Color _kVerseInk = Color(0xFF2E2118);
 const String _kVerseImageBg = 'assets/verse_image_bg.png';
+
+Color verseShareTextColorForBackgroundIndex(int index) {
+  const lightText = Color(0xFFF8F4EB);
+  const darkText = Color(0xFF2E2118);
+  const warmDark = Color(0xFF3D2914);
+  const colors = <Color>[
+    darkText,
+    lightText,
+    warmDark,
+    lightText,
+    darkText,
+    lightText,
+    warmDark,
+    lightText,
+    darkText,
+    lightText,
+  ];
+  return colors[index % colors.length];
+}
 
 /// Decorative verse share card used when capturing verse wallpaper images.
 class VerseShareImageCard extends StatelessWidget {
@@ -6972,6 +7010,7 @@ class VerseShareImageCard extends StatelessWidget {
     required this.minVerseFontSize,
     this.actionBarReserve = 0,
     this.verseTextNudgeDown = 0,
+    this.backgroundIndex = 0,
   });
 
   final String backgroundImagePath;
@@ -6982,6 +7021,7 @@ class VerseShareImageCard extends StatelessWidget {
   final double minVerseFontSize;
   final double actionBarReserve;
   final double verseTextNudgeDown;
+  final int backgroundIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -6996,12 +7036,18 @@ class VerseShareImageCard extends StatelessWidget {
     final verseAlignY = verseTextNudgeDown > 0
         ? (screenWidth < 380 ? 0.30 : 0.36)
         : (screenWidth < 380 ? 0.14 : 0.18);
+    final textColor = verseShareTextColorForBackgroundIndex(backgroundIndex);
+    final secondaryTextColor = textColor.withOpacity(
+      textColor.computeLuminance() > 0.55 ? 0.88 : 0.82,
+    );
 
     return Stack(
       fit: StackFit.expand,
       children: [
         Image.asset(
-          _kVerseImageBg,
+          backgroundImagePath.isNotEmpty
+              ? backgroundImagePath
+              : _kVerseImageBg,
           fit: BoxFit.cover,
           alignment: const Alignment(0, -0.33),
           width: double.infinity,
@@ -7030,7 +7076,7 @@ class VerseShareImageCard extends StatelessWidget {
                       maxLines: 16,
                       maxFontSize: verseMaxSize,
                       minFontSize: verseMinSize,
-                      color: _kVerseInk,
+                      color: textColor,
                       textAlign: TextAlign.center,
                       height: 1.55,
                       fontWeight: FontWeight.w400,
@@ -7041,7 +7087,7 @@ class VerseShareImageCard extends StatelessWidget {
                     verseReference,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: _kVerseInk,
+                      color: textColor,
                       fontSize: referenceSize,
                       fontStyle: FontStyle.italic,
                       fontWeight: FontWeight.w400,
@@ -7078,7 +7124,7 @@ class VerseShareImageCard extends StatelessWidget {
                       Text(
                         BibleInfo.bible_shortName,
                         style: TextStyle(
-                          color: _kVerseInk,
+                          color: textColor,
                           letterSpacing: BibleInfo.letterSpacing,
                           fontSize: BibleInfo.fontSizeScale * 12,
                           fontWeight: FontWeight.w700,
@@ -7089,7 +7135,7 @@ class VerseShareImageCard extends StatelessWidget {
                         Text(
                           'Search in Playstore',
                           style: TextStyle(
-                            color: _kVerseInk.withOpacity(0.82),
+                            color: secondaryTextColor,
                             fontSize: 10,
                             fontWeight: FontWeight.w500,
                           ),
@@ -7098,7 +7144,7 @@ class VerseShareImageCard extends StatelessWidget {
                         Text(
                           'Search in Appstore',
                           style: TextStyle(
-                            color: _kVerseInk.withOpacity(0.82),
+                            color: secondaryTextColor,
                             fontSize: 10,
                             fontWeight: FontWeight.w500,
                           ),

@@ -1058,6 +1058,41 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
     );
   }
 
+  Widget _backupStatusMetaLine({
+    required IconData icon,
+    required String text,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 16,
+            height: 16,
+            child: Icon(
+              icon,
+              size: 14,
+              color: _brownMuted.withValues(alpha: 0.7),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              textAlign: TextAlign.justify,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: _brownMuted.withValues(alpha: 0.8),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   String? _userId;
   DateTime? _lastBackup;
   String? _lastScheduledDate;
@@ -1452,7 +1487,7 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
 
   Widget _signedInStatusBox() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _greenBox,
         borderRadius: BorderRadius.circular(14),
@@ -1461,14 +1496,11 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: _backupIcon(_assetEncryption, size: 44),
-          ),
+          _backupIcon(_assetEncryption, size: _kStatusIconSize),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text(
                   'Automatic backup is enabled',
@@ -1482,6 +1514,7 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
                 const SizedBox(height: 6),
                 Text(
                   'Your library is synced securely to the cloud because you\'re signed in.',
+                  textAlign: TextAlign.justify,
                   style: TextStyle(
                     fontSize: 12.5,
                     height: 1.4,
@@ -1489,46 +1522,18 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Icon(Icons.schedule,
-                        size: 14, color: _brownMuted.withValues(alpha: 0.7)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Last backup: ${_formatLastBackup()}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          height: 1.35,
-                          color: _brownMuted.withValues(alpha: 0.8),
-                        ),
-                      ),
-                    ),
-                  ],
+                _backupStatusMetaLine(
+                  icon: Icons.schedule,
+                  text: 'Last backup: ${_formatLastBackup()}',
+                ),
+                _backupStatusMetaLine(
+                  icon: Icons.update,
+                  text: 'Next backup: ${_formatNextBackup()}',
                 ),
                 const SizedBox(height: 4),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Icon(Icons.update,
-                        size: 14, color: _brownMuted.withValues(alpha: 0.7)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Next backup: ${_formatNextBackup()}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          height: 1.35,
-                          color: _brownMuted.withValues(alpha: 0.8),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
                 Text(
-                  '*Your latest cloud backup replaces the previous one.*',
+                  'Your latest cloud backup replaces the previous one.',
+                  textAlign: TextAlign.justify,
                   style: TextStyle(
                     fontSize: 11,
                     height: 1.35,
@@ -1546,20 +1551,26 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
 
   Widget _signedInFailedStatusBox() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _redBox,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: _redText.withValues(alpha: 0.25)),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, size: 40, color: _redText),
+          SizedBox(
+            width: 44,
+            height: 44,
+            child: Center(
+              child: Icon(Icons.error_outline, size: 40, color: _redText),
+            ),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text(
                   'Last backup failed',
@@ -1654,13 +1665,19 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _backupIcon(_assetEncryptionSign, size: _kStatusIconSize),
+              SizedBox(
+                width: _kStatusIconSize,
+                height: _kStatusIconSize,
+                child: Center(
+                  child: _backupIcon(_assetEncryptionSign, size: _kStatusIconSize),
+                ),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const Text(
                       'Enable Automatic Backup',

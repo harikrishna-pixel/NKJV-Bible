@@ -1183,6 +1183,12 @@ class _HomeScreenState extends State<HomeScreen>
   bool _isBottomSheetOpen = false;
   bool _hasInitialized = false;
   bool _showUI = true; // Track UI visibility for scroll-based hide/show
+  bool _readerAppBarPinnedVisible = true;
+  bool _readerAppBarPendingHide = false;
+  bool _readerAppBarUserScrollingDown = false;
+  bool _readerAppBarScrollUpIntent = false;
+  double _readerAppBarDragDelta = 0;
+  static const double _kReaderAppBarToggleThreshold = 20.0;
   bool _showBackToTop = false;
   BuildContext? _bottomSheetContext; // Track bottom sheet context to dismiss it
   bool _exitOfferCooldownActive = false; // Red dot indicator (show after 3 days)
@@ -1196,6 +1202,12 @@ class _HomeScreenState extends State<HomeScreen>
   bool _verseShown = false;
   bool _readingScreenWasHidden = false;
   bool _feedbackPendingAtSessionStart = false;
+  bool _deferUpgradeAfterStreakRating = false;
+  bool _streakRatingSawLifecyclePause = false;
+  Timer? _deferUpgradeAfterStreakRatingFallbackTimer;
+  int _ratingUiDialogDepth = 0;
+  static const Duration _kUpgradeAfterStreakRatingDelay =
+      Duration(milliseconds: 300);
   StreamSubscription<Uri?>? _widgetClickSubscription;
 
   @override
@@ -1230,6 +1242,14 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _runDeferredHomeStartupTasks() async {
+    final pendingCelebration = await SharPreferences.getInt(
+        SharPreferences.pendingStreakCompleteCelebration);
+    if (pendingCelebration == 1) {
+      await SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, true);
+      _deferUpgradeAfterStreakRating = true;
+      _streakRatingSawLifecyclePause = false;
+    }
+
     final startupPrefs = await SharedPreferences.getInstance();
     _feedbackPendingAtSessionStart =
         (startupPrefs.getBool(SharPreferences.mainFeedbackPending) ?? false) &&
@@ -1277,6 +1297,9 @@ class _HomeScreenState extends State<HomeScreen>
     final lastShown = await SharPreferences.getString(
         SharPreferences.streakCelebrationShownDate);
     if (lastShown == today) {
+      if (count == 1) {
+        await SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, false);
+      }
       await SharPreferences.setInt(
           SharPreferences.pendingStreakCompleteCelebration, 0);
       return;
@@ -1284,10 +1307,69 @@ class _HomeScreenState extends State<HomeScreen>
     await SharPreferences.setString(
         SharPreferences.streakCelebrationShownDate, today);
     if (count == 1) {
-      await _requestReview();
+      await SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, true);
+      _deferUpgradeAfterStreakRating = true;
+      _streakRatingSawLifecyclePause = false;
+      _deferUpgradeAfterStreakRatingFallbackTimer?.cancel();
+
+      final isAvailable = await inAppReview.isAvailable();
+      if (isAvailable) {
+        try {
+          await inAppReview.requestReview();
+        } catch (e, st) {
+          debugPrint('Streak day-1 review request failed: $e,$st');
+        }
+        _deferUpgradeAfterStreakRatingFallbackTimer = Timer(
+          const Duration(seconds: 5),
+          () {
+            if (mounted) {
+              unawaited(_clearDeferUpgradeAfterStreakRating());
+            }
+          },
+        );
+      } else {
+        await _clearDeferUpgradeAfterStreakRating();
+      }
     }
     await SharPreferences.setInt(
         SharPreferences.pendingStreakCompleteCelebration, 0);
+  }
+
+  Future<void> _clearDeferUpgradeAfterStreakRating() async {
+    if (!_deferUpgradeAfterStreakRating) return;
+    _deferUpgradeAfterStreakRating = false;
+    _streakRatingSawLifecyclePause = false;
+    _deferUpgradeAfterStreakRatingFallbackTimer?.cancel();
+    _deferUpgradeAfterStreakRatingFallbackTimer = null;
+    await SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, false);
+  }
+
+  Future<void> _markRatingUiOpening() async {
+    _ratingUiDialogDepth++;
+    if (_ratingUiDialogDepth == 1) {
+      await SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, true);
+    }
+  }
+
+  Future<void> _markRatingUiClosed() async {
+    if (_ratingUiDialogDepth <= 0) return;
+    _ratingUiDialogDepth--;
+    if (_ratingUiDialogDepth == 0 && !_deferUpgradeAfterStreakRating) {
+      await SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, false);
+    }
+  }
+
+  void _scheduleClearDeferAfterStreakRatingDismiss() {
+    if (!_deferUpgradeAfterStreakRating) return;
+    _deferUpgradeAfterStreakRatingFallbackTimer?.cancel();
+    _deferUpgradeAfterStreakRatingFallbackTimer = Timer(
+      _kUpgradeAfterStreakRatingDelay,
+      () {
+        if (mounted) {
+          unawaited(_clearDeferUpgradeAfterStreakRating());
+        }
+      },
+    );
   }
 
   Future<void> _handlePendingNotificationAction() async {
@@ -1382,19 +1464,14 @@ class _HomeScreenState extends State<HomeScreen>
       '${selectedBookname ?? controller.selectedBook}',
     );
     final arrowSize = screenWidth > 450 ? 39.0 : 24.0;
-    final barWidth = MediaQuery.sizeOf(context).width;
-    final leadingReserve = screenWidth > 450 ? 128.0 : 104.0;
-    final actionsReserve = screenWidth > 450 ? 210.0 : 168.0;
-    final maxNameWidth = (barWidth - leadingReserve - actionsReserve - arrowSize)
-        .clamp(72.0, barWidth * 0.36);
 
     return InkWell(
       onTap: onTap,
       child: Row(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: maxNameWidth),
+          Flexible(
             child: Text(
               displayBookName,
               maxLines: 1,
@@ -1405,11 +1482,12 @@ class _HomeScreenState extends State<HomeScreen>
                 fontSize: screenWidth > 450
                     ? BibleInfo.fontSizeScale * 26
                     : BibleInfo.fontSizeScale * 18,
+                height: 1.0,
               ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.only(top: 3.0, left: 4),
+            padding: const EdgeInsets.only(left: 2),
             child: Icon(
               Icons.keyboard_arrow_down_rounded,
               color: CommanColor.whiteBlack(context),
@@ -1421,7 +1499,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  /// "How are you feeling" — once on the 2nd app open (launchCount == 2 after splash).
+  /// Launch-count bookkeeping only; feeling dialog is 20-click verse actions only.
   Future<void> _handleAppLaunchCount() async {
     final prefs = await SharedPreferences.getInstance();
     appLaunchCount = prefs.getInt('launchCount') ?? 0;
@@ -1437,29 +1515,6 @@ class _HomeScreenState extends State<HomeScreen>
     await prefs.setString('review', '2');
     appLaunchCount = prefs.getInt('launchCount') ?? 0;
     debugPrint("launchCount 3 is - $appLaunchCount");
-
-    await prefs.setBool(SharPreferences.mainFeedbackPending, true);
-    await prefs.setBool(SharPreferences.openAdFlowComplete, false);
-    if (!mounted) return;
-    _tryShowPendingFeedbackDialog();
-  }
-
-  /// Shows ratings popup only after the app-open ad is dismissed or skipped.
-  Future<void> _tryShowPendingFeedbackDialog() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (!(prefs.getBool(SharPreferences.mainFeedbackPending) ?? false)) return;
-
-    final deadline = DateTime.now().add(const Duration(seconds: 45));
-    while (DateTime.now().isBefore(deadline)) {
-      if (!mounted) return;
-      if (prefs.getBool(SharPreferences.openAdFlowComplete) ?? false) break;
-      await Future.delayed(const Duration(milliseconds: 300));
-    }
-
-    if (!mounted) return;
-    await prefs.setBool(SharPreferences.mainFeedbackPending, false);
-    await prefs.setBool(SharPreferences.openAdFlowComplete, false);
-    showMainFeedbackDialog(context);
   }
 
   Future<void> _checkAndShowDailyWelcomeToast() async {
@@ -2498,6 +2553,18 @@ class _HomeScreenState extends State<HomeScreen>
   // ---------- App lifecycle (background/foreground) ----------
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_deferUpgradeAfterStreakRating) {
+      if (state == AppLifecycleState.inactive ||
+          state == AppLifecycleState.paused ||
+          state == AppLifecycleState.hidden) {
+        _streakRatingSawLifecyclePause = true;
+        _deferUpgradeAfterStreakRatingFallbackTimer?.cancel();
+      } else if (state == AppLifecycleState.resumed &&
+          _streakRatingSawLifecyclePause) {
+        unawaited(_clearDeferUpgradeAfterStreakRating());
+      }
+    }
+
     // If app goes to background, treat as hidden; if resumed, treat as visible (only if route is current)
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
@@ -2750,6 +2817,7 @@ class _HomeScreenState extends State<HomeScreen>
     disposead();
     WidgetsBinding.instance.removeObserver(this);
     _checkerTimer?.cancel();
+    _deferUpgradeAfterStreakRatingFallbackTimer?.cancel();
     final widgetSub = _widgetClickSubscription;
     _widgetClickSubscription = null;
     widgetSub?.cancel();
@@ -3204,7 +3272,10 @@ class _HomeScreenState extends State<HomeScreen>
           if (widget.From.toString() == 'premium') {
             final data = prefs.getString("premiumalrt") ?? "1";
             if (data == '1') {
-              PremiumWelcomeAlert.show(context);
+              await PremiumWelcomeAlert.show(context);
+            } else {
+              await SharPreferences.setBoolean(
+                  SharPreferences.deferUpgradeAlert, false);
             }
           }
         },
@@ -3219,70 +3290,40 @@ class _HomeScreenState extends State<HomeScreen>
                     toolbarHeight: screenWidth > 450 ? 70 : 55,
                     iconTheme:
                         IconThemeData(color: CommanColor.whiteBlack(context)),
-                    flexibleSpace: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Container(
-                          color: p.Provider.of<ThemeProvider>(context)
-                                      .currentCustomTheme ==
-                                  AppCustomTheme.vintage
-                              ? null
-                              : Provider.of<ThemeProvider>(context).themeMode ==
-                                      ThemeMode.dark
+                    flexibleSpace: Container(
+                      color: p.Provider.of<ThemeProvider>(context)
+                                  .currentCustomTheme ==
+                              AppCustomTheme.vintage
+                          ? null
+                          : Provider.of<ThemeProvider>(context).themeMode ==
+                                  ThemeMode.dark
+                              ? CommanColor.darkPrimaryColor
+                              : p.Provider.of<ThemeProvider>(context)
+                                          .currentCustomTheme ==
+                                      AppCustomTheme.vintage
                                   ? CommanColor.darkPrimaryColor
+                                  : p.Provider.of<ThemeProvider>(context)
+                                      .backgroundColor,
+                      decoration: p.Provider.of<ThemeProvider>(context)
+                                  .currentCustomTheme ==
+                              AppCustomTheme.vintage
+                          ? BoxDecoration(
+                              color: Provider.of<ThemeProvider>(context)
+                                          .themeMode ==
+                                      ThemeMode.dark
+                                  ? CommanColor.black
                                   : p.Provider.of<ThemeProvider>(context)
                                               .currentCustomTheme ==
                                           AppCustomTheme.vintage
                                       ? CommanColor.darkPrimaryColor
                                       : p.Provider.of<ThemeProvider>(context)
                                           .backgroundColor,
-                          decoration: p.Provider.of<ThemeProvider>(context)
-                                      .currentCustomTheme ==
-                                  AppCustomTheme.vintage
-                              ? BoxDecoration(
-                                  color: Provider.of<ThemeProvider>(context)
-                                              .themeMode ==
-                                          ThemeMode.dark
-                                      ? CommanColor.black
-                                      : p.Provider.of<ThemeProvider>(context)
-                                                  .currentCustomTheme ==
-                                              AppCustomTheme.vintage
-                                          ? CommanColor.darkPrimaryColor
-                                          : p.Provider.of<ThemeProvider>(context)
-                                              .backgroundColor,
-                                  image: DecorationImage(
-                                    image:
-                                        AssetImage(Images.bgImage((context))),
-                                    fit: BoxFit.cover,
-                                  ),
-                                )
-                              : null,
-                        ),
-                        SafeArea(
-                          bottom: false,
-                          child: Align(
-                            alignment: Alignment.center,
-                            child: Transform.translate(
-                              offset: const Offset(0, -13),
-                              child: _buildAppBarBookTitleSelector(
-                              context: context,
-                              controller: controller,
-                              screenWidth: screenWidth,
-                              onTap: () async {
-                                if (controller.adFree.value == false) {
-                                  controller.bannerAd?.dispose();
-                                  controller.bannerAd?.load();
-                                }
-                                Get.to(() => const BookListScreen(),
-                                    transition: Transition.cupertinoDialog,
-                                    duration:
-                                        const Duration(milliseconds: 300));
-                              },
-                            ),
-                            ),
-                          ),
-                        ),
-                      ],
+                              image: DecorationImage(
+                                image: AssetImage(Images.bgImage((context))),
+                                fit: BoxFit.cover,
+                              ),
+                            )
+                          : null,
                     ),
                     backgroundColor: p.Provider.of<ThemeProvider>(context)
                                 .currentCustomTheme ==
@@ -3564,7 +3605,20 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
                       ),
                     ],
-                    title: const SizedBox.shrink(),
+                    title: _buildAppBarBookTitleSelector(
+                      context: context,
+                      controller: controller,
+                      screenWidth: screenWidth,
+                      onTap: () async {
+                        if (controller.adFree.value == false) {
+                          controller.bannerAd?.dispose();
+                          controller.bannerAd?.load();
+                        }
+                        Get.to(() => const BookListScreen(),
+                            transition: Transition.cupertinoDialog,
+                            duration: const Duration(milliseconds: 300));
+                      },
+                    ),
                     bottom: PreferredSize(
                       preferredSize: const Size.fromHeight(30.0),
                       child: Theme(
@@ -3779,7 +3833,8 @@ class _HomeScreenState extends State<HomeScreen>
                               image: AssetImage(Images.bgImage(context)),
                               fit: BoxFit.fill))
                       : null,
-                  child: controller.isFetchContent.value
+                  child: controller.isFetchContent.value &&
+                          controller.selectedBookContent.isEmpty
                       ? const Center(
                           child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -3790,15 +3845,15 @@ class _HomeScreenState extends State<HomeScreen>
                         ))
                       : controller.selectedBookContent.isEmpty
                           ? _buildEmptyContentWithChapters(controller)
-                          : NotificationListener<UserScrollNotification>(
+                          : NotificationListener<ScrollNotification>(
                               onNotification: (notification) {
                                 final scrollController =
                                     controller.autoScrollController.value;
                                 if (!scrollController.hasClients) {
                                   return false;
                                 }
-                                _updateReaderAppBarVisibility(
-                                  notification.direction,
+                                _handleReaderScrollForAppBar(
+                                  notification,
                                   scrollController.position.pixels,
                                 );
                                 return false;
@@ -4776,7 +4831,8 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ),
             ),
-            floatingActionButton: controller.isFetchContent.value
+            floatingActionButton: controller.isFetchContent.value &&
+                    controller.selectedBookContent.isEmpty
                 ? const SizedBox()
                 : Visibility(
                     visible: _showUI,
@@ -4910,7 +4966,8 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                     ),
                   ),
-            drawer: controller.isFetchContent.value
+            drawer: controller.isFetchContent.value &&
+                    controller.selectedBookContent.isEmpty
                 ? const SizedBox()
                 : Drawer(
                     backgroundColor: p.Provider.of<ThemeProvider>(context)
@@ -5102,12 +5159,8 @@ class _HomeScreenState extends State<HomeScreen>
                               controller.bannerAd?.load();
                             }
                             Get.to(() => const LibraryScreen(),
-                                    transition: Transition.cupertinoDialog,
-                                    duration:
-                                        const Duration(milliseconds: 300))!
-                                .then((value) {
-                              controller.getSelectedChapterAndBook();
-                            });
+                                transition: Transition.cupertinoDialog,
+                                duration: const Duration(milliseconds: 300));
                           },
                           visualDensity:
                               const VisualDensity(horizontal: 0, vertical: 0),
@@ -6159,6 +6212,7 @@ class _HomeScreenState extends State<HomeScreen>
 
 //share and rating
   void showMainFeedbackDialog(BuildContext context) {
+    unawaited(_markRatingUiOpening());
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -6257,7 +6311,9 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         );
       },
-    );
+    ).whenComplete(() {
+      unawaited(_markRatingUiClosed());
+    });
   }
 
   Widget _buildEmojiOption(BuildContext context,
@@ -6305,6 +6361,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _showRateAppDialog(BuildContext context) {
+    unawaited(_markRatingUiOpening());
     Navigator.of(context).pop(); // close previous dialog
     showDialog(
       context: context,
@@ -6338,7 +6395,9 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         );
       },
-    );
+    ).whenComplete(() {
+      unawaited(_markRatingUiClosed());
+    });
   }
 
   Future<void> _requestReview() async {
@@ -6359,6 +6418,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _showFeedbackDialog(BuildContext context, String emoji) {
+    unawaited(_markRatingUiOpening());
     Navigator.of(context).pop(); // close previous dialog
     showDialog(
       context: context,
@@ -6479,7 +6539,9 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         );
       },
-    );
+    ).whenComplete(() {
+      unawaited(_markRatingUiClosed());
+    });
   }
 
   // Helper methods extracted from the initState
@@ -6507,6 +6569,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _showRatingDialog(GetXState state, DateTime currentTime) {
+    unawaited(_markRatingUiOpening());
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -6517,7 +6580,9 @@ class _HomeScreenState extends State<HomeScreen>
           content: _buildRatingDialogContent(state, currentTime),
         );
       },
-    );
+    ).whenComplete(() {
+      unawaited(_markRatingUiClosed());
+    });
   }
 
   Widget _buildRatingDialogContent(GetXState state, DateTime currentTime) {
@@ -6698,29 +6763,102 @@ class _HomeScreenState extends State<HomeScreen>
     Get.to(const FeedbackWebView());
   }
 
-  void _updateReaderAppBarVisibility(
-    ScrollDirection direction,
+  void _handleReaderScrollForAppBar(
+    ScrollNotification notification,
     double currentOffset,
   ) {
-    if (direction == ScrollDirection.reverse) {
-      // Scroll down — hide immediately (no offset threshold).
-      if (_showUI && mounted) {
-        setState(() => _showUI = false);
+    if (notification.metrics.pixels < 0) {
+      return;
+    }
+    if (notification is OverscrollNotification &&
+        notification.overscroll < 0) {
+      return;
+    }
+
+    if (notification is UserScrollNotification) {
+      if (notification.direction == ScrollDirection.idle) {
+        _readerAppBarDragDelta = 0;
+        _readerAppBarPendingHide = false;
+        _readerAppBarUserScrollingDown = false;
+        // Stay hidden after scroll-down stops until user scrolls up again.
+        if (!_readerAppBarPinnedVisible) {
+          _readerAppBarScrollUpIntent = false;
+        }
+        if (notification.metrics.pixels <= 0 && !_showUI && mounted) {
+          _readerAppBarPinnedVisible = true;
+          _readerAppBarPendingHide = false;
+          _readerAppBarScrollUpIntent = false;
+          setState(() => _showUI = true);
+        }
+        return;
+      }
+
+      if (notification.direction == ScrollDirection.reverse) {
+        _readerAppBarPendingHide = false;
+        _readerAppBarDragDelta = 0;
+        if (_readerAppBarPinnedVisible) {
+          return;
+        }
+        // Arm show only for a fresh upward gesture, not fling settle after scroll down.
+        if (!_readerAppBarUserScrollingDown) {
+          _readerAppBarScrollUpIntent = true;
+        }
+        return;
+      }
+
+      if (notification.direction == ScrollDirection.forward) {
+        _readerAppBarUserScrollingDown = true;
+        _readerAppBarScrollUpIntent = false;
+        _readerAppBarPendingHide = true;
+        _readerAppBarDragDelta = 0;
+        return;
+      }
+    }
+
+    if (notification is! ScrollUpdateNotification) {
+      return;
+    }
+
+    final delta = notification.scrollDelta ?? 0;
+    if (delta == 0) {
+      return;
+    }
+
+    if (_readerAppBarPinnedVisible) {
+      // Reading down — hide after threshold (drag or fling).
+      if (delta > 0) {
+        _readerAppBarDragDelta += delta;
+        if (_readerAppBarDragDelta >= _kReaderAppBarToggleThreshold) {
+          _readerAppBarPinnedVisible = false;
+          _readerAppBarPendingHide = false;
+          _readerAppBarScrollUpIntent = false;
+          _readerAppBarDragDelta = 0;
+          if (_showUI && mounted) {
+            setState(() => _showUI = false);
+          }
+        }
+      } else if (delta < 0) {
+        _readerAppBarDragDelta = 0;
+        _readerAppBarPendingHide = false;
       }
       return;
     }
 
-    if (direction == ScrollDirection.forward) {
-      // Scroll up — show app bar.
-      if (!_showUI && mounted) {
-        setState(() => _showUI = true);
+    // Hidden — show only after deliberate scroll up, not when momentum settles.
+    if (delta < 0 && _readerAppBarScrollUpIntent) {
+      _readerAppBarDragDelta += delta;
+      if (_readerAppBarDragDelta <= -_kReaderAppBarToggleThreshold) {
+        _readerAppBarPinnedVisible = true;
+        _readerAppBarPendingHide = false;
+        _readerAppBarScrollUpIntent = false;
+        _readerAppBarDragDelta = 0;
+        if (!_showUI && mounted) {
+          setState(() => _showUI = true);
+        }
       }
-      return;
-    }
-
-    // At the very top when scroll settles, keep app bar visible.
-    if (currentOffset <= 0 && !_showUI && mounted) {
-      setState(() => _showUI = true);
+    } else if (delta > 0) {
+      _readerAppBarDragDelta = 0;
+      _readerAppBarScrollUpIntent = false;
     }
   }
 
@@ -6738,10 +6876,8 @@ class _HomeScreenState extends State<HomeScreen>
           final direction = scrollController.position.userScrollDirection;
           final currentOffset = scrollController.position.pixels;
 
-          if (direction == ScrollDirection.reverse) {
-            _updateReaderAppBarVisibility(direction, currentOffset);
-          } else if (currentOffset <= 0) {
-            _updateReaderAppBarVisibility(direction, currentOffset);
+          if (currentOffset < 0) {
+            return;
           }
 
           // Back-to-top only; app bar uses UserScrollNotification on the list.
@@ -7327,27 +7463,10 @@ class _SmoothReaderAppBar extends StatelessWidget implements PreferredSizeWidget
 
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(end: visible ? 1.0 : 0.0),
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeInOutCubic,
-      builder: (context, value, appBarChild) {
-        return ClipRect(
-          child: Align(
-            alignment: Alignment.topCenter,
-            heightFactor: value.clamp(0.0, 1.0),
-            child: Opacity(
-              opacity: value.clamp(0.0, 1.0),
-              child: Transform.translate(
-                offset: Offset(0, -8 * (1 - value)),
-                child: appBarChild,
-              ),
-            ),
-          ),
-        );
-      },
-      child: child,
-    );
+    if (!visible) {
+      return const SizedBox.shrink();
+    }
+    return child;
   }
 }
 
@@ -7579,15 +7698,19 @@ class PremiumWelcomeAlert {
       'assets/gold-premium-icons/Gold Earphone icon.png';
   static const String _calendarIcon =
       'assets/gold-premium-icons/Gold Calendar icon.png';
-  static const String _shieldIcon =
-      'assets/gold-premium-icons/Gold Shield icon.png';
+  static const String _laurelIcon =
+      'assets/gold-premium-icons/Gold icon 1.png';
+
+  static const Duration _kClearUpgradeDeferDelay =
+      Duration(milliseconds: 300);
 
   static Future<void> show(BuildContext context) async {
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
     final prefs = await SharedPreferences.getInstance();
+    await SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, true);
     await prefs.setString('premiumalrt', '2');
-    showDialog(
+    await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
@@ -7634,13 +7757,16 @@ class PremiumWelcomeAlert {
                   child: SingleChildScrollView(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Image.asset(
-                          _heroIcon,
-                          height: isTablet ? 118 : 96,
-                          fit: BoxFit.contain,
+                        Center(
+                          child: Image.asset(
+                            _heroIcon,
+                            height: isTablet ? 112 : 92,
+                            fit: BoxFit.contain,
+                          ),
                         ),
-                        SizedBox(height: isTablet ? 14 : 10),
+                        SizedBox(height: isTablet ? 10 : 8),
                         Text(
                           'Premium Unlocked',
                           textAlign: TextAlign.center,
@@ -7650,21 +7776,13 @@ class PremiumWelcomeAlert {
                             fontWeight: FontWeight.w700,
                             color: _ink,
                             letterSpacing: -0.2,
+                            height: 1.15,
                           ),
                         ),
-                        SizedBox(height: isTablet ? 12 : 10),
+                        SizedBox(height: isTablet ? 10 : 8),
                         _premiumDivider(),
                         SizedBox(height: isTablet ? 12 : 10),
-                        Text(
-                          'Your premium access is now active. Enjoy deeper Bible study, audio features, devotionals, and a richer reading experience to support your walk with God.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: 'Georgia',
-                            fontSize: isTablet ? 16 : 13.5,
-                            height: 1.45,
-                            color: _ink.withValues(alpha: 0.88),
-                          ),
-                        ),
+                        _premiumDescription(isTablet),
                         SizedBox(height: isTablet ? 18 : 14),
                         _premiumFeatureGrid(isTablet),
                         SizedBox(height: isTablet ? 22 : 18),
@@ -7677,55 +7795,42 @@ class PremiumWelcomeAlert {
                               elevation: 0,
                               padding: EdgeInsets.symmetric(
                                 vertical: isTablet ? 16 : 14,
-                                horizontal: 18,
+                                horizontal: 20,
                               ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(28),
                               ),
                             ),
-                            child: Row(
+                            child: Stack(
+                              alignment: Alignment.center,
                               children: [
-                                Text(
-                                  '✨',
-                                  style: TextStyle(
-                                    fontSize: isTablet ? 18 : 16,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
+                                Align(
+                                  alignment: Alignment.centerLeft,
                                   child: Text(
-                                    'Start Exploring',
-                                    textAlign: TextAlign.center,
+                                    '✨',
                                     style: TextStyle(
                                       fontSize: isTablet ? 18 : 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
                                     ),
                                   ),
                                 ),
-                                Icon(
-                                  Icons.chevron_right,
-                                  color: Colors.white,
-                                  size: isTablet ? 24 : 22,
+                                Text(
+                                  'Start Exploring',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: isTablet ? 18 : 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Icon(
+                                    Icons.chevron_right,
+                                    color: Colors.white,
+                                    size: isTablet ? 24 : 22,
+                                  ),
                                 ),
                               ],
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: isTablet ? 10 : 8),
-                        TextButton(
-                          onPressed: close,
-                          style: TextButton.styleFrom(
-                            foregroundColor: _ink.withValues(alpha: 0.85),
-                          ),
-                          child: Text(
-                            'Continue Reading',
-                            style: TextStyle(
-                              fontFamily: 'Georgia',
-                              fontSize: isTablet ? 16 : 14,
-                              fontWeight: FontWeight.w600,
-                              decoration: TextDecoration.underline,
-                              decorationColor: _ink.withValues(alpha: 0.85),
                             ),
                           ),
                         ),
@@ -7738,6 +7843,46 @@ class PremiumWelcomeAlert {
           ),
         );
       },
+    );
+    await Future.delayed(_kClearUpgradeDeferDelay);
+    await SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, false);
+  }
+
+  static Widget _premiumDescription(bool isTablet) {
+    final laurelHeight = isTablet ? 58.0 : 48.0;
+    final laurelWidth = isTablet ? 30.0 : 24.0;
+
+    Widget laurelSide({required bool mirrored}) {
+      final child = Image.asset(
+        _laurelIcon,
+        height: laurelHeight,
+        width: laurelWidth,
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => const SizedBox(width: 18),
+      );
+      return mirrored ? Transform.flip(flipX: true, child: child) : child;
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        laurelSide(mirrored: false),
+        SizedBox(width: isTablet ? 8 : 6),
+        Expanded(
+          child: Text(
+            'Your premium access is now active. Enjoy deeper Bible study, audio features, devotionals, and a richer reading experience to support your walk with God.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'Georgia',
+              fontSize: isTablet ? 16 : 13.5,
+              height: 1.45,
+              color: _ink.withValues(alpha: 0.88),
+            ),
+          ),
+        ),
+        SizedBox(width: isTablet ? 8 : 6),
+        laurelSide(mirrored: true),
+      ],
     );
   }
 
@@ -7807,7 +7952,6 @@ class PremiumWelcomeAlert {
             Expanded(
               child: _premiumFeatureCard(
                 isTablet: isTablet,
-                iconPath: _shieldIcon,
                 title: 'Ad-Free Reading',
                 subtitle: 'Enjoy a peaceful, distraction-free experience.',
               ),
@@ -7820,10 +7964,12 @@ class PremiumWelcomeAlert {
 
   static Widget _premiumFeatureCard({
     required bool isTablet,
-    required String iconPath,
+    String? iconPath,
     required String title,
     required String subtitle,
   }) {
+    final iconSlotHeight = isTablet ? 34.0 : 28.0;
+
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: isTablet ? 10 : 8,
@@ -7835,11 +7981,19 @@ class PremiumWelcomeAlert {
         border: Border.all(color: _ink.withValues(alpha: 0.12)),
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.start,
         children: [
-          Image.asset(
-            iconPath,
-            height: isTablet ? 34 : 28,
-            fit: BoxFit.contain,
+          SizedBox(
+            height: iconSlotHeight,
+            child: iconPath == null
+                ? const SizedBox.shrink()
+                : Center(
+                    child: Image.asset(
+                      iconPath,
+                      height: iconSlotHeight,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
           ),
           SizedBox(height: isTablet ? 8 : 6),
           Text(

@@ -33,20 +33,9 @@ class TakeMomentReleasedScreen extends StatelessWidget {
     final lightBtnColor = CommanColor.lightDarkPrimary(context).withOpacity(0.92);
     final Color textColor = isDark ? Colors.white : _brown;
     return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage(TakeMomentRestScreen.doveBackground),
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-          if (isDark)
-            Container(color: Colors.black.withOpacity(0.58)),
-          SafeArea(
+      body: TakeMomentRestScreen.peaceBackgroundStack(
+        isDark: isDark,
+        child: SafeArea(
           child: Column(
             children: [
               const SizedBox(height: 16),
@@ -209,7 +198,6 @@ class TakeMomentReleasedScreen extends StatelessWidget {
             ],
           ),
         ),
-        ],
       ),
     );
   }

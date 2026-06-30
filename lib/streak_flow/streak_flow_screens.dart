@@ -3667,6 +3667,10 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                                 SharPreferences
                                     .pendingStreakCompleteCelebration,
                                 streakCount);
+                            if (streakCount == 1) {
+                              await SharPreferences.setBoolean(
+                                  SharPreferences.deferUpgradeAlert, true);
+                            }
                             // Do not show app-open ad immediately on streak completion.
                             // Instead, schedule it for next cold start (Splash shows it after ~2s).
                             try {

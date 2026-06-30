@@ -22,6 +22,7 @@ import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.da
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
+import 'package:biblebookapp/view/widget/ai_gemini_privacy_banner.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher_string.dart';
@@ -120,16 +121,22 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
   static const Color _kPrayerBrownMid = Color(0xFF6D4C41);
 
   Color _categoryAccentColor(int categoryIndex) {
-    // UI-only: small accent per tile to match reference feel.
-    final palette = <Color>[
-      const Color(0xFFD4A017), // gold
-      const Color(0xFF388E3C), // green
-      const Color(0xFF1976D2), // blue
-      const Color(0xFF7B1FA2), // purple
-      const Color(0xFFEF6C00), // orange
-      const Color(0xFF795548), // brown
-    ];
-    return palette[categoryIndex % palette.length];
+    switch (categoryIndex) {
+      case 0: // Thanksgiving
+        return const Color(0xFFD4A017);
+      case 1: // Forgiveness
+        return const Color(0xFF1976D2);
+      case 2: // Guidance
+        return const Color(0xFF7B1FA2);
+      case 3: // Anxiety & Peace
+        return const Color(0xFFEF6C00);
+      case 4: // Healing
+        return const Color(0xFF388E3C);
+      case 5: // Family
+        return const Color(0xFF795548);
+      default:
+        return const Color(0xFF6D4C41);
+    }
   }
 
   // UI mode: true => Pray for Me view (search + categories). Community navigates to PrayerWallScreen.
@@ -365,169 +372,6 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
           ))
       .toList();
 
-  Future<bool> _showPleaseNoteDialog() async {
-    final agreed =
-        await SharPreferences.getBoolean(SharPreferences.aiDisclaimerAgreed);
-    if (agreed == true) return true;
-
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    final isDark = themeProvider.themeMode == ThemeMode.dark;
-
-    final bodyColor = isDark ? Colors.white70 : const Color(0xFF4A3728);
-    return await showDialog<bool>(
-          context: context,
-          barrierDismissible: false,
-          builder: (ctx) => Dialog(
-            backgroundColor: isDark
-                ? CommanColor.darkPrimaryColor
-                : CommanColor.backgrondcolor,
-            insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Important Notice',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: CommanColor.whiteBlack(ctx),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'AI Chat allows you to ask questions and receive Bible-based guidance.\n\n'
-                    'To generate responses, the message you type may be securely sent to Google Gemini for processing.\n\n'
-                    'The following data may be transmitted:\n'
-                    '• Your chat message\n'
-                    '• Device type\n'
-                    '• App version\n\n'
-                    'This data is used only to generate AI responses.\n\n'
-                    'We do not collect personal identity information such as your name, email, contacts, or location.\n\n'
-                    'By tapping "Agree & Continue", you allow your chat input to be processed by the AI service according to our Privacy Policy.',
-                    textAlign: TextAlign.left,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: bodyColor,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () async {
-                            await SharPreferences.setBoolean(
-                                SharPreferences.aiDisclaimerAgreed, true);
-                            if (ctx.mounted) Navigator.pop(ctx, true);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? Colors.white
-                                  : CommanColor.lightDarkPrimary(ctx),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              'Agree & Continue',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: isDark
-                                    ? CommanColor.darkPrimaryColor
-                                    : Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            if (ctx.mounted) Navigator.pop(ctx, false);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? Colors.white.withOpacity(0.12)
-                                  : Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: isDark
-                                    ? Colors.white.withOpacity(0.55)
-                                    : CommanColor.lightDarkPrimary(ctx),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Text(
-                              'Cancel',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: isDark
-                                    ? Colors.white
-                                    : CommanColor.lightDarkPrimary(ctx),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      GestureDetector(
-                        onTap: () => launchUrlString(
-                            'https://bibleoffice.com/terms_conditions.html'),
-                        child: Text(
-                          'Terms',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: CommanColor.whiteBlack(ctx),
-                          ),
-                        ),
-                      ),
-                      Text(
-                        ' | ',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: CommanColor.whiteBlack(ctx),
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => launchUrlString(
-                            'https://bibleoffice.com/privacy_policy.html'),
-                        child: Text(
-                          'Privacy',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: CommanColor.whiteBlack(ctx),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ) ??
-        false;
-  }
-
   void _showInsufficientCreditsDialog() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -582,10 +426,6 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
 
   Future<void> _sendPrayerRequest(int categoryIndex) async {
     if (_isLoading) return;
-
-    // Show Please Note dialog before first response (must agree to continue)
-    final agreed = await _showPleaseNoteDialog();
-    if (!agreed || !mounted) return;
 
     // Stop any currently playing prayer audio so only one audio plays at a time
     await _audioPlayer.stop();
@@ -1009,10 +849,6 @@ ${category.prompt}
       Constants.showToast("Please enter your prayer request", 3000);
       return;
     }
-
-    // Show Please Note dialog before first response (same as category prayer)
-    final agreed = await _showPleaseNoteDialog();
-    if (!agreed || !mounted) return;
 
     // Stop any currently playing prayer audio so only one audio plays at a time
     await _audioPlayer.stop();
@@ -1762,12 +1598,6 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
 
   /// Show the shared "Select Answer Length" intro once, same as Chat screen.
   Future<void> _showPrayerIntroIfNeeded() async {
-    // Show Important Notice first when entering prayer guidance; only then show intro.
-    final agreed = await _showPleaseNoteDialog();
-    if (!agreed || !mounted) {
-      return;
-    }
-
     final prefs = await SharedPreferences.getInstance();
     final seenIntro = prefs.getBool('chat_intro_seen') ?? false;
     if (seenIntro || !mounted) return;
@@ -1777,7 +1607,6 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     setState(() {
       _introAnswerLength = length;
     });
-    await Future.delayed(const Duration(milliseconds: 150));
     if (!mounted) return;
     await _showPrayerIntroDialog();
   }
@@ -1788,6 +1617,10 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     final screenWidth = MediaQuery.of(context).size.width;
 
     final initialCredits = await WalletService.getCredits();
+    final noticeSeen = await SharPreferences.getBoolean(
+            SharPreferences.aiGeminiPrivacyNoticeSeen) ??
+        false;
+    var showGeminiBanner = !noticeSeen;
 
     await showModalBottomSheet(
       context: context,
@@ -1795,23 +1628,16 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
       enableDrag: false,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      sheetAnimationStyle: const AnimationStyle(
+        duration: Duration(milliseconds: 750),
+        curve: Curves.easeOutCubic,
+        reverseDuration: Duration(milliseconds: 400),
+        reverseCurve: Curves.easeInCubic,
+      ),
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setBottomSheetState) {
-            return TweenAnimationBuilder<double>(
-              duration: const Duration(milliseconds: 800),
-              curve: Curves.easeOutCubic,
-              tween: Tween(begin: 0.0, end: 1.0),
-              builder: (context, value, child) {
-                return Transform.translate(
-                  offset: Offset(0, (1 - value) * 50),
-                  child: Opacity(
-                    opacity: value,
-                    child: child,
-                  ),
-                );
-              },
-              child: ConstrainedBox(
+            return ConstrainedBox(
                 constraints: BoxConstraints(
                   maxHeight: MediaQuery.of(context).size.height * 0.9,
                 ),
@@ -2045,10 +1871,26 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                             ),
                           ),
                         ),
+                        if (showGeminiBanner)
+                          Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              screenWidth > 450 ? 24 : 20,
+                              8,
+                              screenWidth > 450 ? 24 : 20,
+                              0,
+                            ),
+                            child: AiGeminiPrivacyBanner(
+                              onNoticeSeen: () {
+                                setBottomSheetState(() {
+                                  showGeminiBanner = false;
+                                });
+                              },
+                            ),
+                          ),
                         Padding(
                           padding: EdgeInsets.fromLTRB(
                             screenWidth > 450 ? 24 : 20,
-                            8,
+                            10,
                             screenWidth > 450 ? 24 : 20,
                             MediaQuery.of(context).viewInsets.bottom + 16,
                           ),
@@ -2111,8 +1953,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                       ],
                     ),
                 ),
-              ),
-            );
+              );
           },
         );
       },
@@ -3516,32 +3357,18 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  '“',
-                  style: TextStyle(
-                    fontSize: size.width > 450 ? 44 : 40,
-                    height: 0.85,
-                    color: _kPrayerGuidanceGold,
-                    fontFamily: 'Georgia',
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '“',
+              style: TextStyle(
+                fontSize: size.width > 450 ? 44 : 40,
+                height: 0.85,
+                color: _kPrayerGuidanceGold,
+                fontFamily: 'Georgia',
+                fontWeight: FontWeight.w700,
               ),
-              Positioned(
-                top: 0,
-                right: 0,
-                child: Icon(
-                  Icons.bookmark_border_rounded,
-                  color: _kPrayerGuidanceGold.withOpacity(0.85),
-                  size: 24,
-                ),
-              ),
-            ],
+            ),
           ),
           const SizedBox(height: 2),
           _buildGuidanceResponseBody(aiText, size, isDark),
@@ -4077,8 +3904,6 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                               return;
                                             }
                                             // When Pray for Me is tapped, directly show the custom prayer dialog (same popup as the search input used to open)
-                                            final agreed = await _showPleaseNoteDialog();
-                                            if (!agreed || !mounted) return;
                                             _showCustomPrayerDialog(context);
                                           },
                                           borderRadius: BorderRadius.circular(16),
@@ -4534,7 +4359,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                                       height: 3,
                                                       decoration: BoxDecoration(
                                                         color: accentClr
-                                                            .withOpacity(0.7),
+                                                            .withOpacity(0.85),
                                                         borderRadius:
                                                             BorderRadius
                                                                 .circular(6),
