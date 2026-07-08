@@ -1735,7 +1735,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     // Check internet connection
     final bool isConnected = await InternetConnection().hasInternetAccess;
     if (!isConnected) {
-      Constants.showToast("No internet connection", 5000);
+      Constants.showToast("No internet connection", 1000);
       return;
     }
 

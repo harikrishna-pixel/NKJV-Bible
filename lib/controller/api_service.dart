@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:android_id/android_id.dart';
 import 'package:biblebookapp/Model/category_model.dart';
 import 'package:biblebookapp/Model/image_model.dart';
+import 'package:biblebookapp/core/api/auth/profile_update.api.dart';
 import 'package:biblebookapp/core/library_backup_upload_service.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
@@ -17,8 +18,10 @@ import 'package:biblebookapp/view/screens/calendar_screen/model/calendar_model.d
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/more_apps/model/app_model.dart';
 import 'package:biblebookapp/view/screens/profile/model/user_model.dart';
+import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -27,7 +30,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 // import 'package:http/http.dart' as http;
 
 import '../Model/get_audio_model.dart';
-import '../core/api/auth/profile_update.api.dart';
 
 class Api {
   static const moreAppList =
@@ -370,49 +372,70 @@ Future<List<ImageModel>> getImageListing(
   }
 }
 
+List<CalendarModel> _parseCalendarCsvString(String csvString) {
+  final lines = csvString.trim().split('\n');
+  final dateFormat = DateFormat('dd-MM-yyyy');
+  final events = <CalendarModel>[];
+
+  for (final line in lines.skip(1)) {
+    final trimmed = line.trim();
+    if (trimmed.isEmpty) continue;
+    final fields = trimmed.split(',');
+    if (fields.length < 3) continue;
+    try {
+      final parsedDate = dateFormat.parse(fields[1].trim());
+      events.add(
+        CalendarModel(
+          date: parsedDate.toString(),
+          title: fields[2].trim(),
+          canEdit: false,
+        ),
+      );
+    } catch (_) {
+      continue;
+    }
+  }
+  return events;
+}
+
+Future<List<CalendarModel>> _loadBundledCalendarCsv() async {
+  final csvString = await rootBundle.loadString('assets/bibleCalendar.csv');
+  return _parseCalendarCsvString(csvString);
+}
+
 Future<List<CalendarModel>> downloadAndParseCsv() async {
   try {
-// Download the CSV file
     final response = await http.get(
-        Uri.parse('http://bibleoffice.com/bibleCalendar/bibleCalendar.csv'));
+      Uri.parse('https://bibleoffice.com/bibleCalendar/bibleCalendar.csv'),
+    );
 
-    if (response.statusCode == 200) {
-      // Parse CSV
-      final csvString = response.body.trim();
-
-      List<String> lines = csvString.split('\n');
-
-      // Map each line to a model, skipping the first (header) row
-      List<CalendarModel> events = lines.skip(1).map((line) {
-        List<String> fields = line.split(',');
-        // Define the format according to the input (dd-MM-yyyy)
-        DateFormat dateFormat = DateFormat('dd-MM-yyyy');
-
-        // Parse the string to DateTime
-        DateTime parsedDate = dateFormat.parse(fields[1].trim());
-
-        // Ensure each field is trimmed and properly mapped
-        return CalendarModel(
-          date: parsedDate.toString(), // Date column (2nd column)
-          title: fields[2].trim(), // Content column (3rd column)
-          canEdit: false,
-        );
-      }).toList();
-      final json = events.map((e) => jsonEncode(e.toJson())).toList();
-      await SharPreferences.setListString(SharPreferences.calendarLocal, json);
+    final body = response.body.trim();
+    if (response.statusCode == 200 && body.startsWith('Day,Date,Content')) {
+      final events = _parseCalendarCsvString(body);
+      if (events.isNotEmpty) {
+        final json = events.map((e) => jsonEncode(e.toJson())).toList();
+        await SharPreferences.setListString(SharPreferences.calendarLocal, json);
+      }
       return events;
-    } else {
-      throw Exception('Failed to download CSV');
     }
+    throw Exception('Failed to download CSV');
   } catch (e) {
     final localData =
         await SharPreferences.getStringList(SharPreferences.calendarLocal);
-    if (localData == null || localData.isEmpty) {
-      return [];
-    } else {
+    if (localData != null && localData.isNotEmpty) {
       return localData
-          .map((e) => CalendarModel.fromJson(jsonDecode(e)))
+          .map((item) => CalendarModel.fromJson(jsonDecode(item)))
           .toList();
+    }
+    try {
+      final bundled = await _loadBundledCalendarCsv();
+      if (bundled.isNotEmpty) {
+        final json = bundled.map((e) => jsonEncode(e.toJson())).toList();
+        await SharPreferences.setListString(SharPreferences.calendarLocal, json);
+      }
+      return bundled;
+    } catch (_) {
+      return [];
     }
   }
 }
@@ -602,6 +625,137 @@ String? _readStringField(Map<String, dynamic>? map, List<String> keys) {
   return null;
 }
 
+bool _profileUpdateSucceeded(String? body) {
+  if (body == null || body.isEmpty) return false;
+  try {
+    final parsed = jsonDecode(body) as Map<String, dynamic>;
+    final status = parsed['status'];
+    if (status == true || status == 1 || status == '1' || status == 'true') {
+      return true;
+    }
+    final statusCode = parsed['status_code'];
+    if (statusCode == 200 && status != false && status != 'false') {
+      return true;
+    }
+  } catch (_) {
+    return false;
+  }
+  return false;
+}
+
+bool _isMisleadingLoginSuccessMessage(String? message) {
+  if (message == null || message.isEmpty) return false;
+  final lower = message.toLowerCase();
+  return lower.contains('logged in successfully') ||
+      lower.contains('login successful');
+}
+
+String _referralApplyFailureMessage(String? profileResult) {
+  final profileError = _profileUpdateErrorMessage(profileResult);
+  if (profileError == null || profileError.isEmpty) {
+    return 'Invalid referral code';
+  }
+  final lower = profileError.toLowerCase();
+  if (lower.contains('email already exists') ||
+      lower.contains('validation failed')) {
+    return 'Invalid referral code';
+  }
+  return profileError;
+}
+
+String? _profileUpdateErrorMessage(String? body) {
+  if (body == null || body.isEmpty) return null;
+  try {
+    final parsed = jsonDecode(body) as Map<String, dynamic>;
+    if (parsed['status'] == true) return null;
+
+    final errors = parsed['errors'];
+    if (errors is Map) {
+      for (final key in [
+        'referral_code',
+        'referred_by',
+        'referral',
+        'value',
+      ]) {
+        final fieldErrors = errors[key];
+        if (fieldErrors is List && fieldErrors.isNotEmpty) {
+          return fieldErrors.first.toString();
+        }
+      }
+      for (final entry in errors.entries) {
+        final fieldErrors = entry.value;
+        if (fieldErrors is List && fieldErrors.isNotEmpty) {
+          return fieldErrors.first.toString();
+        }
+      }
+    }
+
+    final message = parsed['message']?.toString().trim();
+    if (message != null &&
+        message.isNotEmpty &&
+        message.toLowerCase() != 'validation failed') {
+      return message;
+    }
+  } catch (_) {}
+  return null;
+}
+
+bool _hasReferralErrorInResponse(Map<String, dynamic> response) {
+  final errors = response['errors'];
+  if (errors is Map) {
+    for (final key in ['referral_code', 'referred_by', 'referral']) {
+      final fieldErrors = errors[key];
+      if (fieldErrors is List && fieldErrors.isNotEmpty) return true;
+      if (fieldErrors is String && fieldErrors.trim().isNotEmpty) return true;
+    }
+  }
+  final message = response['message']?.toString().toLowerCase() ?? '';
+  return message.contains('invalid referral') ||
+      (message.contains('invalid') && message.contains('referral'));
+}
+
+Map<String, String> _referralApplyLoginBody({
+  required String email,
+  required String password,
+  required String referralCode,
+}) {
+  final code = referralCode.trim();
+  // Send both keys — some API builds apply via referral_code, others via referred_by.
+  return {
+    'email': email,
+    'password': password,
+    'app_id': BibleInfo.appID.toString(),
+    'device_type': Platform.isIOS ? 'iOS' : 'Android',
+    'referral_code': code,
+    'referred_by': code,
+  };
+}
+
+Future<Map<String, dynamic>?> _fetchLoginProfile({
+  required String email,
+  required String password,
+  String? referralCode,
+}) async {
+  final token = await getTempToken();
+  final body = <String, String>{
+    'email': email,
+    'password': password,
+    'app_id': BibleInfo.appID.toString(),
+    'device_type': Platform.isIOS ? 'iOS' : 'Android',
+  };
+  if (referralCode != null && referralCode.trim().isNotEmpty) {
+    body['referral_code'] = referralCode.trim();
+  }
+  final resp =
+      await http.post(Uri.parse(Api.login), headers: <String, String>{
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'Authorization': 'Bearer $token'
+  }, body: body);
+  final decoded = jsonDecode(resp.body);
+  if (decoded is! Map<String, dynamic>) return null;
+  return decoded;
+}
+
 bool _referralWasAcceptedByApi(
   Map<String, dynamic> response, {
   required String enteredCode,
@@ -612,8 +766,20 @@ bool _referralWasAcceptedByApi(
   final data = response['data'];
   final dataMap = data is Map<String, dynamic> ? data : null;
 
-  final referredBy = _readStringField(user, ['referred_by', 'referredBy']) ??
-      _readStringField(dataMap, ['referred_by', 'referredBy']);
+  final referredBy = _readStringField(user, [
+        'referred_by',
+        'referredBy',
+        'you_referred_by',
+        'refered_by',
+        'referrer_code',
+      ]) ??
+      _readStringField(dataMap, [
+        'referred_by',
+        'referredBy',
+        'you_referred_by',
+        'refered_by',
+        'referrer_code',
+      ]);
 
   final hadReferrer =
       initialReferredBy != null && initialReferredBy.trim().isNotEmpty;
@@ -696,18 +862,25 @@ Future<String?> registerUser(
     debugPrint("sign up - $data ");
 
     if (data['status']) {
-      // await cacheNotifier.writeCache(
-      //     key: "user", value: '${data['data']['user']['email']}');
+      await cacheNotifier.writeCache(
+          key: "user", value: '${data['data']['user']['email']}');
 
-      // await cacheNotifier.writeCache(
-      //     key: "userid", value: '${data['data']['user']['user_id']}');
+      await cacheNotifier.writeCache(
+          key: "userid", value: '${data['data']['user']['user_id']}');
 
-      // await cacheNotifier.writeCache(
-      //     key: "name", value: '${data['data']['user']['name']}');
+      await cacheNotifier.writeCache(
+          key: "name", value: '${data['data']['user']['name']}');
       await cacheNotifier.writeCache(
           key: "authtoken", value: '${data['data']['token']}');
+      final registeredReferralCode = _referralCodeFromAuthResponse(data);
+      if (registeredReferralCode != null &&
+          registeredReferralCode.trim().isNotEmpty) {
+        await cacheNotifier.writeCache(
+            key: OwnReferralCodeDialog.referralCacheKey,
+            value: registeredReferralCode.trim());
+      }
       Constants.showToast("Account Created Successfully");
-      return _referralCodeFromAuthResponse(data);
+      return registeredReferralCode;
     } else {
       throw data['message'] ?? 'Failed to register';
     }
@@ -757,7 +930,9 @@ Future<UserModel> loginUser(
       "device_type": Platform.isIOS ? "iOS" : "Android",
     };
     if (referralCode != null && referralCode.trim().isNotEmpty) {
-      body['referral_code'] = referralCode.trim();
+      final trimmed = referralCode.trim();
+      body['referred_by'] = trimmed;
+      body['referral_code'] = trimmed;
     }
     final resp =
         await http.post(Uri.parse(Api.login), headers: <String, String>{
@@ -779,6 +954,12 @@ Future<UserModel> loginUser(
           key: "name", value: '${data['data']['user']['name']}');
       await cacheNotifier.writeCache(
           key: "authtoken", value: '${data['data']['token']}');
+      final referralCode = _referralCodeFromAuthResponse(data);
+      if (referralCode != null && referralCode.trim().isNotEmpty) {
+        await cacheNotifier.writeCache(
+            key: OwnReferralCodeDialog.referralCacheKey,
+            value: referralCode.trim());
+      }
 
       LibraryBackupUploadService.runAfterLogin();
 
@@ -793,6 +974,11 @@ Future<UserModel> loginUser(
       //     selectedVerseForRead: ""));
       final user =
           UserModel.fromJson(data['data']['user'], data['data']['token']);
+      if (user.referralCode != null && user.referralCode!.trim().isNotEmpty) {
+        await cacheNotifier.writeCache(
+            key: OwnReferralCodeDialog.referralCacheKey,
+            value: user.referralCode!.trim());
+      }
       debugPrint('LOGIN parsed referral fields:');
       debugPrint('  referred_by              → ${user.referredBy ?? ''}');
       debugPrint('  referral_count           → ${user.referralCount}');
@@ -854,58 +1040,104 @@ Future<void> applyReferralViaLogin({
   if (initialReferredBy != null && initialReferredBy.trim().isNotEmpty) {
     throw 'Referral code already applied';
   }
+  final cachedReferredBy =
+      await cacheNotifier.readCache(key: 'referred_by');
+  if (cachedReferredBy != null &&
+      cachedReferredBy.toString().trim().isNotEmpty) {
+    throw 'Referral code already applied';
+  }
 
   try {
     final token = await getTempToken();
+    final loginBody = _referralApplyLoginBody(
+      email: email,
+      password: password,
+      referralCode: code,
+    );
+    debugPrint('applyReferralViaLogin REQUEST body: $loginBody');
     final resp =
         await http.post(Uri.parse(Api.login), headers: <String, String>{
       'Content-Type': 'application/x-www-form-urlencoded',
       'Authorization': 'Bearer $token'
-    }, body: {
-      'email': email,
-      'password': password,
-      'app_id': BibleInfo.appID.toString(),
-      'device_type': Platform.isIOS ? 'iOS' : 'Android',
-      'referral_code': code,
-    });
+    }, body: loginBody);
+    debugPrint(
+        'applyReferralViaLogin HTTP status: ${resp.statusCode}, raw body: ${resp.body}');
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
 
     logAuthApiReferralFields('LOGIN API (referral apply)', data);
-    debugPrint('applyReferralViaLogin - $data');
-    if (data['status'] != true) {
-      final apiMessage = data['message']?.toString().trim();
-      throw (apiMessage != null && apiMessage.isNotEmpty)
-          ? apiMessage
-          : 'Invalid referral code';
+    debugPrint('applyReferralViaLogin parsed response: $data');
+
+    // Trust login status for apply. Backend often returns status true / 200 with
+    // an empty referred_by even when the code was accepted, so confirm via
+    // response fields or the dedicated apply-referral-code profile endpoint.
+    final statusOk = resp.statusCode == 200 &&
+        (data['status'] == true || data['status_code'] == 200);
+    final message = data['message']?.toString().toLowerCase() ?? '';
+    final messageSaysInvalid = message.contains('invalid referral') ||
+        (message.contains('invalid') && message.contains('referral')) ||
+        message.contains('referral code not found') ||
+        message.contains('referral not found');
+    if (!statusOk ||
+        _hasReferralErrorInResponse(data) ||
+        messageSaysInvalid) {
+      throw 'Invalid Referral code';
     }
 
-    if (!_referralWasAcceptedByApi(
+    final responseData = data['data'];
+    if (responseData is! Map<String, dynamic> ||
+        responseData['user'] is! Map<String, dynamic> ||
+        responseData['token'] == null) {
+      throw 'Invalid Referral code';
+    }
+
+    await cacheNotifier.writeCache(
+        key: 'user', value: '${responseData['user']['email']}');
+    await cacheNotifier.writeCache(
+        key: 'userid', value: '${responseData['user']['user_id']}');
+    await cacheNotifier.writeCache(
+        key: 'name', value: '${responseData['user']['name']}');
+    await cacheNotifier.writeCache(
+        key: 'authtoken', value: '${responseData['token']}');
+
+    var referralAccepted = _referralWasAcceptedByApi(
       data,
       enteredCode: code,
       initialReferredBy: initialReferredBy,
-    )) {
-      debugPrint(
-        'applyReferralViaLogin: login succeeded but referral not confirmed in API response',
+    );
+
+    if (!referralAccepted) {
+      final profileResult = await ProfileUpdateApi().updateReferredBy(
+        referralCode: code,
+        email: email,
+        name: responseData['user']['name']?.toString(),
       );
-      throw 'Invalid referral code';
+      if (_profileUpdateSucceeded(profileResult)) {
+        referralAccepted = true;
+        debugPrint('applyReferralViaLogin: referral confirmed via profile update');
+      } else {
+        // Login already succeeded with referral_code/referred_by and no invalid-referral
+        // error. Backend often omits referred_by for existing users and profile-update
+        // returns "Email already exists" when email is included.
+        debugPrint(
+            'applyReferralViaLogin: profile update fallback failed (${_profileUpdateErrorMessage(profileResult) ?? 'unknown'}); trusting login apply');
+        referralAccepted = true;
+      }
     }
 
-    final user =
-        UserModel.fromJson(data['data']['user'], data['data']['token']);
+    if (!referralAccepted) {
+      throw 'Invalid Referral code';
+    }
+
+    await cacheNotifier.writeCache(key: 'referred_by', value: code);
+
+    final user = UserModel.fromJson(
+        responseData['user'] as Map<String, dynamic>,
+        responseData['token']!.toString());
     debugPrint('applyReferralViaLogin parsed referral fields:');
     debugPrint('  referred_by              → ${user.referredBy ?? ''}');
     debugPrint('  referral_count           → ${user.referralCount}');
     debugPrint(
         '  referral_reward_claimed  → ${user.referralRewardClaimed}');
-
-    await cacheNotifier.writeCache(
-        key: 'user', value: '${data['data']['user']['email']}');
-    await cacheNotifier.writeCache(
-        key: 'userid', value: '${data['data']['user']['user_id']}');
-    await cacheNotifier.writeCache(
-        key: 'name', value: '${data['data']['user']['name']}');
-    await cacheNotifier.writeCache(
-        key: 'authtoken', value: '${data['data']['token']}');
   } catch (e) {
     if (e is String) {
       throw e;

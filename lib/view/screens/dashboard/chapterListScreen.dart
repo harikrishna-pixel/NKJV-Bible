@@ -11,6 +11,7 @@ import '../../constants/constant.dart';
 import '../../constants/images.dart';
 import 'package:get/get.dart';
 
+import '../../../controller/dashboard_controller.dart';
 import '../../constants/share_preferences.dart';
 import 'home_screen.dart';
 
@@ -179,21 +180,21 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                         final trackColor =
                             CommanColor.progressUnFillColor(context);
                         return GestureDetector(
-                          onTap: () {
+                          onTap: () async {
+                            final chapterNum = index + 1;
+                            await SharPreferences.setString(
+                                SharPreferences.selectedChapter,
+                                "$chapterNum");
+                            if (Get.isRegistered<DashBoardController>()) {
+                              final c = Get.find<DashBoardController>();
+                              c.selectedChapter.value = "$chapterNum";
+                              c.selectChapterChange.value = chapterNum;
+                            }
                             setState(() {
                               selectedChapter = index;
                               selectedChangeChapter = index;
-                              SharPreferences.setString(
-                                  SharPreferences.selectedChapter,
-                                  "${index + 1}");
-                              // Future.delayed(Duration.zero,() {
-                              //   DashBoardController().getSelectedChapterAndBook();
-                              //   DashBoardController().getFont();
-                              //   DashBoardController().loadApi();
-                              // },);
-
-                              //Navigator.of(context).push(CustomPageRoute(child: HomeScreen(), direction:AxisDirection.left));
-                              Get.offAll(
+                            });
+                            Get.offAll(
                                   () => HomeScreen(
                                       From: "Chapter",
                                       selectedVerseNumForRead: "",
@@ -203,17 +204,6 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                                       selectedVerseForRead: ""),
                                   transition: Transition.fadeIn,
                                   duration: Duration(milliseconds: 300));
-                            });
-                            // Navigator.of(context).pushAndRemoveUntil(
-                            //     MaterialPageRoute(
-                            //         builder: (c) => HomeScreen(
-                            //             From: "Chapter",
-                            //             selectedVerseNumForRead: "",
-                            //             selectedBookForRead: "",
-                            //             selectedChapterForRead: "",
-                            //             selectedBookNameForRead: "",
-                            //             selectedVerseForRead: "")),
-                            //     (v) => true);
                           },
                           child: Container(
                             height: 20,

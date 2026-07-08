@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
@@ -36,10 +37,7 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
   static const Color _card = Color(0xFFF8F4EB);
   static const Color _gold = Color(0xFF8B6914);
 
-  final TextEditingController _searchController = TextEditingController();
-
   List<VerseTopicVerse> _allVerses = [];
-  List<VerseTopicVerse> _filteredVerses = [];
   bool _loading = true;
 
   @override
@@ -47,14 +45,11 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadVerses();
-    _searchController.addListener(_applyFilter);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _searchController.removeListener(_applyFilter);
-    _searchController.dispose();
     super.dispose();
   }
 
@@ -72,23 +67,7 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
     if (!mounted) return;
     setState(() {
       _allVerses = verses;
-      _filteredVerses = verses;
       _loading = false;
-    });
-  }
-
-  void _applyFilter() {
-    if (!mounted) return;
-    final query = _searchController.text.trim().toLowerCase();
-    if (query.isEmpty) {
-      setState(() => _filteredVerses = _allVerses);
-      return;
-    }
-    setState(() {
-      _filteredVerses = _allVerses.where((verse) {
-        return verse.plainText.toLowerCase().contains(query) ||
-            verse.reference.toLowerCase().contains(query);
-      }).toList();
     });
   }
 
@@ -101,16 +80,14 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
           Navigator.of(dialogContext).pop();
           await _shareAsText(verse);
         },
-        onShareAsImage: () async {
+        onShareAsImage: () {
           Navigator.of(dialogContext).pop();
-          final appPackageName = (await PackageInfo.fromPlatform()).packageName;
-          final appid = BibleInfo.apple_AppId;
-          final shareFooterMessage = Platform.isAndroid
-              ? '\n\nYou can read more at:\nhttps://play.google.com/store/apps/details?id=$appPackageName'
-              : '\n\nYou can read more at:\nhttps://itunes.apple.com/app/id$appid';
-          final controller = DashBoardController();
+          // Reuse existing controller when available; avoid PackageInfo await (footer unused).
+          final controller = Get.isRegistered<DashBoardController>()
+              ? Get.find<DashBoardController>()
+              : DashBoardController();
           if (!mounted) return;
-          await showModalBottomSheet<void>(
+          showModalBottomSheet<void>(
             isScrollControlled: true,
             backgroundColor: Colors.transparent,
             context: context,
@@ -121,7 +98,6 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
                 selectedBook: verse.bookName,
                 selectedChapter: '${verse.chapterNum + 1}',
                 selectedVerseView: '${verse.verseNum + 1}',
-                shareFooterMessage: shareFooterMessage,
               );
             },
           );
@@ -153,31 +129,82 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
   Future<void> _readVerse(VerseTopicVerse verse) async {
     Provider.of<DownloadProvider>(context, listen: false).enableAd();
     await SharPreferences.setString('OpenAd', '1');
+    final bookName = verse.bookName;
+    final bookNum = verse.bookNum;
+    final chapter = verse.chapterNum + 1;
+    final verseIndex = verse.verseNum;
+    final verseText = verse.plainText;
     await SharPreferences.setString(
       SharPreferences.selectedBook,
-      verse.bookName,
+      bookName,
     );
     await SharPreferences.setString(
       SharPreferences.selectedChapter,
-      '${verse.chapterNum + 1}',
+      '$chapter',
     );
     await SharPreferences.setString(
       SharPreferences.selectedBookNum,
-      '${verse.bookNum}',
+      '$bookNum',
     );
-    Get.offAll(
-      () => HomeScreen(
-        From: 'Read',
-        selectedBookForRead: verse.bookNum,
-        selectedChapterForRead: verse.chapterNum + 1,
-        selectedVerseNumForRead: verse.verseNum + 1,
-        selectedBookNameForRead: verse.bookName,
-        selectedVerseForRead: verse.plainText,
-        fromSearch: true,
-      ),
-      transition: Transition.cupertinoDialog,
-      duration: const Duration(milliseconds: 300),
-    );
+    // Prefer updating existing Home + pop to root (smooth) over offAll rebuild.
+    try {
+      final controller = Get.find<DashBoardController>();
+      controller.selectedBook.value = bookName;
+      controller.selectedBookNum.value = '$bookNum';
+      controller.selectedChapter.value = '$chapter';
+      controller.selectChapterChange.value = chapter;
+      controller.selectedBookNameForRead.value = bookName;
+      controller.selectedBookNumForRead.value = '$bookNum';
+      controller.selectedChapterForRead.value = '$chapter';
+      controller.selectedVerseForRead.value = '$verseIndex';
+      await controller.getSelectedChapterAndBook();
+      controller.readHighlight.value = true;
+      controller.selectedIndex.value = verseIndex;
+      if (Navigator.of(context).canPop()) {
+        Get.until((route) => route.isFirst);
+      } else {
+        Get.offAll(
+          () => HomeScreen(
+            From: 'Read',
+            selectedBookForRead: bookNum,
+            selectedChapterForRead: chapter,
+            selectedVerseNumForRead: verseIndex,
+            selectedBookNameForRead: bookName,
+            selectedVerseForRead: verseText,
+            fromSearch: true,
+          ),
+          transition: Transition.fadeIn,
+          duration: const Duration(milliseconds: 280),
+          opaque: true,
+        );
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.delayed(const Duration(milliseconds: 80), () async {
+          try {
+            await controller.scrollToIndex(verseIndex);
+          } catch (_) {}
+          Future.delayed(const Duration(seconds: 6), () {
+            controller.readHighlight.value = false;
+            controller.selectedIndex.value = -1;
+          });
+        });
+      });
+    } catch (_) {
+      Get.offAll(
+        () => HomeScreen(
+          From: 'Read',
+          selectedBookForRead: bookNum,
+          selectedChapterForRead: chapter,
+          selectedVerseNumForRead: verseIndex,
+          selectedBookNameForRead: bookName,
+          selectedVerseForRead: verseText,
+          fromSearch: true,
+        ),
+        transition: Transition.fadeIn,
+        duration: const Duration(milliseconds: 280),
+        opaque: true,
+      );
+    }
   }
 
   void _askAboutVerse(VerseTopicVerse verse) {
@@ -190,8 +217,8 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
           'verse': '${verse.verseNum + 1}',
         },
       ),
-      transition: Transition.cupertinoDialog,
-      duration: const Duration(milliseconds: 300),
+      transition: Transition.cupertino,
+      duration: const Duration(milliseconds: 350),
     );
   }
 
@@ -204,44 +231,44 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
             ThemeMode.dark;
     final cardBorder =
         isDark ? _ink.withValues(alpha: 0.38) : _ink.withValues(alpha: 0.12);
+    final bgColor = isDark
+        ? CommanColor.darkPrimaryColor
+        : const Color(0xFFF5F0E6);
 
     return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset(
-            VerseTopicsData.backgroundAsset,
-            fit: BoxFit.cover,
-            width: double.infinity,
-            height: double.infinity,
-          ),
-          SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Get.back(),
-                        icon: const Icon(Icons.arrow_back_ios, color: _ink),
-                      ),
-                      const Spacer(),
-                    ],
+      backgroundColor: bgColor,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Get.back(),
+                    icon: Icon(
+                      Icons.arrow_back_ios,
+                      color: isDark ? Colors.white : _ink,
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: _loading
-                      ? const Center(
-                          child: CircularProgressIndicator(color: _ink),
-                        )
-                      : ListView(
+                  const Spacer(),
+                ],
+              ),
+            ),
+            Expanded(
+              child: _loading
+                  ? Center(
+                      child: CircularProgressIndicator(
+                        color: isDark ? Colors.white : _ink,
+                      ),
+                    )
+                  : ListView(
                           padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                           children: [
                             Center(
                               child: ColorFiltered(
-                                colorFilter: const ColorFilter.mode(
-                                  _ink,
+                                colorFilter: ColorFilter.mode(
+                                  isDark ? Colors.white : _ink,
                                   BlendMode.srcIn,
                                 ),
                                 child: Image.asset(
@@ -260,7 +287,7 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
                                 fontFamily: 'Georgia',
                                 fontSize: isWide ? 30 : 26,
                                 fontWeight: FontWeight.w700,
-                                color: _ink,
+                                color: isDark ? Colors.white : _ink,
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -272,80 +299,38 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
                               style: TextStyle(
                                 fontFamily: 'Georgia',
                                 fontSize: isWide ? 16 : 14,
-                                color: _ink.withValues(alpha: 0.82),
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.82)
+                                    : _ink.withValues(alpha: 0.82),
                                 height: 1.35,
                               ),
                             ),
                             const SizedBox(height: 18),
-                            Container(
-                              height: isWide ? 52 : 48,
-                              decoration: BoxDecoration(
-                                color: _card,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: isDark
-                                      ? _ink.withValues(alpha: 0.38)
-                                      : _ink.withValues(alpha: 0.18),
-                                  width: isDark ? 1.3 : 1,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                    ),
-                                    child: Icon(
-                                      Icons.search,
-                                      color: _ink.withValues(alpha: 0.55),
-                                      size: isWide ? 24 : 22,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _searchController,
-                                      style: TextStyle(
-                                        fontFamily: 'Georgia',
-                                        fontSize: isWide ? 16 : 14,
-                                        color: _ink,
-                                      ),
-                                      decoration: InputDecoration(
-                                        hintText: 'Search verses...',
-                                        hintStyle: TextStyle(
-                                          fontFamily: 'Georgia',
-                                          fontSize: isWide ? 16 : 14,
-                                          color: _ink.withValues(alpha: 0.45),
-                                        ),
-                                        border: InputBorder.none,
-                                        isDense: true,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 14),
                             Row(
                               children: [
                                 Icon(
                                   Icons.menu_book_outlined,
                                   size: 18,
-                                  color: _gold.withValues(alpha: 0.9),
+                                  color: isDark
+                                      ? Colors.white.withValues(alpha: 0.9)
+                                      : _gold.withValues(alpha: 0.9),
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  '${_filteredVerses.length} Verses Found',
+                                  '${_allVerses.length} Verses Found',
                                   style: TextStyle(
                                     fontFamily: 'Georgia',
                                     fontSize: isWide ? 15 : 13,
                                     fontWeight: FontWeight.w600,
-                                    color: _ink.withValues(alpha: 0.85),
+                                    color: isDark
+                                        ? Colors.white.withValues(alpha: 0.9)
+                                        : _ink.withValues(alpha: 0.85),
                                   ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 14),
-                            if (_filteredVerses.isEmpty)
+                            if (_allVerses.isEmpty)
                               Padding(
                                 padding: const EdgeInsets.symmetric(vertical: 32),
                                 child: Text(
@@ -354,12 +339,14 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
                                   style: TextStyle(
                                     fontFamily: 'Georgia',
                                     fontSize: isWide ? 16 : 14,
-                                    color: _ink.withValues(alpha: 0.7),
+                                    color: isDark
+                                        ? Colors.white.withValues(alpha: 0.75)
+                                        : _ink.withValues(alpha: 0.7),
                                   ),
                                 ),
                               )
                             else
-                              ..._filteredVerses.map(
+                              ..._allVerses.map(
                                 (verse) => _VerseCard(
                                   verse: verse,
                                   isWide: isWide,
@@ -374,10 +361,8 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
                           ],
                         ),
                 ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -480,7 +465,7 @@ class _VerseCard extends StatelessWidget {
                 ),
                 Expanded(
                   child: _ActionButton(
-                    iconAsset: 'assets/Bookmark icons/Frame 3630.png',
+                    icon: Icons.copy_outlined,
                     label: 'Copy',
                     onTap: onCopy,
                     isWide: isWide,
@@ -506,7 +491,7 @@ class _VerseCard extends StatelessWidget {
                 ),
                 Expanded(
                   child: _ActionButton(
-                    iconAsset: 'assets/Chat icon.png',
+                    icon: Icons.chat_bubble_outline,
                     label: 'Ask',
                     onTap: onAsk,
                     isWide: isWide,

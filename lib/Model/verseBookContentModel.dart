@@ -129,9 +129,103 @@ List<VerseBookContentModel> filterContent(
   return filteredContent;
 }
 
+/// Normalizes verse HTML/plain text for content comparison.
+String normalizeVersePlainText(String? raw) {
+  if (raw == null || raw.trim().isEmpty) return '';
+  final withoutTags = raw.replaceAll(RegExp(r'<[^>]*>'), ' ');
+  return withoutTags
+      .replaceAll(RegExp(r'&nbsp;|&#160;'), ' ')
+      .replaceAll(RegExp(r'&quot;'), '"')
+      .replaceAll(RegExp(r'&amp;'), '&')
+      .replaceAll(RegExp(r'&lt;'), '<')
+      .replaceAll(RegExp(r'&gt;'), '>')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim()
+      .toLowerCase();
+}
+
 /// DB stores 0-based verse_num; UI shows 1-based verse numbers.
 int displayVerseNumber(VerseBookContentModel verse, {int listIndex = 0}) {
   final stored = verse.verseNum;
   if (stored != null) return stored.toInt() + 1;
   return listIndex + 1;
+}
+
+/// Reader `book_num` from daily [Book_Id] (same as splash daily-verse DB lookup).
+int dailyVerseBookNum(num? bookId) {
+  final id = (bookId ?? 0).toInt();
+  return id > 0 ? id - 1 : 0;
+}
+
+/// Reader UI chapter from daily stored [Chapter] (1-based bible chapter).
+int dailyVerseUiChapter(num? chapter) {
+  final ch = (chapter ?? 0).toInt();
+  return ch > 0 ? ch : 1;
+}
+
+/// Reader UI verse from daily stored [Verse_Num] (1-based bible verse).
+int dailyVerseUiVerse(num? verseNum) {
+  final v = (verseNum ?? 0).toInt();
+  return v > 0 ? v : 1;
+}
+
+/// Reader DB `verse_num` from daily [Verse_Num] (stored 1-based in dailyVerses).
+int dailyVerseDbVerseNum(num? verseNum) {
+  final v = (verseNum ?? 0).toInt();
+  return v > 0 ? v - 1 : 0;
+}
+
+/// Maps daily [Verse_Num] to reader list index.
+/// Book/chapter are loaded separately; this finds the matching verse row.
+int resolveDailyVerseListIndex(
+  int dailyVerseNum,
+  List<VerseBookContentModel> chapterContent, {
+  String? versePlainText,
+}) {
+  if (chapterContent.isEmpty) {
+    return dailyVerseNum < 0 ? 0 : dailyVerseNum;
+  }
+
+  final normalizedHint = normalizeVersePlainText(versePlainText);
+  if (normalizedHint.length >= 8) {
+    for (var i = 0; i < chapterContent.length; i++) {
+      final row =
+          normalizeVersePlainText(chapterContent[i].content?.toString());
+      if (row.isNotEmpty && row == normalizedHint) {
+        return i;
+      }
+    }
+    final hintPrefix =
+        normalizedHint.length > 40 ? normalizedHint.substring(0, 40) : normalizedHint;
+    for (var i = 0; i < chapterContent.length; i++) {
+      final row =
+          normalizeVersePlainText(chapterContent[i].content?.toString());
+      if (row.isEmpty) continue;
+      final rowPrefix = row.length > 40 ? row.substring(0, 40) : row;
+      if (row.startsWith(hintPrefix) || hintPrefix.startsWith(rowPrefix)) {
+        return i;
+      }
+    }
+  }
+
+  // Verse_Num stored 0-based (matches DB verse_num) — try before subtracting 1.
+  for (var i = 0; i < chapterContent.length; i++) {
+    if (chapterContent[i].verseNum?.toInt() == dailyVerseNum) return i;
+  }
+
+  // Verse_Num stored 1-based (splash insert) -> DB verse_num is Verse_Num - 1.
+  final dbVerse = dailyVerseDbVerseNum(dailyVerseNum);
+  for (var i = 0; i < chapterContent.length; i++) {
+    if (chapterContent[i].verseNum?.toInt() == dbVerse) return i;
+  }
+
+  final dailyDisplayVerse = dailyVerseNum + 1;
+  for (var i = 0; i < chapterContent.length; i++) {
+    if (displayVerseNumber(chapterContent[i], listIndex: i) ==
+        dailyDisplayVerse) {
+      return i;
+    }
+  }
+
+  return dailyVerseNum.clamp(0, chapterContent.length - 1);
 }

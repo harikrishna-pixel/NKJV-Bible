@@ -23,6 +23,7 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../Model/dailyVerseList.dart';
+import '../../../Model/verseBookContentModel.dart';
 import '../../constants/constant.dart';
 import '../../constants/images.dart';
 import 'package:flutter/cupertino.dart';
@@ -45,7 +46,7 @@ int _indexOfVerseMatchingWidgetRef(
   for (var i = 0; i < list.length; i++) {
     final v = list[i];
     final listRef = _normalizeDailyVerseRef(
-        '${v.book} ${(v.chapter ?? 0) + 1}:${(v.verseNum ?? 0) + 1}');
+        '${v.book} ${dailyVerseUiChapter(v.chapter)}:${dailyVerseUiVerse(v.verseNum)}');
     if (listRef == wNorm ||
         listRef.replaceAll(' ', '') == wNorm.replaceAll(' ', '')) {
       return i;
@@ -60,8 +61,8 @@ int _indexOfVerseMatchingWidgetRef(
       for (var i = 0; i < list.length; i++) {
         final v = list[i];
         if ((v.book ?? '').toLowerCase().trim() == bookW &&
-            (v.chapter ?? 0) + 1 == ch &&
-            (v.verseNum ?? 0) + 1 == vs) {
+            dailyVerseUiChapter(v.chapter) == ch &&
+            dailyVerseUiVerse(v.verseNum) == vs) {
           return i;
         }
       }
@@ -408,7 +409,7 @@ class _DailyVerseState extends State<DailyVerse> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       Text(
-                          "${data.book} ${data.chapter! + 1}: ${data.verseNum! + 1}",
+                          "${data.book} ${dailyVerseUiChapter(data.chapter)}: ${dailyVerseUiVerse(data.verseNum)}",
                           textAlign: TextAlign.right,
                           style: CommanStyle.black15400),
                     ],
@@ -423,7 +424,7 @@ class _DailyVerseState extends State<DailyVerse> {
                         onTap: () async {
                           await Clipboard.setData(ClipboardData(
                               text:
-                                  "${parse(data.verse).body?.text} \n${data.book} ${data.chapter! + 1}:${data.verseNum! + 1}"));
+                                  "${parse(data.verse).body?.text} \n${data.book} ${dailyVerseUiChapter(data.chapter)}:${dailyVerseUiVerse(data.verseNum)}"));
                           Constants.showToast("Copied");
                         },
                         child: Column(
@@ -458,57 +459,83 @@ class _DailyVerseState extends State<DailyVerse> {
                       ),
                       InkWell(
                         onTap: () async {
-                          // debugPrint(
-                          //   "bookid - ${int.parse(data.bookId.toString())} chapter - ${1 + int.parse(data.chapter.toString())} verseno - ${1 + int.parse(data.verseNum.toString())} book - ${data.book.toString()}  vcontent - ${parse(data.verse).body?.text.toString()} ",
-                          // );
+                          final sheetContext = context;
+                          final bookName = data.book.toString();
+                          final bookId = int.parse(data.bookId.toString());
+                          final bookNum = dailyVerseBookNum(bookId);
+                          final chapter = dailyVerseUiChapter(data.chapter);
+                          final verseNum =
+                              int.parse(data.verseNum.toString());
+                          final verseText =
+                              parse(data.verse).body?.text.toString() ?? '';
+
+                          Navigator.of(sheetContext).pop();
+                          await Future<void>.delayed(
+                              const Duration(milliseconds: 220));
 
                           await SharPreferences.setString(
-                              SharPreferences.selectedBook,
-                              data.book.toString());
+                              SharPreferences.selectedBook, bookName);
+                          await SharPreferences.setString(
+                              SharPreferences.selectedChapter, "$chapter");
+                          await SharPreferences.setString(
+                              SharPreferences.selectedBookNum, "$bookNum");
 
-                          await SharPreferences.setString(
-                              SharPreferences.selectedChapter,
-                              "${1 + int.parse(data.chapter.toString())}");
-                          await SharPreferences.setString(
-                              SharPreferences.selectedBookNum,
-                              "${int.parse(data.bookId.toString())}");
-                          Get.offAll(
+                          try {
+                            final controller =
+                                Get.find<DashBoardController>();
+                            controller.selectedBook.value = bookName;
+                            controller.selectedBookNum.value = "$bookNum";
+                            controller.selectedChapter.value = "$chapter";
+                            controller.selectChapterChange.value = chapter;
+                            controller.selectedBookNameForRead.value =
+                                bookName;
+                            controller.selectedBookNumForRead.value =
+                                "$bookNum";
+                            controller.selectedChapterForRead.value =
+                                "$chapter";
+                            Get.until((route) => route.isFirst);
+                            await Future<void>.delayed(
+                                const Duration(milliseconds: 120));
+                            controller.isFetchContent.value = true;
+                            controller.selectedBookContent.clear();
+                            await controller.getBookContentForRead();
+                            controller.isFetchContent.value = false;
+                            final listIndex = resolveDailyVerseListIndex(
+                              verseNum,
+                              controller.selectedBookContent,
+                              versePlainText: verseText,
+                            );
+                            controller.selectedVerseForRead.value =
+                                "$listIndex";
+                            controller.readHighlight.value = true;
+                            controller.selectedIndex.value = listIndex;
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              Future.delayed(
+                                  const Duration(milliseconds: 400), () async {
+                                try {
+                                  await controller.scrollToIndex(listIndex);
+                                } catch (_) {}
+                                Future.delayed(const Duration(seconds: 6), () {
+                                  controller.readHighlight.value = false;
+                                  controller.selectedIndex.value = -1;
+                                });
+                              });
+                            });
+                          } catch (_) {
+                            Get.offAll(
                               () => HomeScreen(
-                                  From: "Daily",
-                                  selectedBookForRead:
-                                      int.parse(data.bookId.toString()),
-                                  selectedChapterForRead:
-                                      1 + int.parse(data.chapter.toString()),
-                                  selectedVerseNumForRead:
-                                      1 + int.parse(data.verseNum.toString()),
-                                  selectedBookNameForRead: data.book.toString(),
-                                  selectedVerseForRead:
-                                      parse(data.verse).body?.text.toString()),
-                              transition: Transition.cupertinoDialog,
-                              duration: const Duration(milliseconds: 300));
-                          // await SharPreferences.setString(
-                          //     SharPreferences.selectedBookNum,
-                          //     ((data.bookId ?? 1) - 1).toString());
-                          // await SharPreferences.setString(
-                          //     SharPreferences.selectedChapter,
-                          //     data.chapter?.toString() ?? '');
-                          // await SharPreferences.setString(
-                          //     SharPreferences.selectedBook,
-                          //     data.book.toString());
-                          // Get.offAll(
-                          //     () => HomeScreen(
-                          //         From: "Read",
-                          //         selectedBookForRead:
-                          //             int.parse(data.bookId.toString()),
-                          //         selectedChapterForRead:
-                          //             int.parse(data.chapter.toString()),
-                          //         selectedVerseNumForRead:
-                          //             int.parse(data.verseNum.toString()),
-                          //         selectedBookNameForRead: data.book.toString(),
-                          //         selectedVerseForRead:
-                          //             parse(data.verse).body?.text.toString()),
-                          //     transition: Transition.cupertinoDialog,
-                          //     duration: const Duration(milliseconds: 300));
+                                From: "Daily",
+                                selectedBookForRead: bookNum,
+                                selectedChapterForRead: chapter,
+                                selectedVerseNumForRead: verseNum,
+                                selectedBookNameForRead: bookName,
+                                selectedVerseForRead: verseText,
+                              ),
+                              transition: Transition.fadeIn,
+                              duration: const Duration(milliseconds: 400),
+                              opaque: true,
+                            );
+                          }
                         },
                         child: Column(
                           children: [
@@ -567,7 +594,7 @@ class _DailyVerseState extends State<DailyVerse> {
                             context: context,
                             builder: (context) => ShareAlertBox(
                               verseTitle:
-                                  " ${data.book} ${int.parse(data.chapter.toString()) + 1}:${int.parse(data.verseNum.toString()) + 1}",
+                                  " ${data.book} ${dailyVerseUiChapter(data.chapter)}:${dailyVerseUiVerse(data.verseNum)}",
                               onShareAsText: () async {
                                 Navigator.of(context).pop();
                                 // Your logic here
@@ -583,7 +610,7 @@ class _DailyVerseState extends State<DailyVerse> {
                                       "${html.parse("${data.verse}").body?.text ?? ''}.\n\nYou can read more at:\nhttps://play.google.com/store/apps/details?id=$appPackageName";
                                 } else if (Platform.isIOS) {
                                   message =
-                                      '${html.parse("${data.verse}").body?.text ?? ''}.\n${data.book} ${data.chapter! + 1}:${data.verseNum! + 1}\n\nYou can read more at:\nhttps://itunes.apple.com/app/id$appid'; // Example iTunes URL
+                                      '${html.parse("${data.verse}").body?.text ?? ''}.\n${data.book} ${dailyVerseUiChapter(data.chapter)}:${dailyVerseUiVerse(data.verseNum)}\n\nYou can read more at:\nhttps://itunes.apple.com/app/id$appid'; // Example iTunes URL
                                 }
 
                                 if (message.isNotEmpty) {
@@ -615,9 +642,9 @@ class _DailyVerseState extends State<DailyVerse> {
                                       content: data.verse.toString(),
                                       selectedBook: data.book.toString(),
                                       selectedChapter:
-                                          "${int.parse(data.chapter.toString()) + 1}",
+                                          "${dailyVerseUiChapter(data.chapter)}",
                                       selectedVerseView:
-                                          "${int.parse(data.verseNum.toString()) + 1}",
+                                          "${dailyVerseUiVerse(data.verseNum)}",
                                       shareFooterMessage: shareFooterMessage,
                                     );
                                   },
@@ -654,9 +681,9 @@ class _DailyVerseState extends State<DailyVerse> {
                                         '',
                                 'book': data.book.toString(),
                                 'chapter':
-                                    '${int.parse(data.chapter.toString()) + 1}',
+                                    '${dailyVerseUiChapter(data.chapter)}',
                                 'verse':
-                                    '${int.parse(data.verseNum.toString()) + 1}',
+                                    '${dailyVerseUiVerse(data.verseNum)}',
                               },
                             ),
                             transition: Transition.cupertinoDialog,
@@ -703,12 +730,20 @@ class _DailyVerseState extends State<DailyVerse> {
     final provider = Provider.of<DownloadProvider>(context, listen: true);
     // dailyVerseList = dailyVerseList.reversed.toList();
 
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isVintage =
+        themeProvider.currentCustomTheme == AppCustomTheme.vintage;
+    final isDark = themeProvider.themeMode == ThemeMode.dark;
     return Scaffold(
+      backgroundColor: isVintage
+          ? (isDark ? CommanColor.black : const Color(0xFFF5F0E6))
+          : (isDark
+              ? CommanColor.darkPrimaryColor
+              : themeProvider.backgroundColor),
       body: Container(
           height: MediaQuery.of(context).size.height,
           width: MediaQuery.of(context).size.width,
-          decoration: Provider.of<ThemeProvider>(context).currentCustomTheme ==
-                  AppCustomTheme.vintage
+          decoration: isVintage
               ? BoxDecoration(
                   image: DecorationImage(
                       image: AssetImage(Images.bgImage(context)),
@@ -866,6 +901,15 @@ class _DailyVerseState extends State<DailyVerse> {
                                 String yesterdayDate = DateFormat("dd-MM-yyyy")
                                     .format(DateTime.now()
                                         .subtract(Duration(days: 1)));
+                                final formattedDate =
+                                    DateFormat("dd-MM-yyyy").format(date);
+                                final String dateLabel =
+                                    formattedDate == currentDate
+                                        ? "Today"
+                                        : formattedDate == yesterdayDate
+                                            ? "Yesterday"
+                                            : DateFormat('MMMM d, yyyy')
+                                                .format(date);
                                 return Padding(
                                   padding:
                                       const EdgeInsets.symmetric(vertical: 2),
@@ -885,30 +929,14 @@ class _DailyVerseState extends State<DailyVerse> {
                                               MainAxisAlignment.spaceBetween,
                                           children: [
                                             Text(
-                                              DateFormat("dd-MM-yyyy")
-                                                          .format(date) ==
-                                                      yesterdayDate
-                                                  ? "Yesterday"
-                                                  : DateFormat("dd-MM-yyyy")
-                                                              .format(date) ==
-                                                          currentDate
-                                                      ? "Today"
-                                                      : DateFormat("dd-MM-yyyy")
-                                                          .format(date),
+                                              dateLabel,
                                               style: CommanStyle.bw16500(
                                                       context)
                                                   .copyWith(
                                                       fontSize: fontSize,
-                                                      // screenWidth >
-                                                      //         450
-                                                      //     ? BibleInfo
-                                                      //             .fontSizeScale *
-                                                      //         20
-                                                      //     : BibleInfo
-                                                      //             .fontSizeScale *
-                                                      //         16,
                                                       color: CommanColor
-                                                          .whiteBlack(context)),
+                                                          .whiteBlack(
+                                                              context)),
                                             ),
                                             Row(
                                               children: [
@@ -979,7 +1007,7 @@ class _DailyVerseState extends State<DailyVerse> {
                                           children: [
                                             Expanded(
                                               child: Text(
-                                                "${data.book} ${data.chapter! + 1}:${data.verseNum! + 1}",
+                                                "${data.book} ${dailyVerseUiChapter(data.chapter)}:${dailyVerseUiVerse(data.verseNum)}",
                                                 style: CommanStyle
                                                     .bwWithChangeFont(
                                                         context,

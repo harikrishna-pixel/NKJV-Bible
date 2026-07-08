@@ -159,7 +159,16 @@ class _BookListScreenState extends State<BookListScreen> {
     double screenWidth = MediaQuery.of(context).size.width;
     final oldTestamentCount = _oldTestamentBooks.length;
     debugPrint("sz current width - $screenWidth ");
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isVintage =
+        themeProvider.currentCustomTheme == AppCustomTheme.vintage;
+    final isDark = themeProvider.themeMode == ThemeMode.dark;
     return Scaffold(
+      backgroundColor: isVintage
+          ? (isDark ? CommanColor.black : const Color(0xFFF5F0E6))
+          : (isDark
+              ? CommanColor.darkPrimaryColor
+              : themeProvider.backgroundColor),
       appBar: AppBar(
         toolbarHeight: 50,
         flexibleSpace: Container(
@@ -287,9 +296,12 @@ class _BookListScreenState extends State<BookListScreen> {
                               children: [
                                 ListView.builder(
                                   itemCount: oldTestamentCount,
-                                  shrinkWrap: true,
                                   padding: EdgeInsets.symmetric(horizontal: 15),
-                                  physics: ScrollPhysics(),
+                                  physics: const BouncingScrollPhysics(
+                                    parent: AlwaysScrollableScrollPhysics(),
+                                  ),
+                                  cacheExtent: 400,
+                                  addAutomaticKeepAlives: false,
                                   itemBuilder: (context, index) {
                                     if (index >= _oldTestamentBooks.length) {
                                       return const SizedBox.shrink();
@@ -405,9 +417,12 @@ class _BookListScreenState extends State<BookListScreen> {
                                 ),
                                 ListView.builder(
                                   itemCount: newTestmentBookList.length,
-                                  shrinkWrap: true,
                                   padding: EdgeInsets.symmetric(horizontal: 15),
-                                  physics: ScrollPhysics(),
+                                  physics: const BouncingScrollPhysics(
+                                    parent: AlwaysScrollableScrollPhysics(),
+                                  ),
+                                  cacheExtent: 400,
+                                  addAutomaticKeepAlives: false,
                                   itemBuilder: (context, index) {
                                     var data = newTestmentBookList[index];
                                     return Padding(

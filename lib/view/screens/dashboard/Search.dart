@@ -24,6 +24,7 @@ import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/chat/chat_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
+import 'package:biblebookapp/view/screens/verse_topics/verse_topics_data.dart';
 import 'package:biblebookapp/view/screens/verse_topics/verse_topics_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -167,6 +168,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
     // Keep full local hydrate + prefs sync in background (no UI wait).
     unawaited(loadLocal());
+
+    // Preload Explore Topics category list so the grid opens instantly.
+    VerseTopicsData.preloadCategories();
   }
 
   Future<void> _loadRecentSearches() async {
@@ -266,7 +270,85 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _openPreferenceSelection() {
-    Get.to(() => const VerseTopicsScreen());
+    Get.to(
+      () => const VerseTopicsScreen(),
+      transition: Transition.cupertino,
+      duration: const Duration(milliseconds: 350),
+    );
+  }
+
+  /// Opens the reader at [verseIndex] (0-based) without rebuilding the stack.
+  Future<void> _openVerseInReader({
+    required String bookName,
+    required int bookNum,
+    required int chapter,
+    required int verseIndex,
+    required String verseText,
+  }) async {
+    await SharPreferences.setString('OpenAd', '1');
+    await SharPreferences.setString(SharPreferences.selectedBook, bookName);
+    await SharPreferences.setString(
+        SharPreferences.selectedChapter, '$chapter');
+    await SharPreferences.setString(
+        SharPreferences.selectedBookNum, '$bookNum');
+    try {
+      final controller = Get.find<DashBoardController>();
+      controller.selectedBook.value = bookName;
+      controller.selectedBookNum.value = '$bookNum';
+      controller.selectedChapter.value = '$chapter';
+      controller.selectChapterChange.value = chapter;
+      controller.selectedBookNameForRead.value = bookName;
+      controller.selectedBookNumForRead.value = '$bookNum';
+      controller.selectedChapterForRead.value = '$chapter';
+      controller.selectedVerseForRead.value = '$verseIndex';
+      await controller.getSelectedChapterAndBook();
+      controller.readHighlight.value = true;
+      controller.selectedIndex.value = verseIndex;
+      if (Navigator.of(context).canPop()) {
+        Get.until((route) => route.isFirst);
+      } else {
+        Get.offAll(
+          () => HomeScreen(
+            From: 'Read',
+            selectedBookForRead: bookNum,
+            selectedChapterForRead: chapter,
+            selectedVerseNumForRead: verseIndex,
+            selectedBookNameForRead: bookName,
+            selectedVerseForRead: verseText,
+            fromSearch: true,
+          ),
+          transition: Transition.fadeIn,
+          duration: const Duration(milliseconds: 280),
+          opaque: true,
+        );
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.delayed(const Duration(milliseconds: 80), () async {
+          try {
+            await controller.scrollToIndex(verseIndex);
+          } catch (_) {}
+          Future.delayed(const Duration(seconds: 6), () {
+            controller.readHighlight.value = false;
+            controller.selectedIndex.value = -1;
+          });
+        });
+      });
+    } catch (_) {
+      Get.offAll(
+        () => HomeScreen(
+          From: 'Read',
+          selectedBookForRead: bookNum,
+          selectedChapterForRead: chapter,
+          selectedVerseNumForRead: verseIndex,
+          selectedBookNameForRead: bookName,
+          selectedVerseForRead: verseText,
+          fromSearch: true,
+        ),
+        transition: Transition.fadeIn,
+        duration: const Duration(milliseconds: 280),
+        opaque: true,
+      );
+    }
   }
 
   Widget _buildExploreTopicsBanner(double screenWidth) {
@@ -289,23 +371,30 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                boxShadow: [
-                  BoxShadow(
-                    color: primary.withOpacity(0.22),
-                    blurRadius: 14,
-                    spreadRadius: 1,
+            lightText
+                ? DecoratedBox(
+                    decoration: BoxDecoration(
+                      boxShadow: [
+                        BoxShadow(
+                          color: primary.withOpacity(0.22),
+                          blurRadius: 14,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: Image.asset(
+                      Images.searchPlaceHolder(context),
+                      width: screenWidth > 450 ? 72 : 58,
+                      height: screenWidth > 450 ? 72 : 58,
+                      fit: BoxFit.contain,
+                    ),
+                  )
+                : Image.asset(
+                    Images.searchPlaceHolder(context),
+                    width: screenWidth > 450 ? 72 : 58,
+                    height: screenWidth > 450 ? 72 : 58,
+                    fit: BoxFit.contain,
                   ),
-                ],
-              ),
-              child: Image.asset(
-                Images.searchPlaceHolder(context),
-                width: screenWidth > 450 ? 72 : 58,
-                height: screenWidth > 450 ? 72 : 58,
-                fit: BoxFit.contain,
-              ),
-            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -868,9 +957,17 @@ class _SearchScreenState extends State<SearchScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildSuggestionsSection(screenWidth),
-          _buildRecentSearchesSection(screenWidth),
-          if (_showExploreTopicsBanner()) _buildNoResultsState(screenWidth),
+          // When there are no matching results, show the empty state first (primary focus),
+          // and keep optional sections below it.
+          if (_showExploreTopicsBanner()) ...[
+            _buildNoResultsState(screenWidth),
+            const SizedBox(height: 12),
+            _buildRecentSearchesSection(screenWidth),
+            _buildSuggestionsSection(screenWidth),
+          ] else ...[
+            _buildSuggestionsSection(screenWidth),
+            _buildRecentSearchesSection(screenWidth),
+          ],
           const SizedBox(height: 8),
         ],
       ),
@@ -1391,7 +1488,8 @@ class _SearchScreenState extends State<SearchScreen> {
                                   8,
                                   screenWidth > 450 ? 14 : 12,
                                 ),
-                                hintText: 'Search',
+                                hintText:
+                                    'Type a verse, topic, or prayer...',
                                 hintStyle: CommanStyle.grey13400,
                                 border: InputBorder.none,
                                 enabledBorder: InputBorder.none,
@@ -1406,9 +1504,7 @@ class _SearchScreenState extends State<SearchScreen> {
                               right: Radius.circular(14),
                             ),
                             child: Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: screenWidth > 450 ? 20 : 16,
-                              ),
+                              width: screenWidth > 450 ? 56 : 50,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
                                 color: CommanColor.lightDarkPrimary(context),
@@ -1416,13 +1512,10 @@ class _SearchScreenState extends State<SearchScreen> {
                                   right: Radius.circular(14),
                                 ),
                               ),
-                              child: Text(
-                                'Search',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: screenWidth > 450 ? 16 : 14,
-                                ),
+                              child: Icon(
+                                Icons.search,
+                                color: Colors.white,
+                                size: screenWidth > 450 ? 26 : 22,
                               ),
                             ),
                           ),
@@ -1790,59 +1883,26 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                 context,
                                                                 listen: false)
                                                             .enableAd();
-                                                        // if (_myProvider !=
-                                                        //     null) {
-                                                        //   _myProvider?.enableAd();
-                                                        // }
-                                                        await SharPreferences
-                                                            .setString(
-                                                                'OpenAd', '1');
-                                                        await SharPreferences
-                                                            .setString(
-                                                                SharPreferences
-                                                                    .selectedBook,
-                                                                bookName
-                                                                    .toString());
-                                                        await SharPreferences.setString(
-                                                            SharPreferences
-                                                                .selectedChapter,
-                                                            "${1 + int.parse(data.chapterNum.toString())}");
-                                                        await SharPreferences.setString(
-                                                            SharPreferences
-                                                                .selectedBookNum,
-                                                            "${int.parse(data.bookNum.toString())}");
-                                                        await SharPreferences
-                                                            .setString(
-                                                                'OpenAd', '1');
-
-                                                        // Navigator.push(context, MaterialPageRoute(builder: (context) => );
-                                                        Get.offAll(
-                                                            () => HomeScreen(
-                                                                From: "Read",
-                                                                selectedBookForRead:
-                                                                    int.parse(data
-                                                                        .bookNum
-                                                                        .toString()),
-                                                                selectedChapterForRead:
-                                                                    int.parse(data.chapterNum.toString()) +
-                                                                        1,
-                                                                selectedVerseNumForRead:
-                                                                    int.parse(data.verseNum.toString()) +
-                                                                        1,
-                                                                selectedBookNameForRead:
-                                                                    bookName
-                                                                        .toString(),
-                                                                selectedVerseForRead:
-                                                                    parse(data.content)
-                                                                        .body
-                                                                        ?.text
-                                                                        .toString(),
-                                                                fromSearch:
-                                                                    true),
-                                                            transition: Transition
-                                                                .cupertinoDialog,
-                                                            duration: const Duration(
-                                                                milliseconds: 300));
+                                                        await _openVerseInReader(
+                                                          bookName:
+                                                              bookName.toString(),
+                                                          bookNum: int.parse(data
+                                                              .bookNum
+                                                              .toString()),
+                                                          chapter: int.parse(data
+                                                                  .chapterNum
+                                                                  .toString()) +
+                                                              1,
+                                                          verseIndex: int.parse(
+                                                              data.verseNum
+                                                                  .toString()),
+                                                          verseText: parse(data
+                                                                      .content)
+                                                                  .body
+                                                                  ?.text
+                                                                  .toString() ??
+                                                              '',
+                                                        );
                                                       },
                                                       child: Column(
                                                         children: [
@@ -2303,58 +2363,29 @@ class _SearchScreenState extends State<SearchScreen> {
                                                                           listen:
                                                                               false)
                                                                       .enableAd();
-                                                                  // if (_myProvider !=
-                                                                  //     null) {
-                                                                  //   _myProvider?.enableAd();
-                                                                  // }
-                                                                  await SharPreferences
-                                                                      .setString(
-                                                                          'OpenAd',
-                                                                          '1');
-                                                                  await SharPreferences.setString(
-                                                                      SharPreferences
-                                                                          .selectedBook,
-                                                                      bookName
-                                                                          .toString());
-                                                                  await SharPreferences.setString(
-                                                                      SharPreferences
-                                                                          .selectedChapter,
-                                                                      "${1 + int.parse(data.chapterNum.toString())}");
-                                                                  await SharPreferences.setString(
-                                                                      SharPreferences
-                                                                          .selectedBookNum,
-                                                                      "${int.parse(data.bookNum.toString())}");
-                                                                  await SharPreferences
-                                                                      .setString(
-                                                                          'OpenAd',
-                                                                          '1');
-
-                                                                  // Navigator.push(context, MaterialPageRoute(builder: (context) => );
-                                                                  Get.offAll(
-                                                                      () => HomeScreen(
-                                                                          From:
-                                                                              "Read",
-                                                                          selectedBookForRead: int.parse(data
-                                                                              .bookNum
-                                                                              .toString()),
-                                                                          selectedChapterForRead: int.parse(data.chapterNum.toString()) +
-                                                                              1,
-                                                                          selectedVerseNumForRead: int.parse(data.verseNum.toString()) +
-                                                                              1,
-                                                                          selectedBookNameForRead: bookName
-                                                                              .toString(),
-                                                                          selectedVerseForRead: parse(data.content)
-                                                                              .body
-                                                                              ?.text
-                                                                              .toString(),
-                                                                          fromSearch:
-                                                                              true),
-                                                                      transition:
-                                                                          Transition
-                                                                              .cupertinoDialog,
-                                                                      duration:
-                                                                          const Duration(
-                                                                              milliseconds: 300));
+                                                                  await _openVerseInReader(
+                                                                    bookName:
+                                                                        bookName
+                                                                            .toString(),
+                                                                    bookNum: int
+                                                                        .parse(data
+                                                                            .bookNum
+                                                                            .toString()),
+                                                                    chapter: int.parse(data
+                                                                            .chapterNum
+                                                                            .toString()) +
+                                                                        1,
+                                                                    verseIndex:
+                                                                        int.parse(data
+                                                                            .verseNum
+                                                                            .toString()),
+                                                                    verseText: parse(data
+                                                                                .content)
+                                                                            .body
+                                                                            ?.text
+                                                                            .toString() ??
+                                                                        '',
+                                                                  );
                                                                 },
                                                                 child: Column(
                                                                   children: [

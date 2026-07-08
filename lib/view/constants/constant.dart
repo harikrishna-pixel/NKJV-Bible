@@ -18,8 +18,20 @@ class Loader extends StatelessWidget {
 class Constants {
   //show toast
   static showToast(String message, [sec = 1000]) {
-    EasyLoading.showToast(message,
-        toastPosition: EasyLoadingToastPosition.top,
-        duration: Duration(milliseconds: sec));
+    final duration = Duration(milliseconds: sec);
+    final previousInteractions = EasyLoading.instance.userInteractions;
+    // Toasts should not block scrolling/taps on the screen underneath.
+    EasyLoading.instance.userInteractions = true;
+    EasyLoading.showToast(
+      message,
+      toastPosition: EasyLoadingToastPosition.top,
+      duration: duration,
+      maskType: EasyLoadingMaskType.none,
+      dismissOnTap: false,
+    );
+    Future.delayed(duration, () {
+      EasyLoading.dismiss();
+      EasyLoading.instance.userInteractions = previousInteractions;
+    });
   }
 }

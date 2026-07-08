@@ -1,14 +1,17 @@
+import 'package:biblebookapp/controller/dashboard_controller.dart';
+import 'package:biblebookapp/services/paywall_preload_service.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 
 enum MilestoneLifetimeKind { scripture, prayer }
 
-/// Themed Lifetime offer screen after milestone (chat vs prayer copy).
+/// Themed offer screen after milestone (chat vs prayer copy).
 /// Unlock runs IAP via a transparent [SubscriptionScreen] host (store sheet only).
 class MilestoneLifetimeIapScreen extends StatefulWidget {
   const MilestoneLifetimeIapScreen({super.key, required this.kind});
@@ -21,6 +24,32 @@ class MilestoneLifetimeIapScreen extends StatefulWidget {
 }
 
 class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen> {
+  /// Display price for the 1-year plan (from store when available).
+  String _oneYearPrice = '\$19.99';
+  String _oneYearComparePrice = '\$99.99';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOneYearPlanPrice();
+  }
+
+  void _loadOneYearPlanPrice() {
+    final products = PaywallPreloadService.getPreloadedProducts();
+    for (final product in products) {
+      final id = product.id.toLowerCase();
+      // Only the 1-year product — never 2-year.
+      if (id.contains('oneyear')) {
+        if (mounted) {
+          setState(() {
+            _oneYearPrice = product.price;
+          });
+        }
+        return;
+      }
+    }
+  }
+
   Future<void> _openInvisibleLifetimePurchase(BuildContext context) async {
     final sixMonth = await SharPreferences.getString('sixMonthPlan') ??
         BibleInfo.sixMonthPlanid;
@@ -35,6 +64,7 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
         ? 'milestone_scripture_lifetime'
         : 'milestone_prayer_lifetime';
 
+    // Plan slot: 0=6mo, 1=1yr, 2=2yr, 3=lifetime — purchase the 1-year plan.
     final ok = await Navigator.of(context).push<bool>(
       PageRouteBuilder<bool>(
         opaque: false,
@@ -54,6 +84,9 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
 
     // If purchase succeeded, close this offer screen and return to previous screen.
     if (ok == true && context.mounted) {
+      if (Get.isRegistered<DashBoardController>()) {
+        await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
+      }
       Navigator.of(context).maybePop(true);
     }
   }
@@ -228,7 +261,7 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
                               textBaseline: TextBaseline.alphabetic,
                               children: [
                                 Text(
-                                  '\$99.99',
+                                  _oneYearComparePrice,
                                   style: TextStyle(
                                     decoration: TextDecoration.lineThrough,
                                     fontSize: 14,
@@ -239,7 +272,7 @@ class _MilestoneLifetimeIapScreenState extends State<MilestoneLifetimeIapScreen>
                                 ),
                                 const SizedBox(width: 10),
                                 Text(
-                                  '\$19.99',
+                                  _oneYearPrice,
                                   style: TextStyle(
                                     fontSize: 26,
                                     fontWeight: FontWeight.w800,

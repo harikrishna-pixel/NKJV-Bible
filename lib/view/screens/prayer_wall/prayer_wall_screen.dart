@@ -651,7 +651,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
   Future<void> _openPostPrayerScreen({bool showSuccessToast = false}) async {
     final isConnected = await InternetConnection().hasInternetAccess;
     if (!isConnected) {
-      Constants.showToast('No internet connection', 5000);
+      Constants.showToast('No internet connection', 1000);
       return;
     }
     final posted = await Navigator.of(context).push<bool>(

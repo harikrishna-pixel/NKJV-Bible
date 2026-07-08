@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/analytics/analytics_service.dart';
@@ -7,6 +9,8 @@ import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/widget/home_content_edit_bottom_sheet.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:get/get.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:provider/provider.dart';
@@ -43,44 +47,31 @@ class ShareAlertBox extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Stack(
+                Row(
                   children: [
-                    Center(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          SizedBox(
-                            width: 50,
-                          ),
-                          Text(
-                            verseTitle,
-                            style: TextStyle(
-                              fontSize: isTablet ? 19 : 18,
-                              fontWeight: FontWeight.w600,
-                              color: CommanColor.black,
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(
-                              Icons.close,
-                              color: Colors.grey,
-                            ),
-                            onPressed: () => Navigator.of(context).pop(),
-                          ),
-                        ],
+                    const SizedBox(width: 48),
+                    Expanded(
+                      child: Text(
+                        verseTitle,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: isTablet ? 19 : 18,
+                          fontWeight: FontWeight.w600,
+                          color: CommanColor.black,
+                        ),
                       ),
+                    ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.close,
+                        color: Colors.grey,
+                      ),
+                      onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                // Text(
-                //   verseTitle,
-                //   style: TextStyle(
-                //     fontSize: isTablet ? 20 : 16,
-                //     fontWeight: FontWeight.w600,
-                //     color: CommanColor.black,
-                //   ),
-                // ),
                 const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -107,30 +98,44 @@ class ShareAlertBox extends StatelessWidget {
     );
   }
 
-  Widget buildButton(BuildContext context, bool isTablet,
-      {required String label, required VoidCallback onTap}) {
+  Widget buildButton(
+    BuildContext context,
+    bool isTablet, {
+    required String label,
+    required VoidCallback onTap,
+    bool fullWidth = false,
+  }) {
+    final button = ElevatedButton(
+      onPressed: onTap,
+      style: ElevatedButton.styleFrom(
+        padding: EdgeInsets.symmetric(
+          vertical: isTablet ? 16 : 12,
+        ),
+        backgroundColor: CommanColor.darkPrimaryColor,
+        foregroundColor: Colors.black87,
+        textStyle: TextStyle(fontSize: isTablet ? 16 : 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: CommanColor.white,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+
+    if (fullWidth) {
+      return SizedBox(width: double.infinity, child: button);
+    }
+
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6),
-        child: ElevatedButton(
-          onPressed: onTap,
-          style: ElevatedButton.styleFrom(
-            padding: EdgeInsets.symmetric(
-              vertical: isTablet ? 16 : 12,
-            ),
-            backgroundColor: CommanColor.darkPrimaryColor,
-            foregroundColor: Colors.black87,
-            textStyle: TextStyle(fontSize: isTablet ? 16 : 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(color: CommanColor.white,fontWeight: FontWeight.w600),
-          ),
-        ),
+        child: button,
       ),
     );
   }
@@ -145,6 +150,7 @@ class ImageBottomSheets extends StatelessWidget {
   final String shareFooterMessage;
   final bool showNavButtons;
   final double verseTextNudgeDown;
+  final bool useFixedVerseBackground;
   const ImageBottomSheets(
       {super.key,
       required this.controller,
@@ -154,9 +160,10 @@ class ImageBottomSheets extends StatelessWidget {
       required this.selectedVerseView,
       this.shareFooterMessage = '',
       this.showNavButtons = true,
-      this.verseTextNudgeDown = 0});
+      this.verseTextNudgeDown = 0,
+      this.useFixedVerseBackground = false});
 
-  /// Daily Verses share preview: no background arrows, verse text sits lower.
+  /// Daily Verses share preview: single verse_image_bg, no background cycling.
   factory ImageBottomSheets.dailyVerse({
     required DashBoardController controller,
     required String content,
@@ -173,7 +180,8 @@ class ImageBottomSheets extends StatelessWidget {
       selectedVerseView: selectedVerseView,
       shareFooterMessage: shareFooterMessage,
       showNavButtons: false,
-      verseTextNudgeDown: 1,
+      verseTextNudgeDown: 0,
+      useFixedVerseBackground: true,
     );
   }
 
@@ -191,6 +199,51 @@ class ImageBottomSheets extends StatelessWidget {
         : screenWidth > 450
             ? availableBelowAppBar * 0.80
             : availableBelowAppBar * 0.82;
+
+    Widget buildShareCard() {
+      final bgPath = useFixedVerseBackground
+          ? 'assets/verse_image_bg.png'
+          : controller.bgImagesList[controller.selectedBgImage.value];
+      final bgIndex =
+          useFixedVerseBackground ? 0 : controller.selectedBgImage.value;
+
+      return VerseShareImageCard(
+        backgroundImagePath: bgPath,
+        backgroundIndex: bgIndex,
+        verseHtml: content,
+        verseReference:
+            "$selectedBook ${int.parse(selectedChapter.toString())}:${int.parse(selectedVerseView.toString())}",
+        screenWidth: screenWidth,
+        maxVerseFontSize: screenWidth < 380
+            ? BibleInfo.fontSizeScale * 18
+            : screenWidth > 450
+                ? BibleInfo.fontSizeScale * 30
+                : BibleInfo.fontSizeScale * 24,
+        minVerseFontSize: screenWidth < 380 ? 14 : 16,
+        actionBarReserve: actionBarTotalHeight,
+        verseTextNudgeDown: verseTextNudgeDown,
+        useSimpleVerseLayout: useFixedVerseBackground,
+        centerVerseContent: true,
+      );
+    }
+
+    Widget buildScreenshotChild() {
+      if (useFixedVerseBackground) {
+        return buildShareCard();
+      }
+
+      return GestureDetector(
+        onTap: () async {
+          try {
+            await SharPreferences.setString('OpenAd', '1');
+            controller.selectedBgImage.value == 9
+                ? controller.selectedBgImage.value = 0
+                : controller.selectedBgImage.value += 1;
+          } catch (_) {}
+        },
+        child: Obx(buildShareCard),
+      );
+    }
 
     return SizedBox(
       height: media.size.height,
@@ -220,35 +273,7 @@ class ImageBottomSheets extends StatelessWidget {
               children: [
                 Screenshot(
                   controller: controller.screenshotController.value,
-                  child: GestureDetector(
-                    onTap: () async {
-                      try {
-                        await SharPreferences.setString('OpenAd', '1');
-                        controller.selectedBgImage.value == 9
-                            ? controller.selectedBgImage.value = 0
-                            : controller.selectedBgImage.value += 1;
-                      } catch (_) {}
-                    },
-                    child: Obx(
-                      () => VerseShareImageCard(
-                        backgroundImagePath: controller
-                            .bgImagesList[controller.selectedBgImage.value],
-                        backgroundIndex: controller.selectedBgImage.value,
-                        verseHtml: content,
-                        verseReference:
-                            "$selectedBook ${int.parse(selectedChapter.toString())}:${int.parse(selectedVerseView.toString())}",
-                        screenWidth: screenWidth,
-                        maxVerseFontSize: screenWidth < 380
-                            ? BibleInfo.fontSizeScale * 18
-                            : screenWidth > 450
-                                ? BibleInfo.fontSizeScale * 30
-                                : BibleInfo.fontSizeScale * 24,
-                        minVerseFontSize: screenWidth < 380 ? 14 : 16,
-                        actionBarReserve: actionBarTotalHeight,
-                        verseTextNudgeDown: verseTextNudgeDown,
-                      ),
-                    ),
-                  ),
+                  child: buildScreenshotChild(),
                 ),
                 if (showNavButtons) ...[
                   Positioned(
@@ -384,48 +409,68 @@ class ImageBottomSheets extends StatelessWidget {
     }
 
     Future<void> onShareOrSave() async {
-      if (label == 'Share') {
-        await RatingDialogHelper.showRatingDialogOnFirstShare(context);
-      }
-
-      await Future.wait([
-        SharPreferences.setString('OpenAd', '1'),
-        SharPreferences.setString('bottom', '1'),
-      ]);
-      if (controller.adFree.value == false) {
-        final countprovider =
-            Provider.of<DownloadProvider>(context, listen: false);
-        await countprovider.decrementCount(context);
-      }
-      final image = await controller.screenshotController.value.capture(
-        delay: const Duration(milliseconds: 10),
-        pixelRatio: MediaQuery.of(context).devicePixelRatio * 2,
-      );
-
-      if (image == null) {
-        await SharPreferences.setString('bottom', '0');
-        return;
-      }
-
-      if (label == "Share") {
-        // Image-only share; branding is on the image. Use verse ref as filename for iOS preview.
-        final imageShareName =
-            '${selectedBook}_${selectedChapter}_$selectedVerseView'
-                .replaceAll(RegExp(r'[^\w\-. ]+'), '_')
-                .trim();
-        saveAndShare(
-          image,
-          imageShareName.isNotEmpty ? imageShareName : 'bible_verse',
-          '',
-          context: context,
+      HapticFeedback.lightImpact();
+      final showShareLoader = useFixedVerseBackground && label == 'Share';
+      if (showShareLoader) {
+        EasyLoading.show(
+          status: 'Preparing...',
+          maskType: EasyLoadingMaskType.clear,
         );
-        // Track Share event
-        AnalyticsService.trackShare();
-      } else if (label == "Save") {
-        await saveImageIntoLocal(image, context);
       }
 
-      await SharPreferences.setString('bottom', '0');
+      // Capture first so Share/Save feel instant (avoid blocking on ads/prefs/rating).
+      unawaited(SharPreferences.setString('OpenAd', '1'));
+      unawaited(SharPreferences.setString('bottom', '1'));
+
+      try {
+        // Match reading-screen capture: default pixel ratio (devicePixelRatio * 2 is very slow).
+        final image = await controller.screenshotController.value.capture(
+          delay: Duration.zero,
+        );
+
+        if (showShareLoader) {
+          await EasyLoading.dismiss();
+        }
+
+        if (image == null) {
+          unawaited(SharPreferences.setString('bottom', '0'));
+          return;
+        }
+
+        if (label == "Share") {
+          final imageShareName =
+              '${selectedBook}_${selectedChapter}_$selectedVerseView'
+                  .replaceAll(RegExp(r'[^\w\-. ]+'), '_')
+                  .trim();
+          // Await share sheet open so it appears promptly after capture.
+          await saveAndShare(
+            image,
+            imageShareName.isNotEmpty ? imageShareName : 'bible_verse',
+            '',
+          );
+          AnalyticsService.trackShare();
+          // Show the "Thanks for the love" popup only after the share sheet closes.
+          if (context.mounted) {
+            await Future.delayed(const Duration(milliseconds: 400));
+            if (context.mounted) {
+              await RatingDialogHelper.showRatingDialogOnFirstShare(context);
+            }
+          }
+        } else if (label == "Save") {
+          await saveImageIntoLocal(image, context);
+        }
+
+        if (controller.adFree.value == false && context.mounted) {
+          final countprovider =
+              Provider.of<DownloadProvider>(context, listen: false);
+          unawaited(countprovider.decrementCount(context));
+        }
+        unawaited(SharPreferences.setString('bottom', '0'));
+      } catch (_) {
+        if (showShareLoader) {
+          await EasyLoading.dismiss();
+        }
+      }
     }
 
     return SizedBox(
@@ -458,16 +503,20 @@ class ImageBottomSheets extends StatelessWidget {
               size: MediaQuery.of(context).size.width > 450 ? 18 : 16,
               color: Colors.white,
             ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.white,
-                letterSpacing: BibleInfo.letterSpacing,
-                fontSize: MediaQuery.of(context).size.width > 450
-                    ? BibleInfo.fontSizeScale * 15
-                    : BibleInfo.fontSizeScale * 13,
-                fontWeight: FontWeight.w600,
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white,
+                  letterSpacing: BibleInfo.letterSpacing,
+                  fontSize: MediaQuery.of(context).size.width > 450
+                      ? BibleInfo.fontSizeScale * 15
+                      : BibleInfo.fontSizeScale * 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],

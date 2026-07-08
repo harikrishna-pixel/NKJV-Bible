@@ -226,10 +226,13 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                   const SizedBox(
                                                     height: 35,
                                                   ),
-                                                  Row(
+                                                  SingleChildScrollView(
+                                                    scrollDirection:
+                                                        Axis.horizontal,
+                                                    child: Row(
                                                     mainAxisAlignment:
                                                         MainAxisAlignment
-                                                            .center,
+                                                            .start,
                                                     children: [
                                                       Column(
                                                         children: [
@@ -744,7 +747,8 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                         ],
                                                       ),
                                                     ],
-                                                  )
+                                                  ),
+                                                ),
                                                 ],
                                               ),
                                             );
@@ -849,9 +853,12 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                             const SizedBox(
                                               height: 35,
                                             ),
-                                            Row(
+                                            SingleChildScrollView(
+                                              scrollDirection:
+                                                  Axis.horizontal,
+                                              child: Row(
                                               mainAxisAlignment:
-                                                  MainAxisAlignment.center,
+                                                  MainAxisAlignment.start,
                                               children: [
                                                 Column(
                                                   children: [
@@ -1391,10 +1398,11 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                   ],
                                                 ),
                                               ],
-                                            )
-                                          ],
-                                        ),
-                                      );
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
                                     },
                                   );
                                 },

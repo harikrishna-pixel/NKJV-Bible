@@ -98,6 +98,13 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
       unawaited(_openAppStoreListing());
     }
 
+    // Do not show the update alert again after Update is tapped.
+    unawaited(SharPreferences.setBoolean(
+      SharPreferences.upgradeAlertDismissedPermanently,
+      true,
+    ));
+    unawaited(widget.upgrader.saveLastAlerted());
+
     if (shouldPop) {
       popNavigator(context);
     }
@@ -133,8 +140,6 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
                   style: const TextStyle(
                     color: _accent,
                     fontWeight: FontWeight.w700,
-                    decoration: TextDecoration.underline,
-                    decorationColor: _accent,
                   ),
                   recognizer: TapGestureRecognizer()
                     ..onTap = () => unawaited(_openAppStoreListing()),
@@ -148,8 +153,24 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
     );
   }
 
+  Future<void> _dismissUpgradePermanently(BuildContext context) async {
+    await SharPreferences.setBoolean(
+      SharPreferences.upgradeAlertDismissedPermanently,
+      true,
+    );
+    await widget.upgrader.saveLastAlerted();
+    if (context.mounted) {
+      popNavigator(context);
+    }
+  }
+
   Future<void> _checkVersionPhased(BuildContext context) async {
     if (!widget.upgrader.shouldDisplayUpgrade()) return;
+
+    final permanentlyDismissed = await SharPreferences.getBoolean(
+            SharPreferences.upgradeAlertDismissedPermanently) ??
+        false;
+    if (permanentlyDismissed) return;
 
     final checkContext = widget.navigatorKey != null &&
             widget.navigatorKey!.currentContext != null
@@ -200,14 +221,41 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
       return;
     }
 
-    showTheDialog(
-      key: widget.dialogKey ?? const Key('upgrader_alert_dialog'),
-      context: checkContext,
-      title: title,
-      message: message,
-      releaseNotes: releaseNotes,
+    unawaited(widget.upgrader.saveLastAlerted());
+    showGeneralDialog(
       barrierDismissible: widget.barrierDismissible,
-      messages: appMessages,
+      barrierLabel: 'Dismiss',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 280),
+      context: checkContext,
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        return PopScope(
+          canPop: onCanPop(),
+          child: alertDialog(
+            widget.dialogKey ?? const Key('upgrader_alert_dialog'),
+            title,
+            message,
+            releaseNotes,
+            dialogContext,
+            false,
+            appMessages,
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.96, end: 1.0).animate(curved),
+            child: child,
+          ),
+        );
+      },
     );
   }
 
@@ -221,10 +269,13 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
   }) {
     unawaited(widget.upgrader.saveLastAlerted());
 
-    showDialog(
+    showGeneralDialog(
       barrierDismissible: widget.barrierDismissible,
+      barrierLabel: 'Dismiss',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 280),
       context: context,
-      builder: (BuildContext dialogContext) {
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
         return PopScope(
           canPop: onCanPop(),
           child: _buildIntroAlertDialog(
@@ -234,6 +285,20 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
             releaseNotes,
             dialogContext,
             messages,
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.96, end: 1.0).animate(curved),
+            child: child,
           ),
         );
       },
@@ -279,7 +344,8 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
-                    onPressed: () => onUserLater(context, true),
+                    onPressed: () =>
+                        unawaited(_dismissUpgradePermanently(context)),
                     icon: const Icon(
                       Icons.close,
                       size: 22,
@@ -430,9 +496,7 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
     bool cupertino,
     UpgraderMessages messages,
   ) {
-    final isBlocked = widget.upgrader.blocked();
-    final showIgnore = isBlocked ? false : widget.showIgnore;
-    final showLater = isBlocked ? false : widget.showLater;
+    // Remind-later follow-up: only Update CTA (no Ignore / Later).
     final notes = shouldDisplayReleaseNotes ? releaseNotes : null;
 
     return Dialog(
@@ -464,7 +528,8 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
-                    onPressed: () => onUserLater(context, true),
+                    onPressed: () =>
+                        unawaited(_dismissUpgradePermanently(context)),
                     icon: const Icon(
                       Icons.close,
                       size: 22,
@@ -515,24 +580,6 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
                   ),
                 ],
                 const SizedBox(height: 18),
-                if (showIgnore)
-                  _buildSecondaryButton(
-                    icon: Icons.schedule_outlined,
-                    title: messages.message(UpgraderMessage.buttonTitleIgnore) ??
-                        'IGNORE',
-                    subtitle: 'Not now',
-                    onPressed: () => onUserIgnored(context, true),
-                  ),
-                if (showIgnore && showLater) const SizedBox(height: 10),
-                if (showLater)
-                  _buildSecondaryButton(
-                    icon: Icons.schedule_outlined,
-                    title: messages.message(UpgraderMessage.buttonTitleLater) ??
-                        'LATER',
-                    subtitle: 'Remind me later',
-                    onPressed: () => onUserLater(context, true),
-                  ),
-                if ((showIgnore || showLater)) const SizedBox(height: 10),
                 _buildPrimaryButton(
                   title: messages.message(UpgraderMessage.buttonTitleUpdate) ??
                       'UPDATE NOW',

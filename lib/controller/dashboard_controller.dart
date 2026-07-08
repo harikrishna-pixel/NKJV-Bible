@@ -937,31 +937,95 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     debugPrint('testapp No book found with book_num = $bookNum');
   }
 
+  int _chapterLoadGeneration = 0;
+
+  bool _bookIdMatches(String a, String b) {
+    final ai = int.tryParse(a.trim());
+    final bi = int.tryParse(b.trim());
+    if (ai != null && bi != null) return ai == bi;
+    return a.trim() == b.trim();
+  }
+
+  bool _displayedContentMatchesUiChapter(int uiChapter) {
+    if (selectedBookContent.isEmpty) return false;
+    final safe = uiChapter <= 0 ? 1 : uiChapter;
+    final want = <num?>{safe - 1, safe};
+    return selectedBookContent.any((v) => want.contains(v.chapterNum));
+  }
+
+  bool _canSkipChapterReloadSync() {
+    if (selectedBookContent.isEmpty || isFetchContent.value) return false;
+    final uiChapter = int.tryParse(selectedChapter.value);
+    if (uiChapter == null || uiChapter <= 0) return false;
+    return _displayedContentMatchesUiChapter(uiChapter);
+  }
+
+  bool _versesCacheMatchesBook(int bookNum) {
+    if (selectedVersesContent.isEmpty) return false;
+    final cachedBook = selectedVersesContent.first.bookNum;
+    if (cachedBook == null) return false;
+    return cachedBook == bookNum ||
+        cachedBook == bookNum - 1 ||
+        cachedBook == bookNum + 1;
+  }
+
+  List<VerseBookContentModel> _filterChapterFromVerses(
+    List<VerseBookContentModel> verses,
+    int uiChapter,
+  ) {
+    if (verses.isEmpty) return [];
+    final safe = uiChapter <= 0 ? 1 : uiChapter;
+    final want = <num?>{safe - 1, safe};
+    var list = verses.where((v) => want.contains(v.chapterNum)).toList();
+    if (list.isEmpty) {
+      for (final ch in [safe - 2, safe + 1, 0, 1, 2]) {
+        if (ch < 0) continue;
+        list = verses.where((v) => (v.chapterNum ?? -999) == ch).toList();
+        if (list.isNotEmpty) break;
+      }
+    }
+    if (list.isEmpty) return [];
+    return filterContent(list.toSet().toList());
+  }
+
   Future<bool> _loadBookChapterFromDb(
     dynamic db,
     int bookNum,
-    int safeChapter,
-  ) async {
+    int safeChapter, {
+    required int loadId,
+  }) async {
     if (!await _bookNumMatchesSelectedTitle(db, bookNum)) return false;
 
     final selectedBookResponse = await db.rawQuery(
         "SELECT * From verse WHERE book_num ='$bookNum'");
     if (selectedBookResponse.isEmpty) return false;
 
-    selectedVersesContent.value = selectedBookResponse
+    final newVerses = selectedBookResponse
         .map<VerseBookContentModel>(
             (e) => VerseBookContentModel.fromJson(e))
         .toList();
+    // Chapter-only changes should not reload the full book into memory;
+    // that observable drives the reader FAB and forces a full-screen rebuild.
+    if (!_versesCacheMatchesBook(bookNum)) {
+      selectedVersesContent.value = newVerses;
+    }
 
     final chapterRows =
         await _rawQueryVerseChapter(db, bookNum, safeChapter);
-    selectedBookContent.value = filterContent(chapterRows
+    var chapterContent = filterContent(chapterRows
         .map<VerseBookContentModel>(
             (e) => VerseBookContentModel.fromJson(e))
         .toSet()
         .toList());
-    await _fillChapterFromVerseListIfNeeded(safeChapter);
-    if (selectedBookContent.isEmpty) return false;
+    if (chapterContent.isEmpty) {
+      final verses = selectedVersesContent.isNotEmpty
+          ? selectedVersesContent
+          : newVerses;
+      chapterContent = _filterChapterFromVerses(verses, safeChapter);
+    }
+    if (chapterContent.isEmpty) return false;
+    if (loadId != _chapterLoadGeneration) return false;
+    selectedBookContent.value = chapterContent;
 
     selectedBookNum.value = bookNum.toString();
     await SharPreferences.setString(
@@ -987,7 +1051,6 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
       selectedBookNum.value = bookNum.toString();
       await SharPreferences.setString(
           SharPreferences.selectedBookNum, bookNum.toString());
-      selectedBookContent.clear();
       await _fillChapterFromVerseListIfNeeded(safeChapter);
       if (selectedBookContent.isNotEmpty) return true;
     }
@@ -996,36 +1059,48 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
 
   /// If SQL chapter rows were empty but we already loaded all verses for the book, filter in memory.
   Future<void> _fillChapterFromVerseListIfNeeded(int uiChapter) async {
-    if (selectedBookContent.isNotEmpty) return;
+    final safe = uiChapter <= 0 ? 1 : uiChapter;
+    if (selectedBookContent.isNotEmpty &&
+        _displayedContentMatchesUiChapter(safe)) {
+      return;
+    }
     final verses = selectedVersesContent;
     if (verses.isEmpty) return;
-    final safe = uiChapter <= 0 ? 1 : uiChapter;
-    final want = <num?>{safe - 1, safe};
-    var list = verses.where((v) => want.contains(v.chapterNum)).toList();
-    if (list.isEmpty) {
-      for (final ch in [safe - 2, safe + 1, 0, 1, 2]) {
-        if (ch < 0) continue;
-        list = verses.where((v) => (v.chapterNum ?? -999) == ch).toList();
-        if (list.isNotEmpty) break;
-      }
-    }
-    if (list.isNotEmpty) {
-      selectedBookContent.value = filterContent(list.toSet().toList());
+    final chapterContent = _filterChapterFromVerses(verses, uiChapter);
+    if (chapterContent.isNotEmpty) {
+      selectedBookContent.value = chapterContent;
     }
   }
 
   Future<void> getBookContentForRead() async {
     try {
-      if (selectedBookContent.isNotEmpty &&
+      if (_canSkipChapterReloadSync() &&
           selectedChapter.value == selectedChapterForRead.value &&
-          selectedBookNum.value == selectedBookNumForRead.value) {
+          _bookIdMatches(
+              selectedBookNum.value, selectedBookNumForRead.value)) {
         return;
       }
 
-      selectedBookContent.clear();
-      selectedVersesContent.clear();
-      isFetchContent.value = true;
-      loadTextToSpeech.value = true;
+      if (selectedBookContent.isNotEmpty &&
+          selectedChapter.value == selectedChapterForRead.value &&
+          _bookIdMatches(
+              selectedBookNum.value, selectedBookNumForRead.value) &&
+          _displayedContentMatchesUiChapter(
+              int.tryParse(selectedChapterForRead.value) ?? 1)) {
+        return;
+      }
+
+      // Avoid clearing visible content while a reload is in flight.
+      // Only enter "loading" state when we truly have nothing to show.
+      final hadVisibleContent = selectedBookContent.isNotEmpty;
+      if (!hadVisibleContent) {
+        selectedBookContent.clear();
+        selectedVersesContent.clear();
+        isFetchContent.value = true;
+        loadTextToSpeech.value = true;
+      } else {
+        loadTextToSpeech.value = true;
+      }
 
       selectedChapter.value = selectedChapterForRead.value;
       selectedBook.value = selectedBookNameForRead.value;
@@ -1093,18 +1168,30 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         }
       }
 
-      selectedVersesContent.value = effectiveVersesResponse
+      final newVerses = effectiveVersesResponse
           .map<VerseBookContentModel>(
               (e) => VerseBookContentModel.fromJson(e))
           .toList();
+      if (!_versesCacheMatchesBook(effectiveBookNum)) {
+        selectedVersesContent.value = newVerses;
+      }
 
       var chapterRows = await _rawQueryVerseChapter(
           value, effectiveBookNum, parsedChapterForRead);
-      selectedBookContent.value = filterContent(chapterRows
+      var chapterContent = filterContent(chapterRows
           .map<VerseBookContentModel>(
               (e) => VerseBookContentModel.fromJson(e))
           .toList());
-      await _fillChapterFromVerseListIfNeeded(parsedChapterForRead);
+      if (chapterContent.isEmpty) {
+        final verses = selectedVersesContent.isNotEmpty
+            ? selectedVersesContent
+            : newVerses;
+        chapterContent =
+            _filterChapterFromVerses(verses, parsedChapterForRead);
+      }
+      if (chapterContent.isNotEmpty) {
+        selectedBookContent.value = chapterContent;
+      }
 
       var rows =
           await value.rawQuery("SELECT * From book WHERE book_num = ?", [
@@ -1130,35 +1217,55 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     } catch (e, st) {
       log('Error: $e,$st');
     } finally {
-      loadTextToSpeech.value = false;
-      isFetchContent.value = false;
+      if (loadTextToSpeech.value) {
+        loadTextToSpeech.value = false;
+      }
+      if (isFetchContent.value) {
+        isFetchContent.value = false;
+      }
     }
   }
 
   Future<void> getSelectedChapterAndBook() async {
+    if (_canSkipChapterReloadSync()) {
+      return;
+    }
+
+    final selectedBookValue =
+        await SharPreferences.getString(SharPreferences.selectedBookNum);
+    final getChapter =
+        await SharPreferences.getString(SharPreferences.selectedChapter) ??
+            "1";
+    final parsedStoredBookNum = int.tryParse(selectedBookValue ?? '');
+    final storedBookNum = (selectedBookValue == null ||
+            selectedBookValue.trim().isEmpty ||
+            parsedStoredBookNum == null)
+        ? '0'
+        : selectedBookValue.toString();
+    final prefChapter = int.tryParse(getChapter) ?? 1;
+    final memChapter = int.tryParse(selectedChapter.value);
+    // Swipe/chapter pick may update memory before SharedPreferences finishes.
+    final targetChapter =
+        (memChapter != null && memChapter > 0) ? memChapter : prefChapter;
+
+    if (selectedBookContent.isNotEmpty &&
+        _bookIdMatches(selectedBookNum.value, storedBookNum) &&
+        targetChapter == (int.tryParse(selectedChapter.value) ?? 1) &&
+        _displayedContentMatchesUiChapter(targetChapter)) {
+      return;
+    }
+
+    final loadId = ++_chapterLoadGeneration;
     try {
-      final selectedBookValue =
-          await SharPreferences.getString(SharPreferences.selectedBookNum);
-      final getChapter =
-          await SharPreferences.getString(SharPreferences.selectedChapter) ??
-              "1";
-      final parsedStoredBookNum = int.tryParse(selectedBookValue ?? '');
-      final storedBookNum = (selectedBookValue == null ||
-              selectedBookValue.trim().isEmpty ||
-              parsedStoredBookNum == null)
-          ? '0'
-          : selectedBookValue.toString();
-
-      if (selectedBookContent.isNotEmpty &&
-          selectedChapter.value == getChapter &&
-          selectedBookNum.value == storedBookNum) {
-        return;
+      // Avoid clearing visible content while a reload is in flight.
+      // Only enter "loading" state when we truly have nothing to show.
+      final hadVisibleContent = selectedBookContent.isNotEmpty;
+      if (!hadVisibleContent) {
+        selectedBookContent.clear();
+        selectedVersesContent.clear();
+        isFetchContent.value = true;
+        loadTextToSpeech.value = true;
       }
-
-      selectedBookContent.clear();
-      selectedVersesContent.clear();
-      isFetchContent.value = true;
-      loadTextToSpeech.value = true;
       selectedBook.value =
           await SharPreferences.getString(SharPreferences.selectedBook) ?? "";
 
@@ -1171,15 +1278,28 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         selectedBookNum.value = selectedBookValue.toString();
       }
 
-      selectedChapter.value = getChapter;
-      final rawChapter = int.tryParse(selectedChapter.value) ?? 1;
-      final safeChapter = rawChapter <= 0 ? 1 : rawChapter;
+      final safeChapter = targetChapter <= 0 ? 1 : targetChapter;
       if (safeChapter.toString() != selectedChapter.value) {
         selectedChapter.value = safeChapter.toString();
+      }
+      if (safeChapter != prefChapter) {
         await SharPreferences.setString(
             SharPreferences.selectedChapter, safeChapter.toString());
       }
       selectChapterChange.value = safeChapter;
+
+      final parsedBookNumEarly =
+          int.tryParse(selectedBookNum.value) ?? parsedStoredBookNum ?? 1;
+      if (selectedVersesContent.isNotEmpty &&
+          _versesCacheMatchesBook(parsedBookNumEarly)) {
+        final quickChapter =
+            _filterChapterFromVerses(selectedVersesContent, safeChapter);
+        if (quickChapter.isNotEmpty) {
+          selectedBookContent.value = quickChapter;
+        }
+      }
+
+      if (loadId != _chapterLoadGeneration) return;
 
       dynamic value;
       for (var attempt = 0; attempt < 5; attempt++) {
@@ -1197,7 +1317,8 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
       var loaded = false;
 
       for (final bookNum in candidates) {
-        if (await _loadBookChapterFromDb(value, bookNum, safeChapter)) {
+        if (await _loadBookChapterFromDb(value, bookNum, safeChapter,
+            loadId: loadId)) {
           loaded = true;
           break;
         }
@@ -1205,13 +1326,15 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
 
       if (!loaded) {
         for (var attempt = 0; attempt < 4 && !loaded; attempt++) {
+          if (loadId != _chapterLoadGeneration) return;
           await Future.delayed(Duration(milliseconds: 250 * (attempt + 1)));
           final count =
               await value.rawQuery('SELECT COUNT(*) as c FROM verse LIMIT 1');
           final verseCount = int.tryParse('${count.first['c']}') ?? 0;
           if (verseCount == 0) continue;
           for (final bookNum in candidates) {
-            if (await _loadBookChapterFromDb(value, bookNum, safeChapter)) {
+            if (await _loadBookChapterFromDb(value, bookNum, safeChapter,
+                loadId: loadId)) {
               loaded = true;
               break;
             }
@@ -1219,13 +1342,20 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         }
       }
 
+      if (loadId != _chapterLoadGeneration) return;
+
       final resolvedBookNum = int.tryParse(selectedBookNum.value) ?? parsedBookNum;
       await _applyBookMetadata(value, resolvedBookNum, candidates);
     } catch (e) {
       debugPrint(" error on getSelectedChapterAndBook - $e ");
     } finally {
-      loadTextToSpeech.value = false;
-      isFetchContent.value = false;
+      if (loadId != _chapterLoadGeneration) return;
+      if (loadTextToSpeech.value) {
+        loadTextToSpeech.value = false;
+      }
+      if (isFetchContent.value) {
+        isFetchContent.value = false;
+      }
     }
   }
 
@@ -1519,6 +1649,26 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
   //   }
   // }
 
+  Future<void> refreshPremiumStatusFromPrefs() async {
+    final value =
+        await SharPreferences.getString(SharPreferences.isRewardAdViewTime);
+    if (value == null || value.isEmpty) return;
+
+    RewardAdExpireDate.value = value;
+    try {
+      final expiryDate = DateTime.parse(value);
+      final diff = DateTime.now().difference(expiryDate).inDays;
+      if (diff.isNegative) {
+        adFree.value = true;
+        isGetRewardAd.value = false;
+        adsDisplayTim.value = false;
+        await SharPreferences.setBoolean(SharPreferences.isAdsEnabled, false);
+      }
+    } catch (e) {
+      debugPrint('refreshPremiumStatusFromPrefs parse error: $e');
+    }
+  }
+
   disableAd(Duration duration) async {
     final prefs = await SharedPreferences.getInstance();
     var expiryDate = DateTime.now().add(duration);
@@ -1535,6 +1685,7 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     //  openAdIsPaused.value = false;
     isInterstitialAdLoad.value = false;
     isBannerAdLoaded.value = false;
+    await refreshPremiumStatusFromPrefs();
   }
 
   void _setFullScreenContentCallback() {

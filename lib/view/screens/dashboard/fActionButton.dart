@@ -274,20 +274,33 @@ class floatingButtonState extends State<floatingButton>
     // Set release mode based on repeat flag - default to release (no loop)
     String? audioBasePath =
         widget.audioData?.data?.bibleAudioInfo?.audioBasepath;
-    try {
+    audioBaseUrl = "$audioBasePath/$audioBookNum/$audioChapterNum.mp3";
+    log('Audio Base Url:$audioBaseUrl');
+
+    // Slow networks (2G): stop + reset, then retry setSourceUrl once on failure.
+    Future<void> loadSource() async {
       await audioPlayer
           .setReleaseMode(repeat ? ReleaseMode.loop : ReleaseMode.release);
-      audioBaseUrl = "$audioBasePath/$audioBookNum/$audioChapterNum.mp3";
-      log('Audio Base Url:$audioBaseUrl');
-      await audioPlayer.setSourceUrl(audioBaseUrl).whenComplete(() {
-        log('Audio Set Completed');
-        // setState(() {
-        //   isAudioPlaying = true;
-        // });
-      });
+      try {
+        await audioPlayer.stop();
+      } catch (_) {}
+      await audioPlayer.setSourceUrl(audioBaseUrl);
+      await audioPlayer.seek(Duration.zero);
+    }
+
+    try {
+      await loadSource();
+      log('Audio Set Completed');
     } catch (e, st) {
-      log('Audio Set Error: $e,$st');
-      debugPrintStack(stackTrace: st);
+      log('Audio Set Error (retrying): $e,$st');
+      try {
+        await Future.delayed(const Duration(milliseconds: 800));
+        await loadSource();
+        log('Audio Set Completed after retry');
+      } catch (e2, st2) {
+        log('Audio Set Error: $e2,$st2');
+        debugPrintStack(stackTrace: st2);
+      }
     }
   }
 
@@ -583,6 +596,131 @@ class floatingButtonState extends State<floatingButton>
     debugPrint("check network - $hasConnection");
   }
 
+  Future<void> _handleAudioOptionTap(BuildContext popoverContext) async {
+    if (popoverContext.mounted) {
+      Navigator.pop(popoverContext);
+    }
+    final hasInternet = await InternetConnection().hasInternetAccess;
+    if (!hasInternet) {
+      Constants.showToast('No internet connection');
+      return;
+    }
+    await setAudio();
+    if (!mounted) return;
+    setState(() {
+      audioLoad = false;
+    });
+    await audioPlayerBottomSheet();
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _showAudioTtsPopover() async {
+    setState(() {
+      isOpenAudio = true;
+      audioLoad = true;
+    });
+    await setAudio();
+    if (!mounted) return;
+    setState(() {
+      audioLoad = false;
+    });
+    if (!mounted) return;
+    await showPopover(
+      context: context,
+      direction: PopoverDirection.left,
+      transitionDuration: const Duration(milliseconds: 250),
+      bodyBuilder: (popoverContext) {
+        return Container(
+          color: CommanColor.whiteLightModePrimary(context),
+          padding: const EdgeInsets.symmetric(vertical: 0),
+          child: Center(
+            child: ListView(
+              physics: const NeverScrollableScrollPhysics(),
+              shrinkWrap: true,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              children: [
+                GestureDetector(
+                  onTap: () => _handleAudioOptionTap(popoverContext),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12.0, vertical: 5),
+                    child: Row(
+                      children: [
+                        Image.asset(
+                          "assets/musical_note.png",
+                          height: 22,
+                          width: 22,
+                          color:
+                              CommanColor.darkModePrimaryWhite(context),
+                        ),
+                        const SizedBox(
+                          width: 17,
+                        ),
+                        Text(
+                          "Audio",
+                          style: CommanStyle.pw14500(context),
+                        )
+                      ],
+                    ),
+                  ),
+                ),
+                Divider(
+                  color: CommanColor.darkModePrimaryWhite(context),
+                  thickness: 1.2,
+                ),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.pop(popoverContext);
+                    textToSpeechBottomSheet();
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12.0, vertical: 5),
+                    child: Row(
+                      children: [
+                        Image.asset(
+                          "assets/text_to_speech.png",
+                          height: 26,
+                          width: 26,
+                          color:
+                              CommanColor.darkModePrimaryWhite(context),
+                        ),
+                        const SizedBox(
+                          width: 15,
+                        ),
+                        Text(
+                          "Text to speech",
+                          style: CommanStyle.pw14500(context),
+                        )
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      width: 180,
+      height: 100,
+      arrowDyOffset: -20,
+      barrierColor: Colors.transparent,
+      backgroundColor: Provider.of<ThemeProvider>(context, listen: false)
+                  .themeMode ==
+              ThemeMode.dark
+          ? Colors.white
+          : CommanColor.lightModePrimary,
+      arrowWidth: 24,
+    );
+    if (mounted) {
+      setState(() {
+        isOpenAudio = false;
+      });
+    }
+  }
+
   Future _getDefaultEngine() async {
     var engine = await flutterTts.getDefaultEngine;
     if (engine != null) {}
@@ -680,6 +818,11 @@ class floatingButtonState extends State<floatingButton>
   int isInitialProgress = 1;
   int totalStartOffset = 0;
   int totalEndOffset = 0;
+
+  /// Called when the reading screen is left — not on scroll hide/rebuild.
+  void stopPlaybackOnLeave() {
+    closeaudio();
+  }
 
   closeaudio() async {
     debugPrint(" audio  stopped ");
@@ -943,17 +1086,8 @@ class floatingButtonState extends State<floatingButton>
 
     // Stop TTS if running - safely check if flutterTts is initialized
     // Note: TTS handlers already check 'mounted' before calling setState, so they're safe
-    if (isSpeech && _isTtsInitialized) {
-      try {
-        // Try to stop TTS - stop() is safe to call even if not speaking
-        flutterTts.stop();
-      } catch (e) {
-        // Ignore any errors during TTS cleanup (flutterTts might not be fully initialized)
-        debugPrint("TTS cleanup error: $e");
-      }
-    }
+    // Playback stop is handled by HomeScreen.dispose via stopPlaybackOnLeave().
 
-    closeaudio();
     WidgetsBinding.instance.removeObserver(this);
     // audioPlayer.dispose();
     super.dispose();
@@ -973,20 +1107,17 @@ class floatingButtonState extends State<floatingButton>
 
     if (widget.audioData?.data != null) {
       SharPreferences.setBoolean(SharPreferences.isTtsActive, isTTSEnabled);
-      if (context.mounted) {
-        setState(() {
-          isPrevTTSEnabled = isTTSEnabled;
-        });
-      }
+      // Assign only — never setState during build (causes dispose crashes
+      // when Home is hidden while navigating to Settings).
+      isPrevTTSEnabled = isTTSEnabled;
     }
 
     bool isMp3Enabled =
         widget.audioData?.data?.bibleAudioInfo?.isShowMp3Audio == "1";
-    // TTS works offline, so allow it even without internet connection
-    // MP3 audio requires internet, so check hasConnection for that
-    if (hasConnection || isTTSEnabled) {
-      if (isMp3Enabled || isTTSEnabled) {
-        return Container(
+    // TTS works offline; MP3 audio needs internet when selected from the chooser.
+    if (widget.audioData?.data != null &&
+        (isMp3Enabled || isTTSEnabled || isPrevTTSEnabled)) {
+      return Container(
           height: screenWidth > 450 ? 50 : 35,
           width: screenWidth > 450 ? 50 : 35,
           decoration: BoxDecoration(
@@ -1065,6 +1196,9 @@ class floatingButtonState extends State<floatingButton>
                 setState(() {
                   isAudioPlaying = false;
                 });
+              } else if (!hasConnection &&
+                  (isMp3Enabled || isTTSEnabled || isPrevTTSEnabled)) {
+                await _showAudioTtsPopover();
               } else if (isTTSEnabled && !isMp3Enabled) {
                 textToSpeechBottomSheet();
               } else if (isMp3Enabled && !isTTSEnabled) {
@@ -1078,117 +1212,7 @@ class floatingButtonState extends State<floatingButton>
                   }
                 });
               } else {
-                setState(() {
-                  isOpenAudio = true;
-                  audioLoad = true;
-                });
-                await setAudio();
-                setState(() {
-                  audioLoad = false;
-                });
-                showPopover(
-                  context: context,
-                  direction: PopoverDirection.left,
-                  transitionDuration: const Duration(milliseconds: 250),
-                  bodyBuilder: (context) {
-                    return Container(
-                      color: CommanColor.whiteLightModePrimary(context),
-                      padding: const EdgeInsets.symmetric(vertical: 0),
-                      child: Center(
-                        child: ListView(
-                          physics: const NeverScrollableScrollPhysics(),
-                          shrinkWrap: true,
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          children: [
-                            GestureDetector(
-                              onTap: () {
-                                if (context.mounted) {
-                                  Navigator.pop(context);
-                                  audioPlayerBottomSheet().then((value) {
-                                    if (mounted) {
-                                      setState(() {});
-                                    }
-                                  });
-                                }
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12.0, vertical: 5),
-                                child: Row(
-                                  children: [
-                                    Image.asset(
-                                      "assets/musical_note.png",
-                                      height: 22,
-                                      width: 22,
-                                      color: CommanColor.darkModePrimaryWhite(
-                                          context),
-                                    ),
-                                    const SizedBox(
-                                      width: 17,
-                                    ),
-                                    Text(
-                                      "Audio",
-                                      style: CommanStyle.pw14500(context),
-                                    )
-                                  ],
-                                ),
-                              ),
-                            ),
-                            Divider(
-                              color: CommanColor.darkModePrimaryWhite(context),
-                              thickness: 1.2,
-                            ),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.pop(context);
-                                textToSpeechBottomSheet();
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12.0, vertical: 5),
-                                child: Row(
-                                  children: [
-                                    Image.asset(
-                                      "assets/text_to_speech.png",
-                                      height: 26,
-                                      width: 26,
-                                      color: CommanColor.darkModePrimaryWhite(
-                                          context),
-                                    ),
-                                    const SizedBox(
-                                      width: 15,
-                                    ),
-                                    Text(
-                                      "Text to speech",
-                                      style: CommanStyle.pw14500(context),
-                                    )
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                  width: 180,
-                  height: 100,
-                  arrowDyOffset: -20,
-                  barrierColor: Colors.transparent,
-                  backgroundColor:
-                      Provider.of<ThemeProvider>(context, listen: false)
-                                  .themeMode ==
-                              ThemeMode.dark
-                          ? Colors.white
-                          : CommanColor.lightModePrimary,
-                  arrowWidth: 24,
-                ).then((value) {
-                  if (context.mounted) {
-                    setState(() {
-                      isOpenAudio = false;
-                    });
-                  }
-                });
+                await _showAudioTtsPopover();
               }
 
               await checknetwork();
@@ -1198,149 +1222,8 @@ class floatingButtonState extends State<floatingButton>
             },
           ),
         );
-      } else {
-        ///
-        /// If no internet just show tts
-        ///
-        ///
-        if (isPrevTTSEnabled || isTTSEnabled) {
-          return Container(
-            height: 35,
-            width: 35,
-            decoration: BoxDecoration(
-              color: CommanColor.whiteLightModePrimary(context),
-              shape: BoxShape.circle,
-              boxShadow: CommanColor.isDarkTheme(context)
-                  ? const [
-                      BoxShadow(
-                        color: Colors.black45,
-                        blurRadius: 8,
-                        offset: Offset(0, 3),
-                      ),
-                    ]
-                  : null,
-            ),
-            child: GestureDetector(
-              child: Center(
-                  child: (isSpeech ||
-                          isPlaying ||
-                          isAudioPlaying ||
-                          ttsState == TtsState.playing)
-                      ? Icon(Icons.pause,
-                          size: 24,
-                          color: CommanColor.darkModePrimaryWhite(context))
-                      : audioLoad == true
-                          ? SizedBox(
-                              height: 18,
-                              width: 18,
-                              child: CircularProgressIndicator(
-                                color:
-                                    CommanColor.darkModePrimaryWhite(context),
-                                strokeWidth: 2,
-                              ))
-                          : Icon(
-                              isOpenAudio == false
-                                  ? Icons.play_arrow
-                                  : Icons.close,
-                              color: CommanColor.darkModePrimaryWhite(context),
-                              size: isOpenAudio == false ? 28 : 22,
-                            )),
-              onTap: () async {
-                // Check if TTS is playing - check both flag and actual state
-                final isTTSActive =
-                    isSpeech || isPlaying || ttsState == TtsState.playing;
-
-                if (isTTSActive) {
-                  // Stop TTS - ensure it's actually stopped
-                  debugPrint(
-                      'Pausing TTS (offline) - isSpeech: $isSpeech, isPlaying: $isPlaying, ttsState: $ttsState');
-                  // Set flag to prevent auto-restart from completion handler
-                  isManuallyPaused = true;
-                  shouldAutoAdvance =
-                      false; // Disable auto-advance when manually paused
-
-                  if (_isTtsInitialized) {
-                    try {
-                      await flutterTts.stop();
-                      debugPrint('TTS stop called successfully');
-                    } catch (e) {
-                      debugPrint("TTS stop error: $e");
-                    }
-                  }
-                  // Always update state regardless of stop result
-                  if (mounted) {
-                    setState(() {
-                      ttsState = TtsState.stopped;
-                      isSpeech = false;
-                    });
-                    debugPrint(
-                        'TTS state updated - isSpeech: false, ttsState: stopped, isManuallyPaused: true');
-                  }
-                } else if (isAudioPlaying) {
-                  await audioPlayer.stop();
-                  setState(() {
-                    isAudioPlaying = false;
-                  });
-                } else {
-                  textToSpeechBottomSheet();
-                }
-              },
-            ),
-          );
-        }
-      }
-    } else {
-      return Container(
-        height: screenWidth > 450 ? 50 : 35,
-        width: screenWidth > 450 ? 50 : 35,
-        decoration: BoxDecoration(
-          color: CommanColor.whiteLightModePrimary(context),
-          shape: BoxShape.circle,
-          boxShadow: CommanColor.isDarkTheme(context)
-              ? const [
-                  BoxShadow(
-                    color: Colors.black45,
-                    blurRadius: 8,
-                    offset: Offset(0, 3),
-                  ),
-                ]
-              : null,
-        ),
-        child: GestureDetector(
-          child: Center(
-              child: isSpeech || isAudioPlaying
-                  ? Icon(Icons.pause,
-                      size: screenWidth > 450 ? 44 : 24,
-                      color: CommanColor.darkModePrimaryWhite(context))
-                  : audioLoad
-                      ? SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(
-                            color: CommanColor.darkModePrimaryWhite(context),
-                            strokeWidth: 2,
-                          ))
-                      : Icon(
-                          !isOpenAudio ? Icons.play_arrow : Icons.close,
-                          color: CommanColor.darkModePrimaryWhite(context),
-                          size: !isOpenAudio
-                              ? screenWidth > 450
-                                  ? 43
-                                  : 28
-                              : 22,
-                        )),
-          onTap: () async {
-            final hasInternet = await InternetConnection().hasInternetAccess;
-            if (!hasInternet) {
-              Constants.showToast("No Internet Connection");
-            } else {
-              Constants.showToast("Check your Internet Connection");
-            }
-          },
-        ),
-      );
     }
-    return SizedBox();
+    return const SizedBox.shrink();
   }
 
   bool get supportPause => defaultTargetPlatform != TargetPlatform.android;
@@ -1358,33 +1241,46 @@ class floatingButtonState extends State<floatingButton>
     ].join(':');
   }
 
-  Widget _textFromInput(int start, int end, String text) => text.length < end
-      ? const SizedBox.shrink()
-      : RichText(
-          textAlign: TextAlign.center,
-          text: TextSpan(children: <TextSpan>[
-            TextSpan(
-                text: start != 0 ? text.substring(0, start) : "",
-                style: TextStyle(
-                    color: CommanColor.lightDarkPrimary(context),
-                    letterSpacing: BibleInfo.letterSpacing,
-                    fontSize: BibleInfo.fontSizeScale * 16,
-                    fontWeight: FontWeight.w500,
-                    height: 1.3)),
-            TextSpan(
-              text: text.substring(start, end),
-              style: CommanStyle.HighLightWordStyle(context),
-            ),
-            TextSpan(
-                text: text.substring(end),
-                style: TextStyle(
-                    color: CommanColor.lightDarkPrimary(context),
-                    letterSpacing: BibleInfo.letterSpacing,
-                    fontSize: BibleInfo.fontSizeScale * 16,
-                    fontWeight: FontWeight.w500,
-                    height: 1.3)),
-          ]),
-        );
+  Widget _textFromInput(int start, int end, String text) {
+    if (text.isEmpty) return const SizedBox.shrink();
+
+    final len = text.length;
+    final safeStart = start.clamp(0, len);
+    var safeEnd = end.clamp(0, len);
+    if (safeEnd < safeStart) {
+      safeEnd = safeStart;
+    }
+
+    final baseStyle = TextStyle(
+      color: CommanColor.lightDarkPrimary(context),
+      letterSpacing: BibleInfo.letterSpacing,
+      fontSize: BibleInfo.fontSizeScale * 16,
+      fontWeight: FontWeight.w500,
+      height: 1.3,
+    );
+
+    if (safeStart >= safeEnd) {
+      return Text(
+        text,
+        textAlign: TextAlign.center,
+        style: baseStyle,
+      );
+    }
+
+    return RichText(
+      textAlign: TextAlign.center,
+      text: TextSpan(children: <TextSpan>[
+        if (safeStart > 0)
+          TextSpan(text: text.substring(0, safeStart), style: baseStyle),
+        TextSpan(
+          text: text.substring(safeStart, safeEnd),
+          style: CommanStyle.HighLightWordStyle(context),
+        ),
+        if (safeEnd < len)
+          TextSpan(text: text.substring(safeEnd), style: baseStyle),
+      ]),
+    );
+  }
 
   Future audioPlayerBottomSheet() async {
     print("=== AUDIO BOTTOM SHEET: Opening ===");
@@ -2155,61 +2051,54 @@ class floatingButtonState extends State<floatingButton>
                       ),
                       onPressed: () async {
                         final lastChapter = int.parse(widget.chapterCount);
-                        if (widget.internetConnection?.first ==
-                                ConnectivityResult.wifi ||
-                            widget.internetConnection?.first ==
-                                ConnectivityResult.mobile) {
-                          if (audioChapterNum < lastChapter) {
-                            setState(() {
-                              isAudioPlaying = false;
-                              audioChapterNum++;
-                              audioBaseUrl =
-                                  "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$audioChapterNum.mp3";
-                            });
-                            // Update reading screen to match audio chapter
-                            await updateReadingScreenChapter(audioChapterNum);
-                            // Refresh book name after chapter update
-                            try {
-                              if (Get.isRegistered<DashBoardController>()) {
-                                final controller =
-                                    Get.find<DashBoardController>();
-                                if (controller.selectedBook.value.isNotEmpty &&
-                                    mounted) {
-                                  setState(() {
-                                    _storedBookName =
-                                        controller.selectedBook.value;
-                                  });
-                                }
-                              }
-                            } catch (e) {
-                              debugPrint(
-                                  "Error refreshing book name in Next button: $e");
-                            }
-                            // Stop TTS if it's playing
-                            if (isSpeech && _isTtsInitialized) {
-                              await _stop();
-                              if (context.mounted) {
+                        if (audioChapterNum < lastChapter) {
+                          setState(() {
+                            isAudioPlaying = false;
+                            audioChapterNum++;
+                            audioBaseUrl =
+                                "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$audioChapterNum.mp3";
+                          });
+                          // Update reading screen to match audio chapter
+                          await updateReadingScreenChapter(audioChapterNum);
+                          // Refresh book name after chapter update
+                          try {
+                            if (Get.isRegistered<DashBoardController>()) {
+                              final controller =
+                                  Get.find<DashBoardController>();
+                              if (controller.selectedBook.value.isNotEmpty &&
+                                  mounted) {
                                 setState(() {
-                                  isSpeech = false;
+                                  _storedBookName =
+                                      controller.selectedBook.value;
                                 });
                               }
                             }
-                            try {
-                              await audioPlayer.setSourceUrl(audioBaseUrl);
-                              await audioPlayer.seek(Duration.zero);
-                              await audioPlayer.resume();
-                              if (context.mounted) {
-                                setState(() => isAudioPlaying = true);
-                              }
-                            } catch (e) {
-                              // handle load errors
+                          } catch (e) {
+                            debugPrint(
+                                "Error refreshing book name in Next button: $e");
+                          }
+                          // Stop TTS if it's playing
+                          if (isSpeech && _isTtsInitialized) {
+                            await _stop();
+                            if (context.mounted) {
+                              setState(() {
+                                isSpeech = false;
+                              });
                             }
-                          } else {
-                            // already at last chapter - optional feedback
-                            Constants.showToast("Already at last chapter");
+                          }
+                          try {
+                            await audioPlayer.setSourceUrl(audioBaseUrl);
+                            await audioPlayer.seek(Duration.zero);
+                            await audioPlayer.resume();
+                            if (context.mounted) {
+                              setState(() => isAudioPlaying = true);
+                            }
+                          } catch (e) {
+                            // handle load errors
                           }
                         } else {
-                          Constants.showToast("No Internet Connection");
+                          // already at last chapter - optional feedback
+                          Constants.showToast("Already at last chapter");
                         }
                       },
                     ),
@@ -3020,7 +2909,7 @@ class floatingButtonState extends State<floatingButton>
                         ],
                       ),
                       Text(
-                        "${rate.toStringAsFixed(1)}x",
+                        "${(rate * 2).toStringAsFixed(1)}x",
                         style: TextStyle(
                           color: CommanColor.lightDarkPrimary(context),
                           letterSpacing: BibleInfo.letterSpacing,
@@ -3254,8 +3143,10 @@ class floatingButtonState extends State<floatingButton>
                     if (mounted && context.mounted) {
                       setState(() {
                         allText = text;
-                        start = startOffset;
-                        end = endOffset;
+                        final len = text.length;
+                        start = startOffset.clamp(0, len);
+                        end = endOffset.clamp(0, len);
+                        if (end < start) end = start;
                       });
                     }
                   },

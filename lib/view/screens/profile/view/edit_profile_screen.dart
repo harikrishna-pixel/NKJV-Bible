@@ -419,54 +419,32 @@ class EditProfileScreenState extends State<EditProfileScreen> {
                                               ? nameCon.text
                                               : user1,
                                           context: context);
-                                      // await editProfileState.updateProfile();
-                                      // Constants.showToast(
-                                      //     'Profile Updated Successfully');
-                                      // Get.back();
                                     }
                                   } catch (e) {}
                                 },
                                 child: Container(
+                                  width: double.infinity,
                                   padding: const EdgeInsets.symmetric(
-                                      vertical: 14, horizontal: 14),
+                                      vertical: 12),
                                   decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(12),
-                                    color: CommanColor.lightDarkPrimary(context)
-                                        .withOpacity(0.95),
+                                    borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
-                                      color: const Color(0xFFD4A574)
-                                          .withOpacity(0.65),
-                                      width: 2,
+                                      color: Colors.white,
+                                      width: 1,
                                     ),
-                                    boxShadow: const [
-                                      BoxShadow(
-                                        color: Colors.black26,
-                                        blurRadius: 10,
-                                        offset: Offset(0, 4),
-                                      ),
-                                    ],
                                   ),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Container(
-                                        width: 28,
-                                        height: 28,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: const Color(0xFFD4A574)
-                                                .withOpacity(0.7),
-                                          ),
-                                        ),
-                                        child: const Icon(
-                                          Icons.edit_outlined,
-                                          size: 16,
-                                          color: Color(0xFFF5F0E6),
-                                        ),
+                                      Icon(
+                                        Icons.edit_outlined,
+                                        size: 18,
+                                        color: CommanColor.isDarkTheme(context)
+                                            ? Colors.white
+                                            : const Color(0xFF8B5A5A),
                                       ),
-                                      const SizedBox(width: 10),
+                                      const SizedBox(width: 8),
                                       Text(
                                         "Update Profile",
                                         textAlign: TextAlign.center,
@@ -477,7 +455,9 @@ class EditProfileScreenState extends State<EditProfileScreen> {
                                           letterSpacing: BibleInfo.letterSpacing,
                                           fontSize:
                                               BibleInfo.fontSizeScale * 16,
-                                          color: const Color(0xFFF5F0E6),
+                                          color: CommanColor.isDarkTheme(context)
+                                              ? Colors.white
+                                              : const Color(0xFF8B5A5A),
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
@@ -491,8 +471,16 @@ class EditProfileScreenState extends State<EditProfileScreen> {
                                   confirmDeleteAccount(context);
                                 },
                                 child: Container(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 10),
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 12),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 1,
+                                    ),
+                                  ),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     mainAxisSize: MainAxisSize.min,
@@ -500,8 +488,9 @@ class EditProfileScreenState extends State<EditProfileScreen> {
                                       Icon(
                                         Icons.delete_outline,
                                         size: 18,
-                                        color: const Color(0xFF8B5A5A)
-                                            .withOpacity(0.95),
+                                        color: CommanColor.isDarkTheme(context)
+                                            ? Colors.white
+                                            : const Color(0xFF8B5A5A),
                                       ),
                                       const SizedBox(width: 8),
                                       Text(
@@ -514,8 +503,9 @@ class EditProfileScreenState extends State<EditProfileScreen> {
                                           letterSpacing: BibleInfo.letterSpacing,
                                           fontSize:
                                               BibleInfo.fontSizeScale * 16,
-                                          color: const Color(0xFF8B5A5A)
-                                              .withOpacity(0.95),
+                                          color: CommanColor.isDarkTheme(context)
+                                              ? Colors.white
+                                              : const Color(0xFF8B5A5A),
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),

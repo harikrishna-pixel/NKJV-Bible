@@ -14,8 +14,7 @@ import 'package:biblebookapp/services/paywall_preload_service.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
-import 'package:biblebookapp/streak_flow/streak_flow_screens.dart'
-    hide SharPreferences;
+import 'package:biblebookapp/streak_flow/streak_flow_screens.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/remove_add-screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -65,6 +64,31 @@ class SubscriptionScreen extends StatefulWidget {
     this.invisiblePurchaseHost = false,
   });
 
+  /// iOS-style slide used for paywall push/pop so back matches forward.
+  static const Transition paywallRouteTransition = Transition.cupertino;
+  static const Duration paywallRouteDuration = Duration(milliseconds: 350);
+
+  /// Opens paywall on top of the current screen with a smooth slide transition.
+  static Future<T?>? openPaywallStacked<T>({
+    required String sixMonthPlan,
+    required String oneYearPlan,
+    required String lifeTimePlan,
+    required String checkad,
+    bool fromHomeExitOffer = false,
+  }) {
+    return Get.to<T>(
+      () => SubscriptionScreen(
+        sixMonthPlan: sixMonthPlan,
+        oneYearPlan: oneYearPlan,
+        lifeTimePlan: lifeTimePlan,
+        checkad: checkad,
+        fromHomeExitOffer: fromHomeExitOffer,
+      ),
+      transition: paywallRouteTransition,
+      duration: paywallRouteDuration,
+    );
+  }
+
   /// Navigate to paywall from home (direct, no exit offer).
   static Future<void> navigateToPaywallFromHome(BuildContext context) async {
     final sixMonthPlan = AppApiConstant.resolveSubscriptionProductId(
@@ -79,15 +103,11 @@ class SubscriptionScreen extends StatefulWidget {
       await SharPreferences.getString('lifeTimePlan'),
       BibleInfo.lifeTimePlanid,
     );
-    Get.to(
-      () => SubscriptionScreen(
-        sixMonthPlan: sixMonthPlan,
-        oneYearPlan: oneYearPlan,
-        lifeTimePlan: lifeTimePlan,
-        checkad: 'home',
-      ),
-      transition: Transition.cupertinoDialog,
-      duration: const Duration(milliseconds: 300),
+    openPaywallStacked(
+      sixMonthPlan: sixMonthPlan,
+      oneYearPlan: oneYearPlan,
+      lifeTimePlan: lifeTimePlan,
+      checkad: 'home',
     );
   }
 
@@ -211,12 +231,27 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     return 'unknown';
   }
 
+  int _planSlotForProductId(String productId) {
+    if (_isSixMonthProductId(productId)) return 0;
+    if (_isOneYearProductId(productId)) return 1;
+    if (_isTwoYearProductId(productId)) return 2;
+    return 3;
+  }
+
+  int _indexForPlanSlot(int slot) {
+    for (var i = 0; i < _products.length; i++) {
+      if (_planSlotForProductId(_products[i].id) == slot) {
+        return i;
+      }
+    }
+    return selectedindex.clamp(0, _products.length - 1);
+  }
+
   void _applyInitialPlanSelectionIfAny() {
     final idx = widget.initialSelectedPlanIndex;
     if (_products.isEmpty) return;
     if (idx != null) {
-      final safe = idx.clamp(0, _products.length - 1);
-      selectedindex = safe;
+      selectedindex = _indexForPlanSlot(idx);
       return;
     }
 
@@ -284,6 +319,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     required bool invisibleHostPopValue,
   }) async {
     if (!mounted) return;
+    if (Get.isRegistered<DashBoardController>()) {
+      await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
+    }
     if (widget.invisiblePurchaseHost) {
       Navigator.of(context).pop(invisibleHostPopValue);
       return;
@@ -313,7 +351,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Future<void> _navigateAfterNonLifetimePurchaseSuccess() async {
-    await _navigateToHomeAfterPurchaseSuccess(invisibleHostPopValue: false);
+    await _navigateToHomeAfterPurchaseSuccess(invisibleHostPopValue: true);
   }
 
   /// After any paywall subscription succeeds, route to Home (purchase) or streak/home (restore-only).
@@ -751,15 +789,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           BibleInfo.lifeTimePlanid;
 
       if (isExpired) {
-        Get.to(
-          () => SubscriptionScreen(
-            sixMonthPlan: sixMonthPlan,
-            oneYearPlan: oneYearPlan,
-            lifeTimePlan: lifeTimePlan,
-            checkad: 'home',
-          ),
-          transition: Transition.cupertinoDialog,
-          duration: const Duration(milliseconds: 300),
+        SubscriptionScreen.openPaywallStacked(
+          sixMonthPlan: sixMonthPlan,
+          oneYearPlan: oneYearPlan,
+          lifeTimePlan: lifeTimePlan,
+          checkad: 'home',
         );
         return;
       }
@@ -773,15 +807,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
       final exitOffer = await getExitOfferFromApiStatic(controller);
       if (exitOffer == null || !context.mounted) {
-        Get.to(
-          () => SubscriptionScreen(
-            sixMonthPlan: sixMonthPlan,
-            oneYearPlan: oneYearPlan,
-            lifeTimePlan: lifeTimePlan,
-            checkad: 'home',
-          ),
-          transition: Transition.cupertinoDialog,
-          duration: const Duration(milliseconds: 300),
+        SubscriptionScreen.openPaywallStacked(
+          sixMonthPlan: sixMonthPlan,
+          oneYearPlan: oneYearPlan,
+          lifeTimePlan: lifeTimePlan,
+          checkad: 'home',
         );
         return;
       }
@@ -833,16 +863,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               // so the full SubscriptionScreen opens instead of purchase sheets on the sheet.
               Navigator.of(sheetContext).pop();
               if (homeContext.mounted) {
-                Navigator.of(homeContext).push(
-                  MaterialPageRoute(
-                    builder: (_) => SubscriptionScreen(
-                      sixMonthPlan: sixMonthPlan,
-                      oneYearPlan: oneYearPlan,
-                      lifeTimePlan: lifeTimePlan,
-                      checkad: 'home',
-                      fromHomeExitOffer: false,
-                    ),
-                  ),
+                SubscriptionScreen.openPaywallStacked(
+                  sixMonthPlan: sixMonthPlan,
+                  oneYearPlan: oneYearPlan,
+                  lifeTimePlan: lifeTimePlan,
+                  checkad: 'home',
+                  fromHomeExitOffer: false,
                 );
               }
             },
@@ -962,20 +988,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     }
     SharPreferences.setBoolean('closead', true);
 
-    // If came from Settings (theme), route back to Settings
-    if (widget.checkad == 'theme') {
+    if (!mounted) return;
+    final nav = Navigator.of(context);
+
+    // Paywall opened on top of an existing screen — pop with GetX so reverse
+    // animation matches the forward cupertino slide.
+    if (nav.canPop()) {
       Get.back();
       return;
     }
-    // When this screen sits on top of another route (e.g. Navigator.push), pop it
-    // so close / continue / links are not stuck behind a stale stack.
-    if (!mounted) return;
-    final nav = Navigator.of(context);
-    if (nav.canPop()) {
-      nav.pop();
-      return;
-    }
-    if (!mounted) return;
+
+    // Onboarding paywall replaced the stack — continue to streak/home.
     await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
   }
 
@@ -1439,7 +1462,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         Constants.showToast(successToastMessage);
         await SharPreferences.setBoolean('closead', true);
         await _completePaywallSubscriptionNavigation(
-            startFlag: startFlag == true);
+          startFlag: startFlag == true,
+          invisiblePopSuccess: true,
+        );
         return;
       } else if (_isTwoYearProductId(productId)) {
         final dur = DateTime(dateTime.year + 2, dateTime.month, dateTime.day);
@@ -1453,7 +1478,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         Constants.showToast(successToastMessage);
         await SharPreferences.setBoolean('closead', true);
         await _completePaywallSubscriptionNavigation(
-            startFlag: startFlag == true);
+          startFlag: startFlag == true,
+          invisiblePopSuccess: true,
+        );
         return;
       } else if (_isSixMonthProductId(productId)) {
         final dur = addSixMonths(customDate: dateTime);
@@ -1468,7 +1495,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         Constants.showToast(successToastMessage);
         await SharPreferences.setBoolean('closead', true);
         await _completePaywallSubscriptionNavigation(
-            startFlag: startFlag == true);
+          startFlag: startFlag == true,
+          invisiblePopSuccess: true,
+        );
         return;
       }
     }
@@ -1554,6 +1583,21 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   final expiryDate = addSixMonths();
                   final diff = expiryDate.difference(todayDate);
                   await controller.disableAd(diff);
+                  DownloadProvider? downloadProvider = _myProvider;
+                  downloadProvider ??= context.mounted
+                      ? Provider.of<DownloadProvider>(context, listen: false)
+                      : null;
+                  if (downloadProvider == null) {
+                    final getContext = Get.context;
+                    if (getContext != null) {
+                      downloadProvider = Provider.of<DownloadProvider>(
+                          getContext,
+                          listen: false);
+                    }
+                  }
+                  if (downloadProvider != null) {
+                    await downloadProvider.setSubscriptionPlan('silver');
+                  }
                   await Future.delayed(Duration(seconds: 2));
                   // Complete the purchase for iOS - critical to prevent infinite loading
                   if (Platform.isIOS) {
@@ -1567,6 +1611,21 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   return;
                 } else if (_isOneYearProductId(purchaseDetails.productID)) {
                   await controller.disableAd(const Duration(days: 366));
+                  DownloadProvider? downloadProvider = _myProvider;
+                  downloadProvider ??= context.mounted
+                      ? Provider.of<DownloadProvider>(context, listen: false)
+                      : null;
+                  if (downloadProvider == null) {
+                    final getContext = Get.context;
+                    if (getContext != null) {
+                      downloadProvider = Provider.of<DownloadProvider>(
+                          getContext,
+                          listen: false);
+                    }
+                  }
+                  if (downloadProvider != null) {
+                    await downloadProvider.setSubscriptionPlan('gold');
+                  }
                   await Future.delayed(Duration(seconds: 2));
                   // Complete the purchase for iOS - critical to prevent infinite loading
                   if (Platform.isIOS) {
@@ -2178,8 +2237,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     }
   }
 
-  final controller = Get.put(DashBoardController());
-//  final controller = Get.find<DashBoardController>();
+  final controller = Get.isRegistered<DashBoardController>()
+      ? Get.find<DashBoardController>()
+      : Get.put(DashBoardController());
   @override
   void initState() {
     super.initState();
@@ -2525,7 +2585,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         child: IconButton(
                           icon: const Icon(Icons.arrow_back,
                               color: Color(0xFF2D2D3A), size: 24),
-                          onPressed: () => Navigator.of(context).pop(),
+                          onPressed: () => _navigateAwayFromPaywall(),
                         ),
                       ),
                     ),
@@ -2807,9 +2867,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   Widget _buildPaywallHeroWithCard(BuildContext context, Size size) {
     final topPadding = MediaQuery.paddingOf(context).top;
-    final imageHeight = (size.height * 0.42).clamp(280.0, 340.0);
+    final isCompactHeight = size.height < 750;
+    // On smaller devices (e.g. iPhone SE), use a taller hero and less card overlap
+    // so the subtitle stays fully visible above the value card.
+    final imageHeight = isCompactHeight
+        ? (size.height * 0.44).clamp(290.0, 340.0)
+        : (size.height * 0.42).clamp(280.0, 340.0);
+    final cardOverlap =
+        isCompactHeight ? 72.0 : _kPaywallCardOverlap;
     final sectionHeight = imageHeight +
-        (_kPaywallValueCardLayoutHeight - _kPaywallCardOverlap) +
+        (_kPaywallValueCardLayoutHeight - cardOverlap) +
         _kPaywallValueCardSectionGap;
 
     return SizedBox(
@@ -2943,7 +3010,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           Positioned(
             left: 16,
             right: 16,
-            top: imageHeight - _kPaywallCardOverlap,
+            top: imageHeight - cardOverlap,
             child: _buildPaywallValueCard(context),
           ),
         ],

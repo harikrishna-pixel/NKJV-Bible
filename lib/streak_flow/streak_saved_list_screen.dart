@@ -11,6 +11,62 @@ import 'package:provider/provider.dart';
 const Color _dialogCream = Color(0xFFF8F4EB);
 const Color _dialogBrown = Color(0xFF3D2914);
 
+IconData _streakSavedTypeIconData(String type) {
+  switch (type) {
+    case 'verse':
+      return Icons.menu_book_rounded;
+    case 'devotional':
+      return Icons.local_fire_department_rounded;
+    case 'prayer':
+      return Icons.volunteer_activism_rounded;
+    default:
+      return Icons.bookmark;
+  }
+}
+
+Widget _buildStreakSavedTypeIcon({
+  required IconData icon,
+  required Color gold,
+  double outer = 44,
+  double inner = 34,
+  double iconSize = 20,
+}) {
+  return SizedBox(
+    width: outer,
+    height: outer,
+    child: Stack(
+      alignment: Alignment.center,
+      children: [
+        Container(
+          width: outer,
+          height: outer,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withOpacity(0.12),
+            boxShadow: [
+              BoxShadow(
+                color: gold.withOpacity(0.28),
+                blurRadius: 14,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+        ),
+        Container(
+          width: inner,
+          height: inner,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withOpacity(0.9),
+            border: Border.all(color: gold.withOpacity(0.5), width: 1),
+          ),
+          child: Icon(icon, color: gold, size: iconSize),
+        ),
+      ],
+    ),
+  );
+}
+
 String _removedMessageForType(String type) {
   switch (type) {
     case 'verse':
@@ -186,19 +242,37 @@ class StreakSavedListScreen extends StatefulWidget {
   State<StreakSavedListScreen> createState() => _StreakSavedListScreenState();
 }
 
-class _StreakSavedListScreenState extends State<StreakSavedListScreen> {
+class _StreakSavedListScreenState extends State<StreakSavedListScreen>
+    with SingleTickerProviderStateMixin {
   static const Color _brown = Color(0xFF3D2914);
   static const Color _gold = Color(0xFFC9A227);
   static const Color _panel = Color(0xFFF8F4EB);
 
   List<StreakSavedItem> _items = [];
   bool _loading = true;
+  late TabController _tabController;
+  int _selectedTap = 0;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging && mounted) {
+        setState(() => _selectedTap = _tabController.index);
+      }
+    });
     _load();
   }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  List<StreakSavedItem> _itemsForType(String type) =>
+      _items.where((e) => e.type == type).toList();
 
   Future<void> _load() async {
     final list = await StreakSavedStorage.getAll();
@@ -217,6 +291,128 @@ class _StreakSavedListScreenState extends State<StreakSavedListScreen> {
         _loading = false;
       });
     }
+  }
+
+  BoxDecoration _tabChipDecoration(BuildContext context, int tabIndex) {
+    final isSelected = _selectedTap == tabIndex;
+    return BoxDecoration(
+      borderRadius: BorderRadius.circular(3),
+      boxShadow: const [
+        BoxShadow(
+          color: Colors.black38,
+          blurRadius: 0.5,
+          spreadRadius: 1,
+          offset: Offset(0, 1),
+        ),
+      ],
+      color: isSelected
+          ? CommanColor.lightDarkPrimary(context)
+          : CommanColor.whiteBlack45(context),
+    );
+  }
+
+  Color _tabIconColor(BuildContext context, int tabIndex) {
+    if (_selectedTap == tabIndex) return Colors.white;
+    return CommanColor.isDarkTheme(context)
+        ? CommanColor.lightDarkPrimary(context)
+        : Colors.white;
+  }
+
+  Widget _buildTabChip({
+    required BuildContext context,
+    required int tabIndex,
+    required double screenWidth,
+    required IconData icon,
+    required String label,
+  }) {
+    final chipHeight = screenWidth > 450 ? 50.0 : 42.0;
+    final iconSize = screenWidth > 450 ? 22.0 : 18.0;
+    final fontSize = screenWidth > 450 ? 15.0 : 13.0;
+    final isSelected = _selectedTap == tabIndex;
+
+    return Tab(
+      child: Container(
+        height: chipHeight,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: _tabChipDecoration(context, tabIndex),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: iconSize,
+              color: _tabIconColor(context, tabIndex),
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight:
+                      isSelected ? FontWeight.w600 : FontWeight.w500,
+                  color: isSelected
+                      ? Colors.white
+                      : (CommanColor.isDarkTheme(context)
+                          ? CommanColor.lightDarkPrimary(context)
+                          : Colors.white),
+                  fontFamily: 'Georgia',
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTypeEmptyState({
+    required String typeLabel,
+    required Color textColor,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
+        child: Text(
+          'No saved $typeLabel yet.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 16,
+            height: 1.45,
+            color: textColor.withOpacity(0.85),
+            fontFamily: 'Georgia',
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSavedListForType({
+    required List<StreakSavedItem> items,
+    required Color textColor,
+    required Color panelColor,
+  }) {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return _SavedItemCard(
+          item: item,
+          textColor: textColor,
+          panelColor: panelColor,
+          gold: _gold,
+          onDelete: (String type) async {
+            await StreakSavedStorage.remove(item.type, item.title, item.body);
+            await _load();
+            if (mounted) _showRemovedToast(context, type);
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -258,7 +454,7 @@ class _StreakSavedListScreenState extends State<StreakSavedListScreen> {
                     ),
                     Expanded(
                       child: Text(
-                        'Saved',
+                        'Saved to Faith Journey',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: isTablet ? 24 : 20,
@@ -289,7 +485,7 @@ class _StreakSavedListScreenState extends State<StreakSavedListScreen> {
                             height: 130,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: panelColor.withOpacity(isDark ? 0.35 : 0.9),
+                              color: _panel.withOpacity(0.9),
                               border: Border.all(
                                 color: _gold.withOpacity(0.65),
                                 width: 2,
@@ -302,20 +498,10 @@ class _StreakSavedListScreenState extends State<StreakSavedListScreen> {
                                 ),
                               ],
                             ),
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                Icon(Icons.auto_stories,
-                                    size: 64, color: _gold.withOpacity(0.95)),
-                                // Positioned(
-                                //   right: 28,
-                                //   bottom: 28,
-                                //   child: Icon(Icons.bookmark,
-                                //       size: 24,
-                                //       color:
-                                //           textColor.withOpacity(isDark ? 0.85 : 0.75)),
-                                // ),
-                              ],
+                            child: Icon(
+                              Icons.menu_book_rounded,
+                              size: 64,
+                              color: _gold.withOpacity(0.95),
                             ),
                           ),
                           const SizedBox(height: 22),
@@ -394,23 +580,90 @@ class _StreakSavedListScreenState extends State<StreakSavedListScreen> {
                 )
               else
                 Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    itemCount: _items.length,
-                    itemBuilder: (context, index) {
-                      final item = _items[index];
-                      return _SavedItemCard(
-                        item: item,
-                        textColor: textColor,
-                        panelColor: panelColor,
-                        gold: _gold,
-                        onDelete: (String type) async {
-                          await StreakSavedStorage.removeAt(index);
-                          await _load();
-                          if (mounted) _showRemovedToast(context, type);
-                        },
-                      );
-                    },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+                        child: SizedBox(
+                          height: isTablet ? 54 : 46,
+                          child: TabBar(
+                            controller: _tabController,
+                            isScrollable: false,
+                            indicatorWeight: 0,
+                            dividerColor: Colors.transparent,
+                            padding: EdgeInsets.zero,
+                            labelPadding: EdgeInsets.zero,
+                            indicatorPadding: EdgeInsets.zero,
+                            indicatorSize: TabBarIndicatorSize.tab,
+                            indicator: const BoxDecoration(),
+                            onTap: (value) {
+                              setState(() => _selectedTap = value);
+                            },
+                            tabs: [
+                              _buildTabChip(
+                                context: context,
+                                tabIndex: 0,
+                                screenWidth: MediaQuery.of(context).size.width,
+                                icon: Icons.menu_book_rounded,
+                                label: 'Verses',
+                              ),
+                              _buildTabChip(
+                                context: context,
+                                tabIndex: 1,
+                                screenWidth: MediaQuery.of(context).size.width,
+                                icon: Icons.local_fire_department_rounded,
+                                label: 'Devotional',
+                              ),
+                              _buildTabChip(
+                                context: context,
+                                tabIndex: 2,
+                                screenWidth: MediaQuery.of(context).size.width,
+                                icon: Icons.volunteer_activism_rounded,
+                                label: 'Prayer',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: TabBarView(
+                          controller: _tabController,
+                          children: [
+                            _itemsForType('verse').isEmpty
+                                ? _buildTypeEmptyState(
+                                    typeLabel: 'verses',
+                                    textColor: textColor,
+                                  )
+                                : _buildSavedListForType(
+                                    items: _itemsForType('verse'),
+                                    textColor: textColor,
+                                    panelColor: panelColor,
+                                  ),
+                            _itemsForType('devotional').isEmpty
+                                ? _buildTypeEmptyState(
+                                    typeLabel: 'devotionals',
+                                    textColor: textColor,
+                                  )
+                                : _buildSavedListForType(
+                                    items: _itemsForType('devotional'),
+                                    textColor: textColor,
+                                    panelColor: panelColor,
+                                  ),
+                            _itemsForType('prayer').isEmpty
+                                ? _buildTypeEmptyState(
+                                    typeLabel: 'prayers',
+                                    textColor: textColor,
+                                  )
+                                : _buildSavedListForType(
+                                    items: _itemsForType('prayer'),
+                                    textColor: textColor,
+                                    panelColor: panelColor,
+                                  ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
             ],
@@ -456,19 +709,6 @@ class _SavedItemCardState extends State<_SavedItemCard> {
     }
   }
 
-  static IconData _typeIcon(String type) {
-    switch (type) {
-      case 'verse':
-        return Icons.menu_book;
-      case 'devotional':
-        return Icons.auto_stories;
-      case 'prayer':
-        return Icons.favorite;
-      default:
-        return Icons.bookmark;
-    }
-  }
-
   static String _formatSavedDate(String savedAt) {
     try {
       final dt = DateTime.parse(savedAt);
@@ -499,8 +739,11 @@ class _SavedItemCardState extends State<_SavedItemCard> {
             children: [
               Row(
                 children: [
-                  Icon(_typeIcon(item.type), size: 20, color: gold),
-                  const SizedBox(width: 8),
+                  _buildStreakSavedTypeIcon(
+                    icon: _streakSavedTypeIconData(item.type),
+                    gold: gold,
+                  ),
+                  const SizedBox(width: 10),
                   Text(
                     _typeLabel(item.type),
                     style: TextStyle(

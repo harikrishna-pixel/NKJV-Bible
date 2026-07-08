@@ -28,11 +28,43 @@ class VerseTopicVerse {
 class VerseTopicsData {
   static const String backgroundAsset = 'assets/verse-topics-bg.png';
   static final Map<String, List<VerseTopicVerse>> _categoryVersesCache = {};
+  static List<String>? _categoriesCache;
+  static Future<List<String>>? _categoriesLoadFuture;
+
+  static void preloadCategories() {
+    loadCategories();
+  }
+
+  static List<String>? get cachedCategories {
+    return _categoriesCache == null
+        ? null
+        : List<String>.from(_categoriesCache!);
+  }
 
   static Future<List<String>> loadCategories() async {
+    if (_categoriesCache != null) {
+      return List<String>.from(_categoriesCache!);
+    }
+    _categoriesLoadFuture ??= _loadCategoriesOnce();
+    return _categoriesLoadFuture!;
+  }
+
+  static Future<List<String>> _loadCategoriesOnce() async {
     final icons = await _loadCategoryIcons();
     final names = icons.keys.toList()..sort();
-    return names;
+    String? encouragementKey;
+    for (final name in names) {
+      if (name.toLowerCase() == 'encouragement') {
+        encouragementKey = name;
+        break;
+      }
+    }
+    if (encouragementKey != null) {
+      names.remove(encouragementKey);
+      names.add(encouragementKey);
+    }
+    _categoriesCache = names;
+    return List<String>.from(names);
   }
 
   static Future<Map<String, String>> _loadCategoryIcons() async {
@@ -195,22 +227,37 @@ class VerseTopicsData {
     }
 
     final verseContentByKey = <String, String>{};
-    for (final chapterKey in chapterKeys) {
-      final parts = chapterKey.split('-');
-      if (parts.length != 2) continue;
-      final bookNum = int.tryParse(parts[0]);
-      final chapterNum = int.tryParse(parts[1]);
-      if (bookNum == null || chapterNum == null) continue;
+    if (chapterKeys.isNotEmpty) {
+      final chapterClauses = <String>[];
+      final chapterArgs = <Object>[];
+      for (final chapterKey in chapterKeys) {
+        final parts = chapterKey.split('-');
+        if (parts.length != 2) continue;
+        final bookNum = int.tryParse(parts[0]);
+        final chapterNum = int.tryParse(parts[1]);
+        if (bookNum == null || chapterNum == null) continue;
+        chapterClauses.add('(book_num = ? AND chapter_num = ?)');
+        chapterArgs.addAll([bookNum, chapterNum]);
+      }
 
-      final chapterVerses = await db.rawQuery(
-        'SELECT verse_num, content FROM verse WHERE book_num = ? AND chapter_num = ?',
-        [bookNum, chapterNum],
-      );
-      for (final verseRow in chapterVerses) {
-        final verseNum = int.tryParse(verseRow['verse_num']?.toString() ?? '');
-        if (verseNum == null) continue;
-        verseContentByKey['$bookNum-$chapterNum-$verseNum'] =
-            verseRow['content']?.toString() ?? '';
+      if (chapterClauses.isNotEmpty) {
+        final chapterVerses = await db.rawQuery(
+          'SELECT book_num, chapter_num, verse_num, content FROM verse WHERE ${chapterClauses.join(' OR ')}',
+          chapterArgs,
+        );
+        for (final verseRow in chapterVerses) {
+          final bookNum =
+              int.tryParse(verseRow['book_num']?.toString() ?? '');
+          final chapterNum =
+              int.tryParse(verseRow['chapter_num']?.toString() ?? '');
+          final verseNum =
+              int.tryParse(verseRow['verse_num']?.toString() ?? '');
+          if (bookNum == null || chapterNum == null || verseNum == null) {
+            continue;
+          }
+          verseContentByKey['$bookNum-$chapterNum-$verseNum'] =
+              verseRow['content']?.toString() ?? '';
+        }
       }
     }
 

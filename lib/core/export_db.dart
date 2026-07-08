@@ -24,6 +24,26 @@ import 'package:permission_handler/permission_handler.dart';
 class ExportDb {
   static String encryptionKey = dotenv.env['ENCRYPTION_KEY'] ?? '';
 
+  /// iOS [open_file_manager] appends this to `shareddocuments://.../Documents/`.
+  /// Must be a relative folder (not an absolute file path) and URL-encoded —
+  /// spaces in [BibleInfo.bible_shortName] crash native URL parsing otherwise.
+  static String _iosBackupSubFolderPath() {
+    final folder = BibleInfo.bible_shortName.trim();
+    if (folder.isEmpty) return '';
+    return '${Uri.encodeComponent(folder)}/';
+  }
+
+  static Future<void> _openBackupFolder() async {
+    await openFileManager(
+      androidConfig: AndroidConfig(
+        folderType: FolderType.recent,
+      ),
+      iosConfig: IosConfig(
+        subFolderPath: _iosBackupSubFolderPath(),
+      ),
+    );
+  }
+
   static Future<Map<String, dynamic>> syncAllData() async {
     try {
       final bookmarkDataList = await DBHelper().getBookMark();
@@ -104,23 +124,8 @@ class ExportDb {
                   GestureDetector(
                     onTap: () async {
                       Navigator.pop(context);
-                      // final directory =
-                      //     await getApplicationDocumentsDirectory();
-                      final bibleDir = Directory(path);
                       try {
-                        openFileManager(
-                          androidConfig: AndroidConfig(
-                            folderType: FolderType.recent,
-                          ),
-                          iosConfig: IosConfig(
-                            // Path is case-sensitive here.
-                            subFolderPath: bibleDir.path,
-                          ),
-                        );
-                        // final data = await FilePicker.platform
-                        //     .getDirectoryPath(initialDirectory: path);
-
-                        // debugPrint("$data");
+                        await _openBackupFolder();
                       } catch (e) {
                         Constants.showToast("Something went wrong - $e.");
                       }
@@ -233,22 +238,13 @@ class ExportDb {
             builder: (_) => BackupDialog(
               type: "complete",
               onPrimaryPressed: () async {
-                //  Navigator.pop(context);
-
+                Get.back();
+                Get.back();
                 try {
-                  openFileManager(
-                    androidConfig: AndroidConfig(
-                      folderType: FolderType.recent,
-                    ),
-                    iosConfig: IosConfig(
-                      // Path is case-sensitive here.
-                      subFolderPath: file.path,
-                    ),
-                  );
-                  Get.back();
-                  Get.back();
+                  await _openBackupFolder();
                 } catch (e) {
                   debugPrint(e.toString());
+                  Constants.showToast('Could not open backup folder.');
                 }
               },
               onSecondaryPressed: () {
@@ -328,6 +324,35 @@ class ExportDb {
     }
   }
 
+  /// Shows splash-style percentage progress while [work] runs.
+  static Future<void> _runWithPercentProgress(Future<void> Function() work) async {
+    final prevIndicator = EasyLoading.instance.indicatorType;
+    final prevProgressColor = EasyLoading.instance.progressColor;
+    EasyLoading.instance
+      ..indicatorType = EasyLoadingIndicatorType.ring
+      ..progressColor = Colors.white;
+
+    var progress = 0.05;
+    EasyLoading.showProgress(progress, status: 'Importing… 5%');
+    final timer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      progress = (progress + 0.035).clamp(0.05, 0.92);
+      final pct = (progress * 100).round();
+      EasyLoading.showProgress(progress, status: 'Importing… $pct%');
+    });
+    try {
+      await work();
+      timer.cancel();
+      EasyLoading.showProgress(1.0, status: 'Importing… 100%');
+      await Future.delayed(const Duration(milliseconds: 350));
+    } finally {
+      timer.cancel();
+      EasyLoading.dismiss();
+      EasyLoading.instance
+        ..indicatorType = prevIndicator
+        ..progressColor = prevProgressColor;
+    }
+  }
+
   /// Restores library data from an existing .enc backup file (e.g. cloud download).
   /// Does not change [importData] file-picker flow.
   static Future<String?> restoreBackupFromFile(File file) async {
@@ -337,17 +362,17 @@ class ExportDb {
         Constants.showToast("File is not selected");
         return "File is not selected";
       }
-      final encryptedContent = await file.readAsString();
-      final decryptedContent = decryptData(encryptedContent);
-      await saveAllData(decryptedContent);
-      await Future.delayed(const Duration(seconds: 3));
+      await _runWithPercentProgress(() async {
+        final encryptedContent = await file.readAsString();
+        final decryptedContent = decryptData(encryptedContent);
+        await saveAllData(decryptedContent);
+      });
       await SharPreferences.setString('OpenAd', '1');
-      Constants.showToast(
-          "Data Imported Successfully. Please restart app to see the changes",
-          3000);
+      Constants.showToast("Data imported successfully", 3000);
       return null;
     } catch (e, st) {
       log('Error: $e,$st');
+      EasyLoading.dismiss();
       await SharPreferences.setString('OpenAd', '1');
       Constants.showToast(e.toString());
       return e.toString();
@@ -365,16 +390,13 @@ class ExportDb {
         // final file = File("$filePath/${BibleInfo.bible_shortName}_Backup.enc");
         final file = File(filePath);
         if (await file.exists()) {
-          // Read the encrypted data from the file
-          String encryptedContent = await file.readAsString();
-          // Decrypt the data using the same encryption method
-          String decryptedContent = decryptData(encryptedContent);
-          await saveAllData(decryptedContent);
-          await Future.delayed(Duration(seconds: 3));
+          await _runWithPercentProgress(() async {
+            String encryptedContent = await file.readAsString();
+            String decryptedContent = decryptData(encryptedContent);
+            await saveAllData(decryptedContent);
+          });
           await SharPreferences.setString('OpenAd', '1');
-          Constants.showToast(
-              "Data Imported Successfully. Please restart app to see the changes",
-              3000);
+          Constants.showToast("Data imported successfully", 3000);
         } else {
           Constants.showToast("File is not selected");
           await SharPreferences.setString('OpenAd', '1');
@@ -387,6 +409,7 @@ class ExportDb {
       }
     } catch (e, st) {
       log('Error: $e,$st');
+      EasyLoading.dismiss();
       await SharPreferences.setString('OpenAd', '1');
       Constants.showToast(e.toString());
       return "File is not selected";

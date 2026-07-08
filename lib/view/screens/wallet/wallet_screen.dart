@@ -43,6 +43,8 @@ class _WalletScreenState extends State<WalletScreen> {
   int _claimCooldownSeconds = 0;
   bool _hasWatchedMaxAds =
       false; // Track if user has watched max ads (2 per day)
+  int _remainingAdsToday = 0;
+  bool _remainingAdsLoaded = false;
   Map<String, Timer> _purchaseTimeouts =
       {}; // Track timeout timers for each product
   bool _isLowNetwork = false; // Track if network is low/2G
@@ -55,6 +57,7 @@ class _WalletScreenState extends State<WalletScreen> {
       'wallet_processed_purchases';
 
   static const String _walletIntroSeenKey = 'wallet_intro_seen';
+  static const int _walletToastMs = 2000;
 
   Future<void> _showWalletIntroIfNeeded() async {
     try {
@@ -270,10 +273,12 @@ class _WalletScreenState extends State<WalletScreen> {
     _checkConnectivityAndShowToast();
     // Initialize and load credits immediately from local storage (works offline)
     _initializeCredits();
+    _refreshClaimCooldown();
     _loadCoinPacks();
     _initStoreInfoIfOnline();
     _loadRewardedAd();
     _loadAnswerLength();
+    _refreshRemainingAdsToday();
     _storeLoadFallbackTimer = Timer(const Duration(seconds: 6), () {
       if (!mounted) return;
       if (_products.isEmpty && !_usingFallbackPacks) {
@@ -286,11 +291,27 @@ class _WalletScreenState extends State<WalletScreen> {
     _creditsTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _loadCredits();
       _refreshClaimCooldown();
+      _refreshRemainingAdsToday();
       _checkMaxAdsWatched();
     });
     // Initialize max ads check
     _checkMaxAdsWatched();
 
+  }
+
+  Future<void> _refreshRemainingAdsToday() async {
+    try {
+      final remaining = await WalletService.getRemainingAdsToday();
+      final safeRemaining = remaining < 0 ? 0 : remaining;
+      if (!mounted) return;
+      if (_remainingAdsLoaded && safeRemaining == _remainingAdsToday) return;
+      setState(() {
+        _remainingAdsToday = safeRemaining;
+        _remainingAdsLoaded = true;
+      });
+    } catch (_) {
+      // Keep previous value if anything fails
+    }
   }
 
   Future<void> _checkConnectivityAndShowToast() async {
@@ -509,7 +530,11 @@ class _WalletScreenState extends State<WalletScreen> {
     }
   }
 
+  bool _claimUiLocked = false;
+
   Future<void> _refreshClaimCooldown() async {
+    // Avoid Claim↔Wait flicker while claim is in progress.
+    if (_claimUiLocked) return;
     final cooldown = await WalletService.getClaimCooldownMinutes();
     final cooldownSeconds = await WalletService.getClaimCooldownSeconds();
     if (mounted &&
@@ -885,16 +910,28 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Future<void> _claimFreeCredits() async {
+    if (_claimUiLocked || _claimCooldownSeconds > 0) return;
+    _claimUiLocked = true;
+    // Show timer immediately (no Claim → Wait flash from the 1s poll).
+    if (mounted) {
+      setState(() {
+        _claimCooldownMinutes = 15;
+        _claimCooldownSeconds = 15 * 60;
+      });
+    }
+
     final result = await WalletService.claimFreeCredits();
     if (result != null) {
-      // Update cached instance immediately for instant display
       if (_cachedPrefs != null) {
         await _cachedPrefs!.setInt('user_wallet_credits', result);
       }
       await _loadCredits();
-      await _refreshClaimCooldown();
-      Constants.showToast('Claimed 20 credits!', 6000);
+      Constants.showToast('Claimed 20 credits!', _walletToastMs);
+      _claimUiLocked = false;
+      if (mounted) await _refreshClaimCooldown();
     } else {
+      _claimUiLocked = false;
+      await _refreshClaimCooldown();
       final cooldown = await WalletService.getClaimCooldownMinutes();
       if (cooldown > 0) {
         Constants.showToast('Please wait $cooldown more minutes');
@@ -908,26 +945,26 @@ class _WalletScreenState extends State<WalletScreen> {
       // This checks actual internet access, not just network interface availability
       final hasInternet = await InternetConnection().hasInternetAccess;
       if (!hasInternet) {
-        Constants.showToast("No Internet Connection", 6000);
+        Constants.showToast("No Internet Connection", _walletToastMs);
         return;
       }
 
       // Check if user can watch ad (max 2 per day)
       final canWatch = await WalletService.canWatchAd();
       if (!canWatch) {
-        final remaining = await WalletService.getRemainingAdsToday();
+        await _refreshRemainingAdsToday();
         Constants.showToast(
-            'You have already watched 2 ads Today. Come back Tomorrow!', 6000);
+            'You have already watched 2 ads Today. Come back Tomorrow!', _walletToastMs);
         return;
       }
 
       // Capture remaining before showing ad to avoid off-by-one toast
-      final remainingBefore = await WalletService.getRemainingAdsToday();
+      await _refreshRemainingAdsToday();
 
       // Check if ad is loaded
       if (!_isRewardedAdLoaded || _rewardedAd == null) {
         Constants.showToast(
-            'Ad is loading. Please try again in a moment.', 6000);
+            'Ad is loading. Please try again in a moment.', _walletToastMs);
         _loadRewardedAd(); // Try to load ad
         return;
       }
@@ -935,7 +972,7 @@ class _WalletScreenState extends State<WalletScreen> {
       // Store the callback before showing ad
       final adToShow = _rewardedAd;
       if (adToShow == null) {
-        Constants.showToast('Ad is not ready. Please try again.', 6000);
+        Constants.showToast('Ad is not ready. Please try again.', _walletToastMs);
         _loadRewardedAd();
         return;
       }
@@ -953,7 +990,7 @@ class _WalletScreenState extends State<WalletScreen> {
           ad.dispose();
           _rewardedAd = null;
           _isRewardedAdLoaded = false;
-          Constants.showToast('Failed to show ad. Please try again.', 6000);
+          Constants.showToast('Failed to show ad. Please try again.', _walletToastMs);
           _loadRewardedAd();
         },
       );
@@ -972,26 +1009,24 @@ class _WalletScreenState extends State<WalletScreen> {
                 await _cachedPrefs!.setInt('user_wallet_credits', newBalance);
               }
               await _loadCredits();
-              final remainingAfter = await WalletService.getRemainingAdsToday();
-              final safeRemaining = remainingAfter < 0 ? 0 : remainingAfter;
-              Constants.showToast(
-                  'Watched ad! Received 50 credits. $safeRemaining ads remaining today.',
-                  6000);
-              // Update max ads status after watching ad
+              await _refreshRemainingAdsToday();
               await _checkMaxAdsWatched();
+              Constants.showToast(
+                  'Watched ad! Received 50 credits.', _walletToastMs);
             } else {
-              Constants.showToast('You have already watched 2 ads today', 6000);
+              await _refreshRemainingAdsToday();
+              Constants.showToast('You have already watched 2 ads today', _walletToastMs);
             }
           } catch (e) {
             debugPrint('WalletScreen: Error giving credits after ad: $e');
             Constants.showToast(
-                'Error processing credits. Please try again.', 6000);
+                'Error processing credits. Please try again.', _walletToastMs);
           }
         },
       );
     } catch (e) {
       debugPrint('WalletScreen: Error in _watchAdForCredits: $e');
-      Constants.showToast('Error loading ad. Please try again.', 6000);
+      Constants.showToast('Error loading ad. Please try again.', _walletToastMs);
       _loadRewardedAd(); // Try to reload ad
     }
   }
@@ -1177,7 +1212,8 @@ class _WalletScreenState extends State<WalletScreen> {
                         subtitle: 'Get 50 credits \n(2 ads per day)',
                         buttonText: 'Watch Ad',
                         onTap: _watchAdForCredits,
-                        buttonOpacity: _hasWatchedMaxAds ? 0.5 : 1.0,
+                        isDisabled: _hasWatchedMaxAds,
+                        buttonOpacity: _hasWatchedMaxAds ? 0.85 : 1.0,
                       ),
                       const SizedBox(height: 32),
 
@@ -1214,6 +1250,7 @@ class _WalletScreenState extends State<WalletScreen> {
     required String subtitle,
     required String buttonText,
     required VoidCallback onTap,
+    Widget? footer,
     bool isDisabled = false,
     double buttonOpacity = 1.0,
   }) {
@@ -1284,28 +1321,26 @@ class _WalletScreenState extends State<WalletScreen> {
                     ),
                   ),
                 ],
+                if (footer != null) ...[
+                  const SizedBox(height: 8),
+                  footer,
+                ],
               ],
             ),
           ),
           Opacity(
-            opacity: buttonOpacity,
+            opacity: buttonOpacity < 0.5 ? 0.7 : buttonOpacity,
             child: Container(
               decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.transparent
-                    : (isDisabled
-                        ? CommanColor.lightDarkPrimary(context)
-                            .withOpacity(0.6)
-                        : CommanColor.lightDarkPrimary(context)),
+                // Always use a solid filled button so labels stay readable in dark/vintage.
+                color: isDisabled
+                    ? const Color(0xFF6D4C41).withOpacity(0.75)
+                    : const Color(0xFF6D4C41),
                 borderRadius: BorderRadius.circular(8),
-                border: isDark
-                    ? Border.all(
-                        color: isDisabled
-                            ? Colors.white.withOpacity(0.4)
-                            : Colors.white,
-                        width: 1.5,
-                      )
-                    : null,
+                border: Border.all(
+                  color: Colors.white.withOpacity(isDisabled ? 0.7 : 0.95),
+                  width: 1.5,
+                ),
               ),
               child: Material(
                 color: Colors.transparent,
@@ -1321,7 +1356,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: screenWidth > 450 ? 14 : 13.5,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                       ),
                       textAlign: TextAlign.center,
                     ),

@@ -14,7 +14,9 @@ import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/authenitcation/bloc/signup_bloc.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
+import 'package:biblebookapp/utils/email_validator.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/login_screen.dart';
+import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/social_auth_widget.dart';
 import 'package:biblebookapp/view/screens/authenitcation/widgets/text_form_field.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
@@ -129,6 +131,7 @@ class SignupScreen extends HookConsumerWidget {
                                               'Please enter your email address'),
                                       FormBuilderValidators.email(
                                           errorText: 'Email is not valid'),
+                                      AppEmailValidator.validate,
                                     ]),
                                   ),
                                   const SizedBox(height: 20),
@@ -296,8 +299,13 @@ class SignupScreen extends HookConsumerWidget {
                                                 );
                                               }
                                               if (!context.mounted) return;
-                                              Get.to(() => LoginScreen(
-                                                    hasSkip: false,
+                                              Get.offAll(() => HomeScreen(
+                                                    From: "splash",
+                                                    selectedVerseNumForRead: "",
+                                                    selectedBookForRead: "",
+                                                    selectedChapterForRead: "",
+                                                    selectedBookNameForRead: "",
+                                                    selectedVerseForRead: "",
                                                   ));
                                             }
                                           } catch (e) {

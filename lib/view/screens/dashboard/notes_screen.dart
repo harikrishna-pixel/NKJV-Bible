@@ -214,9 +214,12 @@ class _NotesScreenState extends State<NotesScreen> {
                                                 const SizedBox(
                                                   height: 35,
                                                 ),
-                                                Row(
+                                                SingleChildScrollView(
+                                                  scrollDirection:
+                                                      Axis.horizontal,
+                                                  child: Row(
                                                   mainAxisAlignment:
-                                                      MainAxisAlignment.center,
+                                                      MainAxisAlignment.start,
                                                   children: [
                                                     Column(
                                                       children: [
@@ -728,7 +731,8 @@ class _NotesScreenState extends State<NotesScreen> {
                                                       ],
                                                     ),
                                                   ],
-                                                )
+                                                ),
+                                                ),
                                               ],
                                             ),
                                           );
@@ -837,9 +841,12 @@ class _NotesScreenState extends State<NotesScreen> {
                                             const SizedBox(
                                               height: 35,
                                             ),
-                                            Row(
+                                            SingleChildScrollView(
+                                              scrollDirection:
+                                                  Axis.horizontal,
+                                              child: Row(
                                               mainAxisAlignment:
-                                                  MainAxisAlignment.center,
+                                                  MainAxisAlignment.start,
                                               children: [
                                                 Column(
                                                   children: [
@@ -1371,10 +1378,11 @@ class _NotesScreenState extends State<NotesScreen> {
                                                   ],
                                                 ),
                                               ],
-                                            )
-                                          ],
-                                        ),
-                                      );
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
                                     },
                                   );
                                 },

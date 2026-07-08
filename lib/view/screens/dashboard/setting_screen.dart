@@ -63,6 +63,28 @@ class _SettingScreenState extends State<SettingScreen>
     super.dispose();
   }
 
+  /// Leave Settings without double-navigating (PopScope + back button used to
+  /// call Get.back and Get.offAll in the same frame → navigator !_debugLocked).
+  void _leaveSettings() {
+    if (!mounted) return;
+    if (Navigator.of(context).canPop()) {
+      Get.back();
+      return;
+    }
+    Get.offAll(
+      () => HomeScreen(
+        From: "Setting",
+        selectedVerseNumForRead: "",
+        selectedBookForRead: "",
+        selectedChapterForRead: "",
+        selectedBookNameForRead: "",
+        selectedVerseForRead: "",
+      ),
+      transition: Transition.cupertino,
+      duration: const Duration(milliseconds: 350),
+    );
+  }
+
   @override
   Future<void> didChangeAppLifecycleState(AppLifecycleState state) async {
     switch (state) {
@@ -228,24 +250,6 @@ class _SettingScreenState extends State<SettingScreen>
     //   },
     // );
 
-    final prefs = await SharedPreferences.getInstance();
-
-    final data = prefs.getBool('notificationshowonetime') ?? false;
-
-    if (data == false) {
-      final prefs = await SharedPreferences.getInstance();
-
-      prefs.setBool("notificationshowonetime", true);
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) {
-            return const NotifyMeDialog();
-          },
-        );
-      }
-    }
-
     try {
       // Fetch all values sequentially using await
       String? hour =
@@ -320,7 +324,7 @@ class _SettingScreenState extends State<SettingScreen>
         notificationMinute = minute ?? "00";
         selectedTime = (minute == null)
             ? "8:00 AM"
-            : DateFormat.jm().format(DateFormat("HH:mm:ss")
+            : DateFormat("h:mm a").format(DateFormat("HH:mm:ss")
                 .parse("$notificationHours:$notificationMinute:00"));
         selectedNotificationTime = Time(
           hour: int.parse(notificationHours),
@@ -332,7 +336,7 @@ class _SettingScreenState extends State<SettingScreen>
         notificationMinute1 = minute1 ?? "00";
         selectedTime1 = (minute1 == null)
             ? "2:00 PM"
-            : DateFormat.jm().format(DateFormat("HH:mm:ss")
+            : DateFormat("h:mm a").format(DateFormat("HH:mm:ss")
                 .parse("$notificationHours1:$notificationMinute1:00"));
         selectedNotificationTime1 = Time(
           hour: int.parse(notificationHours1),
@@ -344,7 +348,7 @@ class _SettingScreenState extends State<SettingScreen>
         notificationMinute2 = minute2 ?? "00";
         selectedTime2 = (minute2 == null)
             ? "8:00 PM"
-            : DateFormat.jm().format(DateFormat("HH:mm:ss")
+            : DateFormat("h:mm a").format(DateFormat("HH:mm:ss")
                 .parse("$notificationHours2:$notificationMinute2:00"));
         selectedNotificationTime2 = Time(
           hour: int.parse(notificationHours2),
@@ -701,7 +705,8 @@ class _SettingScreenState extends State<SettingScreen>
   }
 
   updateOnTimeChange(NotificationTime notificationTime, DateTime time) {
-    final hourtime = DateFormat("hh:mm a").format(time);
+    // Use h:mm (not hh:mm) so hours are not zero-padded ("4:00 PM", not "04:00 PM").
+    final hourtime = DateFormat("h:mm a").format(time);
     final onlyhourtime = DateFormat("HH:mm").format(time);
     setState(() {
       if (notificationTime == NotificationTime.morning) {
@@ -1113,29 +1118,19 @@ class _SettingScreenState extends State<SettingScreen>
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
-        // Navigator.of(context).push(
-        //   MaterialPageRoute(builder: (context) {
-        //     return HomeScreen(
-        //         From: "",
-        //         selectedVerseNumForRead: "",
-        //         selectedBookForRead: "",
-        //         selectedChapterForRead: "",
-        //         selectedBookNameForRead: "",
-        //         selectedVerseForRead: "");
-        //   }),
-        // );
-        Get.offAll(
-            () => HomeScreen(
-                From: "Setting",
-                selectedVerseNumForRead: "",
-                selectedBookForRead: "",
-                selectedChapterForRead: "",
-                selectedBookNameForRead: "",
-                selectedVerseForRead: ""),
-            transition: Transition.cupertinoDialog,
-            duration: const Duration(milliseconds: 300));
+        // Route already popped (e.g. toolbar back already called Get.back).
+        if (didPop) return;
+        // Defer so we are not inside Navigator's locked update cycle.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _leaveSettings();
+        });
       },
       child: Scaffold(
+        backgroundColor:
+            Provider.of<ThemeProvider>(context).currentCustomTheme ==
+                    AppCustomTheme.vintage
+                ? const Color(0xFFF5F0E6)
+                : Provider.of<ThemeProvider>(context).backgroundColor,
         body: Container(
             height: MediaQuery.of(context).size.height,
             width: MediaQuery.of(context).size.width,
@@ -1159,16 +1154,7 @@ class _SettingScreenState extends State<SettingScreen>
                   children: [
                     InkWell(
                       onTap: () {
-                        Get.offAll(
-                            () => HomeScreen(
-                                From: "Setting",
-                                selectedVerseNumForRead: "",
-                                selectedBookForRead: "",
-                                selectedChapterForRead: "",
-                                selectedBookNameForRead: "",
-                                selectedVerseForRead: ""),
-                            transition: Transition.cupertinoDialog,
-                            duration: const Duration(milliseconds: 300));
+                        _leaveSettings();
                         // Get.back();
                         // Get.to(() => HomeScreen(
                         //     From: "",
@@ -2026,8 +2012,8 @@ class _SettingScreenState extends State<SettingScreen>
                               lifeTimePlan: lifeTimePlan,
                               checkad: 'theme',
                             ),
-                            transition: Transition.cupertinoDialog,
-                            duration: const Duration(milliseconds: 300),
+                            transition: SubscriptionScreen.paywallRouteTransition,
+                            duration: SubscriptionScreen.paywallRouteDuration,
                           );
                         },
                         style: ElevatedButton.styleFrom(

@@ -12,10 +12,12 @@ class TakeMomentRestScreen extends StatefulWidget {
   static const String peaceBackground = 'assets/peace-bg.png';
   static const String birdAsset = 'assets/bird.png';
 
-  /// Find Peace flow background: parchment scene + dove overlay (UI only).
+  /// Find Peace flow background: parchment scene + optional dove overlay (UI only).
   static Widget peaceBackgroundStack({
     required Widget child,
     bool isDark = false,
+    bool showBird = true,
+    double birdWidthFactor = 0.52,
   }) {
     return Stack(
       fit: StackFit.expand,
@@ -28,19 +30,20 @@ class TakeMomentRestScreen extends StatefulWidget {
             ),
           ),
         ),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final birdWidth = constraints.maxWidth * 0.52;
-            return Align(
-              alignment: const Alignment(0, 0.38),
-              child: Image.asset(
-                birdAsset,
-                width: birdWidth,
-                fit: BoxFit.contain,
-              ),
-            );
-          },
-        ),
+        if (showBird)
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final birdWidth = constraints.maxWidth * birdWidthFactor;
+              return Align(
+                alignment: const Alignment(0, 0.38),
+                child: Image.asset(
+                  birdAsset,
+                  width: birdWidth,
+                  fit: BoxFit.contain,
+                ),
+              );
+            },
+          ),
         if (isDark) Container(color: Colors.black.withOpacity(0.58)),
         child,
       ],
@@ -137,6 +140,7 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
     return Scaffold(
       body: TakeMomentRestScreen.peaceBackgroundStack(
         isDark: isDark,
+        showBird: false,
         child: SafeArea(
           child: Column(
             children: [

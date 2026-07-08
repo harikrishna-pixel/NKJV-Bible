@@ -17,6 +17,7 @@ import 'package:biblebookapp/streak_flow/streak_flow_screens.dart' hide SharPref
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 import 'package:biblebookapp/view/screens/onboard_faith_screen.dart';
+import 'package:biblebookapp/services/paywall_preload_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -30,7 +31,6 @@ import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/utils/internet_speed_checker.dart';
-import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 
 class PreferenceSelectionScreen extends StatefulWidget {
   final bool isSetting;
@@ -1509,26 +1509,23 @@ class FaithJourneyDialog {
                       // closing on preference/category screen reopens to onboarding).
                       await SharPreferences.setBoolean(
                           SharPreferences.onboarding, true);
-                      // Check network speed - if slow/2G, bypass IAP screen and go to Home
-                      final hasInternet =
-                          await InternetConnection().hasInternetAccess;
-                      if (!hasInternet) {
+
+                      // Skip IAP when offline or paywall product data is unavailable.
+                      final shouldShowPaywall =
+                          await PaywallPreloadService.canShowOnboardingPaywall();
+                      if (!shouldShowPaywall) {
                         await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
                         return;
                       }
 
-                      // Check connection speed only for very slow networks (e.g. >12s)
-                      // Null/timeout or error: still show IAP so onboarding paywall is not skipped
+                      // Very slow networks: skip IAP and continue to home/streak.
                       try {
                         final connectionSpeed =
                             await InternetSpeedChecker.checkSpeed(
                           timeout: const Duration(seconds: 8),
                         );
-
-                        // Only bypass IAP when we have a measured speed and it's very slow (>12s)
                         final isVerySlowConnection = connectionSpeed != null &&
                             connectionSpeed > 12000;
-
                         if (isVerySlowConnection) {
                           await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
                           return;
@@ -1536,10 +1533,9 @@ class FaithJourneyDialog {
                       } catch (e) {
                         debugPrint(
                             'Error checking connection speed in onboarding: $e');
-                        // On error, still show IAP (don't skip onboarding paywall)
                       }
 
-                      // Fast connection - proceed to SubscriptionScreen using constants only
+                      // Proceed to SubscriptionScreen when internet + product data exist.
                       final sixMonthPlan = BibleInfo.sixMonthPlanid;
                       final oneYearPlan = BibleInfo.oneYearPlanid;
                       final lifeTimePlan = BibleInfo.lifeTimePlanid;
@@ -1548,7 +1544,9 @@ class FaithJourneyDialog {
                             oneYearPlan: oneYearPlan,
                             lifeTimePlan: lifeTimePlan,
                             checkad: 'onboard',
-                          ));
+                          ),
+                          transition: SubscriptionScreen.paywallRouteTransition,
+                          duration: SubscriptionScreen.paywallRouteDuration);
                     } else {
                       await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
                     }

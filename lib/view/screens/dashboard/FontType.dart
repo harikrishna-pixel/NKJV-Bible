@@ -66,6 +66,21 @@ class _FontTypeState extends State<FontType> {
     );
   }
 
+  Future<void> _saveFontSettings({bool popAfterSave = true}) async {
+    await SharPreferences.setString(
+      SharPreferences.selectedFontSize,
+      fontSize.toString(),
+    );
+    await SharPreferences.setString(
+      SharPreferences.selectedFontFamily,
+      (selectedFontFamily ?? "Arial").toString(),
+    );
+    Constants.showToast("Font settings saved");
+    if (popAfterSave && mounted) {
+      Get.back();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
@@ -89,7 +104,6 @@ class _FontTypeState extends State<FontType> {
                 height: 2,
               ),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   InkWell(
                     onTap: () {
@@ -104,12 +118,14 @@ class _FontTypeState extends State<FontType> {
                       ),
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 20.0),
-                    child: Text("Font Type",
-                        style: CommanStyle.appBarStyle(context)),
+                  Expanded(
+                    child: Text(
+                      "Font Type",
+                      textAlign: TextAlign.center,
+                      style: CommanStyle.appBarStyle(context),
+                    ),
                   ),
-                  SizedBox()
+                  const SizedBox(width: 56),
                 ],
               ),
               SizedBox(
@@ -262,62 +278,94 @@ class _FontTypeState extends State<FontType> {
                 ),
               ),
               Padding(
-                padding: EdgeInsets.only(
-                  top: 19,
-                  bottom: screenWidth < 380
-                      ? 7
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  12,
+                  16,
+                  screenWidth < 380
+                      ? 10
                       : screenWidth > 450
-                          ? 35
-                          : 10,
+                          ? 28
+                          : 14,
                 ),
-                child: Center(
-                  child: GestureDetector(
-                    onTap: () async {
-                      setState(() {
-                        fontSizeS = SharPreferences.setString(
-                                SharPreferences.selectedFontSize,
-                                Sizecf.scrnWidth! > 450 ? "25.0" : "18")
-                            .then((value) {
-                          fontSize = Sizecf.scrnWidth! > 450
-                              ? double.parse("25.0")
-                              : double.parse("18");
-                        });
-                        SharPreferences.setString(
-                                SharPreferences.selectedFontFamily, "Arial")
-                            .then((value) {
-                          selectedFontFamily = "Arial";
-                        });
-                      });
-                      Constants.showToast("Reset Successful!");
-                    },
-                    child: Container(
-                      height: 44,
-                      constraints: BoxConstraints(
-                        minWidth: screenWidth > 450 ? 168 : 140,
-                        maxWidth: screenWidth > 450 ? 168 : 140,
-                      ),
-                      decoration: BoxDecoration(
-                        color: CommanColor.whiteLightModePrimary(context),
-                        borderRadius:
-                            const BorderRadius.all(Radius.circular(9)),
-                        boxShadow: const [
-                          BoxShadow(color: Colors.black26, blurRadius: 2)
-                        ],
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'Reset to default',
-                        textAlign: TextAlign.center,
-                        textScaler: TextScaler.noScaling,
-                        style: TextStyle(
-                          letterSpacing: BibleInfo.letterSpacing,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: CommanColor.darkModePrimaryWhite(context),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          setState(() {
+                            fontSizeS = SharPreferences.setString(
+                                    SharPreferences.selectedFontSize,
+                                    Sizecf.scrnWidth! > 450 ? "25.0" : "18")
+                                .then((value) {
+                              fontSize = Sizecf.scrnWidth! > 450
+                                  ? double.parse("25.0")
+                                  : double.parse("18");
+                            });
+                            SharPreferences.setString(
+                                    SharPreferences.selectedFontFamily, "Arial")
+                                .then((value) {
+                              selectedFontFamily = "Arial";
+                            });
+                          });
+                          Constants.showToast("Reset Successful!");
+                        },
+                        child: Container(
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: Colors.transparent,
+                            borderRadius:
+                                const BorderRadius.all(Radius.circular(9)),
+                            border: Border.all(
+                              color: CommanColor.whiteLightModePrimary(context),
+                              width: 1.4,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            'Reset to default',
+                            textAlign: TextAlign.center,
+                            textScaler: TextScaler.noScaling,
+                            style: TextStyle(
+                              letterSpacing: BibleInfo.letterSpacing,
+                              fontSize: screenWidth < 380 ? 13 : 14,
+                              fontWeight: FontWeight.w500,
+                              color: CommanColor.whiteLightModePrimary(context),
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _saveFontSettings(),
+                        child: Container(
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: CommanColor.whiteLightModePrimary(context),
+                            borderRadius:
+                                const BorderRadius.all(Radius.circular(9)),
+                            boxShadow: const [
+                              BoxShadow(color: Colors.black26, blurRadius: 2)
+                            ],
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            'Save',
+                            textAlign: TextAlign.center,
+                            textScaler: TextScaler.noScaling,
+                            style: TextStyle(
+                              letterSpacing: BibleInfo.letterSpacing,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: CommanColor.darkModePrimaryWhite(context),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               )
             ],

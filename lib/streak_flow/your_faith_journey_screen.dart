@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:biblebookapp/streak/streak_service.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
@@ -27,6 +29,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
   int _totalDays = 0;
   List<String> _completedDates = [];
   String? _startedNotFinishedDate;
+  Map<String, int> _stepsByDay = {};
   DateTime? _installDateOnly;
   bool _restoreActive = false;
   String? _restoreDate;
@@ -52,9 +55,29 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
             0;
     final installRaw =
         await SharPreferences.getString(SharPreferences.appInstalledDate);
-    final installDate = (installRaw == null || installRaw.trim().isEmpty)
-        ? DateTime.now()
-        : DateTime.tryParse(installRaw) ?? DateTime.now();
+    final rawStepsMap =
+        await SharPreferences.getString(SharPreferences.streakFlowStepsByDay);
+    Map<String, int> parsedStepsMap = {};
+    if (rawStepsMap != null && rawStepsMap.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawStepsMap);
+        if (decoded is Map) {
+          parsedStepsMap = decoded.map((k, v) {
+            final numVal = v is num ? v : int.tryParse(v.toString()) ?? 0;
+            return MapEntry(k.toString(), numVal.toInt());
+          });
+        }
+      } catch (_) {
+        parsedStepsMap = {};
+      }
+    }
+    final DateTime installDate;
+    if (installRaw != null && installRaw.trim().isNotEmpty) {
+      installDate = DateTime.tryParse(installRaw) ?? DateTime.now();
+    } else {
+      installDate =
+          _earliestTrackedDate(dates, parsedStepsMap) ?? DateTime.now();
+    }
     final restoreActive =
         await SharPreferences.getBoolean(SharPreferences.streakFlowRestoreActive) ??
             false;
@@ -72,6 +95,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
             (started == today && !dates.contains(today) && stepsCompletedToday > 0)
             ? today
             : null;
+        _stepsByDay = parsedStepsMap;
         _installDateOnly = _dateOnly(installDate);
         _restoreActive = restoreActive;
         _restoreDate = restoreDate;
@@ -79,18 +103,30 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
     }
   }
 
+  DateTime? _earliestTrackedDate(
+    List<String> dates,
+    Map<String, int> stepsByDay,
+  ) {
+    final keys = <String>{...dates, ...stepsByDay.keys};
+    DateTime? earliest;
+    for (final key in keys) {
+      final parsed = DateTime.tryParse(key);
+      if (parsed == null) continue;
+      final day = _dateOnly(parsed);
+      if (earliest == null || day.isBefore(earliest)) {
+        earliest = day;
+      }
+    }
+    return earliest;
+  }
+
   bool _isMissedDay(DateTime date, String key, DateTime today) {
     final d = _dateOnly(date);
     final todayOnly = _dateOnly(today);
     if (d.isAfter(todayOnly) || d == todayOnly) return false;
     if (_completedDates.contains(key)) return false;
+    if ((_stepsByDay[key] ?? 0) >= 4) return false;
     if (_installDateOnly != null && d.isBefore(_installDateOnly!)) return false;
-    if (_restoreActive &&
-        _restoreDate != null &&
-        _restoreDate!.isNotEmpty &&
-        _restoreDate == key) {
-      return false;
-    }
     return true;
   }
 
@@ -242,6 +278,8 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
     final daysInMonth = last.day;
     final firstWeekday = first.weekday % 7;
     final today = DateTime.now();
+    final todayOnly = _dateOnly(today);
+    final isTablet = MediaQuery.sizeOf(context).width > 450;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -331,7 +369,8 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
                   final isToday = date.year == today.year &&
                       date.month == today.month &&
                       date.day == today.day;
-                  final isCompleted = _completedDates.contains(key);
+                  final isCompleted = _completedDates.contains(key) ||
+                      (_stepsByDay[key] ?? 0) >= 4;
                   final isStartedNotFinished = _startedNotFinishedDate == key;
                   final isMissed = _isMissedDay(date, key, today);
                   rowChildren.add(
@@ -345,8 +384,9 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
                           isCompleted: isCompleted,
                           isStartedNotFinished: isStartedNotFinished,
                           isMissed: isMissed,
-                          isFuture: date.isAfter(today),
+                          isFuture: _dateOnly(date).isAfter(todayOnly),
                           textColor: textColor,
+                          isTablet: isTablet,
                         ),
                       ),
                     ),
@@ -460,7 +500,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
       );
     }
     if (isMissed) {
-      final double borderW = compact ? 1.0 : 1.2;
+      final double borderW = compact ? 1.0 : 1.4;
       return Container(
         width: size,
         height: size,
@@ -468,7 +508,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
           shape: BoxShape.circle,
           color: Colors.transparent,
           border: Border.all(
-            color: textColor.withOpacity(0.42),
+            color: textColor.withOpacity(compact ? 0.42 : 0.58),
             width: borderW,
           ),
         ),
@@ -494,6 +534,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
     required bool isMissed,
     required bool isFuture,
     required Color textColor,
+    bool isTablet = false,
   }) {
     return SizedBox(
       width: double.infinity,
@@ -521,7 +562,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
             isMissed: isMissed,
             isFuture: isFuture,
             textColor: textColor,
-            compact: true,
+            compact: !isTablet,
           ),
         ],
       ),

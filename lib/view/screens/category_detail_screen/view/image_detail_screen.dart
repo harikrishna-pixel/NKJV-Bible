@@ -518,16 +518,12 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
                               if (context.mounted) {
                                 Navigator.pop(context);
                                 // Handle buy premium - Navigate to SubscriptionScreen
-                                Get.to(
-                                    () => SubscriptionScreen(
-                                          sixMonthPlan: sixMonthPlan,
-                                          oneYearPlan: oneYearPlan,
-                                          lifeTimePlan: lifeTimePlan,
-                                          checkad: 'image',
-                                        ),
-                                    transition: Transition.cupertinoDialog,
-                                    duration:
-                                        const Duration(milliseconds: 300));
+                                SubscriptionScreen.openPaywallStacked(
+                                  sixMonthPlan: sixMonthPlan,
+                                  oneYearPlan: oneYearPlan,
+                                  lifeTimePlan: lifeTimePlan,
+                                  checkad: 'image',
+                                );
                               }
                             },
                             style: ElevatedButton.styleFrom(

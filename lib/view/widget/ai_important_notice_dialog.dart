@@ -58,8 +58,6 @@ class _AiImportantNoticeDialogBody extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                   child: Column(
                     children: [
-                      _buildHeaderIcon(),
-                      const SizedBox(height: 12),
                       const Text(
                         'Important Notice',
                         textAlign: TextAlign.center,
@@ -122,71 +120,6 @@ class _AiImportantNoticeDialogBody extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeaderIcon() {
-    return SizedBox(
-      height: 88,
-      width: 88,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Positioned(
-            top: 4,
-            left: 6,
-            child: Icon(
-              Icons.auto_awesome,
-              size: 13,
-              color: AiImportantNoticeDialog._accent.withOpacity(0.85),
-            ),
-          ),
-          Positioned(
-            top: 10,
-            right: 4,
-            child: Icon(
-              Icons.auto_awesome,
-              size: 11,
-              color: AiImportantNoticeDialog._accent.withOpacity(0.7),
-            ),
-          ),
-          Positioned(
-            bottom: 8,
-            left: 8,
-            child: Icon(
-              Icons.auto_awesome,
-              size: 10,
-              color: AiImportantNoticeDialog._accent.withOpacity(0.65),
-            ),
-          ),
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAD7C3),
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.brown.withOpacity(0.12),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: ClipOval(
-              child: Image.asset(
-                'assets/start.png',
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const Icon(
-                  Icons.menu_book_rounded,
-                  size: 34,
-                  color: AiImportantNoticeDialog._ink,
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -410,7 +343,7 @@ class _AiImportantNoticeDialogBody extends StatelessWidget {
               const Text('By using AI Chat, you agree to our ', style: baseStyle),
               GestureDetector(
                 onTap: () => launchUrlString(BibleInfo.termsandConditionURL),
-                child: const Text('Terms of Service', style: linkStyle),
+                child: const Text('Terms of Use', style: linkStyle),
               ),
               const Text(' and ', style: baseStyle),
               GestureDetector(

@@ -23,6 +23,11 @@ class _VerseTopicsScreenState extends State<VerseTopicsScreen> {
   @override
   void initState() {
     super.initState();
+    final cached = VerseTopicsData.cachedCategories;
+    if (cached != null) {
+      _categories = cached;
+      _loading = false;
+    }
     _loadCategories();
   }
 
@@ -33,15 +38,6 @@ class _VerseTopicsScreenState extends State<VerseTopicsScreen> {
       _categories = categories;
       _loading = false;
     });
-    _warmVersesCacheInBackground(categories);
-  }
-
-  void _warmVersesCacheInBackground(List<String> categories) {
-    Future<void>(() async {
-      for (final category in categories) {
-        await VerseTopicsData.loadVersesForCategory(category);
-      }
-    });
   }
 
   @override
@@ -50,6 +46,7 @@ class _VerseTopicsScreenState extends State<VerseTopicsScreen> {
     final isWide = screenWidth > 450;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F0E6),
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -58,6 +55,7 @@ class _VerseTopicsScreenState extends State<VerseTopicsScreen> {
             fit: BoxFit.cover,
             width: double.infinity,
             height: double.infinity,
+            gaplessPlayback: true,
           ),
           SafeArea(
             child: Column(

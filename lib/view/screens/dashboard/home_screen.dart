@@ -48,6 +48,7 @@ import 'package:biblebookapp/services/smart_notification_helper.dart';
 import 'package:biblebookapp/services/scenario_notification_helper.dart';
 import 'package:biblebookapp/services/streak_notification_helper.dart';
 import 'package:biblebookapp/streak_flow/streak_flow_screens.dart' hide SharPreferences;
+import 'package:biblebookapp/streak_flow/streak_saved_list_screen.dart';
 import '../../constants/share_preferences.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:home_widget/home_widget.dart';
@@ -209,6 +210,8 @@ class _HomeScreenState extends State<HomeScreen>
     with WidgetsBindingObserver, RouteAware {
   bool isOpenChat = false;
   bool _attemptedProviderChapterFallback = false;
+  bool _hasDisplayedChapterContent = false;
+  List<VerseBookContentModel> _lastVisibleChapterContent = [];
 //   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
 //   final ValueNotifier<int> _rating = ValueNotifier<int>(0);
@@ -1153,13 +1156,14 @@ class _HomeScreenState extends State<HomeScreen>
   final InAppReview inAppReview = InAppReview.instance;
   final AdService _adService = AdService();
   final AudioPlayer audioPlayer = AudioPlayer();
+  final GlobalKey<floatingButtonState> _readerAudioFabKey =
+      GlobalKey<floatingButtonState>();
 
   // State variables
   double _fontSize = 19.0;
   bool isAdReady = false;
   bool adsIcon = true;
   bool isLoggedIn = false;
-  bool _scrollListenerAttached = false;
   int swipeCount = 0;
   int _swipeThreshold = 7;
   int appLaunchCount = 0;
@@ -1182,14 +1186,14 @@ class _HomeScreenState extends State<HomeScreen>
   // Flags
   bool _isBottomSheetOpen = false;
   bool _hasInitialized = false;
-  bool _showUI = true; // Track UI visibility for scroll-based hide/show
+  final ValueNotifier<bool> _showUI = ValueNotifier<bool>(true);
   bool _readerAppBarPinnedVisible = true;
   bool _readerAppBarPendingHide = false;
   bool _readerAppBarUserScrollingDown = false;
   bool _readerAppBarScrollUpIntent = false;
   double _readerAppBarDragDelta = 0;
   static const double _kReaderAppBarToggleThreshold = 20.0;
-  bool _showBackToTop = false;
+  List<VerseBookContentModel>? _lastContentSource;
   BuildContext? _bottomSheetContext; // Track bottom sheet context to dismiss it
   bool _exitOfferCooldownActive = false; // Red dot indicator (show after 3 days)
   Timer?
@@ -1219,6 +1223,26 @@ class _HomeScreenState extends State<HomeScreen>
     AnalyticsService.trackHomeScreen();
   }
 
+  void _precacheBackupDialogAssets() {
+    // Backup dialog is opened from the drawer and can feel slow on low-end devices
+    // because several PNG assets are decoded on first open. Precache them after
+    // the first frame so the dialog shows instantly when tapped.
+    if (!mounted) return;
+    const assets = <String>[
+      'assets/export_backup/refresh.png',
+      'assets/export_backup/lock.png',
+      'assets/export_backup/encryption.png',
+      'assets/export_backup/encryption-sign.png',
+      'assets/export_backup/download.png',
+      'assets/export_backup/upload.png',
+    ];
+    for (final asset in assets) {
+      try {
+        precacheImage(AssetImage(asset), context);
+      } catch (_) {}
+    }
+  }
+
   Future<void> _initializeApp() async {
     if (_hasInitialized) return;
     _hasInitialized = true;
@@ -1234,6 +1258,7 @@ class _HomeScreenState extends State<HomeScreen>
       final downloadProvider =
           Provider.of<DownloadProvider>(context, listen: false);
       unawaited(downloadProvider.preloadBibleDataFromDatabaseIfNeeded());
+      _precacheBackupDialogAssets();
       _runDeferredHomeStartupTasks();
     });
 
@@ -1262,7 +1287,7 @@ class _HomeScreenState extends State<HomeScreen>
     ]);
     if (!mounted) return;
 
-    await _checkAndShowDailyWelcomeToast();
+      await _checkAndShowDailyWelcomeToast();
     if (!mounted) return;
 
     await Future.wait([
@@ -1273,23 +1298,26 @@ class _HomeScreenState extends State<HomeScreen>
     ]);
     if (!mounted) return;
 
-    SmartNotificationHelper.recordAppOpen();
-    SmartNotificationHelper.scheduleSmartNotificationIfNeeded();
-    await updateAllLauncherWidgets();
+      SmartNotificationHelper.recordAppOpen();
+      SmartNotificationHelper.scheduleSmartNotificationIfNeeded();
+      await updateAllLauncherWidgets();
     if (!mounted) return;
 
-    final initialUri = await HomeWidget.initiallyLaunchedFromHomeWidget();
-    if (!mounted) return;
-    _navigateForWidgetRoute(getBibleWidgetRouteFromUri(initialUri));
-    if (!mounted) return;
-    _widgetClickSubscription ??=
-        HomeWidget.widgetClicked.listen((uri) {
+      final initialUri = await HomeWidget.initiallyLaunchedFromHomeWidget();
       if (!mounted) return;
-      _navigateForWidgetRoute(getBibleWidgetRouteFromUri(uri));
-    });
+      _navigateForWidgetRoute(getBibleWidgetRouteFromUri(initialUri));
+      if (!mounted) return;
+      _widgetClickSubscription ??=
+          HomeWidget.widgetClicked.listen((uri) {
+        if (!mounted) return;
+        _navigateForWidgetRoute(getBibleWidgetRouteFromUri(uri));
+      });
   }
 
   Future<void> _showStreakCompleteCelebrationIfNeeded() async {
+    // First-streak Apple rating is shown on LeaveRatingScreen after Continue
+    // on StreakCompletedScreen. Home only clears a leftover pending flag (e.g.
+    // if the user left before the rating flow finished).
     final count = await SharPreferences.getInt(
         SharPreferences.pendingStreakCompleteCelebration);
     if (count == null || count < 1 || !mounted) return;
@@ -1297,16 +1325,17 @@ class _HomeScreenState extends State<HomeScreen>
     final lastShown = await SharPreferences.getString(
         SharPreferences.streakCelebrationShownDate);
     if (lastShown == today) {
-      if (count == 1) {
-        await SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, false);
-      }
       await SharPreferences.setInt(
           SharPreferences.pendingStreakCompleteCelebration, 0);
       return;
     }
+    // Fallback only: rating was not shown on Streak Completed screen.
     await SharPreferences.setString(
         SharPreferences.streakCelebrationShownDate, today);
     if (count == 1) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('showopenad', 'false');
+      await SharPreferences.setString('OpenAd', '1');
       await SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, true);
       _deferUpgradeAfterStreakRating = true;
       _streakRatingSawLifecyclePause = false;
@@ -1508,83 +1537,40 @@ class _HomeScreenState extends State<HomeScreen>
 
     if (appLaunchCount != 2) return;
 
-    final data = prefs.getString("review") ?? "1";
+      final data = prefs.getString("review") ?? "1";
     if (data != '1' || !mounted) return;
 
-    await prefs.setInt('launchCount', 3);
-    await prefs.setString('review', '2');
-    appLaunchCount = prefs.getInt('launchCount') ?? 0;
-    debugPrint("launchCount 3 is - $appLaunchCount");
+            await prefs.setInt('launchCount', 3);
+            await prefs.setString('review', '2');
+            appLaunchCount = prefs.getInt('launchCount') ?? 0;
+            debugPrint("launchCount 3 is - $appLaunchCount");
   }
 
   Future<void> _checkAndShowDailyWelcomeToast() async {
     if (!mounted) return;
 
-    final pendingStreakCelebration = await SharPreferences.getInt(
-            SharPreferences.pendingStreakCompleteCelebration) ??
-        0;
-    final isReadEntry = widget.From == "Read";
-    final isPostStreakHome =
-        widget.From == "splash" && pendingStreakCelebration >= 1;
-
-    if (!isReadEntry && !isPostStreakHome) return;
-
-    final today = DateTime.now();
-    final todayKey = today.toIso8601String().split('T')[0]; // YYYY-MM-DD format
-
-    // Check if first-time message has been shown
+    // Lifetime once only — first time user completes streak and lands on Reading.
     final firstTimeShown = await SharPreferences.getBoolean(
             SharPreferences.dailyWelcomeFirstTimeShown) ??
         false;
+    if (firstTimeShown) return;
 
-    // Get last shown date
-    final lastShownDate = await SharPreferences.getString(
-        SharPreferences.dailyWelcomeLastShownDate);
+    // Continue My Journey opens Home with From "splash" after streak completion.
+    if (widget.From != "splash") return;
 
-    // Check if it's a new day
-    if (lastShownDate != todayKey) {
-      String message;
-
-      if (!firstTimeShown) {
-        if (isReadEntry) {
-          final streakCompleted = await SharPreferences.getString(
-              SharPreferences.streakFlowLastShownDate);
-          if (streakCompleted == null || streakCompleted.isEmpty) {
-            // Streak flow comes first — defer welcome until after streak completes.
-            return;
-          }
-        }
-
-        message = "Welcome You. God's Word is always with you.";
+    final streakCompletedDate = await SharPreferences.getString(
+        SharPreferences.streakFlowLastShownDate);
+    if (streakCompletedDate == null || streakCompletedDate.isEmpty) return;
 
         await SharPreferences.setBoolean(
             SharPreferences.dailyWelcomeFirstTimeShown, true);
-        await SharPreferences.setInt(
-            SharPreferences.dailyWelcomeMessageIndex, 1);
-      } else {
-        final messageIndex = await SharPreferences.getInt(
-                SharPreferences.dailyWelcomeMessageIndex) ??
-            1;
 
-        message = "Welcome You. God's Word is always with you.";
-
-        // Rotate to next message index for tomorrow (keep in range 1-3)
-        final nextIndex = messageIndex % 3 + 1;
-        await SharPreferences.setInt(
-            SharPreferences.dailyWelcomeMessageIndex, nextIndex);
-      }
-
-      // Show toast after a small delay to ensure screen is fully loaded
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
-          Constants.showToast(message, 3000);
+        Constants.showToast(
+            "Welcome You. God's Word is always with you.", 3000);
         }
       });
-
-      // Update last shown date
-      await SharPreferences.setString(
-          SharPreferences.dailyWelcomeLastShownDate, todayKey);
-    }
   }
 
   Future<void> _showRotatingVerseAmenMessage() async {
@@ -2033,7 +2019,7 @@ class _HomeScreenState extends State<HomeScreen>
                                     child: Align(
                                       alignment: Alignment.center,
                                       child: Text(
-                                        "- ${todayVerse.book} ${todayVerse.chapter! + 1}:${todayVerse.verseNum! + 1}",
+                                        "- ${todayVerse.book} ${dailyVerseUiChapter(todayVerse.chapter)}:${dailyVerseUiVerse(todayVerse.verseNum)}",
                                         style: TextStyle(
                                           color: const Color(0xFF3E2723),
                                           fontStyle: FontStyle.italic,
@@ -2074,32 +2060,32 @@ class _HomeScreenState extends State<HomeScreen>
                             bottom: 0,
                             child: Opacity(
                               opacity: 0.52,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
                                     vertical: 6, horizontal: 10),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Image.asset(
-                                      "assets/Icon-1024.png",
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Image.asset(
+                                    "assets/Icon-1024.png",
                                       height: 22,
                                       width: 22,
-                                    ),
+                                  ),
                                     const SizedBox(width: 8),
-                                    Text(
-                                      BibleInfo.bible_shortName,
-                                      style: TextStyle(
-                                        color: const Color(0xFF3E2723),
+                                  Text(
+                                    BibleInfo.bible_shortName,
+                                    style: TextStyle(
+                                      color: const Color(0xFF3E2723),
                                         letterSpacing:
                                             BibleInfo.letterSpacing,
                                         fontSize:
                                             BibleInfo.fontSizeScale * 12,
                                         fontWeight: FontWeight.w600,
-                                        height: 1.2,
-                                      ),
-                                      textAlign: TextAlign.center,
+                                      height: 1.2,
                                     ),
-                                  ],
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
                                 ),
                               ),
                             ),
@@ -2144,7 +2130,7 @@ class _HomeScreenState extends State<HomeScreen>
           context: context,
           builder: (context) => ShareAlertBox(
             verseTitle:
-                " ${todayVerse.book} ${int.parse(todayVerse.chapter.toString()) + 1}:${int.parse(todayVerse.verseNum.toString()) + 1}",
+                " ${todayVerse.book} ${dailyVerseUiChapter(todayVerse.chapter)}:${dailyVerseUiVerse(todayVerse.verseNum)}",
             onShareAsText: () async {
               Navigator.of(context).pop();
               final appPackageName =
@@ -2156,7 +2142,7 @@ class _HomeScreenState extends State<HomeScreen>
                     "${parse(todayVerse.verse.toString()).body?.text ?? ''}. \n   You can read more at:\nhttps://play.google.com/store/apps/details?id=$appPackageName";
               } else if (Platform.isIOS) {
                 message =
-                    '${parse(todayVerse.verse.toString()).body?.text ?? ''}.\n ${todayVerse.book} ${todayVerse.chapter! + 1}:${todayVerse.verseNum! + 1} \n You can read more at:\nhttps://itunes.apple.com/app/id$appid';
+                    '${parse(todayVerse.verse.toString()).body?.text ?? ''}.\n ${todayVerse.book} ${dailyVerseUiChapter(todayVerse.chapter)}:${dailyVerseUiVerse(todayVerse.verseNum)} \n You can read more at:\nhttps://itunes.apple.com/app/id$appid';
               }
 
               if (message.isNotEmpty) {
@@ -2357,23 +2343,22 @@ class _HomeScreenState extends State<HomeScreen>
         await SharPreferences.setString(
             SharPreferences.selectedBook, todayVerse.book.toString());
         await SharPreferences.setString(SharPreferences.selectedChapter,
-            "${int.parse(todayVerse.chapter.toString()) + 1}");
+            "${dailyVerseUiChapter(todayVerse.chapter)}");
         await SharPreferences.setString(SharPreferences.selectedBookNum,
-            "${int.parse(todayVerse.bookId.toString())}");
+            "${dailyVerseBookNum(todayVerse.bookId)}");
         Get.offAll(
           () => HomeScreen(
             From: "Daily",
-            selectedBookForRead: int.parse(todayVerse.bookId.toString()),
-            selectedChapterForRead:
-                1 + int.parse(todayVerse.chapter.toString()),
+            selectedBookForRead: dailyVerseBookNum(todayVerse.bookId),
+            selectedChapterForRead: dailyVerseUiChapter(todayVerse.chapter),
             selectedVerseNumForRead:
-                1 + int.parse(todayVerse.verseNum.toString()),
+                int.parse(todayVerse.verseNum.toString()),
             selectedBookNameForRead: todayVerse.book.toString(),
             selectedVerseForRead:
                 parse(todayVerse.verse.toString()).body?.text.toString() ?? '',
           ),
-          transition: Transition.cupertinoDialog,
-          duration: const Duration(milliseconds: 300),
+          transition: Transition.cupertino,
+          duration: const Duration(milliseconds: 350),
         );
       },
       child: Container(
@@ -2426,7 +2411,7 @@ class _HomeScreenState extends State<HomeScreen>
       );
       await Share.shareXFiles(
         [xFile],
-        sharePositionOrigin:
+          sharePositionOrigin:
             Rect.fromPoints(const Offset(2, 2), const Offset(3, 3)),
       );
     } catch (e) {
@@ -2505,6 +2490,7 @@ class _HomeScreenState extends State<HomeScreen>
   // Called when this route has been pushed and is now top (visible)
   @override
   void didPush() {
+    _refreshPremiumStatusForReadingUi();
     // Only show verse on Reader screen (Home Screen)
     if (widget.From.toString() == "Read" &&
         mounted &&
@@ -2532,15 +2518,69 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
+  void _restoreReaderAppBarVisibility() {
+    _readerAppBarPinnedVisible = true;
+    _readerAppBarPendingHide = false;
+    _readerAppBarScrollUpIntent = false;
+    _readerAppBarDragDelta = 0;
+    _readerAppBarUserScrollingDown = false;
+    if (!_showUI.value) {
+      _showUI.value = true;
+    }
+  }
+
   // Called when this route is again visible because the top route was popped
   @override
   void didPopNext() {
+    _refreshPremiumStatusForReadingUi();
+    void restoreReaderAppBarIfNeeded() {
+      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+      final hasReaderChapter = Get.isRegistered<DashBoardController>() &&
+          Get.find<DashBoardController>().selectedChapter.value.isNotEmpty;
+      if (hasReaderChapter || widget.From.toString() == "Read") {
+        _restoreReaderAppBarVisibility();
+      }
+    }
+
+    restoreReaderAppBarIfNeeded();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      restoreReaderAppBarIfNeeded();
+    });
+    unawaited(_syncReaderChapterAfterChildRoutePop());
     // Only show verse on Reader screen (Home Screen)
     if (widget.From.toString() == "Read" &&
         mounted &&
         ModalRoute.of(context)?.isCurrent == true) {
       _onVisible();
       _maybeShowPendingFeedbackAfterReadingResume();
+    }
+  }
+
+  Future<void> _refreshPremiumStatusForReadingUi() async {
+    if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+    if (!Get.isRegistered<DashBoardController>()) return;
+    await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
+  }
+
+  /// After Mark as Read / chapter picker pops, ensure verses match the header chapter.
+  Future<void> _syncReaderChapterAfterChildRoutePop() async {
+    if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+    if (!Get.isRegistered<DashBoardController>()) return;
+    final controller = Get.find<DashBoardController>();
+    if (controller.selectedChapter.value.isEmpty) return;
+
+    _restoreReaderAppBarVisibility();
+
+    final uiChapter = int.tryParse(controller.selectedChapter.value) ?? 1;
+    final safe = uiChapter <= 0 ? 1 : uiChapter;
+    final want = <num?>{safe - 1, safe};
+    final contentMatches = controller.selectedBookContent.isNotEmpty &&
+        controller.selectedBookContent
+            .any((v) => want.contains(v.chapterNum));
+
+    if (!contentMatches) {
+      await controller.getSelectedChapterAndBook();
+      if (mounted) setState(() {});
     }
   }
 
@@ -2618,16 +2658,7 @@ class _HomeScreenState extends State<HomeScreen>
       return;
     }
 
-    if (_verseShown) return; // already shown, nothing to do
-
-    // start or resume stopwatch
-    if (!_stopwatch.isRunning) {
-      _stopwatch.start();
-    }
-    // start periodic checker if not running
-    _checkerTimer ??=
-        Timer.periodic(const Duration(seconds: 1), (_) => _checkElapsed());
-    // setState(() {}); // update UI counter if desired
+    // Auto Verse of the Day popup on reading screen is disabled.
   }
 
   void _onHidden() {
@@ -2806,8 +2837,10 @@ class _HomeScreenState extends State<HomeScreen>
     _rating.dispose();
     _showFeedbackButton.dispose();
     lastInterstitialAdPlayed.dispose();
+    _showUI.dispose();
 
     adsDuration.dispose();
+    _readerAudioFabKey.currentState?.stopPlaybackOnLeave();
     // audioPlayer.dispose();
     if (mounted) {
       if (audioPlayer.state == PlayerState.playing) {
@@ -2864,12 +2897,12 @@ class _HomeScreenState extends State<HomeScreen>
     });
 
     double screenWidth = MediaQuery.of(context).size.width;
-    debugPrint("sz current width - $screenWidth ");
     var bibleName = BibleInfo.bible_shortName;
     return UpgradeCheckWrapper(
       check: "home",
       child: GetX<DashBoardController>(
         init: DashBoardController(),
+        autoRemove: false,
         initState: (state) async {
           final cacheProvider =
               Provider.of<CacheNotifier>(context, listen: false);
@@ -3263,10 +3296,23 @@ class _HomeScreenState extends State<HomeScreen>
           //     }
           //   },
           // );
-          _attachScrollListener(state);
           _initializeControllerState(state);
+          final cachedController = state.controller;
+          final hasCachedContent = cachedController != null &&
+              cachedController.selectedBookContent.isNotEmpty;
+          final skipReloadPath =
+              hasCachedContent && !_homeEntryRequiresContentReload();
+          if (!hasCachedContent || _homeEntryRequiresContentReload()) {
           _loadInitialData(state);
-          _handleAdExpiration(state);
+          }
+          if (hasCachedContent) {
+            cachedController.isFetchContent.value = false;
+            _hasDisplayedChapterContent = true;
+            if (skipReloadPath) {
+              cachedController.loadTextToSpeech.value = false;
+            }
+          }
+          _handleAdExpiration(state, skipLoadApi: hasCachedContent);
           _initializeRatingDialog(state);
           final prefs = await SharedPreferences.getInstance();
           if (widget.From.toString() == 'premium') {
@@ -3280,14 +3326,54 @@ class _HomeScreenState extends State<HomeScreen>
           }
         },
         builder: (controller) {
+          if (controller.selectedBookContent.isNotEmpty) {
+            _hasDisplayedChapterContent = true;
+            final content = controller.selectedBookContent;
+            // Copy only when the chapter list instance changes — not on every rebuild.
+            if (!identical(_lastContentSource, content)) {
+              _lastContentSource = content;
+              _lastVisibleChapterContent =
+                  List<VerseBookContentModel>.from(content);
+            }
+          }
+          final readerVerses = controller.selectedBookContent.isNotEmpty
+              ? controller.selectedBookContent
+              : (_lastVisibleChapterContent.isNotEmpty &&
+                      _staleContentMatchesChapter(controller)
+                  ? _lastVisibleChapterContent
+                  : controller.selectedBookContent);
+          final themeProvider = p.Provider.of<ThemeProvider>(context);
+          final isVintage =
+              themeProvider.currentCustomTheme == AppCustomTheme.vintage;
+          final isDark = themeProvider.themeMode == ThemeMode.dark;
+          final scaffoldBg = isVintage
+              ? (isDark ? CommanColor.black : const Color(0xFFF5F0E6))
+              : (isDark
+                  ? CommanColor.darkPrimaryColor
+                  : themeProvider.backgroundColor);
+
+          final readerToolbarHeight = screenWidth > 450 ? 70.0 : 55.0;
+          final readerChapterBarHeight = screenWidth > 450 ? 45.0 : 30.0;
+          final readerAppBarHeight =
+              readerToolbarHeight + readerChapterBarHeight;
+          // extendBodyBehindAppBar: list must clear status bar + full app bar.
+          final readerContentTopPadding =
+              MediaQuery.paddingOf(context).top + readerAppBarHeight;
+          return ValueListenableBuilder<bool>(
+            valueListenable: _showUI,
+            builder: (context, showUI, child) {
           return Scaffold(
             key: _scaffoldKey,
+            backgroundColor: scaffoldBg,
+            // Body stays full-height; app bar fades over content (no list resize jank).
+            extendBodyBehindAppBar:
+                controller.selectedChapter.value.isNotEmpty,
             appBar: controller.selectedChapter.value.isNotEmpty
                 ? _SmoothReaderAppBar(
-                    visible: _showUI,
-                    height: screenWidth > 450 ? 115.0 : 85.0,
+                    visible: showUI,
+                    height: readerAppBarHeight,
                     child: AppBar(
-                    toolbarHeight: screenWidth > 450 ? 70 : 55,
+                    toolbarHeight: readerToolbarHeight,
                     iconTheme:
                         IconThemeData(color: CommanColor.whiteBlack(context)),
                     flexibleSpace: Container(
@@ -3568,40 +3654,40 @@ class _HomeScreenState extends State<HomeScreen>
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            InkWell(
-                              onTap: () {
-                                if (controller.adFree.value == false) {
-                                  controller.bannerAd?.dispose();
-                                  controller.bannerAd?.load();
-                                }
-                                Get.to(
-                                    () => SearchScreen(
-                                          controller: controller,
-                                        ),
-                                    transition: Transition.cupertinoDialog,
+                      InkWell(
+                          onTap: () {
+                            if (controller.adFree.value == false) {
+                              controller.bannerAd?.dispose();
+                              controller.bannerAd?.load();
+                            }
+                            Get.to(
+                                () => SearchScreen(
+                                      controller: controller,
+                                    ),
+                                    transition: Transition.cupertino,
                                     duration:
                                         const Duration(milliseconds: 300));
-                              },
+                          },
                               child: Padding(
                                 padding: const EdgeInsets.all(4),
-                                child: Image.asset(
-                                  "assets/home icons/search.png",
-                                  height: screenWidth > 450 ? 30 : 22,
-                                  width: screenWidth > 450 ? 30 : 22,
-                                  color: CommanColor.whiteBlack(context),
+                          child: Image.asset(
+                            "assets/home icons/search.png",
+                            height: screenWidth > 450 ? 30 : 22,
+                            width: screenWidth > 450 ? 30 : 22,
+                            color: CommanColor.whiteBlack(context),
                                 ),
                               ),
                             ),
                             const SizedBox(width: 6),
-                            StreakIconButton(
-                              iconSize: screenWidth > 450 ? 28 : 22,
-                            ),
+                      StreakIconButton(
+                        iconSize: screenWidth > 450 ? 28 : 22,
+                      ),
                             const SizedBox(width: 6),
-                            Padding(
+                      Padding(
                               padding: const EdgeInsets.all(4),
-                              child: ChangeThemeButtonWidget(),
-                            ),
-                          ],
+                        child: ChangeThemeButtonWidget(),
+                      ),
+                    ],
                         ),
                       ),
                     ],
@@ -3609,34 +3695,35 @@ class _HomeScreenState extends State<HomeScreen>
                       context: context,
                       controller: controller,
                       screenWidth: screenWidth,
-                      onTap: () async {
-                        if (controller.adFree.value == false) {
-                          controller.bannerAd?.dispose();
-                          controller.bannerAd?.load();
-                        }
-                        Get.to(() => const BookListScreen(),
-                            transition: Transition.cupertinoDialog,
-                            duration: const Duration(milliseconds: 300));
+                        onTap: () async {
+                          if (controller.adFree.value == false) {
+                            controller.bannerAd?.dispose();
+                            controller.bannerAd?.load();
+                          }
+                          Get.to(() => const BookListScreen(),
+                            transition: Transition.cupertino,
+                            duration: const Duration(milliseconds: 350));
                       },
                     ),
                     bottom: PreferredSize(
-                      preferredSize: const Size.fromHeight(30.0),
+                      preferredSize:
+                          Size.fromHeight(readerChapterBarHeight),
                       child: Theme(
                         data: Theme.of(context).copyWith(
                             hintColor: CommanColor.whiteAndDark(context)),
                         child: Container(
-                          height: screenWidth > 450 ? 45 : 30.0,
+                          height: readerChapterBarHeight,
                           decoration: () {
                             final themeProvider =
                                 p.Provider.of<ThemeProvider>(context);
                             final isDark =
                                 themeProvider.themeMode == ThemeMode.dark;
                             final isVintage = themeProvider
-                                    .currentCustomTheme ==
+                                              .currentCustomTheme ==
                                 AppCustomTheme.vintage;
                             if (isDark) {
                               final base = isVintage
-                                  ? CommanColor.darkPrimaryColor
+                                      ? CommanColor.darkPrimaryColor
                                   : CommanColor.darkPrimaryColor200;
                               return BoxDecoration(
                                 color: Color.lerp(
@@ -3655,7 +3742,7 @@ class _HomeScreenState extends State<HomeScreen>
                             }
                             return BoxDecoration(
                               color: isVintage
-                                  ? CommanColor.white
+                                      ? CommanColor.white
                                   : themeProvider.backgroundColor,
                               border: Border(
                                 bottom: BorderSide(
@@ -3681,8 +3768,8 @@ class _HomeScreenState extends State<HomeScreen>
                                         selectedChapter:
                                             controller.selectedChapter.value,
                                       ),
-                                  transition: Transition.cupertinoDialog,
-                                  duration: const Duration(milliseconds: 300));
+                                  transition: Transition.cupertino,
+                                  duration: const Duration(milliseconds: 350));
                             },
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -3718,9 +3805,1414 @@ class _HomeScreenState extends State<HomeScreen>
                     centerTitle: true,
                     elevation: 2,
                   ),
-                )
+                  )
                 : null,
-            body: WillPopScope(
+            body: child,
+            floatingActionButton: !_hasDisplayedChapterContent &&
+                    controller.selectedBookContent.isEmpty
+                ? const SizedBox()
+                : IgnorePointer(
+                    ignoring: !showUI,
+                    child: Opacity(
+                      opacity: showUI ? 1 : 0,
+                      child: SizedBox(
+                      width: double.infinity,
+                      child: Stack(
+                        alignment: Alignment.bottomCenter,
+                        clipBehavior: Clip.none,
+                        children: [
+                          Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          if (BibleInfo.chat == 1)
+                            Builder(
+                              builder: (buttonContext) => GestureDetector(
+                                onTap: () {
+                                  if (isOpenChat) {
+                                    if (Navigator.of(buttonContext,
+                                            rootNavigator: false)
+                                        .canPop()) {
+                                      Navigator.of(buttonContext,
+                                              rootNavigator: false)
+                                          .pop();
+                                    }
+                                    setState(() {
+                                      isOpenChat = false;
+                                    });
+                                  } else {
+                                    setState(() {
+                                      isOpenChat = true;
+                                  });
+                                    _showChatEntryPopover(buttonContext);
+                                  }
+                                },
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: screenWidth > 600
+                                        ? 48
+                                        : screenWidth > 450
+                                            ? 40
+                                            : 32,
+                                  ),
+                                  child: Container(
+                                      height: screenWidth > 600
+                                          ? 56
+                                          : screenWidth > 450
+                                              ? 50
+                                              : 35,
+                                      width: screenWidth > 600
+                                          ? 56
+                                          : screenWidth > 450
+                                              ? 50
+                                              : 35,
+                                      decoration: BoxDecoration(
+                                        color: CommanColor.whiteLightModePrimary(
+                                            context),
+                                        shape: BoxShape.circle,
+                                        boxShadow: CommanColor.isDarkTheme(context)
+                                            ? const [
+                                                BoxShadow(
+                                                  color: Colors.black45,
+                                                  blurRadius: 8,
+                                                  offset: Offset(0, 3),
+                                                ),
+                                              ]
+                                            : null,
+                                      ),
+                                      child: Center(
+                                        child: isOpenChat
+                                            ? Icon(
+                                                Icons.close,
+                                                color: CommanColor
+                                                    .darkModePrimaryWhite(context),
+                                                size: screenWidth > 450 ? 22 : 18,
+                                              )
+                                            : Image.asset(
+                                                CommanColor.isDarkTheme(context)
+                                                    ? "assets/dark_modes/new-dark_chat.png"
+                                                    : "assets/Chat white.png",
+                                                width: screenWidth > 600
+                                                    ? 26
+                                                    : screenWidth > 450
+                                                        ? 24
+                                                        : 22,
+                                                height: screenWidth > 600
+                                                    ? 26
+                                                    : screenWidth > 450
+                                                        ? 24
+                                                        : 22,
+                                                color: CommanColor
+                                                    .darkModePrimaryWhite(context),
+                                              ),
+                                      )),
+                                ),
+                              ),
+                            )
+                          else
+                            SizedBox(
+                              width: screenWidth > 600
+                                  ? 56
+                                  : screenWidth > 450
+                                      ? 50
+                                      : 35,
+                            ),
+                        ],
+                      ),
+                      floatingButton(
+                        key: _readerAudioFabKey,
+                        chapterNum: controller.selectedChapter.value,
+                        bookName: controller.selectedBook.value,
+                        contentList: controller.selectedVersesContent,
+                        chapterCount: controller.selectedBookChapterCount.value,
+                        audioData: controller.audioData.value,
+                        bookNum: controller.selectedBookNum.value,
+                        internetConnection: controller.connectionStatus,
+                        textToSpeechLoad: controller.loadTextToSpeech.value,
+                        audioPlayer: audioPlayer,
+                      ),
+                    ],
+                      ),
+                        ],
+                      ),
+                    ),
+                    ),
+                  ),
+            drawer: controller.isFetchContent.value &&
+                    controller.selectedBookContent.isEmpty &&
+                    !_hasDisplayedChapterContent
+                ? const SizedBox()
+                : Drawer(
+                    backgroundColor: p.Provider.of<ThemeProvider>(context)
+                                .currentCustomTheme ==
+                            AppCustomTheme.vintage
+                        ? CommanColor.white
+                        : p.Provider.of<ThemeProvider>(context).backgroundColor,
+                    width: MediaQuery.of(context).size.width * 0.6,
+                    child: ListView(
+                      // Important: Remove any padding from the ListView.
+                      padding: EdgeInsets.zero,
+                      children: [
+                        SizedBox(
+                          height: 120,
+                          child: DrawerHeader(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: CommanColor.lightDarkPrimary(context),
+                            ),
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 10),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    bibleName,
+                                    style: CommanStyle.white16600,
+                                  )
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        ListTile(
+                          dense: true,
+                          onTap: () {
+                            Get.back();
+                            Future.microtask(() {
+                              Get.to(
+                                () => isLoggedIn
+                                    ? const ProfileScreen()
+                                    : LoginScreen(hasSkip: false),
+                                transition: Transition.cupertino,
+                                duration: const Duration(milliseconds: 350),
+                              );
+                              if (controller.adFree.value == false) {
+                                Future(() {
+                                  controller.bannerAd?.dispose();
+                                  controller.bannerAd?.load();
+                                });
+                              }
+                            });
+                          },
+                          visualDensity:
+                              const VisualDensity(horizontal: 0, vertical: 0),
+                          leading: Image.asset(
+                            "assets/home icons/My Account.png",
+                            height: 24,
+                            width: 24,
+                          ),
+                          title: Text(
+                            'My Account',
+                            style: CommanStyle.bothPrimary16600(context),
+                          ),
+                        ),
+                        ListTile(
+                          onTap: () {
+                            Get.back();
+                            if (controller.adFree.value == false) {
+                              // Defer ad reload so it does not block route animation.
+                              Future(() {
+                                controller.bannerAd?.dispose();
+                                controller.bannerAd?.load();
+                              });
+                            }
+                            Get.to(() => const DailyVerse(),
+                                transition: Transition.cupertino,
+                                duration: const Duration(milliseconds: 350));
+                          },
+                          dense: true,
+                          visualDensity:
+                              const VisualDensity(horizontal: 0, vertical: 0),
+                          leading: Image.asset(
+                            "assets/home icons/Daily verse.png",
+                            height: 24,
+                            width: 24,
+                          ),
+                          title: Text(
+                            'Daily Verses',
+                            style: CommanStyle.bothPrimary16600(context),
+                          ),
+                        ),
+                        if (BibleInfo.chat == 1)
+                          ListTile(
+                            dense: true,
+                            onTap: () async {
+                              Get.to(ChatScreen());
+                            },
+                            visualDensity:
+                                const VisualDensity(horizontal: 0, vertical: 0),
+                            leading: Image.asset(
+                              "assets/Chat icon.png",
+                              height: 24,
+                              width: 24,
+                            ),
+                            title: Text(
+                              'Ask Anything',
+                              style: CommanStyle.bothPrimary16600(context),
+                            ),
+                          ),
+                        ListTile(
+                          dense: true,
+                          onTap: () {
+                            Get.back();
+                            Future.microtask(() {
+                              Get.to(
+                                () => const PrayerGuidanceScreen(),
+                                transition: Transition.cupertino,
+                                duration: const Duration(milliseconds: 350),
+                              );
+                            });
+                          },
+                          visualDensity:
+                              const VisualDensity(horizontal: 0, vertical: 0),
+                          leading: Image.asset(
+                            "assets/dove.png",
+                            height: 26,
+                            width: 26,
+                            color:
+                                Provider.of<ThemeProvider>(context).themeMode ==
+                                        ThemeMode.dark
+                                    ? CommanColor.darkPrimaryColor
+                                    : CommanColor.lightModePrimary,
+                          ),
+                          title: Text(
+                            'Prayer Guidance',
+                            style: CommanStyle.bothPrimary16600(context),
+                          ),
+                        ),
+                        ListTile(
+                          dense: true,
+                          onTap: () {
+                            Get.back();
+                            Future.microtask(() {
+                              Get.to(
+                                () => const StreakSavedListScreen(),
+                                transition: Transition.cupertino,
+                                duration: const Duration(milliseconds: 350),
+                              );
+                            });
+                          },
+                          visualDensity:
+                              const VisualDensity(horizontal: 0, vertical: 0),
+                          leading: Image.asset(
+                            'assets/home icons/book.png',
+                            height: 24,
+                            width: 24,
+                          ),
+                          title: Text(
+                            'Faith Journey',
+                            style: CommanStyle.bothPrimary16600(context),
+                          ),
+                        ),
+                        ListTile(
+                          dense: true,
+                          onTap: () {
+                            Get.back();
+                            Future.microtask(() {
+                              Get.to(
+                                () => const AddWidgetIntroScreen(),
+                                transition: Transition.cupertino,
+                                duration: const Duration(milliseconds: 350),
+                              );
+                            });
+                          },
+                          visualDensity:
+                              const VisualDensity(horizontal: 0, vertical: 0),
+                          leading: Icon(
+                            Icons.widgets,
+                            size: 24,
+                            color:
+                                Provider.of<ThemeProvider>(context).themeMode ==
+                                        ThemeMode.dark
+                                    ? CommanColor.darkPrimaryColor
+                                    : CommanColor.lightModePrimary,
+                          ),
+                          title: Text(
+                            'Add Widget',
+                            style: CommanStyle.bothPrimary16600(context),
+                          ),
+                        ),
+                        // ListTile(
+                        //   dense: true,
+                        //   onTap: () async {
+                        //     Get.back();
+                        //     await SharPreferences.setString('OpenAd', '1');
+                        //     if (controller.adFree.value == false) {
+                        //       controller.bannerAd?.dispose();
+                        //       controller.bannerAd?.load();
+                        //     }
+                        //     Get.to(
+                        //         () => SearchScreen(
+                        //               controller: controller,
+                        //             ),
+                        //         transition: Transition.cupertino,
+                        //         duration: const Duration(milliseconds: 350));
+                        //   },
+                        //   visualDensity:
+                        //       const VisualDensity(horizontal: 0, vertical: 0),
+                        //   leading: Image.asset(
+                        //     "assets/home icons/search.png",
+                        //     height: 24,
+                        //     width: 24,
+                        //   ),
+                        //   title: Text(
+                        //     'Search',
+                        //     style: CommanStyle.bothPrimary16600(context),
+                        //   ),
+                        // ),
+                        ListTile(
+                          dense: true,
+                          onTap: () {
+                            Get.back();
+                            if (controller.adFree.value == false) {
+                              // Defer ad reload so it does not block route animation.
+                              Future(() {
+                                controller.bannerAd?.dispose();
+                                controller.bannerAd?.load();
+                              });
+                            }
+                            Get.to(() => const LibraryScreen(),
+                                transition: Transition.cupertino,
+                                duration: const Duration(milliseconds: 350));
+                          },
+                          visualDensity:
+                              const VisualDensity(horizontal: 0, vertical: 0),
+                          leading: Image.asset(
+                            "assets/home icons/My Library.png",
+                            height: 24,
+                            width: 24,
+                          ),
+                          title: Text(
+                            'My Library',
+                            style: CommanStyle.bothPrimary16600(context),
+                          ),
+                        ),
+                        ListTile(
+                          dense: true,
+                          onTap: () async {
+                            Get.back();
+                            if (controller.adFree.value == false) {
+                              // Defer ad reload so it does not block route animation.
+                              Future(() {
+                                controller.bannerAd?.dispose();
+                                controller.bannerAd?.load();
+                              });
+                            }
+                            // Check internet connection before navigating
+                            final hasInternet =
+                                await InternetConnection().hasInternetAccess;
+                            if (!hasInternet) {
+                              Constants.showToast('No internet connection');
+                              return;
+                            }
+                            try {
+                              final connectionSpeed =
+                                  await InternetSpeedChecker.checkSpeed(
+                                timeout: const Duration(seconds: 5),
+                              );
+                              final isSlowConnection = connectionSpeed == null ||
+                                  connectionSpeed > 5000;
+                              if (isSlowConnection) {
+                                Constants.showToast(
+                                    kCheckInternetConnectionMessage);
+                              }
+                            } catch (_) {
+                              Constants.showToast(
+                                  kCheckInternetConnectionMessage);
+                            }
+                            Get.to(() => const WallpaperScreen(),
+                                transition: Transition.cupertino,
+                                duration: const Duration(milliseconds: 350));
+                          },
+                          visualDensity:
+                              const VisualDensity(horizontal: 0, vertical: 0),
+                          leading: Image.asset(
+                            "assets/home icons/Wallpaper.png",
+                            height: 24,
+                            width: 24,
+                          ),
+                          title: Text(
+                            'Wallpapers',
+                            style: CommanStyle.bothPrimary16600(context),
+                          ),
+                        ),
+                        ListTile(
+                          dense: true,
+                          onTap: () async {
+                            Get.back();
+                            if (controller.adFree.value == false) {
+                              // Defer ad reload so it does not block route animation.
+                              Future(() {
+                                controller.bannerAd?.dispose();
+                                controller.bannerAd?.load();
+                              });
+                            }
+                            // Check internet connection before navigating
+                            final hasInternet =
+                                await InternetConnection().hasInternetAccess;
+                            if (!hasInternet) {
+                              Constants.showToast('No internet connection');
+                              return;
+                            }
+                            try {
+                              final connectionSpeed =
+                                  await InternetSpeedChecker.checkSpeed(
+                                timeout: const Duration(seconds: 5),
+                              );
+                              final isSlowConnection = connectionSpeed == null ||
+                                  connectionSpeed > 5000;
+                              if (isSlowConnection) {
+                                Constants.showToast(
+                                    kCheckInternetConnectionMessage);
+                              }
+                            } catch (_) {
+                              Constants.showToast(
+                                  kCheckInternetConnectionMessage);
+                            }
+                            Get.to(() => const QuoteScreen(),
+                                transition: Transition.cupertino,
+                                duration: const Duration(milliseconds: 350));
+                          },
+                          visualDensity:
+                              const VisualDensity(horizontal: 0, vertical: 0),
+                          leading: Image.asset(
+                            "assets/home icons/Quotes.png",
+                            height: 24,
+                            width: 24,
+                          ),
+                          title: Text(
+                            'Quotes',
+                            style: CommanStyle.bothPrimary16600(context),
+                          ),
+                        ),
+                        ListTile(
+                          dense: true,
+                          onTap: () {
+                            Get.back();
+                            if (controller.adFree.value == false) {
+                              // Defer ad reload so it does not block route animation.
+                              Future(() {
+                                controller.bannerAd?.dispose();
+                                controller.bannerAd?.load();
+                              });
+                            }
+                            Get.to(() => const CalendarScreen(),
+                                transition: Transition.cupertino,
+                                duration: const Duration(milliseconds: 350));
+                          },
+                          visualDensity:
+                              const VisualDensity(horizontal: 0, vertical: 0),
+                          leading:
+                              // const Icon(
+                              //   Icons.calendar_month,
+                              //   color: Color(0XFF805531),
+                              //   size: 26,
+                              // ),
+                              Image.asset(
+                            "assets/home icons/Artboard – 35.png",
+                            height: 24,
+                            width: 24,
+                          ),
+                          title: Text(
+                            'Calendar',
+                            style: CommanStyle.bothPrimary16600(context),
+                          ),
+                        ),
+                        // ListTile(
+                        //   dense: true,
+                        //   onTap: () async {
+                        //     // If offline, show toast and do not navigate
+                        //     final connectivityResult =
+                        //         await Connectivity().checkConnectivity();
+                        //     final hasConnection = connectivityResult
+                        //             .isNotEmpty &&
+                        //         (connectivityResult
+                        //                 .contains(ConnectivityResult.wifi) ||
+                        //             connectivityResult
+                        //                 .contains(ConnectivityResult.mobile) ||
+                        //             connectivityResult
+                        //                 .contains(ConnectivityResult.ethernet));
+                        //     if (!hasConnection) {
+                        //       await Future.delayed(
+                        //           const Duration(milliseconds: 500));
+                        //       final retry =
+                        //           await Connectivity().checkConnectivity();
+                        //       final retryHasConnection = retry.isNotEmpty &&
+                        //           (retry.contains(ConnectivityResult.wifi) ||
+                        //               retry.contains(
+                        //                   ConnectivityResult.mobile) ||
+                        //               retry.contains(
+                        //                   ConnectivityResult.ethernet));
+                        //       if (!retryHasConnection) {
+                        //         try {
+                        //           final hasInternet = await InternetConnection()
+                        //               .hasInternetAccess;
+                        //           if (!hasInternet) {
+                        //             return Constants.showToast(
+                        //                 "No Internet Connection");
+                        //           } else {
+                        //             return Constants.showToast(
+                        //                 "Check your Internet connection");
+                        //           }
+                        //         } catch (_) {
+                        //           return Constants.showToast(
+                        //               "No Internet Connection");
+                        //         }
+                        //       }
+                        //     }
+
+                        //     Get.back();
+                        //     if (controller.adFree.value == false) {
+                        //       controller.bannerAd?.dispose();
+                        //       controller.bannerAd?.load();
+                        //     }
+                        //     Get.to(() => const biblebookapp.StudyPlansScreen(),
+                        //         transition: Transition.cupertino,
+                        //         duration: const Duration(milliseconds: 350));
+                        //   },
+                        //   visualDensity:
+                        //       const VisualDensity(horizontal: 0, vertical: 0),
+                        //   leading: Icon(
+                        //     Icons.menu_book,
+                        //     size: 24,
+                        //     color:
+                        //         Provider.of<ThemeProvider>(context).themeMode ==
+                        //                 ThemeMode.dark
+                        //             ? CommanColor.darkPrimaryColor
+                        //             : CommanColor.lightModePrimary,
+                        //   ),
+                        //   title: Text(
+                        //     'Study Plans',
+                        //     style: CommanStyle.bothPrimary16600(context),
+                        //   ),
+                        // ),
+                        // ListTile(
+                        //   dense: true,
+                        //   onTap: () {
+                        //     Get.back();
+                        //     if (controller.adFree.value == false) {
+                        //       controller.bannerAd?.dispose();
+                        //       controller.bannerAd?.load();
+                        //     }
+                        //     if (isLoggedIn) {
+                        //       showImportExportInfo(context, () async {
+                        //         final permission =
+                        //             await ExportDb.requestStoragePermission();
+                        //         if (permission) {
+                        //           updateLoading(true,
+                        //               mess: 'Exporting the data. Please wait');
+                        //           await ExportDb.getAllDataToExport(context);
+                        //           updateLoading(false);
+                        //         } else {
+                        //           Constants.showToast(
+                        //               "Permission is required to export the data.");
+                        //         }
+                        //       });
+                        //     } else {
+                        //       backupNotification(
+                        //           context: context,
+                        //           message:
+                        //               " Account is required to access this feature ");
+                        //     }
+                        //   },
+                        //   visualDensity:
+                        //       const VisualDensity(horizontal: 0, vertical: 0),
+                        //   leading: const Icon(
+                        //     Icons.file_upload_outlined,
+                        //     color: Color(0XFF805531),
+                        //   ),
+                        //   title: Text(
+                        //     'Export',
+                        //     style: CommanStyle.bothPrimary16600(context),
+                        //   ),
+                        // ),
+                        GestureDetector(
+                          onTap: () async {
+                            Navigator.of(context).pop();
+                            // Subscription gate temporarily disabled — open backup directly.
+                            // Same logic as Library hamburger: subscription check, then MainBackupDialog or Subscribe dialog
+                            // final downloadProvider =
+                            //     Provider.of<DownloadProvider>(context,
+                            //         listen: false);
+                            // final subscriptionPlan =
+                            //     await downloadProvider.getSubscriptionPlan();
+                            // final isSubscribed = subscriptionPlan != null &&
+                            //     subscriptionPlan.isNotEmpty &&
+                            //     ['platinum', 'gold', 'silver']
+                            //         .contains(subscriptionPlan.toLowerCase());
+                            // if (isSubscribed) {
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (context) => const MainBackupDialog(),
+                            );
+                            // } else {
+                            //   await SharPreferences.setString('OpenAd', '1');
+                            //   if (!context.mounted) return;
+                            //   showDialog(
+                            //     context: context,
+                            //     barrierDismissible: false,
+                            //     builder: (ctx) {
+                            //       final dlgWidth =
+                            //           MediaQuery.of(ctx).size.width;
+                            //       return Dialog(
+                            //         backgroundColor: CommanColor.white,
+                            //         shape: RoundedRectangleBorder(
+                            //           borderRadius: BorderRadius.circular(15),
+                            //         ),
+                            //         elevation: 16,
+                            //         child: Padding(
+                            //           padding: const EdgeInsets.symmetric(
+                            //               horizontal: 16, vertical: 24),
+                            //           child: Column(
+                            //             mainAxisSize: MainAxisSize.min,
+                            //             crossAxisAlignment:
+                            //                 CrossAxisAlignment.stretch,
+                            //             children: [
+                            //               Text(
+                            //                 "You're not subscribed. Subscribe to export and import your data.",
+                            //                 textAlign: TextAlign.center,
+                            //                 style: TextStyle(
+                            //                   color: CommanColor.black,
+                            //                   fontSize:
+                            //                       dlgWidth > 450 ? 19 : 15,
+                            //                 ),
+                            //               ),
+                            //               const SizedBox(height: 20),
+                            //               GestureDetector(
+                            //                 onTap: () {
+                            //                   Navigator.pop(ctx);
+                            //                   Get.to(
+                            //                     () => SubscriptionScreen(
+                            //                       sixMonthPlan:
+                            //                           BibleInfo.sixMonthPlanid,
+                            //                       oneYearPlan:
+                            //                           BibleInfo.oneYearPlanid,
+                            //                       lifeTimePlan:
+                            //                           BibleInfo.lifeTimePlanid,
+                            //                       checkad: 'drawer',
+                            //                     ),
+                            //                     transition:
+                            //                         Transition.cupertino,
+                            //                     duration: const Duration(
+                            //                         milliseconds: 300),
+                            //                   );
+                            //                 },
+                            //                 child: Container(
+                            //                   padding:
+                            //                       const EdgeInsets.symmetric(
+                            //                           vertical: 8),
+                            //                   decoration: BoxDecoration(
+                            //                     color: CommanColor
+                            //                         .lightDarkPrimary(ctx),
+                            //                     borderRadius:
+                            //                         const BorderRadius.all(
+                            //                             Radius.circular(5)),
+                            //                     boxShadow: const [
+                            //                       BoxShadow(
+                            //                           color: Colors.black26,
+                            //                           blurRadius: 2)
+                            //                     ],
+                            //                   ),
+                            //                   child: Text(
+                            //                     'Subscribe',
+                            //                     textAlign: TextAlign.center,
+                            //                     style: TextStyle(
+                            //                       letterSpacing:
+                            //                           BibleInfo.letterSpacing,
+                            //                       fontSize:
+                            //                           BibleInfo.fontSizeScale *
+                            //                               14,
+                            //                       fontWeight: FontWeight.w500,
+                            //                       color: Colors.white,
+                            //                     ),
+                            //                   ),
+                            //                 ),
+                            //               ),
+                            //               const SizedBox(height: 12),
+                            //               GestureDetector(
+                            //                 onTap: () => Navigator.pop(ctx),
+                            //                 child: Container(
+                            //                   padding:
+                            //                       const EdgeInsets.symmetric(
+                            //                           vertical: 8),
+                            //                   decoration: BoxDecoration(
+                            //                     color: CommanColor.lightGrey1,
+                            //                     borderRadius:
+                            //                         const BorderRadius.all(
+                            //                             Radius.circular(5)),
+                            //                     boxShadow: const [
+                            //                       BoxShadow(
+                            //                           color: Colors.black26,
+                            //                           blurRadius: 2)
+                            //                     ],
+                            //                   ),
+                            //                   child: Text(
+                            //                     'Cancel',
+                            //                     textAlign: TextAlign.center,
+                            //                     style: TextStyle(
+                            //                         letterSpacing:
+                            //                             BibleInfo.letterSpacing,
+                            //                         fontSize: BibleInfo
+                            //                                 .fontSizeScale *
+                            //                             14,
+                            //                         fontWeight: FontWeight.w500,
+                            //                         color: CommanColor.black),
+                            //                   ),
+                            //                 ),
+                            //               ),
+                            //             ],
+                            //           ),
+                            //         ),
+                            //       );
+                            //     },
+                            //   );
+                            // }
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: screenWidth > 450 ? 15 : 17),
+                                  child:
+                                      // Icon(
+                                      //   size: screenWidth > 450 ? 27 : 24,
+                                      //   Icons.cloud_download,
+                                      //   color: Color(0XFF805531),
+                                      // ),
+                                      Image.asset(
+                                    "assets/home icons/Frame 3631.png",
+                                    height: 24,
+                                    width: 24,
+                                  ),
+                                ),
+                                Padding(
+                                  padding: EdgeInsets.only(
+                                      right: screenWidth > 450 ? 1 : 20.0),
+                                  child: Text(
+                                    "Back up",
+                                    style:
+                                        CommanStyle.bothPrimary16600(context),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (BibleInfo.enableEShop == true)
+                          //! E-Products
+                          ListTile(
+                            dense: true,
+                            onTap: () async {
+                              Get.back();
+                              await SharPreferences.setString('OpenAd', '1');
+                              if (controller.adFree.value == false) {
+                                controller.bannerAd?.dispose();
+                                controller.bannerAd?.load();
+                              }
+                              Get.to(() => const EProductsScreen(),
+                                  transition: Transition.cupertino,
+                                  duration: const Duration(milliseconds: 350));
+                            },
+                            visualDensity:
+                                const VisualDensity(horizontal: 0, vertical: 0),
+                            leading: Image.asset(
+                              "assets/eproduct-d.png",
+                              color: CommanColor.lightModePrimary,
+                              width: 20,
+                              height: 20,
+                            ),
+                            title: Text(
+                              'e-Products',
+                              style: CommanStyle.bothPrimary16600(context),
+                            ),
+                          ),
+                        //Books
+
+                        if (controller.bookAdsStatus.value == 1)
+                          ListTile(
+                            dense: true,
+                            onTap: () async {
+                              Get.back();
+                              await SharPreferences.setString('OpenAd', '1');
+                              if (controller.adFree.value == false) {
+                                controller.bannerAd?.dispose();
+                                controller.bannerAd?.load();
+                              }
+                              // Check internet connection before navigating
+                              final hasInternet =
+                                  await InternetConnection().hasInternetAccess;
+                              if (!hasInternet) {
+                                Constants.showToast('No internet connection');
+                                return;
+                              }
+                              try {
+                                final connectionSpeed =
+                                    await InternetSpeedChecker.checkSpeed(
+                                  timeout: const Duration(seconds: 5),
+                                );
+                                final isSlowConnection = connectionSpeed == null ||
+                                    connectionSpeed > 5000;
+                                if (isSlowConnection) {
+                                  Constants.showToast(
+                                      kCheckInternetConnectionMessage);
+                                }
+                              } catch (_) {
+                                Constants.showToast(
+                                    kCheckInternetConnectionMessage);
+                              }
+                              Get.to(
+                                  () => BooksScreen(
+                                      bookAdId: controller.bookAdsAppId.value),
+                                  transition: Transition.cupertino,
+                                  duration: const Duration(milliseconds: 350));
+                            },
+                            visualDensity:
+                                const VisualDensity(horizontal: 0, vertical: 0),
+                            leading:
+                                // const Icon(
+                                //   Icons.menu_book,
+                                //   color: Color(0XFF805531),
+                                //   size: 26,
+                                // ),
+                                Image.asset(
+                              "assets/home icons/book.png",
+                              height: 24,
+                              width: 24,
+                            ),
+                            title: Text(
+                              'Books',
+                              style: CommanStyle.bothPrimary16600(context),
+                            ),
+                          ),
+
+                        // Exit Offer / Limited Time Offer
+                        // ListTile(
+                        //   dense: true,
+                        //   onTap: () async {
+                        //     Get.back();
+                        //     if (controller.adFree.value == false) {
+                        //       controller.bannerAd?.dispose();
+                        //       controller.bannerAd?.load();
+                        //     }
+                        //     await SubscriptionScreen.showExitOfferFromHomeScreen(context, controller);
+                        //   },
+                        //   visualDensity:
+                        //   const VisualDensity(horizontal: 0, vertical: 0),
+                        //   leading: Container(
+                        //     padding: const EdgeInsets.all(4),
+                        //     decoration: BoxDecoration(
+                        //       color: Colors.red.withOpacity(0.1),
+                        //       borderRadius: BorderRadius.circular(4),
+                        //     ),
+                        //     child: const Icon(
+                        //       Icons.local_offer,
+                        //       color: Colors.red,
+                        //       size: 18,
+                        //     ),
+                        //   ),
+                        //   title: Text(
+                        //     'SPECIAL FAITH Offer',
+                        //     style: CommanStyle.bothPrimary16600(context),
+                        //   ),
+                        // ),
+                        // More apps
+                        ListTile(
+                          dense: true,
+                          onTap: () async {
+                            Get.back();
+                            await SharPreferences.setString('OpenAd', '1');
+                            // Check internet connection before showing More Apps
+                            final hasInternet =
+                                await InternetConnection().hasInternetAccess;
+                            if (!hasInternet) {
+                              Constants.showToast('No internet connection');
+                              return;
+                            }
+                            try {
+                              final connectionSpeed =
+                                  await InternetSpeedChecker.checkSpeed(
+                                timeout: const Duration(seconds: 5),
+                              );
+                              final isSlowConnection = connectionSpeed == null ||
+                                  connectionSpeed > 5000;
+                              if (isSlowConnection) {
+                                Constants.showToast(
+                                    kCheckInternetConnectionMessage);
+                              }
+                            } catch (_) {
+                              Constants.showToast(
+                                  kCheckInternetConnectionMessage);
+                            }
+                            if (controller.adFree.value == false) {
+                              // Defer ad reload so it does not block route animation.
+                              Future(() {
+                                controller.bannerAd?.dispose();
+                                controller.bannerAd?.load();
+                              });
+                            }
+                            Get.to(() => const MoreAppsScreen(),
+                                transition: Transition.cupertino,
+                                duration: const Duration(milliseconds: 350));
+                          },
+                          visualDensity:
+                              const VisualDensity(horizontal: 0, vertical: 0),
+                          leading: Image.asset(
+                            "assets/home icons/More apps.png",
+                            height: 24,
+                            width: 24,
+                          ),
+                          title: Text(
+                            'More Apps',
+                            style: CommanStyle.bothPrimary16600(context),
+                          ),
+                        ),
+                        // Survey
+                        // ListTile(
+                        //   dense: true,
+                        //   onTap: () async {
+                        //     Get.back();
+                        //     if (controller.adFree.value == false) {
+                        //       controller.bannerAd?.dispose();
+                        //       controller.bannerAd?.load();
+                        //     }
+                        //     Get.to(() => const FeedbackWebView(),
+                        //         transition: Transition.cupertino,
+                        //         duration: const Duration(milliseconds: 350));
+                        //   },
+                        //   visualDensity:
+                        //       const VisualDensity(horizontal: 0, vertical: 0),
+                        //   leading: const Icon(
+                        //     Icons.edit_calendar,
+                        //     color: Color(0XFF805531),
+                        //   ),
+                        //   title: Text(
+                        //     'Survey',
+                        //     style: CommanStyle.bothPrimary16600(context),
+                        //   ),
+                        // ),
+                        ListTile(
+                          dense: true,
+                          onTap: () {
+                            Get.back();
+                            // Use Get.to (not offAll) so open/back stay smooth.
+                            SharPreferences.getBoolean(
+                                    SharPreferences.isNotificationOn)
+                                .then((value) {
+                              final natificationValue = value ?? true;
+                              Future.microtask(() {
+                                Get.to(
+                                  () => SettingScreen(
+                                    notificationValue: natificationValue,
+                                  ),
+                                  transition: Transition.cupertino,
+                                  duration: const Duration(milliseconds: 350),
+                                )?.then((_) async {
+                                  final fontSize = await SharPreferences
+                                      .getString(
+                                          SharPreferences.selectedFontSize);
+                                  controller.fontSize.value = fontSize == null
+                                      ? 19.0
+                                      : double.parse(fontSize.toString());
+                                  final fontFamily = await SharPreferences
+                                      .getString(
+                                          SharPreferences.selectedFontFamily);
+                                  controller.selectedFontFamily.value =
+                                      fontFamily ?? "Arial";
+                                });
+                              });
+                            });
+                          },
+                          visualDensity:
+                              const VisualDensity(horizontal: 0, vertical: 0),
+                          leading: Image.asset(
+                            "assets/home icons/setting.png",
+                            height: 24,
+                            width: 24,
+                          ),
+                          title: Text(
+                            "Settings",
+                            style: CommanStyle.bothPrimary16600(context),
+                          ),
+                        ),
+                        ListTile(
+                          dense: true,
+                          onTap: () async {
+                            final appPackageName =
+                                (await PackageInfo.fromPlatform()).packageName;
+                            String message =
+                                ''; // Declare the message variable outside the if-else block
+                            String appid;
+                            appid = BibleInfo.apple_AppId;
+                            if (Platform.isAndroid) {
+                              message =
+                                  "Hey, I've been using this Bible app that has transformed my daily Bible study experience. Try it now at : https://play.google.com/store/apps/details?id=$appPackageName";
+                            } else if (Platform.isIOS) {
+                              message =
+                                  "Hey, I've been using this Bible app that has transformed my daily Bible study experience. Try it now at : https://itunes.apple.com/app/id$appid"; // Example iTunes URL
+                            }
+
+                            if (message.isNotEmpty) {
+                              Share.share(message,
+                                  sharePositionOrigin: Rect.fromPoints(
+                                      const Offset(2, 2), const Offset(3, 3)));
+                            } else {
+                              print('Message is empty or undefined');
+                            }
+                          },
+                          visualDensity:
+                              const VisualDensity(horizontal: 0, vertical: 0),
+                          leading: Image.asset(
+                            "assets/home icons/Share.png",
+                            height: 24,
+                            width: 24,
+                          ),
+                          title: Text(
+                            'Share',
+                            style: CommanStyle.bothPrimary16600(context),
+                          ),
+                        ),
+                        ListTile(
+                          dense: true,
+                          onTap: () async {
+                            Get.back();
+                            await _launchContactUsEmail();
+                          },
+                          visualDensity:
+                              const VisualDensity(horizontal: 0, vertical: 0),
+                          leading: Image.asset(
+                            //Images.rateUs(context),
+                            'assets/home icons/customer-service 2.png',
+                            height: 24,
+                            width: 24,
+                          ),
+                          title: Text(
+                            'Contact Us',
+                            style: CommanStyle.bothPrimary16600(context),
+                          ),
+                        ),
+                        // ListTile(
+                        //   dense: true,
+                        //   onTap: () {
+                        //     Get.back();
+                        //     Get.to(() => const AboutUs(),
+                        //         transition: Transition.cupertino,
+                        //         duration: const Duration(milliseconds: 350));
+                        //   },
+                        //   visualDensity:
+                        //       const VisualDensity(horizontal: 0, vertical: 0),
+                        //   leading: Image.asset(
+                        //     Images.aboutUs(context),
+                        //     height: 24,
+                        //     width: 24,
+                        //   ),
+                        //   title: Text(
+                        //     'About Us',
+                        //     style: CommanStyle.bothPrimary16600(context),
+                        //   ),
+                        // ),
+                        const SizedBox(
+                          height: 2,
+                        ),
+                        controller.isAdsCompletlyDisabled.value
+                            ? const SizedBox.shrink()
+                            : controller.adFree.value
+                                ? DateTime.tryParse(
+                                            '${controller.RewardAdExpireDate}') !=
+                                        null
+                                    ? Container(
+                                        margin: const EdgeInsets.symmetric(
+                                            vertical: 3),
+                                        color: CommanColor.lightDarkPrimary(
+                                            context),
+                                        child: ListTile(
+                                          dense: true,
+                                          onTap: () {
+                                            Navigator.pop(context);
+                                            showModalBottomSheet<void>(
+                                              context: context,
+                                              backgroundColor: Colors.white,
+                                              shape:
+                                                  const RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.vertical(
+                                                  top: Radius.circular(25),
+                                                ),
+                                              ),
+                                              clipBehavior:
+                                                  Clip.antiAliasWithSaveLayer,
+                                              builder: (BuildContext context) {
+                                                final expiryDate = DateTime.parse(
+                                                    '${controller.RewardAdExpireDate}');
+
+                                                return Stack(
+                                                  children: [
+                                                    Container(
+                                                      decoration: BoxDecoration(
+                                                          border: Border.all(
+                                                              color:
+                                                                  Colors.white),
+                                                          borderRadius:
+                                                              const BorderRadius
+                                                                  .only(
+                                                                  topLeft: Radius
+                                                                      .circular(
+                                                                          20),
+                                                                  topRight: Radius
+                                                                      .circular(
+                                                                          20))),
+                                                      height:
+                                                          MediaQuery.of(context)
+                                                                  .size
+                                                                  .height *
+                                                              0.30,
+                                                      // color: Colors.white,
+                                                      child:
+                                                          SingleChildScrollView(
+                                                        physics:
+                                                            const ScrollPhysics(),
+                                                        child: Column(
+                                                          mainAxisAlignment:
+                                                              MainAxisAlignment
+                                                                  .start,
+                                                          mainAxisSize:
+                                                              MainAxisSize.min,
+                                                          children: <Widget>[
+                                                            Row(
+                                                              mainAxisAlignment:
+                                                                  MainAxisAlignment
+                                                                      .center,
+                                                              children: [
+                                                                Image.asset(
+                                                                    "assets/feedbacklogo.png",
+                                                                    height: 120,
+                                                                    width: 120,
+                                                                    color: CommanColor
+                                                                        .lightDarkPrimary(
+                                                                            context)),
+                                                              ],
+                                                            ),
+                                                            // SizedBox(height: 5,),
+                                                            Text(
+                                                              'Subscription Info',
+                                                              style: TextStyle(
+                                                                  letterSpacing:
+                                                                      BibleInfo
+                                                                          .letterSpacing,
+                                                                  fontSize:
+                                                                      BibleInfo
+                                                                              .fontSizeScale *
+                                                                          16,
+                                                                  color: CommanColor
+                                                                      .lightDarkPrimary(
+                                                                          context),
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w500),
+                                                            ),
+                                                            const SizedBox(
+                                                              height: 15,
+                                                            ),
+                                                            _buildSubscriptionInfoDetails(
+                                                              context: context,
+                                                              expiryDate:
+                                                                  expiryDate,
+                                                              screenWidth:
+                                                                  screenWidth,
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    Positioned(
+                                                      top: 10,
+                                                      right: 15,
+                                                      child: InkWell(
+                                                        child: Icon(
+                                                          Icons.close,
+                                                          color: CommanColor
+                                                              .lightDarkPrimary(
+                                                                  context),
+                                                          size: 25,
+                                                        ),
+                                                        onTap: () {
+                                                          Navigator.pop(
+                                                              context);
+                                                        },
+                                                      ),
+                                                    )
+                                                  ],
+                                                );
+                                              },
+                                            );
+                                          },
+                                          visualDensity: const VisualDensity(
+                                              horizontal: 0, vertical: 0),
+                                          leading: const Icon(
+                                            Icons.info_outline_rounded,
+                                            size: 28,
+                                            color: Colors.white,
+                                          ),
+                                          title: const Text("Subscription Info",
+                                              style: TextStyle(
+                                                  color: Colors.white,
+                                                  letterSpacing:
+                                                      BibleInfo.letterSpacing,
+                                                  fontSize:
+                                                      BibleInfo.fontSizeScale *
+                                                          16,
+                                                  fontWeight: FontWeight.w600)),
+                                        ),
+                                      )
+                                    : Visibility(
+                                        visible:
+                                            controller.isSubscriptionEnabled ??
+                                                false,
+                                        child: Container(
+                                          color: CommanColor.lightDarkPrimary(
+                                              context),
+                                          child: ListTile(
+                                            dense: true,
+                                            onTap: () async {
+                                              adsIcon = false;
+                                              Get.back();
+                                              await SharPreferences.setString(
+                                                  'OpenAd', '1');
+                                              // Use constants as fallback when SharedPreferences are empty (first time loading)
+                                              final sixMonthPlan =
+                                                  await SharPreferences
+                                                          .getString(
+                                                              'sixMonthPlan') ??
+                                                      BibleInfo.sixMonthPlanid;
+                                              final oneYearPlan =
+                                                  await SharPreferences
+                                                          .getString(
+                                                              'oneYearPlan') ??
+                                                      BibleInfo.oneYearPlanid;
+                                              final lifeTimePlan =
+                                                  await SharPreferences
+                                                          .getString(
+                                                              'lifeTimePlan') ??
+                                                      BibleInfo.lifeTimePlanid;
+                                              SubscriptionScreen.openPaywallStacked(
+                                                sixMonthPlan: sixMonthPlan,
+                                                oneYearPlan: oneYearPlan,
+                                                lifeTimePlan: lifeTimePlan,
+                                                checkad: 'theme',
+                                              );
+                                            },
+                                            visualDensity: const VisualDensity(
+                                                horizontal: 0, vertical: 0),
+                                            leading: SizedBox(
+                                              width: 24,
+                                              height: 24,
+                                              child: Image.asset(
+                                                Images.adFree(context),
+                                                height: 24,
+                                                width: 24,
+                                                errorBuilder: (_, __, ___) =>
+                                                    Icon(
+                                                  Icons.workspace_premium,
+                                                  size: 24,
+                                                  color: CommanColor
+                                                      .darkModePrimaryWhite(
+                                                          context),
+                                                ),
+                                              ),
+                                            ),
+                                            title: const Text("",
+                                                style: TextStyle(
+                                                    color: Colors.white,
+                                                    letterSpacing:
+                                                        BibleInfo.letterSpacing,
+                                                    fontSize: BibleInfo
+                                                            .fontSizeScale *
+                                                        16,
+                                                    fontWeight:
+                                                        FontWeight.w600)),
+                                          ),
+                                        ),
+                                      )
+                                : Visibility(
+                                    visible: controller.isSubscriptionEnabled ??
+                                        false,
+                                    child: Container(
+                                      color:
+                                          CommanColor.lightDarkPrimary(context),
+                                      child: ListTile(
+                                        dense: true,
+                                        onTap: () async {
+                                          adsIcon = false;
+                                          Get.back();
+                                          await SharPreferences.setString(
+                                              'OpenAd', '1');
+                                          // Use constants as fallback when SharedPreferences are empty (first time loading)
+                                          final sixMonthPlan =
+                                              await SharPreferences.getString(
+                                                      'sixMonthPlan') ??
+                                                  BibleInfo.sixMonthPlanid;
+                                          final oneYearPlan =
+                                              await SharPreferences.getString(
+                                                      'oneYearPlan') ??
+                                                  BibleInfo.oneYearPlanid;
+                                          final lifeTimePlan =
+                                              await SharPreferences.getString(
+                                                      'lifeTimePlan') ??
+                                                  BibleInfo.lifeTimePlanid;
+                                          SubscriptionScreen.openPaywallStacked(
+                                            sixMonthPlan: sixMonthPlan,
+                                            oneYearPlan: oneYearPlan,
+                                            lifeTimePlan: lifeTimePlan,
+                                            checkad: 'theme',
+                                          );
+                                        },
+                                        visualDensity: const VisualDensity(
+                                            horizontal: 0, vertical: 0),
+                                        leading: SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: Image.asset(
+                                            Images.adFree(context),
+                                            height: 24,
+                                            width: 24,
+                                            errorBuilder: (_, __, ___) => Icon(
+                                              Icons.workspace_premium,
+                                              size: 24,
+                                              color: CommanColor
+                                                  .darkModePrimaryWhite(
+                                                      context),
+                                            ),
+                                          ),
+                                        ),
+                                        title: const Text("Get Premium",
+                                            style: TextStyle(
+                                                color: Colors.white,
+                                                letterSpacing:
+                                                    BibleInfo.letterSpacing,
+                                                fontSize:
+                                                    BibleInfo.fontSizeScale *
+                                                        16,
+                                                fontWeight: FontWeight.w600)),
+                                      ),
+                                    ),
+                                  ),
+                      ],
+                    ),
+                  ),
+            bottomNavigationBar: const SizedBox(
+              height: 1,
+            ),
+          );
+            },
+            child: WillPopScope(
               onWillPop: () async {
                 Future.delayed(Duration.zero, () async {
                   int saveRating = await SharPreferences.getInt(
@@ -3785,11 +5277,12 @@ class _HomeScreenState extends State<HomeScreen>
                       controller.selectChapterChange.value++;
                       controller.selectedChapter.value =
                           controller.selectChapterChange.value.toString();
-                      SharPreferences.setString(SharPreferences.selectedChapter,
+                      await SharPreferences.setString(
+                          SharPreferences.selectedChapter,
                           controller.selectedChapter.value);
 
-                      controller.getSelectedChapterAndBook();
-                      controller.getFont();
+                      await controller.getSelectedChapterAndBook();
+                      await controller.getFont();
                     } else {
                       Constants.showToast(
                           "Selected Book is completed. Please change the book.");
@@ -3815,10 +5308,11 @@ class _HomeScreenState extends State<HomeScreen>
                     controller.selectChapterChange.value--;
                     controller.selectedChapter.value =
                         controller.selectChapterChange.value.toString();
-                    SharPreferences.setString(SharPreferences.selectedChapter,
+                    await SharPreferences.setString(
+                        SharPreferences.selectedChapter,
                         controller.selectedChapter.value);
-                    controller.getSelectedChapterAndBook();
-                    controller.getFont();
+                    await controller.getSelectedChapterAndBook();
+                    await controller.getFont();
                   }
                 },
                 child: Container(
@@ -3834,7 +5328,8 @@ class _HomeScreenState extends State<HomeScreen>
                               fit: BoxFit.fill))
                       : null,
                   child: controller.isFetchContent.value &&
-                          controller.selectedBookContent.isEmpty
+                          controller.selectedBookContent.isEmpty &&
+                          !_hasDisplayedChapterContent
                       ? const Center(
                           child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -3843,7 +5338,8 @@ class _HomeScreenState extends State<HomeScreen>
                             Loader(),
                           ],
                         ))
-                      : controller.selectedBookContent.isEmpty
+                      : controller.selectedBookContent.isEmpty &&
+                              !_hasDisplayedChapterContent
                           ? _buildEmptyContentWithChapters(controller)
                           : NotificationListener<ScrollNotification>(
                               onNotification: (notification) {
@@ -3861,14 +5357,24 @@ class _HomeScreenState extends State<HomeScreen>
                               child: ListView.builder(
                               scrollDirection: controller.scrollDirection,
                               controller: controller.autoScrollController.value,
-                              itemCount: controller.selectedBookContent.length,
-                              physics: const ScrollPhysics(),
-                              shrinkWrap: true,
-                              padding: const EdgeInsets.only(
-                                  left: 15, right: 15, bottom: 20),
+                              itemCount: readerVerses.length,
+                              physics: const BouncingScrollPhysics(
+                                parent: AlwaysScrollableScrollPhysics(),
+                              ),
+                              cacheExtent: 800,
+                              addAutomaticKeepAlives: false,
+                              addRepaintBoundaries: true,
+                              padding: EdgeInsets.only(
+                                  left: 15,
+                                  right: 15,
+                                  bottom: 20,
+                                  // Clear status bar + overlay app bar (extendBodyBehindAppBar).
+                                  top: controller.selectedChapter.value
+                                          .isNotEmpty
+                                      ? readerContentTopPadding
+                                      : 0),
                               itemBuilder: (context, index) {
-                                var data =
-                                    controller.selectedBookContent[index];
+                                var data = readerVerses[index];
                                 return AutoScrollTag(
                                   key: ValueKey(index),
                                   controller:
@@ -4219,7 +5725,7 @@ class _HomeScreenState extends State<HomeScreen>
                                                                   print(
                                                                       'Not Load Interstitial Ad');
                                                                   Get.to(() =>
-                                                                      MarkAsReadScreen(
+                                                                              MarkAsReadScreen(
                                                                         ReadedChapter: controller
                                                                             .selectedChapter
                                                                             .value,
@@ -4611,10 +6117,10 @@ class _HomeScreenState extends State<HomeScreen>
                                                                           } else {
                                                                             print('Not Load Interstitial Ad');
                                                                             Get.to(() => MarkAsReadScreen(
-                                                                                  ReadedChapter: controller.selectedChapter.value,
-                                                                                  RededBookName: controller.selectedBook.value,
-                                                                                  SelectedBookChapterCount: controller.selectedBookChapterCount.value,
-                                                                                ));
+                                                                                    ReadedChapter: controller.selectedChapter.value,
+                                                                                    RededBookName: controller.selectedBook.value,
+                                                                                    SelectedBookChapterCount: controller.selectedBookChapterCount.value,
+                                                                                  ));
                                                                           }
                                                                         },
                                                                       );
@@ -4827,1382 +6333,9 @@ class _HomeScreenState extends State<HomeScreen>
                                 );
                               },
                             ),
-                          ),
                 ),
               ),
             ),
-            floatingActionButton: controller.isFetchContent.value &&
-                    controller.selectedBookContent.isEmpty
-                ? const SizedBox()
-                : Visibility(
-                    visible: _showUI,
-                    maintainState: true,
-                    maintainAnimation: true,
-                    child: IgnorePointer(
-                      ignoring: !_showUI,
-                      child: SizedBox(
-                      width: double.infinity,
-                      child: Stack(
-                        alignment: Alignment.bottomCenter,
-                        clipBehavior: Clip.none,
-                        children: [
-                          Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          if (BibleInfo.chat == 1)
-                            Builder(
-                              builder: (buttonContext) => GestureDetector(
-                                onTap: () {
-                                  if (isOpenChat) {
-                                    if (Navigator.of(buttonContext,
-                                            rootNavigator: false)
-                                        .canPop()) {
-                                      Navigator.of(buttonContext,
-                                              rootNavigator: false)
-                                          .pop();
-                                    }
-                                    setState(() {
-                                      isOpenChat = false;
-                                    });
-                                  } else {
-                                    setState(() {
-                                      isOpenChat = true;
-                                  });
-                                    _showChatEntryPopover(buttonContext);
-                                  }
-                                },
-                                child: Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: screenWidth > 600
-                                        ? 48
-                                        : screenWidth > 450
-                                            ? 40
-                                            : 32,
-                                  ),
-                                  child: Container(
-                                      height: screenWidth > 600
-                                          ? 56
-                                          : screenWidth > 450
-                                              ? 50
-                                              : 35,
-                                      width: screenWidth > 600
-                                          ? 56
-                                          : screenWidth > 450
-                                              ? 50
-                                              : 35,
-                                      decoration: BoxDecoration(
-                                        color: CommanColor.whiteLightModePrimary(
-                                            context),
-                                        shape: BoxShape.circle,
-                                        boxShadow: CommanColor.isDarkTheme(context)
-                                            ? const [
-                                                BoxShadow(
-                                                  color: Colors.black45,
-                                                  blurRadius: 8,
-                                                  offset: Offset(0, 3),
-                                                ),
-                                              ]
-                                            : null,
-                                      ),
-                                      child: Center(
-                                        child: isOpenChat
-                                            ? Icon(
-                                                Icons.close,
-                                                color: CommanColor
-                                                    .darkModePrimaryWhite(context),
-                                                size: screenWidth > 450 ? 22 : 18,
-                                              )
-                                            : Image.asset(
-                                                CommanColor.isDarkTheme(context)
-                                                    ? "assets/dark_modes/new-dark_chat.png"
-                                                    : "assets/Chat white.png",
-                                                width: screenWidth > 600
-                                                    ? 26
-                                                    : screenWidth > 450
-                                                        ? 24
-                                                        : 22,
-                                                height: screenWidth > 600
-                                                    ? 26
-                                                    : screenWidth > 450
-                                                        ? 24
-                                                        : 22,
-                                                color: CommanColor
-                                                    .darkModePrimaryWhite(context),
-                                              ),
-                                      )),
-                                ),
-                              ),
-                            )
-                          else
-                            SizedBox(
-                              width: screenWidth > 600
-                                  ? 56
-                                  : screenWidth > 450
-                                      ? 50
-                                      : 35,
-                            ),
-                        ],
-                      ),
-                      floatingButton(
-                        chapterNum: controller.selectedChapter.value,
-                        bookName: controller.selectedBook.value,
-                        contentList: controller.selectedVersesContent,
-                        chapterCount: controller.selectedBookChapterCount.value,
-                        audioData: controller.audioData.value,
-                        bookNum: controller.selectedBookNum.value,
-                        internetConnection: controller.connectionStatus,
-                        textToSpeechLoad: controller.loadTextToSpeech.value,
-                        audioPlayer: audioPlayer,
-                      ),
-                    ],
-                      ),
-                        ],
-                      ),
-                    ),
-                    ),
-                  ),
-            drawer: controller.isFetchContent.value &&
-                    controller.selectedBookContent.isEmpty
-                ? const SizedBox()
-                : Drawer(
-                    backgroundColor: p.Provider.of<ThemeProvider>(context)
-                                .currentCustomTheme ==
-                            AppCustomTheme.vintage
-                        ? CommanColor.white
-                        : p.Provider.of<ThemeProvider>(context).backgroundColor,
-                    width: MediaQuery.of(context).size.width * 0.6,
-                    child: ListView(
-                      // Important: Remove any padding from the ListView.
-                      padding: EdgeInsets.zero,
-                      children: [
-                        SizedBox(
-                          height: 120,
-                          child: DrawerHeader(
-                            padding: const EdgeInsets.all(5),
-                            decoration: BoxDecoration(
-                              color: CommanColor.lightDarkPrimary(context),
-                            ),
-                            child: Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 10),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    bibleName,
-                                    style: CommanStyle.white16600,
-                                  )
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        ListTile(
-                          dense: true,
-                          onTap: () {
-                            Get.back();
-                            if (controller.adFree.value == false) {
-                              controller.bannerAd?.dispose();
-                              controller.bannerAd?.load();
-                            }
-                            Get.to(
-                                () => isLoggedIn
-                                    ? const ProfileScreen()
-                                    : LoginScreen(hasSkip: false),
-                                transition: Transition.cupertinoDialog,
-                                duration: const Duration(milliseconds: 300));
-                          },
-                          visualDensity:
-                              const VisualDensity(horizontal: 0, vertical: 0),
-                          leading: Image.asset(
-                            "assets/home icons/My Account.png",
-                            height: 24,
-                            width: 24,
-                          ),
-                          title: Text(
-                            'My Account',
-                            style: CommanStyle.bothPrimary16600(context),
-                          ),
-                        ),
-                        ListTile(
-                          onTap: () {
-                            Get.back();
-                            if (controller.adFree.value == false) {
-                              controller.bannerAd?.dispose();
-                              controller.bannerAd?.load();
-                            }
-                            Get.to(() => const DailyVerse(),
-                                transition: Transition.cupertinoDialog,
-                                duration: const Duration(milliseconds: 300));
-                          },
-                          dense: true,
-                          visualDensity:
-                              const VisualDensity(horizontal: 0, vertical: 0),
-                          leading: Image.asset(
-                            "assets/home icons/Daily verse.png",
-                            height: 24,
-                            width: 24,
-                          ),
-                          title: Text(
-                            'Daily Verses',
-                            style: CommanStyle.bothPrimary16600(context),
-                          ),
-                        ),
-                        if (BibleInfo.chat == 1)
-                          ListTile(
-                            dense: true,
-                            onTap: () async {
-                              Get.to(ChatScreen());
-                            },
-                            visualDensity:
-                                const VisualDensity(horizontal: 0, vertical: 0),
-                            leading: Image.asset(
-                              "assets/Chat icon.png",
-                              height: 24,
-                              width: 24,
-                            ),
-                            title: Text(
-                              'Ask Anything',
-                              style: CommanStyle.bothPrimary16600(context),
-                            ),
-                          ),
-                        ListTile(
-                          dense: true,
-                          onTap: () async {
-                            Get.back();
-                            Get.to(() => const PrayerGuidanceScreen(),
-                                transition: Transition.cupertinoDialog,
-                                duration: const Duration(milliseconds: 300));
-                          },
-                          visualDensity:
-                              const VisualDensity(horizontal: 0, vertical: 0),
-                          leading: Image.asset(
-                            "assets/dove.png",
-                            height: 26,
-                            width: 26,
-                            color:
-                                Provider.of<ThemeProvider>(context).themeMode ==
-                                        ThemeMode.dark
-                                    ? CommanColor.darkPrimaryColor
-                                    : CommanColor.lightModePrimary,
-                          ),
-                          title: Text(
-                            'Prayer Guidance',
-                            style: CommanStyle.bothPrimary16600(context),
-                          ),
-                        ),
-                        ListTile(
-                          dense: true,
-                          onTap: () {
-                            Get.back();
-                            Get.to(
-                              () => const AddWidgetIntroScreen(),
-                              transition: Transition.cupertinoDialog,
-                              duration: const Duration(milliseconds: 300),
-                            );
-                          },
-                          visualDensity:
-                              const VisualDensity(horizontal: 0, vertical: 0),
-                          leading: Icon(
-                            Icons.widgets,
-                            size: 24,
-                            color:
-                                Provider.of<ThemeProvider>(context).themeMode ==
-                                        ThemeMode.dark
-                                    ? CommanColor.darkPrimaryColor
-                                    : CommanColor.lightModePrimary,
-                          ),
-                          title: Text(
-                            'Add Widget',
-                            style: CommanStyle.bothPrimary16600(context),
-                          ),
-                        ),
-                        // ListTile(
-                        //   dense: true,
-                        //   onTap: () async {
-                        //     Get.back();
-                        //     await SharPreferences.setString('OpenAd', '1');
-                        //     if (controller.adFree.value == false) {
-                        //       controller.bannerAd?.dispose();
-                        //       controller.bannerAd?.load();
-                        //     }
-                        //     Get.to(
-                        //         () => SearchScreen(
-                        //               controller: controller,
-                        //             ),
-                        //         transition: Transition.cupertinoDialog,
-                        //         duration: const Duration(milliseconds: 300));
-                        //   },
-                        //   visualDensity:
-                        //       const VisualDensity(horizontal: 0, vertical: 0),
-                        //   leading: Image.asset(
-                        //     "assets/home icons/search.png",
-                        //     height: 24,
-                        //     width: 24,
-                        //   ),
-                        //   title: Text(
-                        //     'Search',
-                        //     style: CommanStyle.bothPrimary16600(context),
-                        //   ),
-                        // ),
-                        ListTile(
-                          dense: true,
-                          onTap: () {
-                            Get.back();
-                            if (controller.adFree.value == false) {
-                              controller.bannerAd?.dispose();
-                              controller.bannerAd?.load();
-                            }
-                            Get.to(() => const LibraryScreen(),
-                                transition: Transition.cupertinoDialog,
-                                duration: const Duration(milliseconds: 300));
-                          },
-                          visualDensity:
-                              const VisualDensity(horizontal: 0, vertical: 0),
-                          leading: Image.asset(
-                            "assets/home icons/My Library.png",
-                            height: 24,
-                            width: 24,
-                          ),
-                          title: Text(
-                            'My Library',
-                            style: CommanStyle.bothPrimary16600(context),
-                          ),
-                        ),
-                        ListTile(
-                          dense: true,
-                          onTap: () async {
-                            Get.back();
-                            if (controller.adFree.value == false) {
-                              controller.bannerAd?.dispose();
-                              controller.bannerAd?.load();
-                            }
-                            // Check internet connection before navigating
-                            final hasInternet =
-                                await InternetConnection().hasInternetAccess;
-                            if (!hasInternet) {
-                              Constants.showToast('No internet connection');
-                              return;
-                            }
-                            try {
-                              final connectionSpeed =
-                                  await InternetSpeedChecker.checkSpeed(
-                                timeout: const Duration(seconds: 5),
-                              );
-                              final isSlowConnection = connectionSpeed == null ||
-                                  connectionSpeed > 5000;
-                              if (isSlowConnection) {
-                                Constants.showToast(
-                                    kCheckInternetConnectionMessage);
-                              }
-                            } catch (_) {
-                              Constants.showToast(
-                                  kCheckInternetConnectionMessage);
-                            }
-                            Get.to(() => const WallpaperScreen(),
-                                transition: Transition.cupertinoDialog,
-                                duration: const Duration(milliseconds: 300));
-                          },
-                          visualDensity:
-                              const VisualDensity(horizontal: 0, vertical: 0),
-                          leading: Image.asset(
-                            "assets/home icons/Wallpaper.png",
-                            height: 24,
-                            width: 24,
-                          ),
-                          title: Text(
-                            'Wallpapers',
-                            style: CommanStyle.bothPrimary16600(context),
-                          ),
-                        ),
-                        ListTile(
-                          dense: true,
-                          onTap: () async {
-                            Get.back();
-                            if (controller.adFree.value == false) {
-                              controller.bannerAd?.dispose();
-                              controller.bannerAd?.load();
-                            }
-                            // Check internet connection before navigating
-                            final hasInternet =
-                                await InternetConnection().hasInternetAccess;
-                            if (!hasInternet) {
-                              Constants.showToast('No internet connection');
-                              return;
-                            }
-                            try {
-                              final connectionSpeed =
-                                  await InternetSpeedChecker.checkSpeed(
-                                timeout: const Duration(seconds: 5),
-                              );
-                              final isSlowConnection = connectionSpeed == null ||
-                                  connectionSpeed > 5000;
-                              if (isSlowConnection) {
-                                Constants.showToast(
-                                    kCheckInternetConnectionMessage);
-                              }
-                            } catch (_) {
-                              Constants.showToast(
-                                  kCheckInternetConnectionMessage);
-                            }
-                            Get.to(() => const QuoteScreen(),
-                                transition: Transition.cupertinoDialog,
-                                duration: const Duration(milliseconds: 300));
-                          },
-                          visualDensity:
-                              const VisualDensity(horizontal: 0, vertical: 0),
-                          leading: Image.asset(
-                            "assets/home icons/Quotes.png",
-                            height: 24,
-                            width: 24,
-                          ),
-                          title: Text(
-                            'Quotes',
-                            style: CommanStyle.bothPrimary16600(context),
-                          ),
-                        ),
-                        ListTile(
-                          dense: true,
-                          onTap: () {
-                            Get.back();
-                            if (controller.adFree.value == false) {
-                              controller.bannerAd?.dispose();
-                              controller.bannerAd?.load();
-                            }
-                            Get.to(() => const CalendarScreen(),
-                                transition: Transition.cupertinoDialog,
-                                duration: const Duration(milliseconds: 300));
-                          },
-                          visualDensity:
-                              const VisualDensity(horizontal: 0, vertical: 0),
-                          leading:
-                              // const Icon(
-                              //   Icons.calendar_month,
-                              //   color: Color(0XFF805531),
-                              //   size: 26,
-                              // ),
-                              Image.asset(
-                            "assets/home icons/Artboard – 35.png",
-                            height: 24,
-                            width: 24,
-                          ),
-                          title: Text(
-                            'Calendar',
-                            style: CommanStyle.bothPrimary16600(context),
-                          ),
-                        ),
-                        // ListTile(
-                        //   dense: true,
-                        //   onTap: () async {
-                        //     // If offline, show toast and do not navigate
-                        //     final connectivityResult =
-                        //         await Connectivity().checkConnectivity();
-                        //     final hasConnection = connectivityResult
-                        //             .isNotEmpty &&
-                        //         (connectivityResult
-                        //                 .contains(ConnectivityResult.wifi) ||
-                        //             connectivityResult
-                        //                 .contains(ConnectivityResult.mobile) ||
-                        //             connectivityResult
-                        //                 .contains(ConnectivityResult.ethernet));
-                        //     if (!hasConnection) {
-                        //       await Future.delayed(
-                        //           const Duration(milliseconds: 500));
-                        //       final retry =
-                        //           await Connectivity().checkConnectivity();
-                        //       final retryHasConnection = retry.isNotEmpty &&
-                        //           (retry.contains(ConnectivityResult.wifi) ||
-                        //               retry.contains(
-                        //                   ConnectivityResult.mobile) ||
-                        //               retry.contains(
-                        //                   ConnectivityResult.ethernet));
-                        //       if (!retryHasConnection) {
-                        //         try {
-                        //           final hasInternet = await InternetConnection()
-                        //               .hasInternetAccess;
-                        //           if (!hasInternet) {
-                        //             return Constants.showToast(
-                        //                 "No Internet Connection");
-                        //           } else {
-                        //             return Constants.showToast(
-                        //                 "Check your Internet connection");
-                        //           }
-                        //         } catch (_) {
-                        //           return Constants.showToast(
-                        //               "No Internet Connection");
-                        //         }
-                        //       }
-                        //     }
-
-                        //     Get.back();
-                        //     if (controller.adFree.value == false) {
-                        //       controller.bannerAd?.dispose();
-                        //       controller.bannerAd?.load();
-                        //     }
-                        //     Get.to(() => const biblebookapp.StudyPlansScreen(),
-                        //         transition: Transition.cupertinoDialog,
-                        //         duration: const Duration(milliseconds: 300));
-                        //   },
-                        //   visualDensity:
-                        //       const VisualDensity(horizontal: 0, vertical: 0),
-                        //   leading: Icon(
-                        //     Icons.menu_book,
-                        //     size: 24,
-                        //     color:
-                        //         Provider.of<ThemeProvider>(context).themeMode ==
-                        //                 ThemeMode.dark
-                        //             ? CommanColor.darkPrimaryColor
-                        //             : CommanColor.lightModePrimary,
-                        //   ),
-                        //   title: Text(
-                        //     'Study Plans',
-                        //     style: CommanStyle.bothPrimary16600(context),
-                        //   ),
-                        // ),
-                        // ListTile(
-                        //   dense: true,
-                        //   onTap: () {
-                        //     Get.back();
-                        //     if (controller.adFree.value == false) {
-                        //       controller.bannerAd?.dispose();
-                        //       controller.bannerAd?.load();
-                        //     }
-                        //     if (isLoggedIn) {
-                        //       showImportExportInfo(context, () async {
-                        //         final permission =
-                        //             await ExportDb.requestStoragePermission();
-                        //         if (permission) {
-                        //           updateLoading(true,
-                        //               mess: 'Exporting the data. Please wait');
-                        //           await ExportDb.getAllDataToExport(context);
-                        //           updateLoading(false);
-                        //         } else {
-                        //           Constants.showToast(
-                        //               "Permission is required to export the data.");
-                        //         }
-                        //       });
-                        //     } else {
-                        //       backupNotification(
-                        //           context: context,
-                        //           message:
-                        //               " Account is required to access this feature ");
-                        //     }
-                        //   },
-                        //   visualDensity:
-                        //       const VisualDensity(horizontal: 0, vertical: 0),
-                        //   leading: const Icon(
-                        //     Icons.file_upload_outlined,
-                        //     color: Color(0XFF805531),
-                        //   ),
-                        //   title: Text(
-                        //     'Export',
-                        //     style: CommanStyle.bothPrimary16600(context),
-                        //   ),
-                        // ),
-                        GestureDetector(
-                          onTap: () async {
-                            Navigator.of(context).pop();
-                            // Subscription gate temporarily disabled — open backup directly.
-                            // Same logic as Library hamburger: subscription check, then MainBackupDialog or Subscribe dialog
-                            // final downloadProvider =
-                            //     Provider.of<DownloadProvider>(context,
-                            //         listen: false);
-                            // final subscriptionPlan =
-                            //     await downloadProvider.getSubscriptionPlan();
-                            // final isSubscribed = subscriptionPlan != null &&
-                            //     subscriptionPlan.isNotEmpty &&
-                            //     ['platinum', 'gold', 'silver']
-                            //         .contains(subscriptionPlan.toLowerCase());
-                            // if (isSubscribed) {
-                            showDialog(
-                              context: context,
-                              barrierDismissible: false,
-                              builder: (context) => const MainBackupDialog(),
-                            );
-                            // } else {
-                            //   await SharPreferences.setString('OpenAd', '1');
-                            //   if (!context.mounted) return;
-                            //   showDialog(
-                            //     context: context,
-                            //     barrierDismissible: false,
-                            //     builder: (ctx) {
-                            //       final dlgWidth =
-                            //           MediaQuery.of(ctx).size.width;
-                            //       return Dialog(
-                            //         backgroundColor: CommanColor.white,
-                            //         shape: RoundedRectangleBorder(
-                            //           borderRadius: BorderRadius.circular(15),
-                            //         ),
-                            //         elevation: 16,
-                            //         child: Padding(
-                            //           padding: const EdgeInsets.symmetric(
-                            //               horizontal: 16, vertical: 24),
-                            //           child: Column(
-                            //             mainAxisSize: MainAxisSize.min,
-                            //             crossAxisAlignment:
-                            //                 CrossAxisAlignment.stretch,
-                            //             children: [
-                            //               Text(
-                            //                 "You're not subscribed. Subscribe to export and import your data.",
-                            //                 textAlign: TextAlign.center,
-                            //                 style: TextStyle(
-                            //                   color: CommanColor.black,
-                            //                   fontSize:
-                            //                       dlgWidth > 450 ? 19 : 15,
-                            //                 ),
-                            //               ),
-                            //               const SizedBox(height: 20),
-                            //               GestureDetector(
-                            //                 onTap: () {
-                            //                   Navigator.pop(ctx);
-                            //                   Get.to(
-                            //                     () => SubscriptionScreen(
-                            //                       sixMonthPlan:
-                            //                           BibleInfo.sixMonthPlanid,
-                            //                       oneYearPlan:
-                            //                           BibleInfo.oneYearPlanid,
-                            //                       lifeTimePlan:
-                            //                           BibleInfo.lifeTimePlanid,
-                            //                       checkad: 'drawer',
-                            //                     ),
-                            //                     transition:
-                            //                         Transition.cupertinoDialog,
-                            //                     duration: const Duration(
-                            //                         milliseconds: 300),
-                            //                   );
-                            //                 },
-                            //                 child: Container(
-                            //                   padding:
-                            //                       const EdgeInsets.symmetric(
-                            //                           vertical: 8),
-                            //                   decoration: BoxDecoration(
-                            //                     color: CommanColor
-                            //                         .lightDarkPrimary(ctx),
-                            //                     borderRadius:
-                            //                         const BorderRadius.all(
-                            //                             Radius.circular(5)),
-                            //                     boxShadow: const [
-                            //                       BoxShadow(
-                            //                           color: Colors.black26,
-                            //                           blurRadius: 2)
-                            //                     ],
-                            //                   ),
-                            //                   child: Text(
-                            //                     'Subscribe',
-                            //                     textAlign: TextAlign.center,
-                            //                     style: TextStyle(
-                            //                       letterSpacing:
-                            //                           BibleInfo.letterSpacing,
-                            //                       fontSize:
-                            //                           BibleInfo.fontSizeScale *
-                            //                               14,
-                            //                       fontWeight: FontWeight.w500,
-                            //                       color: Colors.white,
-                            //                     ),
-                            //                   ),
-                            //                 ),
-                            //               ),
-                            //               const SizedBox(height: 12),
-                            //               GestureDetector(
-                            //                 onTap: () => Navigator.pop(ctx),
-                            //                 child: Container(
-                            //                   padding:
-                            //                       const EdgeInsets.symmetric(
-                            //                           vertical: 8),
-                            //                   decoration: BoxDecoration(
-                            //                     color: CommanColor.lightGrey1,
-                            //                     borderRadius:
-                            //                         const BorderRadius.all(
-                            //                             Radius.circular(5)),
-                            //                     boxShadow: const [
-                            //                       BoxShadow(
-                            //                           color: Colors.black26,
-                            //                           blurRadius: 2)
-                            //                     ],
-                            //                   ),
-                            //                   child: Text(
-                            //                     'Cancel',
-                            //                     textAlign: TextAlign.center,
-                            //                     style: TextStyle(
-                            //                         letterSpacing:
-                            //                             BibleInfo.letterSpacing,
-                            //                         fontSize: BibleInfo
-                            //                                 .fontSizeScale *
-                            //                             14,
-                            //                         fontWeight: FontWeight.w500,
-                            //                         color: CommanColor.black),
-                            //                   ),
-                            //                 ),
-                            //               ),
-                            //             ],
-                            //           ),
-                            //         ),
-                            //       );
-                            //     },
-                            //   );
-                            // }
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding: EdgeInsets.symmetric(
-                                      horizontal: screenWidth > 450 ? 15 : 17),
-                                  child:
-                                      // Icon(
-                                      //   size: screenWidth > 450 ? 27 : 24,
-                                      //   Icons.cloud_download,
-                                      //   color: Color(0XFF805531),
-                                      // ),
-                                      Image.asset(
-                                    "assets/home icons/Frame 3631.png",
-                                    height: 24,
-                                    width: 24,
-                                  ),
-                                ),
-                                Padding(
-                                  padding: EdgeInsets.only(
-                                      right: screenWidth > 450 ? 1 : 20.0),
-                                  child: Text(
-                                    "Back up",
-                                    style:
-                                        CommanStyle.bothPrimary16600(context),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        if (BibleInfo.enableEShop == true)
-                          //! E-Products
-                          ListTile(
-                            dense: true,
-                            onTap: () async {
-                              Get.back();
-                              await SharPreferences.setString('OpenAd', '1');
-                              if (controller.adFree.value == false) {
-                                controller.bannerAd?.dispose();
-                                controller.bannerAd?.load();
-                              }
-                              Get.to(() => const EProductsScreen(),
-                                  transition: Transition.cupertinoDialog,
-                                  duration: const Duration(milliseconds: 300));
-                            },
-                            visualDensity:
-                                const VisualDensity(horizontal: 0, vertical: 0),
-                            leading: Image.asset(
-                              "assets/eproduct-d.png",
-                              color: CommanColor.lightModePrimary,
-                              width: 20,
-                              height: 20,
-                            ),
-                            title: Text(
-                              'e-Products',
-                              style: CommanStyle.bothPrimary16600(context),
-                            ),
-                          ),
-                        //Books
-
-                        if (controller.bookAdsStatus.value == 1)
-                          ListTile(
-                            dense: true,
-                            onTap: () async {
-                              Get.back();
-                              await SharPreferences.setString('OpenAd', '1');
-                              if (controller.adFree.value == false) {
-                                controller.bannerAd?.dispose();
-                                controller.bannerAd?.load();
-                              }
-                              // Check internet connection before navigating
-                              final hasInternet =
-                                  await InternetConnection().hasInternetAccess;
-                              if (!hasInternet) {
-                                Constants.showToast('No internet connection');
-                                return;
-                              }
-                              try {
-                                final connectionSpeed =
-                                    await InternetSpeedChecker.checkSpeed(
-                                  timeout: const Duration(seconds: 5),
-                                );
-                                final isSlowConnection = connectionSpeed == null ||
-                                    connectionSpeed > 5000;
-                                if (isSlowConnection) {
-                                  Constants.showToast(
-                                      kCheckInternetConnectionMessage);
-                                }
-                              } catch (_) {
-                                Constants.showToast(
-                                    kCheckInternetConnectionMessage);
-                              }
-                              Get.to(
-                                  () => BooksScreen(
-                                      bookAdId: controller.bookAdsAppId.value),
-                                  transition: Transition.cupertinoDialog,
-                                  duration: const Duration(milliseconds: 300));
-                            },
-                            visualDensity:
-                                const VisualDensity(horizontal: 0, vertical: 0),
-                            leading:
-                                // const Icon(
-                                //   Icons.menu_book,
-                                //   color: Color(0XFF805531),
-                                //   size: 26,
-                                // ),
-                                Image.asset(
-                              "assets/home icons/book.png",
-                              height: 24,
-                              width: 24,
-                            ),
-                            title: Text(
-                              'Books',
-                              style: CommanStyle.bothPrimary16600(context),
-                            ),
-                          ),
-
-                        // Exit Offer / Limited Time Offer
-                        // ListTile(
-                        //   dense: true,
-                        //   onTap: () async {
-                        //     Get.back();
-                        //     if (controller.adFree.value == false) {
-                        //       controller.bannerAd?.dispose();
-                        //       controller.bannerAd?.load();
-                        //     }
-                        //     await SubscriptionScreen.showExitOfferFromHomeScreen(context, controller);
-                        //   },
-                        //   visualDensity:
-                        //   const VisualDensity(horizontal: 0, vertical: 0),
-                        //   leading: Container(
-                        //     padding: const EdgeInsets.all(4),
-                        //     decoration: BoxDecoration(
-                        //       color: Colors.red.withOpacity(0.1),
-                        //       borderRadius: BorderRadius.circular(4),
-                        //     ),
-                        //     child: const Icon(
-                        //       Icons.local_offer,
-                        //       color: Colors.red,
-                        //       size: 18,
-                        //     ),
-                        //   ),
-                        //   title: Text(
-                        //     'SPECIAL FAITH Offer',
-                        //     style: CommanStyle.bothPrimary16600(context),
-                        //   ),
-                        // ),
-                        // More apps
-                        ListTile(
-                          dense: true,
-                          onTap: () async {
-                            Get.back();
-                            await SharPreferences.setString('OpenAd', '1');
-                            // Check internet connection before showing More Apps
-                            final hasInternet =
-                                await InternetConnection().hasInternetAccess;
-                            if (!hasInternet) {
-                              Constants.showToast('No internet connection');
-                              return;
-                            }
-                            try {
-                              final connectionSpeed =
-                                  await InternetSpeedChecker.checkSpeed(
-                                timeout: const Duration(seconds: 5),
-                              );
-                              final isSlowConnection = connectionSpeed == null ||
-                                  connectionSpeed > 5000;
-                              if (isSlowConnection) {
-                                Constants.showToast(
-                                    kCheckInternetConnectionMessage);
-                              }
-                            } catch (_) {
-                              Constants.showToast(
-                                  kCheckInternetConnectionMessage);
-                            }
-                            if (controller.adFree.value == false) {
-                              controller.bannerAd?.dispose();
-                              controller.bannerAd?.load();
-                            }
-                            Get.to(() => const MoreAppsScreen(),
-                                transition: Transition.cupertinoDialog,
-                                duration: const Duration(milliseconds: 300));
-                          },
-                          visualDensity:
-                              const VisualDensity(horizontal: 0, vertical: 0),
-                          leading: Image.asset(
-                            "assets/home icons/More apps.png",
-                            height: 24,
-                            width: 24,
-                          ),
-                          title: Text(
-                            'More Apps',
-                            style: CommanStyle.bothPrimary16600(context),
-                          ),
-                        ),
-                        // Survey
-                        // ListTile(
-                        //   dense: true,
-                        //   onTap: () async {
-                        //     Get.back();
-                        //     if (controller.adFree.value == false) {
-                        //       controller.bannerAd?.dispose();
-                        //       controller.bannerAd?.load();
-                        //     }
-                        //     Get.to(() => const FeedbackWebView(),
-                        //         transition: Transition.cupertinoDialog,
-                        //         duration: const Duration(milliseconds: 300));
-                        //   },
-                        //   visualDensity:
-                        //       const VisualDensity(horizontal: 0, vertical: 0),
-                        //   leading: const Icon(
-                        //     Icons.edit_calendar,
-                        //     color: Color(0XFF805531),
-                        //   ),
-                        //   title: Text(
-                        //     'Survey',
-                        //     style: CommanStyle.bothPrimary16600(context),
-                        //   ),
-                        // ),
-                        ListTile(
-                          dense: true,
-                          onTap: () {
-                            Get.back();
-                            SharPreferences.getBoolean(
-                                    SharPreferences.isNotificationOn)
-                                .then((value) {
-                              bool natificationValue;
-                              value != null
-                                  ? natificationValue = value
-                                  : natificationValue = true;
-                              Get.offAll(() => SettingScreen(
-                                        notificationValue: natificationValue,
-                                      ))!
-                                  .then((value) async {
-                                SharPreferences.getString(
-                                        SharPreferences.selectedFontSize)
-                                    .then((value) {
-                                  value == null
-                                      ? controller.fontSize.value = 19.0
-                                      : controller.fontSize.value =
-                                          double.parse(value.toString());
-                                });
-                                SharPreferences.getString(
-                                        SharPreferences.selectedFontFamily)
-                                    .then((value) {
-                                  value == null
-                                      ? controller.selectedFontFamily.value =
-                                          "Arial"
-                                      : controller.selectedFontFamily.value =
-                                          value;
-                                });
-                              });
-                            });
-                          },
-                          visualDensity:
-                              const VisualDensity(horizontal: 0, vertical: 0),
-                          leading: Image.asset(
-                            "assets/home icons/setting.png",
-                            height: 24,
-                            width: 24,
-                          ),
-                          title: Text(
-                            "Settings",
-                            style: CommanStyle.bothPrimary16600(context),
-                          ),
-                        ),
-                        ListTile(
-                          dense: true,
-                          onTap: () async {
-                            final appPackageName =
-                                (await PackageInfo.fromPlatform()).packageName;
-                            String message =
-                                ''; // Declare the message variable outside the if-else block
-                            String appid;
-                            appid = BibleInfo.apple_AppId;
-                            if (Platform.isAndroid) {
-                              message =
-                                  "Hey, I've been using this Bible app that has transformed my daily Bible study experience. Try it now at : https://play.google.com/store/apps/details?id=$appPackageName";
-                            } else if (Platform.isIOS) {
-                              message =
-                                  "Hey, I've been using this Bible app that has transformed my daily Bible study experience. Try it now at : https://itunes.apple.com/app/id$appid"; // Example iTunes URL
-                            }
-
-                            if (message.isNotEmpty) {
-                              Share.share(message,
-                                  sharePositionOrigin: Rect.fromPoints(
-                                      const Offset(2, 2), const Offset(3, 3)));
-                            } else {
-                              print('Message is empty or undefined');
-                            }
-                          },
-                          visualDensity:
-                              const VisualDensity(horizontal: 0, vertical: 0),
-                          leading: Image.asset(
-                            "assets/home icons/Share.png",
-                            height: 24,
-                            width: 24,
-                          ),
-                          title: Text(
-                            'Share',
-                            style: CommanStyle.bothPrimary16600(context),
-                          ),
-                        ),
-                        ListTile(
-                          dense: true,
-                          onTap: (() async {
-                            Get.back();
-                            final hasInternet =
-                                await InternetConnection().hasInternetAccess;
-                            if (!hasInternet) {
-                              Constants.showToast(
-                                  "No Internet Connection", 5000);
-                              return;
-                            }
-                            await SharPreferences.setString('OpenAd', '1');
-                            // Open feedback screen instead of chat
-                            Get.to(() => const FeedbackWebView());
-                          }),
-                          visualDensity:
-                              const VisualDensity(horizontal: 0, vertical: 0),
-                          leading: Image.asset(
-                            //Images.rateUs(context),
-                            'assets/home icons/customer-service 2.png',
-                            height: 24,
-                            width: 24,
-                          ),
-                          title: Text(
-                            'Contact Us',
-                            style: CommanStyle.bothPrimary16600(context),
-                          ),
-                        ),
-                        // ListTile(
-                        //   dense: true,
-                        //   onTap: () {
-                        //     Get.back();
-                        //     Get.to(() => const AboutUs(),
-                        //         transition: Transition.cupertinoDialog,
-                        //         duration: const Duration(milliseconds: 300));
-                        //   },
-                        //   visualDensity:
-                        //       const VisualDensity(horizontal: 0, vertical: 0),
-                        //   leading: Image.asset(
-                        //     Images.aboutUs(context),
-                        //     height: 24,
-                        //     width: 24,
-                        //   ),
-                        //   title: Text(
-                        //     'About Us',
-                        //     style: CommanStyle.bothPrimary16600(context),
-                        //   ),
-                        // ),
-                        const SizedBox(
-                          height: 2,
-                        ),
-                        controller.isAdsCompletlyDisabled.value
-                            ? const SizedBox.shrink()
-                            : controller.adFree.value
-                                ? DateTime.tryParse(
-                                            '${controller.RewardAdExpireDate}') !=
-                                        null
-                                    ? Container(
-                                        margin: const EdgeInsets.symmetric(
-                                            vertical: 3),
-                                        color: CommanColor.lightDarkPrimary(
-                                            context),
-                                        child: ListTile(
-                                          dense: true,
-                                          onTap: () {
-                                            Navigator.pop(context);
-                                            showModalBottomSheet<void>(
-                                              context: context,
-                                              backgroundColor: Colors.white,
-                                              shape:
-                                                  const RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.vertical(
-                                                  top: Radius.circular(25),
-                                                ),
-                                              ),
-                                              clipBehavior:
-                                                  Clip.antiAliasWithSaveLayer,
-                                              builder: (BuildContext context) {
-                                                final expiryDate = DateTime.parse(
-                                                    '${controller.RewardAdExpireDate}');
-
-                                                return Stack(
-                                                  children: [
-                                                    Container(
-                                                      decoration: BoxDecoration(
-                                                          border: Border.all(
-                                                              color:
-                                                                  Colors.white),
-                                                          borderRadius:
-                                                              const BorderRadius
-                                                                  .only(
-                                                                  topLeft: Radius
-                                                                      .circular(
-                                                                          20),
-                                                                  topRight: Radius
-                                                                      .circular(
-                                                                          20))),
-                                                      height:
-                                                          MediaQuery.of(context)
-                                                                  .size
-                                                                  .height *
-                                                              0.30,
-                                                      // color: Colors.white,
-                                                      child:
-                                                          SingleChildScrollView(
-                                                        physics:
-                                                            const ScrollPhysics(),
-                                                        child: Column(
-                                                          mainAxisAlignment:
-                                                              MainAxisAlignment
-                                                                  .start,
-                                                          mainAxisSize:
-                                                              MainAxisSize.min,
-                                                          children: <Widget>[
-                                                            Row(
-                                                              mainAxisAlignment:
-                                                                  MainAxisAlignment
-                                                                      .center,
-                                                              children: [
-                                                                Image.asset(
-                                                                    "assets/feedbacklogo.png",
-                                                                    height: 120,
-                                                                    width: 120,
-                                                                    color: CommanColor
-                                                                        .lightDarkPrimary(
-                                                                            context)),
-                                                              ],
-                                                            ),
-                                                            // SizedBox(height: 5,),
-                                                            Text(
-                                                              'Subscription Info',
-                                                              style: TextStyle(
-                                                                  letterSpacing:
-                                                                      BibleInfo
-                                                                          .letterSpacing,
-                                                                  fontSize:
-                                                                      BibleInfo
-                                                                              .fontSizeScale *
-                                                                          16,
-                                                                  color: CommanColor
-                                                                      .lightDarkPrimary(
-                                                                          context),
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w500),
-                                                            ),
-                                                            const SizedBox(
-                                                              height: 15,
-                                                            ),
-                                                            _buildSubscriptionInfoDetails(
-                                                              context: context,
-                                                              expiryDate:
-                                                                  expiryDate,
-                                                              screenWidth:
-                                                                  screenWidth,
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    Positioned(
-                                                      top: 10,
-                                                      right: 15,
-                                                      child: InkWell(
-                                                        child: Icon(
-                                                          Icons.close,
-                                                          color: CommanColor
-                                                              .lightDarkPrimary(
-                                                                  context),
-                                                          size: 25,
-                                                        ),
-                                                        onTap: () {
-                                                          Navigator.pop(
-                                                              context);
-                                                        },
-                                                      ),
-                                                    )
-                                                  ],
-                                                );
-                                              },
-                                            );
-                                          },
-                                          visualDensity: const VisualDensity(
-                                              horizontal: 0, vertical: 0),
-                                          leading: const Icon(
-                                            Icons.info_outline_rounded,
-                                            size: 28,
-                                            color: Colors.white,
-                                          ),
-                                          title: const Text("Subscription Info",
-                                              style: TextStyle(
-                                                  color: Colors.white,
-                                                  letterSpacing:
-                                                      BibleInfo.letterSpacing,
-                                                  fontSize:
-                                                      BibleInfo.fontSizeScale *
-                                                          16,
-                                                  fontWeight: FontWeight.w600)),
-                                        ),
-                                      )
-                                    : Visibility(
-                                        visible:
-                                            controller.isSubscriptionEnabled ??
-                                                false,
-                                        child: Container(
-                                          color: CommanColor.lightDarkPrimary(
-                                              context),
-                                          child: ListTile(
-                                            dense: true,
-                                            onTap: () async {
-                                              adsIcon = false;
-                                              Get.back();
-                                              await SharPreferences.setString(
-                                                  'OpenAd', '1');
-                                              // Use constants as fallback when SharedPreferences are empty (first time loading)
-                                              final sixMonthPlan =
-                                                  await SharPreferences
-                                                          .getString(
-                                                              'sixMonthPlan') ??
-                                                      BibleInfo.sixMonthPlanid;
-                                              final oneYearPlan =
-                                                  await SharPreferences
-                                                          .getString(
-                                                              'oneYearPlan') ??
-                                                      BibleInfo.oneYearPlanid;
-                                              final lifeTimePlan =
-                                                  await SharPreferences
-                                                          .getString(
-                                                              'lifeTimePlan') ??
-                                                      BibleInfo.lifeTimePlanid;
-                                              Get.to(
-                                                () => SubscriptionScreen(
-                                                  sixMonthPlan: sixMonthPlan,
-                                                  oneYearPlan: oneYearPlan,
-                                                  lifeTimePlan: lifeTimePlan,
-                                                  checkad: 'theme',
-                                                ),
-                                                transition:
-                                                    Transition.cupertinoDialog,
-                                                duration: const Duration(
-                                                    milliseconds: 300),
-                                              );
-                                            },
-                                            visualDensity: const VisualDensity(
-                                                horizontal: 0, vertical: 0),
-                                            leading: SizedBox(
-                                              width: 24,
-                                              height: 24,
-                                              child: Image.asset(
-                                                Images.adFree(context),
-                                                height: 24,
-                                                width: 24,
-                                                errorBuilder: (_, __, ___) =>
-                                                    Icon(
-                                                  Icons.workspace_premium,
-                                                  size: 24,
-                                                  color: CommanColor
-                                                      .darkModePrimaryWhite(
-                                                          context),
-                                                ),
-                                              ),
-                                            ),
-                                            title: const Text("",
-                                                style: TextStyle(
-                                                    color: Colors.white,
-                                                    letterSpacing:
-                                                        BibleInfo.letterSpacing,
-                                                    fontSize: BibleInfo
-                                                            .fontSizeScale *
-                                                        16,
-                                                    fontWeight:
-                                                        FontWeight.w600)),
-                                          ),
-                                        ),
-                                      )
-                                : Visibility(
-                                    visible: controller.isSubscriptionEnabled ??
-                                        false,
-                                    child: Container(
-                                      color:
-                                          CommanColor.lightDarkPrimary(context),
-                                      child: ListTile(
-                                        dense: true,
-                                        onTap: () async {
-                                          adsIcon = false;
-                                          Get.back();
-                                          await SharPreferences.setString(
-                                              'OpenAd', '1');
-                                          // Use constants as fallback when SharedPreferences are empty (first time loading)
-                                          final sixMonthPlan =
-                                              await SharPreferences.getString(
-                                                      'sixMonthPlan') ??
-                                                  BibleInfo.sixMonthPlanid;
-                                          final oneYearPlan =
-                                              await SharPreferences.getString(
-                                                      'oneYearPlan') ??
-                                                  BibleInfo.oneYearPlanid;
-                                          final lifeTimePlan =
-                                              await SharPreferences.getString(
-                                                      'lifeTimePlan') ??
-                                                  BibleInfo.lifeTimePlanid;
-                                          Get.to(
-                                            () => SubscriptionScreen(
-                                              sixMonthPlan: sixMonthPlan,
-                                              oneYearPlan: oneYearPlan,
-                                              lifeTimePlan: lifeTimePlan,
-                                              checkad: 'theme',
-                                            ),
-                                            transition:
-                                                Transition.cupertinoDialog,
-                                            duration: const Duration(
-                                                milliseconds: 300),
-                                          );
-                                        },
-                                        visualDensity: const VisualDensity(
-                                            horizontal: 0, vertical: 0),
-                                        leading: SizedBox(
-                                          width: 24,
-                                          height: 24,
-                                          child: Image.asset(
-                                            Images.adFree(context),
-                                            height: 24,
-                                            width: 24,
-                                            errorBuilder: (_, __, ___) => Icon(
-                                              Icons.workspace_premium,
-                                              size: 24,
-                                              color: CommanColor
-                                                  .darkModePrimaryWhite(
-                                                      context),
-                                            ),
-                                          ),
-                                        ),
-                                        title: const Text("Get Premium",
-                                            style: TextStyle(
-                                                color: Colors.white,
-                                                letterSpacing:
-                                                    BibleInfo.letterSpacing,
-                                                fontSize:
-                                                    BibleInfo.fontSizeScale *
-                                                        16,
-                                                fontWeight: FontWeight.w600)),
-                                      ),
-                                    ),
-                                  ),
-                      ],
-                    ),
-                  ),
-            bottomNavigationBar: const SizedBox(
-              height: 1,
             ),
           );
         },
@@ -6379,17 +6512,17 @@ class _HomeScreenState extends State<HomeScreen>
               onClose: () => Navigator.of(dialogContext).pop(),
               onRate: () async {
                 Navigator.pop(dialogContext);
-                // Rate us: only block when connectivity explicitly reports none (avoid false "no internet" on 5G etc.)
-                final connectivityResult =
-                    await Connectivity().checkConnectivity();
-                if (connectivityResult.isNotEmpty &&
-                    connectivityResult.first == ConnectivityResult.none) {
-                  Constants.showToast("Check your Internet connection");
-                  return;
-                }
-                await SharPreferences.setString('OpenAd', '1');
-                _requestReview();
-              },
+                    // Rate us: only block when connectivity explicitly reports none (avoid false "no internet" on 5G etc.)
+                    final connectivityResult =
+                        await Connectivity().checkConnectivity();
+                    if (connectivityResult.isNotEmpty &&
+                        connectivityResult.first == ConnectivityResult.none) {
+                      Constants.showToast("Check your Internet connection");
+                      return;
+                    }
+                    await SharPreferences.setString('OpenAd', '1');
+                    _requestReview();
+                  },
               onMaybeLater: () => Navigator.pop(dialogContext),
             ),
           ),
@@ -6758,6 +6891,31 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
+  Future<void> _launchContactUsEmail() async {
+    const email = 'support@bibleoffice.com';
+    final pkg = await PackageInfo.fromPlatform();
+    final subject =
+        Uri.encodeComponent('${BibleInfo.bible_shortName} - Contact Us');
+    final body = Uri.encodeComponent(
+      '\n\n---\nApp: ${pkg.appName}\nVersion: ${pkg.version}\nPackage: ${pkg.packageName}',
+    );
+    final uri = Uri.parse('mailto:$email?subject=$subject&body=$body');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+    } catch (e) {
+      debugPrint('Contact Us mailto error: $e');
+    }
+    if (!mounted) return;
+    await Clipboard.setData(const ClipboardData(text: email));
+    Constants.showToast(
+      'No mail app found. $email copied to clipboard.',
+      5000,
+    );
+  }
+
   Future<void> _launchFeedbackForm() async {
     // Open feedback screen
     Get.to(const FeedbackWebView());
@@ -6784,11 +6942,11 @@ class _HomeScreenState extends State<HomeScreen>
         if (!_readerAppBarPinnedVisible) {
           _readerAppBarScrollUpIntent = false;
         }
-        if (notification.metrics.pixels <= 0 && !_showUI && mounted) {
+        if (notification.metrics.pixels <= 0 && !_showUI.value && mounted) {
           _readerAppBarPinnedVisible = true;
           _readerAppBarPendingHide = false;
           _readerAppBarScrollUpIntent = false;
-          setState(() => _showUI = true);
+          _showUI.value = true;
         }
         return;
       }
@@ -6833,8 +6991,8 @@ class _HomeScreenState extends State<HomeScreen>
           _readerAppBarPendingHide = false;
           _readerAppBarScrollUpIntent = false;
           _readerAppBarDragDelta = 0;
-          if (_showUI && mounted) {
-            setState(() => _showUI = false);
+          if (_showUI.value && mounted) {
+            _showUI.value = false;
           }
         }
       } else if (delta < 0) {
@@ -6852,8 +7010,8 @@ class _HomeScreenState extends State<HomeScreen>
         _readerAppBarPendingHide = false;
         _readerAppBarScrollUpIntent = false;
         _readerAppBarDragDelta = 0;
-        if (!_showUI && mounted) {
-          setState(() => _showUI = true);
+        if (!_showUI.value && mounted) {
+          _showUI.value = true;
         }
       }
     } else if (delta > 0) {
@@ -6862,55 +7020,29 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  void _attachScrollListener(GetXState<DashBoardController> state) {
-    Future.delayed(const Duration(milliseconds: 600), () {
-      if (!_scrollListenerAttached) {
-        _scrollListenerAttached = true;
-        state.controller?.autoScrollController.value.addListener(() {
-          final scrollController = state.controller?.autoScrollController.value;
-          if (scrollController == null || !scrollController.hasClients) return;
+  bool _staleContentMatchesChapter(DashBoardController controller) {
+    if (_lastVisibleChapterContent.isEmpty) return false;
+    final ch = int.tryParse(controller.selectedChapter.value) ?? 1;
+    final safe = ch <= 0 ? 1 : ch;
+    final want = <num?>{safe - 1, safe};
+    return _lastVisibleChapterContent
+        .any((v) => want.contains(v.chapterNum));
+  }
 
-          // Check if controller has exactly one position to avoid multiple scroll views error
-          if (scrollController.positions.length != 1) return;
-
-          final direction = scrollController.position.userScrollDirection;
-          final currentOffset = scrollController.position.pixels;
-
-          if (currentOffset < 0) {
-            return;
-          }
-
-          // Back-to-top only; app bar uses UserScrollNotification on the list.
-          if (currentOffset <= 0) {
-            if (_showBackToTop && mounted) {
-              setState(() => _showBackToTop = false);
-            }
-          } else {
-            const backToTopThreshold = 320.0;
-            var showBackToTop = _showBackToTop;
-            if (currentOffset <= backToTopThreshold) {
-              showBackToTop = false;
-            } else if (direction == ScrollDirection.forward) {
-              showBackToTop = true;
-            } else if (direction == ScrollDirection.reverse) {
-              showBackToTop = false;
-            }
-            if (_showBackToTop != showBackToTop && mounted) {
-              setState(() => _showBackToTop = showBackToTop);
-            }
-          }
-
-          // Existing logic for scrollHideShowIcon
-          if (direction == ScrollDirection.reverse ||
-              direction == ScrollDirection.forward) {
-            state.controller?.scrollHideShowIcon.value = false;
-            Future.delayed(const Duration(milliseconds: 1), () {
-              state.controller?.scrollHideShowIcon.value = true;
-            });
-          }
-        });
-      }
-    });
+  bool _homeEntryRequiresContentReload() {
+    final from = widget.From.toString();
+    if (from == 'Chapter' ||
+        from == 'Daily' ||
+        from == 'chat' ||
+        widget.fromSearch) {
+      return true;
+    }
+    if (from == 'Read') {
+      return widget.selectedBookForRead.toString().isNotEmpty &&
+          widget.selectedChapterForRead.toString().isNotEmpty &&
+          widget.selectedVerseNumForRead.toString().isNotEmpty;
+    }
+    return false;
   }
 
   void _initializeControllerState(GetXState<DashBoardController> state) {
@@ -6929,16 +7061,19 @@ class _HomeScreenState extends State<HomeScreen>
         widget.selectedBookNameForRead.toString();
   }
 
-  void _handleAdExpiration(GetXState<DashBoardController> state) async {
+  void _handleAdExpiration(GetXState<DashBoardController> state,
+      {bool skipLoadApi = false}) async {
     final value =
         await SharPreferences.getString(SharPreferences.isRewardAdViewTime);
     state.controller!.RewardAdExpireDate.value = value.toString();
     RewardAdExpireDate = value;
     debugPrint("RewardAdExpireDate is $RewardAdExpireDate");
 
+    if (!skipLoadApi) {
     Future.delayed(Duration.zero, () {
       state.controller!.loadApi();
     });
+    }
 
     if (value != null) {
       final currentDateTime = DateTime.now();
@@ -7063,10 +7198,16 @@ class _HomeScreenState extends State<HomeScreen>
     });
 
     Future.delayed(Duration.zero, () {
-      state.controller?.autoScrollController.value = AutoScrollController(
+      final c = state.controller;
+      if (c == null) return;
+      final scrollController = c.autoScrollController.value;
+      if (c.selectedBookContent.isNotEmpty && scrollController.hasClients) {
+        return;
+      }
+      c.autoScrollController.value = AutoScrollController(
         viewportBoundaryGetter: () =>
             Rect.fromLTRB(0, 0, 0, MediaQuery.of(context).padding.bottom),
-        axis: state.controller!.scrollDirection,
+        axis: c.scrollDirection,
       );
     });
 
@@ -7244,27 +7385,36 @@ class _HomeScreenState extends State<HomeScreen>
   void _scrollAndHighlightVerse(
       GetXState<DashBoardController> state, int verseIndex) {
     try {
-      // Scroll to the verse
-      state.controller!.scrollToIndex(verseIndex);
+      final contentLen = state.controller!.selectedBookContent.length;
+      if (contentLen == 0) return;
 
-      // Highlight the verse when coming from chat
-      if (widget.From.toString() == "chat") {
-        // Set selectedIndex to highlight the verse (verse numbers are 1-indexed, so subtract 1)
-        // Make sure the index is within bounds
-        final highlightIndex = verseIndex - 1;
-        if (highlightIndex >= 0 &&
-            highlightIndex < state.controller!.selectedBookContent.length) {
-          state.controller!.selectedIndex.value = highlightIndex;
+      // Daily Verse_Num is 1-based; match by verse text then verse_num.
+      final listIndex = widget.From.toString() == "Daily"
+          ? resolveDailyVerseListIndex(
+              verseIndex,
+              state.controller!.selectedBookContent,
+              versePlainText: widget.selectedVerseForRead?.toString(),
+            )
+          : widget.From.toString() == "chat"
+              ? verseIndex - 1
+              : verseIndex;
+      final safeIndex = listIndex.clamp(0, contentLen - 1);
+
+      state.controller!.scrollToIndex(safeIndex);
+
+      if (widget.From.toString() == "chat" ||
+          widget.From.toString() == "Daily" ||
+          widget.From.toString() == "Read") {
+        state.controller!.selectedIndex.value = safeIndex;
           state.controller!.readHighlight.value = true;
 
-          // Keep highlight for longer when from chat
-          Future.delayed(const Duration(seconds: 10), () {
+        Future.delayed(
+            Duration(seconds: widget.From.toString() == "chat" ? 10 : 6), () {
             if (mounted) {
               state.controller?.readHighlight.value = false;
               state.controller?.selectedIndex.value = -1;
             }
           });
-        }
       } else {
         state.controller?.selectedIndex.value = -1;
       }
@@ -7363,8 +7513,8 @@ class _HomeScreenState extends State<HomeScreen>
                     onTap: () {
                       Navigator.pop(context);
                       Get.to(() => LoginScreen(hasSkip: false),
-                          transition: Transition.cupertinoDialog,
-                          duration: const Duration(milliseconds: 300));
+                          transition: Transition.cupertino,
+                          duration: const Duration(milliseconds: 350));
                     },
                     child: Container(
                         margin: const EdgeInsets.symmetric(horizontal: 32),
@@ -7458,15 +7608,21 @@ class _SmoothReaderAppBar extends StatelessWidget implements PreferredSizeWidget
   final double height;
   final Widget child;
 
+  /// Keep height stable so the verse ListView does not resize mid-scroll.
   @override
-  Size get preferredSize => Size.fromHeight(visible ? height : 0);
+  Size get preferredSize => Size.fromHeight(height);
 
   @override
   Widget build(BuildContext context) {
-    if (!visible) {
-      return const SizedBox.shrink();
-    }
-    return child;
+    return IgnorePointer(
+      ignoring: !visible,
+      child: AnimatedOpacity(
+        opacity: visible ? 1 : 0,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        child: child,
+      ),
+    );
   }
 }
 
@@ -7689,17 +7845,14 @@ class PremiumWelcomeAlert {
   static const Color _ink = Color(0xFF3D2914);
   static const Color _brown = Color(0xFF5C4033);
   static const Color _cardFill = Color(0xFFF5F0E6);
+  static const Color _dialogFill = Color(0xFFF8F4EB);
 
-  static const String _heroIcon =
-      'assets/gold-premium-icons/Premium active icon.png';
-  static const String _bookIcon =
-      'assets/gold-premium-icons/Gold book icon.png';
-  static const String _audioIcon =
-      'assets/gold-premium-icons/Gold Earphone icon.png';
+  static const String _heroIcon = 'assets/gold-premium-icons/top_crown.png';
+  static const String _bookIcon = 'assets/gold-premium-icons/book_icon.png';
+  static const String _audioIcon = 'assets/gold-premium-icons/audio.png';
   static const String _calendarIcon =
-      'assets/gold-premium-icons/Gold Calendar icon.png';
-  static const String _laurelIcon =
-      'assets/gold-premium-icons/Gold icon 1.png';
+      'assets/gold-premium-icons/calendar_icon.png';
+  static const String _shieldIcon = 'assets/gold-premium-icons/Shield_icon.png';
 
   static const Duration _kClearUpgradeDeferDelay =
       Duration(milliseconds: 300);
@@ -7724,121 +7877,94 @@ class PremiumWelcomeAlert {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(22),
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: Image.asset(
-                    'assets/premium-bg.png',
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        const ColoredBox(color: Color(0xFFF8F4EB)),
-                  ),
-                ),
-                Positioned(
-                  top: 4,
-                  right: 4,
-                  child: IconButton(
-                    onPressed: close,
-                    icon: Icon(
-                      Icons.close,
-                      color: _ink.withValues(alpha: 0.72),
-                      size: 22,
+            child: Container(
+              color: _dialogFill,
+              child: Stack(
+                children: [
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: IconButton(
+                      onPressed: close,
+                      icon: Icon(
+                        Icons.close,
+                        color: _ink.withValues(alpha: 0.72),
+                        size: 22,
+                      ),
+                      splashRadius: 20,
                     ),
-                    splashRadius: 20,
                   ),
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      isTablet ? 28 : 20,
+                      isTablet ? 28 : 24,
+                      isTablet ? 28 : 20,
+                      isTablet ? 24 : 20,
+                    ),
+                    child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                          Center(
+                            child: Image.asset(
+                              _heroIcon,
+                              height: isTablet ? 140 : 120,
+                  fit: BoxFit.contain,
                 ),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    isTablet ? 28 : 20,
-                    isTablet ? 28 : 24,
-                    isTablet ? 28 : 20,
-                    isTablet ? 24 : 20,
-                  ),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Center(
-                          child: Image.asset(
-                            _heroIcon,
-                            height: isTablet ? 112 : 92,
-                            fit: BoxFit.contain,
                           ),
-                        ),
-                        SizedBox(height: isTablet ? 10 : 8),
-                        Text(
-                          'Premium Unlocked',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: 'Georgia',
-                            fontSize: isTablet ? 28 : 24,
-                            fontWeight: FontWeight.w700,
-                            color: _ink,
-                            letterSpacing: -0.2,
-                            height: 1.15,
-                          ),
-                        ),
-                        SizedBox(height: isTablet ? 10 : 8),
-                        _premiumDivider(),
-                        SizedBox(height: isTablet ? 12 : 10),
-                        _premiumDescription(isTablet),
-                        SizedBox(height: isTablet ? 18 : 14),
-                        _premiumFeatureGrid(isTablet),
-                        SizedBox(height: isTablet ? 22 : 18),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: close,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _brown,
-                              elevation: 0,
-                              padding: EdgeInsets.symmetric(
-                                vertical: isTablet ? 16 : 14,
-                                horizontal: 20,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(28),
-                              ),
-                            ),
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(
-                                    '✨',
-                                    style: TextStyle(
-                                      fontSize: isTablet ? 18 : 16,
-                                    ),
-                                  ),
-                                ),
-                                Text(
-                                  'Start Exploring',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: isTablet ? 18 : 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: Icon(
-                                    Icons.chevron_right,
-                                    color: Colors.white,
-                                    size: isTablet ? 24 : 22,
-                                  ),
-                                ),
-                              ],
+                          SizedBox(height: isTablet ? 10 : 8),
+                Text(
+                            'Premium Unlocked',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                              fontFamily: 'Georgia',
+                              fontSize: isTablet ? 28 : 24,
+                              fontWeight: FontWeight.w700,
+                              color: _ink,
+                              letterSpacing: -0.2,
+                              height: 1.15,
                             ),
                           ),
+                          SizedBox(height: isTablet ? 10 : 8),
+                          _premiumDivider(),
+                          SizedBox(height: isTablet ? 12 : 10),
+                          _premiumDescription(isTablet),
+                          SizedBox(height: isTablet ? 18 : 14),
+                          _premiumFeatureGrid(isTablet),
+                          SizedBox(height: isTablet ? 22 : 18),
+                          SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                              onPressed: close,
+                      style: ElevatedButton.styleFrom(
+                                backgroundColor: _brown,
+                                elevation: 0,
+                        padding: EdgeInsets.symmetric(
+                                  vertical: isTablet ? 16 : 14,
+                                  horizontal: 20,
                         ),
-                      ],
+                        shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(28),
+                        ),
+                      ),
+                      child: Text(
+                                'Start Exploring',
+                                textAlign: TextAlign.center,
+                        style: TextStyle(
+                                  fontSize: isTablet ? 18 : 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                            ),
+                          ),
+                        ],
                     ),
                   ),
                 ),
               ],
+              ),
             ),
           ),
         );
@@ -7849,40 +7975,15 @@ class PremiumWelcomeAlert {
   }
 
   static Widget _premiumDescription(bool isTablet) {
-    final laurelHeight = isTablet ? 58.0 : 48.0;
-    final laurelWidth = isTablet ? 30.0 : 24.0;
-
-    Widget laurelSide({required bool mirrored}) {
-      final child = Image.asset(
-        _laurelIcon,
-        height: laurelHeight,
-        width: laurelWidth,
-        fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => const SizedBox(width: 18),
-      );
-      return mirrored ? Transform.flip(flipX: true, child: child) : child;
-    }
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        laurelSide(mirrored: false),
-        SizedBox(width: isTablet ? 8 : 6),
-        Expanded(
-          child: Text(
-            'Your premium access is now active. Enjoy deeper Bible study, audio features, devotionals, and a richer reading experience to support your walk with God.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: 'Georgia',
-              fontSize: isTablet ? 16 : 13.5,
-              height: 1.45,
-              color: _ink.withValues(alpha: 0.88),
-            ),
-          ),
-        ),
-        SizedBox(width: isTablet ? 8 : 6),
-        laurelSide(mirrored: true),
-      ],
+    return Text(
+      'Your premium access is now active. Enjoy deeper Bible study, audio features, devotionals, and a richer reading experience to support your walk with God.',
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        fontFamily: 'Georgia',
+        fontSize: isTablet ? 16 : 13.5,
+        height: 1.45,
+        color: _ink.withValues(alpha: 0.88),
+      ),
     );
   }
 
@@ -7952,6 +8053,7 @@ class PremiumWelcomeAlert {
             Expanded(
               child: _premiumFeatureCard(
                 isTablet: isTablet,
+                iconPath: _shieldIcon,
                 title: 'Ad-Free Reading',
                 subtitle: 'Enjoy a peaceful, distraction-free experience.',
               ),
@@ -7964,16 +8066,16 @@ class PremiumWelcomeAlert {
 
   static Widget _premiumFeatureCard({
     required bool isTablet,
-    String? iconPath,
+    required String iconPath,
     required String title,
     required String subtitle,
   }) {
-    final iconSlotHeight = isTablet ? 34.0 : 28.0;
+    final iconSlotHeight = isTablet ? 68.0 : 58.0;
 
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: isTablet ? 10 : 8,
-        vertical: isTablet ? 12 : 10,
+        vertical: isTablet ? 14 : 12,
       ),
       decoration: BoxDecoration(
         color: _cardFill,
@@ -7985,15 +8087,13 @@ class PremiumWelcomeAlert {
         children: [
           SizedBox(
             height: iconSlotHeight,
-            child: iconPath == null
-                ? const SizedBox.shrink()
-                : Center(
-                    child: Image.asset(
-                      iconPath,
-                      height: iconSlotHeight,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
+            child: Center(
+              child: Image.asset(
+                iconPath,
+                height: iconSlotHeight,
+                fit: BoxFit.contain,
+              ),
+            ),
           ),
           SizedBox(height: isTablet ? 8 : 6),
           Text(

@@ -584,7 +584,7 @@ class _SplashScreenState extends State<SplashScreen>
       try {
         final provider =
             Provider.of<DownloadProvider>(context, listen: false);
-        await provider.warmDataBeforeHomeScreen();
+        unawaited(provider.warmDataBeforeHomeScreen());
       } catch (e) {
         debugPrint('warmDataBeforeHomeScreen error: $e');
       }
@@ -1406,6 +1406,7 @@ class _SplashScreenState extends State<SplashScreen>
     final iconSize = isCompact ? 168.0 : 200.0;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF2E6D4),
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -1805,7 +1806,15 @@ class AdConsentManager {
 class UpgradeCheckWrapper extends StatefulWidget {
   final Widget child;
   final String? check;
-  const UpgradeCheckWrapper({super.key, required this.child, this.check});
+  /// When true, wraps [child] with [BibleUpgradeAlert]. Home uses open-ad only.
+  final bool showUpgradeAlert;
+
+  const UpgradeCheckWrapper({
+    super.key,
+    required this.child,
+    this.check,
+    this.showUpgradeAlert = false,
+  });
 
   @override
   State<UpgradeCheckWrapper> createState() => _UpgradeCheckWrapperState();
@@ -1815,7 +1824,6 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
   bool shouldShowAd = false;
   AppOpenAd? _appOpenAd;
   late final Upgrader _upgrader;
-  bool _upgradeAlertReady = false;
 
   @override
   void initState() {
@@ -1824,11 +1832,13 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
       debugLogging: true,
       durationUntilAlertAgain: const Duration(days: 1),
     );
-    if (widget.check == 'home') {
-      _scheduleUpgradeAlertForHome();
-    } else {
-      _upgradeAlertReady = true;
+
+    if (widget.showUpgradeAlert) {
+      unawaited(
+          SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, false));
     }
+
+    if (widget.check != 'home') return;
 
     Future.microtask(() async {
       final updateAvailable = _upgrader.isUpdateAvailable();
@@ -1836,6 +1846,19 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
       final prefs = await SharedPreferences.getInstance();
 
       final data = prefs.getString('showopenad');
+      final deferForRating =
+          await SharPreferences.getBoolean(SharPreferences.deferUpgradeAlert) ??
+              false;
+      final pendingStreakRating = await SharPreferences.getInt(
+              SharPreferences.pendingStreakCompleteCelebration) ??
+          0;
+      // Never stack open ad with Apple rating (streak day-1 review).
+      if (deferForRating || pendingStreakRating == 1) {
+        await prefs.setString("showopenad", "false");
+        await SharPreferences.setString('OpenAd', '1');
+        await _markOpenAdFlowComplete();
+        return;
+      }
       // debugPrint(
       //     'upgrader is  ${upgrader.versionInfo} ${upgrader.releaseNotes} $data');
       if (!updateAvailable && data == "true") {
@@ -1855,34 +1878,6 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
   Future<void> _markOpenAdFlowComplete() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(SharPreferences.openAdFlowComplete, true);
-  }
-
-  /// Wait until rating / premium dialogs finish, then show update alert.
-  Future<void> _scheduleUpgradeAlertForHome() async {
-    await Future.delayed(const Duration(milliseconds: 200));
-    final deadline = DateTime.now().add(const Duration(seconds: 120));
-    DateTime? deferClearedAt;
-
-    while (DateTime.now().isBefore(deadline)) {
-      if (!mounted) return;
-      final defer =
-          await SharPreferences.getBoolean(SharPreferences.deferUpgradeAlert) ??
-              false;
-      if (defer) {
-        deferClearedAt = null;
-        await Future.delayed(const Duration(milliseconds: 100));
-        continue;
-      }
-
-      deferClearedAt ??= DateTime.now();
-      final sinceClear = DateTime.now().difference(deferClearedAt);
-      if (sinceClear >= const Duration(milliseconds: 300)) {
-        break;
-      }
-      await Future.delayed(const Duration(milliseconds: 100));
-    }
-    if (!mounted) return;
-    if (mounted) setState(() => _upgradeAlertReady = true);
   }
 
   loadOpenAd() async {
@@ -1996,7 +1991,7 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_upgradeAlertReady) {
+    if (!widget.showUpgradeAlert) {
       return widget.child;
     }
     return BibleUpgradeAlert(

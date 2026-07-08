@@ -152,7 +152,8 @@ class ThemeProvider extends ChangeNotifier {
   Color get backgroundColor {
     switch (currentCustomTheme) {
       case AppCustomTheme.vintage:
-        return const Color(0xFFF3E5C2);
+        // Match reader cream so route transitions do not flash yellow/brown.
+        return const Color(0xFFF5F0E6);
       case AppCustomTheme.white:
         return Colors.white;
       case AppCustomTheme.lightbrown:

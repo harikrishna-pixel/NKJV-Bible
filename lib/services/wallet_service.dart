@@ -83,8 +83,9 @@ class WalletService {
     if (!await canClaimFreeCredits()) {
       return null; // Still on cooldown
     }
-    
+
     final prefs = await SharedPreferences.getInstance();
+    // Persist cooldown timestamp first so UI polls never briefly show "Claim" again.
     await prefs.setString(_lastClaimTimeKey, DateTime.now().toIso8601String());
     final newBalance = await addCredits(_claimAmount);
     debugPrint('WalletService: Claimed $_claimAmount free credits');

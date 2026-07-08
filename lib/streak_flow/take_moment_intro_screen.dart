@@ -21,6 +21,7 @@ class TakeMomentIntroScreen extends StatelessWidget {
     return Scaffold(
       body: TakeMomentRestScreen.peaceBackgroundStack(
         isDark: isDark,
+        birdWidthFactor: 0.62,
         child: SafeArea(
           child: Column(
             children: [

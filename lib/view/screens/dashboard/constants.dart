@@ -107,7 +107,7 @@ class BibleInfo {
   static String thankyoutitle = " 🙏 Help Us Keep the Bible App Free ";
 
   static int old_testament_count =
-      45; //book count 65 - olt 39, book count 72 - olt 45
+      46; // 73 books: OT book_num 0–45 (46 books), NT starts at 46 (Mateus)
   static String new_testament_count = "27";
 
   static String exportText =

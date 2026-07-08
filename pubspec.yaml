@@ -160,7 +160,9 @@ flutter:
     - assets/paywall_icons/crown_icon.png
     - assets/paywall_icons/shield_icon.png
     - assets/gold-premium-icons/
+    - assets/leave_rating/
     - assets/splash_welcome_icons/
+    - assets/streak_completed_icons/
     - assets/home-widgets/light-home_1.png
     - assets/home-widgets/light-home_2.png
     - assets/home-widgets/light-home_3.png

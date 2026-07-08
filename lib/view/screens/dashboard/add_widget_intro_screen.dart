@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 
-/// Walkthrough for adding home-screen widgets. Advance with the Next button only.
+/// Walkthrough for adding home-screen widgets. Swipe left/right or use Next.
 /// Opened from Home Screen drawer -> Add Widget.
 class AddWidgetIntroScreen extends StatefulWidget {
   const AddWidgetIntroScreen({super.key});
@@ -33,6 +33,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
   /// Shifts cover downward to hide baked-in dots/title baked into slide PNGs.
   static const Alignment _slideAlignment = Alignment(0, 0.18);
 
+  late final PageController _pageController;
   int _currentPage = 0;
 
   List<String> _imagePathsForTheme(bool isDark) =>
@@ -102,15 +103,117 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
 
   void _onNextTap(bool isDark) {
     if (!_isLastPage(isDark)) {
-      setState(() => _currentPage++);
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
     } else {
       Get.back();
     }
   }
 
+  Widget _buildPrimaryButton({
+    required bool isTablet,
+    required bool isLastPage,
+    required VoidCallback onPressed,
+  }) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(
+        isLastPage ? Icons.check_rounded : Icons.arrow_forward_rounded,
+        size: isTablet ? 20 : 18,
+      ),
+      label: Text(
+        isLastPage ? 'Got it' : 'Next',
+        style: TextStyle(
+          fontSize: isTablet ? 16 : 14,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: CommanColor.lightDarkPrimary(context),
+        foregroundColor: Colors.white,
+        padding: EdgeInsets.symmetric(
+          vertical: isTablet ? 14 : 12,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomActions({
+    required bool isTablet,
+    required bool isDark,
+    required bool isFirstPage,
+    required bool isLastPage,
+  }) {
+    if (isLastPage) {
+      return SizedBox(
+        width: double.infinity,
+        child: _buildPrimaryButton(
+          isTablet: isTablet,
+          isLastPage: true,
+          onPressed: () => Get.back(),
+        ),
+      );
+    }
+
+    if (isFirstPage) {
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => Get.back(),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: CommanColor.whiteBlack(context),
+                side: BorderSide(
+                  color: CommanColor.lightDarkPrimary(context).withOpacity(0.5),
+                ),
+                padding: EdgeInsets.symmetric(
+                  vertical: isTablet ? 14 : 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(
+                'Not Now',
+                style: TextStyle(
+                  fontSize: isTablet ? 16 : 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 2,
+            child: _buildPrimaryButton(
+              isTablet: isTablet,
+              isLastPage: false,
+              onPressed: () => _onNextTap(isDark),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      child: _buildPrimaryButton(
+        isTablet: isTablet,
+        isLastPage: false,
+        onPressed: () => _onNextTap(isDark),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
+    _pageController = PageController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final isDark = Provider.of<ThemeProvider>(context, listen: false)
@@ -123,6 +226,12 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
   }
 
   @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
@@ -130,21 +239,26 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
     final isDark = themeProvider.themeMode == ThemeMode.dark;
     final imagePaths = _imagePathsForTheme(isDark);
     final isLastPage = _isLastPage(isDark);
+    final isFirstPage = _currentPage == 0;
     final pageCount = _pageCount(isDark);
 
     return Scaffold(
+      // Solid theme color avoids yellow flash during route transition.
       backgroundColor: isDark
           ? CommanColor.darkPrimaryColor
-          : themeProvider.backgroundColor,
+          : (themeProvider.currentCustomTheme == AppCustomTheme.vintage
+              ? const Color(0xFFF5F0E6)
+              : themeProvider.backgroundColor),
       body: Stack(
         fit: StackFit.expand,
         children: [
-          IndexedStack(
-            index: _currentPage,
-            sizing: StackFit.expand,
-            children: [
-              for (final path in imagePaths) _buildFullScreenSlide(path),
-            ],
+          PageView.builder(
+            controller: _pageController,
+            physics: const BouncingScrollPhysics(),
+            onPageChanged: (index) => setState(() => _currentPage = index),
+            itemCount: imagePaths.length,
+            itemBuilder: (context, index) =>
+                _buildFullScreenSlide(imagePaths[index]),
           ),
 
           // Top page dots indicator
@@ -168,65 +282,11 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
                   isTablet ? 28 : 20,
                   12,
                 ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Get.back(),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: CommanColor.whiteBlack(context),
-                          side: BorderSide(
-                            color: CommanColor.lightDarkPrimary(context)
-                                .withOpacity(0.5),
-                          ),
-                          padding: EdgeInsets.symmetric(
-                            vertical: isTablet ? 14 : 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Text(
-                          'Not Now',
-                          style: TextStyle(
-                            fontSize: isTablet ? 16 : 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton.icon(
-                        onPressed: () => _onNextTap(isDark),
-                        icon: Icon(
-                          isLastPage
-                              ? Icons.check_rounded
-                              : Icons.arrow_forward_rounded,
-                          size: isTablet ? 20 : 18,
-                        ),
-                        label: Text(
-                          isLastPage ? 'Got it' : 'Next',
-                          style: TextStyle(
-                            fontSize: isTablet ? 16 : 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              CommanColor.lightDarkPrimary(context),
-                          foregroundColor: Colors.white,
-                          padding: EdgeInsets.symmetric(
-                            vertical: isTablet ? 14 : 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                child: _buildBottomActions(
+                  isTablet: isTablet,
+                  isDark: isDark,
+                  isFirstPage: isFirstPage,
+                  isLastPage: isLastPage,
                 ),
               ),
             ),

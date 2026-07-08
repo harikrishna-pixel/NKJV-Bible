@@ -199,9 +199,12 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                 const SizedBox(
                                                   height: 35,
                                                 ),
-                                                Row(
+                                                SingleChildScrollView(
+                                                  scrollDirection:
+                                                      Axis.horizontal,
+                                                  child: Row(
                                                   mainAxisAlignment:
-                                                      MainAxisAlignment.center,
+                                                      MainAxisAlignment.start,
                                                   children: [
                                                     Column(
                                                       children: [
@@ -723,7 +726,8 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                       ],
                                                     ),
                                                   ],
-                                                )
+                                                ),
+                                                ),
                                               ],
                                             ),
                                           );
@@ -823,9 +827,12 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                             const SizedBox(
                                               height: 35,
                                             ),
-                                            Row(
+                                            SingleChildScrollView(
+                                              scrollDirection:
+                                                  Axis.horizontal,
+                                              child: Row(
                                               mainAxisAlignment:
-                                                  MainAxisAlignment.center,
+                                                  MainAxisAlignment.start,
                                               children: [
                                                 Column(
                                                   children: [
@@ -1369,10 +1376,11 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                   ],
                                                 ),
                                               ],
-                                            )
-                                          ],
-                                        ),
-                                      );
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
                                     },
                                   );
                                 },

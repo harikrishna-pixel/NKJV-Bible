@@ -35,6 +35,7 @@ class TakeMomentReleasedScreen extends StatelessWidget {
     return Scaffold(
       body: TakeMomentRestScreen.peaceBackgroundStack(
         isDark: isDark,
+        birdWidthFactor: 0.62,
         child: SafeArea(
           child: Column(
             children: [
@@ -156,41 +157,20 @@ class TakeMomentReleasedScreen extends StatelessWidget {
                             ),
                           ],
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'Continue Your Journey',
-                              style: TextStyle(
-                                fontSize: isTablet ? 18 : 16,
-                                fontWeight: FontWeight.w600,
-                                color: isDark ? Colors.white : _cream,
-                                fontFamily: 'Georgia',
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Icon(
-                              Icons.chevron_right_rounded,
+                        child: Center(
+                          child: Text(
+                            'Continue Your Journey',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: isTablet ? 18 : 16,
+                              fontWeight: FontWeight.w600,
                               color: isDark ? Colors.white : _cream,
-                              size: 22,
+                              fontFamily: 'Georgia',
                             ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: _goHome,
-                child: Text(
-                  'Return to Home',
-                  style: TextStyle(
-                    fontSize: isTablet ? 16 : 14,
-                    color: textColor.withOpacity(0.85),
-                    fontFamily: 'Georgia',
-                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),

@@ -215,9 +215,12 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                 const SizedBox(
                                                   height: 25,
                                                 ),
-                                                Row(
+                                                SingleChildScrollView(
+                                                  scrollDirection:
+                                                      Axis.horizontal,
+                                                  child: Row(
                                                   mainAxisAlignment:
-                                                      MainAxisAlignment.center,
+                                                      MainAxisAlignment.start,
                                                   children: [
                                                     Column(
                                                       children: [
@@ -751,9 +754,6 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                                     context)),
                                                       ],
                                                     ),
-                                                    const SizedBox(
-                                                      width: 20,
-                                                    ),
                                                     // InkWell(
                                                     //   onTap: () {
                                                     //     // Navigator.push(context, MaterialPageRoute(builder: (context) => );
@@ -820,6 +820,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                     //   ),
                                                     // ),
                                                   ],
+                                                ),
                                                 ),
                                               ],
                                             ),
@@ -920,9 +921,12 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                             const SizedBox(
                                               height: 35,
                                             ),
-                                            Row(
+                                            SingleChildScrollView(
+                                              scrollDirection:
+                                                  Axis.horizontal,
+                                              child: Row(
                                               mainAxisAlignment:
-                                                  MainAxisAlignment.center,
+                                                  MainAxisAlignment.start,
                                               children: [
                                                 Column(
                                                   children: [
@@ -1517,10 +1521,11 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                   ],
                                                 ),
                                               ],
-                                            )
-                                          ],
-                                        ),
-                                      );
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
                                     },
                                   );
                                 },

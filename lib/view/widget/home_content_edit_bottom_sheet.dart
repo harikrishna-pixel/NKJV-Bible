@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
@@ -3229,16 +3230,6 @@ String normalizeHtml(String htmlContent) {
 
 Future saveAndShare(Uint8List bytes, String imgname, String mesage,
     {BuildContext? context}) async {
-  // Check and show rating dialog on first share if context is provided
-  bool ratingShown = false;
-  if (context != null) {
-    ratingShown =
-        await RatingDialogHelper.showRatingDialogOnFirstShare(context);
-  }
-  if (ratingShown) {
-    await Future.delayed(const Duration(milliseconds: 300));
-  }
-
   final directory = await getApplicationDocumentsDirectory();
   final image = File("${directory.path}/$imgname.png");
   image.writeAsBytesSync(bytes);
@@ -3356,12 +3347,13 @@ Future<void> saveImageIntoLocal(Uint8List base64Image, context) async {
   if (!hasPermission) return;
 
   try {
-    final appPackageName = (await PackageInfo.fromPlatform()).packageName;
     await ImageGallerySaverPlus.saveImage(
       Uint8List.fromList(base64Image),
-      name: "Image $appPackageName ${DateTime.now()}",
+      name: "bible_verse_${DateTime.now().millisecondsSinceEpoch}",
     );
-    DBHelper().saveImage(SaveImageModel(imagePath: base64Encode(base64Image)));
+    // Persist to library off the critical path.
+    unawaited(DBHelper()
+        .saveImage(SaveImageModel(imagePath: base64Encode(base64Image))));
     Constants.showToast("Image saved successfully");
   } catch (e) {
     log('Error: $e');
@@ -4016,13 +4008,11 @@ class PremiumAccessDialog extends StatelessWidget {
     if (context.mounted) {
       Navigator.of(context).pop();
     }
-    Get.to(
-      () => SubscriptionScreen(
-        sixMonthPlan: sixMonthPlan,
-        oneYearPlan: oneYearPlan,
-        lifeTimePlan: lifeTimePlan,
-        checkad: 'onboard',
-      ),
+    SubscriptionScreen.openPaywallStacked(
+      sixMonthPlan: sixMonthPlan,
+      oneYearPlan: oneYearPlan,
+      lifeTimePlan: lifeTimePlan,
+      checkad: 'onboard',
     );
   }
 
@@ -5793,10 +5783,7 @@ class HomeContentEditBottomSheetState
             }
 
             if (message.isNotEmpty) {
-              // Check and show rating dialog on first share
-              await RatingDialogHelper.showRatingDialogOnFirstShare(context);
-
-              Share.share(
+              await Share.share(
                 message,
                 sharePositionOrigin: Rect.fromPoints(
                   const Offset(2, 2),
@@ -5805,6 +5792,13 @@ class HomeContentEditBottomSheetState
               );
               // Track Share event
               AnalyticsService.trackShare();
+              // Show "Thanks for the love" only after the share sheet closes.
+              if (context.mounted) {
+                await Future.delayed(const Duration(milliseconds: 400));
+                if (context.mounted) {
+                  await RatingDialogHelper.showRatingDialogOnFirstShare(context);
+                }
+              }
             }
           },
           child: Image(
@@ -6364,6 +6358,7 @@ class ImageBottomSheet extends StatelessWidget {
                             minVerseFontSize:
                                 screenWidth < 380 ? 14 : 16,
                             actionBarReserve: actionBarTotalHeight,
+                            centerVerseContent: true,
                           ),
                         ),
                       ),
@@ -6533,25 +6528,17 @@ class ImageBottomSheet extends StatelessWidget {
         }
 
         Future<void> onShareOrSave() async {
-          if (label == 'Share') {
-            await RatingDialogHelper.showRatingDialogOnFirstShare(context);
-          }
+          HapticFeedback.lightImpact();
 
-          await Future.wait([
-            SharPreferences.setString('OpenAd', '1'),
-            SharPreferences.setString('bottom', '1'),
-          ]);
-          if (controller.adFree.value == false) {
-            final countprovider =
-                Provider.of<DownloadProvider>(context, listen: false);
-            await countprovider.decrementCount(context);
-          }
+          unawaited(SharPreferences.setString('OpenAd', '1'));
+          unawaited(SharPreferences.setString('bottom', '1'));
+
           final image = await controller.screenshotController.value.capture(
-            delay: const Duration(milliseconds: 10),
+            delay: Duration.zero,
           );
 
           if (image == null) {
-            await SharPreferences.setString('bottom', '0');
+            unawaited(SharPreferences.setString('bottom', '0'));
             return;
           }
 
@@ -6569,14 +6556,24 @@ class ImageBottomSheet extends StatelessWidget {
                   " \n Read More at: https://itunes.apple.com/app/id$appid";
             }
 
-            saveAndShare(image, "bible", message, context: context);
-            // Track Share event
+            await saveAndShare(image, "bible", message);
             AnalyticsService.trackShare();
+            if (context.mounted) {
+              await Future.delayed(const Duration(milliseconds: 400));
+              if (context.mounted) {
+                await RatingDialogHelper.showRatingDialogOnFirstShare(context);
+              }
+            }
           } else if (label == "Save") {
             await saveImageIntoLocal(image, context);
           }
 
-          await SharPreferences.setString('bottom', '0');
+          if (controller.adFree.value == false && context.mounted) {
+            final countprovider =
+                Provider.of<DownloadProvider>(context, listen: false);
+            unawaited(countprovider.decrementCount(context));
+          }
+          unawaited(SharPreferences.setString('bottom', '0'));
         }
 
         return SizedBox(
@@ -7011,6 +7008,8 @@ class VerseShareImageCard extends StatelessWidget {
     this.actionBarReserve = 0,
     this.verseTextNudgeDown = 0,
     this.backgroundIndex = 0,
+    this.useSimpleVerseLayout = false,
+    this.centerVerseContent = false,
   });
 
   final String backgroundImagePath;
@@ -7022,6 +7021,8 @@ class VerseShareImageCard extends StatelessWidget {
   final double actionBarReserve;
   final double verseTextNudgeDown;
   final int backgroundIndex;
+  final bool useSimpleVerseLayout;
+  final bool centerVerseContent;
 
   @override
   Widget build(BuildContext context) {
@@ -7033,13 +7034,135 @@ class VerseShareImageCard extends StatelessWidget {
     final verseMaxSize = maxVerseFontSize;
     final verseMinSize = minVerseFontSize.clamp(10.0, verseMaxSize);
     final footerHeight = screenWidth < 380 ? 68.0 : 76.0;
-    final verseAlignY = verseTextNudgeDown > 0
-        ? (screenWidth < 380 ? 0.30 : 0.36)
-        : (screenWidth < 380 ? 0.14 : 0.18);
     final textColor = verseShareTextColorForBackgroundIndex(backgroundIndex);
     final secondaryTextColor = textColor.withOpacity(
       textColor.computeLuminance() > 0.55 ? 0.88 : 0.82,
     );
+    const verseTextColor = Color(0xFF3E2723);
+
+    if (useSimpleVerseLayout) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            backgroundImagePath.isNotEmpty
+                ? backgroundImagePath
+                : _kVerseImageBg,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            filterQuality: FilterQuality.high,
+            gaplessPlayback: true,
+          ),
+          Positioned.fill(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                22,
+                screenWidth < 380 ? 16 : 20,
+                22,
+                actionBarReserve + footerHeight + 12,
+              ),
+              child: Center(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: AutoSizeHtmlWidget(
+                          html: verseHtml,
+                          maxLines: 16,
+                          maxFontSize: verseMaxSize,
+                          minFontSize: verseMinSize,
+                          color: verseTextColor,
+                          textAlign: TextAlign.center,
+                          height: 1.55,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                      SizedBox(height: screenWidth < 380 ? 12 : 16),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          verseReference,
+                          textAlign: TextAlign.left,
+                          style: TextStyle(
+                            color: verseTextColor,
+                            fontSize: referenceSize,
+                            fontStyle: FontStyle.italic,
+                            fontWeight: FontWeight.w400,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: actionBarReserve,
+            height: footerHeight,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset(
+                      'assets/Icon-1024.png',
+                      height: 22,
+                      width: 22,
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          BibleInfo.bible_shortName,
+                          style: TextStyle(
+                            color: verseTextColor,
+                            letterSpacing: BibleInfo.letterSpacing,
+                            fontSize: BibleInfo.fontSizeScale * 12,
+                            fontWeight: FontWeight.w700,
+                            height: 1.2,
+                          ),
+                        ),
+                        if (Platform.isAndroid)
+                          Text(
+                            'Search in Playstore',
+                            style: TextStyle(
+                              color: verseTextColor.withOpacity(0.82),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          )
+                        else if (Platform.isIOS)
+                          Text(
+                            'Search in Appstore',
+                            style: TextStyle(
+                              color: verseTextColor.withOpacity(0.82),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
 
     return Stack(
       fit: StackFit.expand,
@@ -7060,41 +7183,49 @@ class VerseShareImageCard extends StatelessWidget {
           right: 22,
           top: 0,
           bottom: actionBarReserve + footerHeight,
-          child: Align(
-            alignment: Alignment(0, verseAlignY),
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2),
-                    child: AutoSizeHtmlWidget(
-                      html: verseHtml,
-                      maxLines: 16,
-                      maxFontSize: verseMaxSize,
-                      minFontSize: verseMinSize,
-                      color: textColor,
+          child: Padding(
+            padding: EdgeInsets.only(
+              top: centerVerseContent ? 0 : (screenWidth < 380 ? 28 : 36),
+              bottom: 8,
+            ),
+            child: Align(
+              alignment: centerVerseContent
+                  ? Alignment.center
+                  : Alignment.topCenter,
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: AutoSizeHtmlWidget(
+                        html: verseHtml,
+                        maxLines: 16,
+                        maxFontSize: verseMaxSize,
+                        minFontSize: verseMinSize,
+                        color: textColor,
+                        textAlign: TextAlign.center,
+                        height: 1.55,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    SizedBox(height: screenWidth < 380 ? 12 : 16),
+                    Text(
+                      verseReference,
                       textAlign: TextAlign.center,
-                      height: 1.55,
-                      fontWeight: FontWeight.w400,
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: referenceSize,
+                        fontStyle: FontStyle.italic,
+                        fontWeight: FontWeight.w400,
+                        height: 1.35,
+                      ),
                     ),
-                  ),
-                  SizedBox(height: screenWidth < 380 ? 12 : 16),
-                  Text(
-                    verseReference,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: referenceSize,
-                      fontStyle: FontStyle.italic,
-                      fontWeight: FontWeight.w400,
-                      height: 1.35,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:html/parser.dart';
 
 import 'package:biblebookapp/Model/verseBookContentModel.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
-import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:html_unescape/html_unescape.dart';
 
@@ -41,17 +39,26 @@ class VerseItemWidget extends StatefulWidget {
 
 class _VerseItemWidgetState extends State<VerseItemWidget> {
   bool showTempHighlight = false;
+  late String _parsedText;
 
   @override
   void initState() {
     super.initState();
+    _parsedText = parseVerseContent(widget.data.content);
     _checkTempHighlight();
   }
 
+  @override
+  void didUpdateWidget(VerseItemWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.data.content != widget.data.content) {
+      _parsedText = parseVerseContent(widget.data.content);
+    }
+  }
+
   void _checkTempHighlight() {
-    final parsedText = parseVerseContent(widget.data.content);
     if (widget.controller.readHighlight.value &&
-        parsedText == widget.selectedVerseForRead) {
+        _parsedText == widget.selectedVerseForRead) {
       if (mounted) {
         setState(() {
           showTempHighlight = true;
@@ -140,88 +147,68 @@ class _VerseItemWidgetState extends State<VerseItemWidget> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final parsedText = parseVerseContent(widget.data.content);
     final verseLabel =
         displayVerseNumber(widget.data, listIndex: widget.index);
     final isHighlighted = widget.data.isHighlighted != "no";
     final isUnderlined = widget.data.isUnderlined == "yes";
     final isBookmarked = widget.data.isBookmarked == "yes";
     final isNoted = widget.data.isNoted != "no";
+    final highlightColor =
+        widget.data.isHighlighted ?? widget.selectedColor;
+    final bgColor = isHighlighted
+        ? _parseColor(highlightColor, fallback: Colors.transparent)
+        : Colors.transparent;
+    final textStyle = _getTextStyle(
+      context,
+      screenWidth,
+      showTempHighlight,
+      isHighlighted,
+      isUnderlined,
+    );
+    final iconSize = screenWidth > 450
+        ? widget.controller.fontSize.value * 1.6
+        : widget.controller.fontSize.value * 1.2;
 
-    //  final normalized = normalizeHtml(widget.data.content);
-
-    return FutureBuilder<String?>(
-      future: DBHelper().getColorByContent(
-        widget.data.content?.toString() ?? '',
-      ),
-      builder: (context, snapshot) {
-        final highlightColor =
-            widget.data.isHighlighted ?? widget.selectedColor;
-
-        //   debugPrint("Color parse 1 : ${widget.data.content} $highlightColor");
-
-        final bgColor = isHighlighted
-            ? _parseColor(highlightColor, fallback: Colors.transparent)
-            : Colors.transparent;
-        // debugPrint("Color parse 2 : $highlightColor");
-        return Container(
-          color: bgColor,
-          // decoration: BoxDecoration(color: bgColor),
-          child: RichText(
-            text: TextSpan(
-              children: [
-                WidgetSpan(
-                  alignment: PlaceholderAlignment.top,
-                  child: HtmlWidget(
-                    "$verseLabel. $parsedText",
-                    textStyle: _getTextStyle(
-                      context,
-                      screenWidth,
-                      showTempHighlight,
-                      isHighlighted,
-                      isUnderlined,
-                    ),
+    return Container(
+      color: bgColor,
+      child: RichText(
+        text: TextSpan(
+          children: [
+            TextSpan(
+              text: "$verseLabel. $_parsedText",
+              style: textStyle,
+            ),
+            if (isBookmarked)
+              WidgetSpan(
+                alignment: PlaceholderAlignment.middle,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 3.0),
+                  child: Icon(
+                    Icons.bookmark,
+                    color: CommanColor.whiteLightModePrimary(context),
+                    size: iconSize,
                   ),
                 ),
-                if (isBookmarked)
-                  WidgetSpan(
-                    alignment: PlaceholderAlignment.middle,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 3.0),
-                      child: Icon(
-                        Icons.bookmark,
-                        color: CommanColor.whiteLightModePrimary(context),
-                        size: screenWidth > 450
-                            ? widget.controller.fontSize.value * 1.6
-                            : widget.controller.fontSize.value * 1.2,
-                      ),
-                    ),
+              ),
+            if (isNoted)
+              WidgetSpan(
+                alignment: PlaceholderAlignment.middle,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 5.0),
+                  child: Image.asset(
+                    CommanColor.isDarkTheme(context)
+                        ? "assets/light_modes/stickynote.png"
+                        : "assets/Bookmark icons/stickynote-1.png",
+                    width: iconSize,
+                    height: iconSize,
+                    color: null,
+                    fit: BoxFit.contain,
                   ),
-                if (isNoted)
-                  WidgetSpan(
-                    alignment: PlaceholderAlignment.middle,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 5.0),
-                      child: Image.asset(
-                        CommanColor.isDarkTheme(context)
-                            ? "assets/light_modes/stickynote.png"
-                            : "assets/Bookmark icons/stickynote-1.png",
-                        width: screenWidth > 450
-                            ? widget.controller.fontSize.value * 1.6
-                            : widget.controller.fontSize.value * 1.2,
-                        height: screenWidth > 450
-                            ? widget.controller.fontSize.value * 1.6
-                            : widget.controller.fontSize.value * 1.2,
-                        color: null,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 

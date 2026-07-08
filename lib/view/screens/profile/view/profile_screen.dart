@@ -11,6 +11,7 @@ import 'package:biblebookapp/view/screens/dashboard/myLibrary.dart';
 import 'package:biblebookapp/view/screens/profile/bloc/user_bloc.dart';
 import 'package:biblebookapp/view/screens/profile/model/library_status_model.dart';
 import 'package:biblebookapp/view/screens/profile/view/edit_profile_screen.dart';
+import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:provider/provider.dart' as P;
@@ -56,6 +57,8 @@ void confirmLogoutAccount(BuildContext context) {
                     await cacheprovider.removeCache(key: 'user');
                     await cacheprovider.removeCache(key: 'name');
                     await cacheprovider.removeCache(key: 'authtoken');
+                    await cacheprovider.removeCache(
+                        key: OwnReferralCodeDialog.referralCacheKey);
                     //   FirebaseAuth.instance.signOut();
                     Constants.showToast("Logged Out Successfully");
                     Get.offAll(() => HomeScreen(
@@ -136,6 +139,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   bool isLoading = false;
   String? message;
   String? user = '';
+  String? _referralCode = '';
   loadDB() async {
     final db = DBHelper();
     if (mounted) {
@@ -171,16 +175,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
     // final data = await cacheprovider.readCache(key: 'user');
     final dataname = await cacheprovider.readCache(key: 'name');
+    final referralCode = await cacheprovider.readCache(
+        key: OwnReferralCodeDialog.referralCacheKey);
 
     debugPrint(' name is $dataname');
 
     if (dataname != null) {
       setState(() {
         user = dataname;
+        _referralCode = referralCode?.trim() ?? '';
       });
     } else {
       setState(() {
         user = '';
+        _referralCode = '';
       });
     }
   }
@@ -268,6 +276,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     })();
 
     return Scaffold(
+        backgroundColor:
+            p.Provider.of<ThemeProvider>(context).currentCustomTheme ==
+                    AppCustomTheme.vintage
+                ? const Color(0xFFF5F0E6)
+                : p.Provider.of<ThemeProvider>(context).backgroundColor,
         body: Container(
       height: MediaQuery.of(context).size.height,
       width: MediaQuery.of(context).size.width,
@@ -511,6 +524,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                   ],
                                 ),
                                 SizedBox(height: mheight * 0.03),
+                                ReferralCodeProfileSection(
+                                  referralCode: _referralCode ?? '',
+                                ),
                                 Text(
                                   'My Library Status'.toUpperCase(),
                                   style: const TextStyle(

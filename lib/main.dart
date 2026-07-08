@@ -6,6 +6,8 @@ import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/background_api_service.dart';
 import 'package:biblebookapp/core/library_backup_upload_service.dart';
 import 'package:biblebookapp/services/analytics/analytics_service.dart';
+import 'package:biblebookapp/streak_flow/leave_rating_screen.dart';
+import 'package:biblebookapp/view/screens/welcome_screen.dart';
 
 import 'package:biblebookapp/view/widget/adhelper.dart';
 import 'package:biblebookapp/constant/app_api_constant.dart';
@@ -119,12 +121,25 @@ bool _isBenignHomeWidgetUpdatesStreamCancel(FlutterErrorDetails details) {
       .contains('home_widget/updates');
 }
 
+/// iOS simulator / soft-keyboard can desync HardwareKeyboard on KeyUp (debug-only).
+bool _isBenignHardwareKeyboardKeyUp(FlutterErrorDetails details) {
+  if (details.library != 'services library') return false;
+  final ex = details.exception;
+  if (ex is! AssertionError) return false;
+  final msg = ex.toString();
+  return msg.contains('KeyUpEvent is dispatched') &&
+      msg.contains('_pressedKeys.containsKey');
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final FlutterExceptionHandler? previousFlutterOnError = FlutterError.onError;
   FlutterError.onError = (FlutterErrorDetails details) {
     if (_isBenignHomeWidgetUpdatesStreamCancel(details)) {
+      return;
+    }
+    if (_isBenignHardwareKeyboardKeyUp(details)) {
       return;
     }
     if (previousFlutterOnError != null) {
@@ -263,6 +278,13 @@ class _LifecycleWrapperState extends State<LifecycleWrapper>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      precacheImage(
+        const AssetImage('assets/splash-bg.png'),
+        context,
+      );
+    });
   }
 
   @override
@@ -367,8 +389,18 @@ class MyApp extends StatelessWidget {
           themeMode: themeProvider.themeMode,
           theme: MyThemes.lightTheme(context, themeProvider.backgroundColor),
           darkTheme: MyThemes.darkTheme(context),
+          defaultTransition: Transition.cupertino,
+          transitionDuration: const Duration(milliseconds: 350),
           home: SplashScreen(),
-          builder: EasyLoading.init(),
+          builder: (context, child) {
+            return EasyLoading.init()(
+              context,
+              ColoredBox(
+                color: const Color(0xFFF2E6D4),
+                child: child ?? const SizedBox.shrink(),
+              ),
+            );
+          },
         );
       },
     );

@@ -38,6 +38,8 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
 
   String _currentMessage = "";
   String _readingPercentage = "0";
+  /// Prevents rapid Next Chapter taps from stacking overlapping Home routes.
+  bool _isNavigating = false;
 
   @override
   void initState() {
@@ -100,9 +102,65 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
   }
 
   void _handleBackToReading() {
-    Get.back();
-    Provider.of<DownloadProvider>(context, listen: false)
-        .incrementBookmarkCount(context);
+    final downloadProvider =
+        Provider.of<DownloadProvider>(context, listen: false);
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      Get.back(closeOverlays: false);
+    }
+    Future.microtask(() async {
+      await WidgetsBinding.instance.endOfFrame;
+      DashBoardController? controller;
+      try {
+        controller = Get.find<DashBoardController>();
+      } catch (_) {}
+      if (controller != null) {
+        final scrollCtrl = controller.autoScrollController.value;
+        if (scrollCtrl.hasClients) {
+          scrollCtrl.jumpTo(0);
+        }
+      }
+    });
+    Future.microtask(() {
+      final navContext = Get.context;
+      if (navContext != null) {
+        downloadProvider.incrementBookmarkCount(navContext);
+      }
+    });
+  }
+
+  Future<void> _popToReaderAfterChapterChange(
+    DashBoardController? controller,
+  ) async {
+    if (!mounted) return;
+    if (Navigator.of(context).canPop()) {
+      await Navigator.of(context).maybePop();
+    } else {
+      Get.back(closeOverlays: false);
+    }
+    await WidgetsBinding.instance.endOfFrame;
+    if (controller != null) {
+      final scrollCtrl = controller.autoScrollController.value;
+      if (scrollCtrl.hasClients) {
+        scrollCtrl.jumpTo(0);
+      }
+    }
+    Future.microtask(() {
+      final navContext = Get.context;
+      if (navContext != null) {
+        Provider.of<DownloadProvider>(navContext, listen: false)
+            .incrementBookmarkCount(navContext);
+      }
+    });
+  }
+
+  Future<void> _loadNextChapterOnReader(DashBoardController controller) async {
+    // Replace stale verses so Home does not keep showing the chapter just read.
+    controller.selectedBookContent.clear();
+    await controller.getSelectedChapterAndBook();
+    controller.isFetchContent.value = false;
+    controller.loadTextToSpeech.value = false;
   }
 
   Widget _markAsReadSparkle({double size = 12}) {
@@ -113,30 +171,44 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
     );
   }
 
-  Widget _markAsReadSuccessBadge() {
-    const badgeSize = 250.0;
+  Widget _markAsReadSuccessBadge({required bool isCompact}) {
+    final badgeWidth = isCompact ? 136.0 : 160.0;
+    // Asset is 2:3; clip lower transparent area so title sits closer.
+    final frameHeight = isCompact ? 98.0 : 114.0;
 
     return SizedBox(
-      height: 118,
-      width: 170,
-      child: Stack(
-        alignment: Alignment.center,
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(top: 4, left: 28, child: _markAsReadSparkle(size: 11)),
-          Positioned(top: 8, right: 30, child: _markAsReadSparkle(size: 13)),
-          Positioned(top: 16, left: 54, child: _markAsReadSparkle(size: 9)),
-          Container(
-            width: badgeSize,
-            height: badgeSize,
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage('assets/mark-us-complete.png'),
-                fit: BoxFit.cover,
+      width: badgeWidth,
+      height: frameHeight,
+      child: ClipRect(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                top: isCompact ? 0 : 2,
+                left: isCompact ? 6 : 10,
+                child: _markAsReadSparkle(size: isCompact ? 10 : 11),
               ),
-            ),
+              Positioned(
+                top: isCompact ? 2 : 6,
+                right: isCompact ? 6 : 10,
+                child: _markAsReadSparkle(size: isCompact ? 11 : 13),
+              ),
+              Positioned(
+                top: isCompact ? 8 : 12,
+                left: isCompact ? 24 : 30,
+                child: _markAsReadSparkle(size: isCompact ? 8 : 9),
+              ),
+              Image.asset(
+                'assets/mark-us-complete.png',
+                width: badgeWidth,
+                fit: BoxFit.fitWidth,
+                filterQuality: FilterQuality.high,
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -325,47 +397,56 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
     );
   }
 
+  Widget _markAsReadDateRow({required bool isCompact}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          Icons.calendar_today_outlined,
+          size: isCompact ? 16 : 18,
+          color: _kMarkAsReadGold.withOpacity(0.95),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          DateFormat('dd/MM/yyyy').format(DateTime.now()),
+          style: TextStyle(
+            fontSize: isCompact ? 15 : 17,
+            fontWeight: FontWeight.w500,
+            color: _kMarkAsReadBodyBrown,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _markAsReadBottomSection({
     required BuildContext context,
     required double progress,
     required bool hasNextChapter,
     required VoidCallback onNextChapter,
-    required VoidCallback onBackToReading,
   }) {
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final media = MediaQuery.of(context);
+    final bottomInset = media.padding.bottom;
+    final isCompact = media.size.width < 375 || media.size.height < 700;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, bottomInset > 0 ? bottomInset + 8 : 20),
+      padding: EdgeInsets.fromLTRB(
+        isCompact ? 16 : 20,
+        isCompact ? 10 : 12,
+        isCompact ? 16 : 20,
+        bottomInset > 0 ? bottomInset + (isCompact ? 4 : 8) : (isCompact ? 12 : 20),
+      ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.calendar_today_outlined,
-                size: 18,
-                color: _kMarkAsReadGold.withOpacity(0.95),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                DateFormat('dd/MM/yyyy').format(DateTime.now()),
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w500,
-                  color: _kMarkAsReadBodyBrown,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
           _markAsReadProgressCard(progress),
-          const SizedBox(height: 22),
+          SizedBox(height: isCompact ? 12 : 16),
           InkWell(
             onTap: onNextChapter,
             borderRadius: BorderRadius.circular(999),
             child: Container(
               width: double.infinity,
-              height: 56,
+              height: isCompact ? 50 : 56,
               decoration: BoxDecoration(
                 color: _kMarkAsReadBrown,
                 borderRadius: BorderRadius.circular(999),
@@ -398,36 +479,6 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          Center(
-            child: InkWell(
-              onTap: onBackToReading,
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                child: Text(
-                  'Back to Reading',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: _kMarkAsReadCardCream,
-                    shadows: const [
-                      Shadow(
-                        color: Color(0x99000000),
-                        blurRadius: 8,
-                        offset: Offset(0, 1),
-                      ),
-                    ],
-                    decoration: TextDecoration.underline,
-                    decorationColor: _kMarkAsReadGold,
-                    decorationThickness: 1.5,
-                  ),
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -439,11 +490,25 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
         (double.tryParse(_readingPercentage) ?? 0).clamp(0.0, 100.0);
     final hasNextChapter = int.parse(widget.ReadedChapter) + 1 <=
         int.parse("${int.parse(widget.SelectedBookChapterCount)}");
+    final media = MediaQuery.of(context);
+    // iPhone SE and other compact screens.
+    final isCompact =
+        media.size.width < 375 || media.size.height < 700;
+    final titleSize = isCompact ? 24.0 : 28.0;
+    final messageSize = isCompact ? 14.0 : 15.0;
+    final bookNameSize = isCompact ? 20.0 : 24.0;
+    final badgeTitleGap = isCompact ? 0.0 : 2.0;
+    final messageGap = isCompact ? 4.0 : 6.0;
+    final dividerGap = isCompact ? 8.0 : 10.0;
+    final bookBlockGap = isCompact ? 10.0 : 12.0;
 
     return Scaffold(
+      // Match bg asset so route transition has no yellow flash.
+      backgroundColor: _kMarkAsReadCardCream,
       body: Stack(
         fit: StackFit.expand,
         children: [
+          const ColoredBox(color: _kMarkAsReadCardCream),
           Image.asset(
             _kMarkAsReadBg,
             fit: BoxFit.cover,
@@ -458,34 +523,41 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
               children: [
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                    padding: EdgeInsets.fromLTRB(
+                      isCompact ? 20 : 24,
+                      isCompact ? 22 : 30,
+                      isCompact ? 20 : 24,
+                      isCompact ? 8 : 12,
+                    ),
                     child: Column(
                       children: [
-                        _markAsReadSuccessBadge(),
-                        const SizedBox(height: 14),
-                        const Text(
+                        _markAsReadSuccessBadge(isCompact: isCompact),
+                        SizedBox(height: badgeTitleGap),
+                        Text(
                           'Successful!',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontFamily: 'Georgia',
-                            fontSize: 28,
+                            fontSize: titleSize,
                             fontWeight: FontWeight.w700,
+                            height: 1.15,
+                            letterSpacing: 0,
                             color: _kMarkAsReadBrown,
                           ),
                         ),
-                        const SizedBox(height: 10),
+                        SizedBox(height: messageGap),
                         Text(
                           _currentMessage.isEmpty ? 'Loading...' : _currentMessage,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            height: 1.4,
+                          style: TextStyle(
+                            fontSize: messageSize,
+                            height: 1.3,
                             color: _kMarkAsReadBodyBrown,
                           ),
                         ),
-                        const SizedBox(height: 18),
+                        SizedBox(height: dividerGap),
                         _markAsReadGoldDivider(),
-                        const SizedBox(height: 20),
+                        SizedBox(height: bookBlockGap),
                         ColorFiltered(
                           colorFilter: const ColorFilter.mode(
                             _kMarkAsReadGold,
@@ -493,38 +565,42 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                           ),
                           child: Image.asset(
                             'assets/reading_book.png',
-                            width: 30,
-                            height: 30,
+                            width: isCompact ? 26 : 30,
+                            height: isCompact ? 26 : 30,
                             fit: BoxFit.contain,
                           ),
                         ),
-                        const SizedBox(height: 10),
+                        SizedBox(height: isCompact ? 6 : 8),
                         Text(
                           widget.RededBookName,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'Georgia',
-                            fontSize: 24,
+                            fontSize: bookNameSize,
                             fontWeight: FontWeight.w700,
+                            height: 1.2,
                             color: _kMarkAsReadBrown,
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        SizedBox(height: isCompact ? 2 : 4),
                         Text(
                           'Chapter ${widget.ReadedChapter}',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 16,
+                          style: TextStyle(
+                            fontSize: isCompact ? 15 : 16,
                             fontWeight: FontWeight.w500,
+                            height: 1.2,
                             color: _kMarkAsReadBodyBrown,
                           ),
                         ),
-                        const SizedBox(height: 18),
+                        SizedBox(height: isCompact ? 8 : 10),
                         Container(
                           width: 120,
                           height: 1,
                           color: _kMarkAsReadGold.withOpacity(0.45),
                         ),
+                        SizedBox(height: isCompact ? 10 : 12),
+                        _markAsReadDateRow(isCompact: isCompact),
                       ],
                     ),
                   ),
@@ -533,31 +609,45 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                   context: context,
                   progress: progress,
                   hasNextChapter: hasNextChapter,
-                  onBackToReading: _handleBackToReading,
                   onNextChapter: () async {
+                    if (_isNavigating) return;
+                    _isNavigating = true;
                     debugPrint('ReadedChapter : ${widget.ReadedChapter}');
                     debugPrint(
                         'SelectedBookChapterCount : ${widget.SelectedBookChapterCount}');
                     if (int.parse(widget.ReadedChapter) + 1 <=
                         int.parse(
                             "${int.parse(widget.SelectedBookChapterCount)}")) {
-                      // Next Chapter
-                      SharPreferences.setString(SharPreferences.selectedChapter,
-                          (int.parse(widget.ReadedChapter) + 1).toString());
-                      debugPrint('Get off All');
+                      // Next Chapter — pop Mark-as-Read before loading new verses so
+                      // the reader underneath does not bleed through this screen.
+                      final nextChapter = int.parse(widget.ReadedChapter) + 1;
+                      final nextChapterStr = nextChapter.toString();
+                      await SharPreferences.setString(
+                          SharPreferences.selectedChapter, nextChapterStr);
                       await SharPreferences.setString('OpenAd', '1');
-                      Get.offAll(
-                          () => HomeScreen(
-                              From: "Chapter",
-                              selectedVerseNumForRead: "",
-                              selectedBookForRead: "",
-                              selectedChapterForRead: "",
-                              selectedBookNameForRead: "",
-                              selectedVerseForRead: ""),
-                          transition: Transition.fadeIn,
-                          duration: Duration(milliseconds: 300));
-                      Provider.of<DownloadProvider>(context, listen: false)
-                          .incrementBookmarkCount(context);
+                      DashBoardController? controller;
+                      try {
+                        controller = Get.find<DashBoardController>();
+                      } catch (e) {
+                        debugPrint(
+                            'DashBoardController not available for next chapter: $e');
+                      }
+                      if (!context.mounted) return;
+                      try {
+                        await _popToReaderAfterChapterChange(controller);
+                      } catch (_) {
+                        if (Navigator.of(context).canPop()) {
+                          await Navigator.of(context).maybePop();
+                        }
+                      }
+                      if (controller != null) {
+                        controller.selectedChapter.value = nextChapterStr;
+                        controller.selectChapterChange.value = nextChapter;
+                        controller.selectedChapterForRead.value =
+                            nextChapterStr;
+                        await _loadNextChapterOnReader(controller);
+                      }
+                      _isNavigating = false;
                     } else {
                       // Next Book - Get the next book and navigate to first chapter
                       try {
@@ -590,9 +680,36 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                                 SharPreferences.selectedBookNum,
                                 nextBookNumValue.toString());
 
-                            // Update controller if available
+                            // Navigate to reading screen
+                            await SharPreferences.setString('OpenAd', '1');
+                            if (!context.mounted) return;
+                            DashBoardController? controller;
                             try {
-                              final controller = Get.find<DashBoardController>();
+                              controller = Get.find<DashBoardController>();
+                            } catch (e) {
+                              debugPrint("DashBoardController not available: $e");
+                            }
+                            try {
+                              await _popToReaderAfterChapterChange(controller);
+                            } catch (_) {
+                              if (Navigator.of(context).canPop()) {
+                                Navigator.of(context).pop();
+                              } else {
+                                Get.offAll(
+                                  () => HomeScreen(
+                                      From: "Chapter",
+                                      selectedVerseNumForRead: "",
+                                      selectedBookForRead: "",
+                                      selectedChapterForRead: "1",
+                                      selectedBookNameForRead: nextBookName,
+                                      selectedVerseForRead: ""),
+                                  transition: Transition.fadeIn,
+                                  duration: const Duration(milliseconds: 280),
+                                  opaque: true,
+                                );
+                              }
+                            }
+                            if (controller != null) {
                               controller.selectedBook.value = nextBookName;
                               controller.selectedBookNum.value =
                                   nextBookNumValue.toString();
@@ -605,39 +722,25 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                               controller.selectedBookNumForRead.value =
                                   nextBookNumValue.toString();
                               controller.selectedChapterForRead.value = "1";
-
-                              // Load content
-                              controller.getSelectedChapterAndBook();
-                              controller.getBookContentForRead();
-                            } catch (e) {
-                              debugPrint("DashBoardController not available: $e");
-                              // Controller will be initialized when HomeScreen loads
+                              controller.selectedBookContent.clear();
+                              await controller.getBookContentForRead();
+                              controller.isFetchContent.value = false;
+                              controller.loadTextToSpeech.value = false;
                             }
-
-                            // Navigate to reading screen
-                            await SharPreferences.setString('OpenAd', '1');
-                            Get.offAll(
-                                () => HomeScreen(
-                                    From: "Chapter",
-                                    selectedVerseNumForRead: "",
-                                    selectedBookForRead: "",
-                                    selectedChapterForRead: "",
-                                    selectedBookNameForRead: "",
-                                    selectedVerseForRead: ""),
-                                transition: Transition.fadeIn,
-                                duration: Duration(milliseconds: 300));
-                            Provider.of<DownloadProvider>(context, listen: false)
-                                .incrementBookmarkCount(context);
+                            _isNavigating = false;
                           } else {
                             // No next book found
+                            _isNavigating = false;
                             Constants.showToast(
                                 "Selected Book is completed. Please change the book.");
                           }
                         } else {
+                          _isNavigating = false;
                           Constants.showToast(
                               "Selected Book is completed. Please change the book.");
                         }
                       } catch (e) {
+                        _isNavigating = false;
                         debugPrint("Error getting next book: $e");
                         Constants.showToast(
                             "Selected Book is completed. Please change the book.");
@@ -646,6 +749,22 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                   },
                 ),
               ],
+            ),
+          ),
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: IconButton(
+                onPressed: _handleBackToReading,
+                padding: const EdgeInsets.only(left: 8, top: 2),
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 32),
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: _kMarkAsReadBrown,
+                  size: 20,
+                ),
+              ),
             ),
           ),
         ],

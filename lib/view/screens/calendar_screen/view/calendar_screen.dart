@@ -21,11 +21,38 @@ class CalendarScreen extends StatefulHookConsumerWidget {
 
 class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   static const Color _tanCircle = Color(0xFFD4A96A);
+  final _eventFieldKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
-    ref.read(calendarDataBloc).initState();
+    final bloc = ref.read(calendarDataBloc);
+    bloc.initState();
+    bloc.fieldNode.addListener(_scrollEventFieldIntoView);
+  }
+
+  @override
+  void dispose() {
+    ref.read(calendarDataBloc).fieldNode.removeListener(_scrollEventFieldIntoView);
+    super.dispose();
+  }
+
+  void _scrollEventFieldIntoView() {
+    final bloc = ref.read(calendarDataBloc);
+    if (!bloc.fieldNode.hasFocus) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 280), () {
+        if (!mounted || !bloc.fieldNode.hasFocus) return;
+        final fieldContext = _eventFieldKey.currentContext;
+        if (fieldContext == null) return;
+        Scrollable.ensureVisible(
+          fieldContext,
+          alignment: 0.35,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      });
+    });
   }
 
   Widget _legendItem({
@@ -68,8 +95,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final textColor = CommanColor.whiteBlack(context);
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+      margin: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
         color: CommanColor.whiteAndDark(context).withOpacity(0.45),
         borderRadius: BorderRadius.circular(14),
@@ -202,14 +229,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     }
 
     return Scaffold(
-        resizeToAvoidBottomInset: false,
+        resizeToAvoidBottomInset: true,
         backgroundColor: p.Provider.of<ThemeProvider>(context).backgroundColor,
         body: GestureDetector(
           onTap: () {
             FocusScope.of(context).unfocus();
           },
           child: Container(
-            height: MediaQuery.of(context).size.height,
             width: MediaQuery.of(context).size.width,
             color: isVintageTheme ? null : themeProvider.backgroundColor,
             decoration: isVintageTheme
@@ -220,66 +246,65 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     ),
                   )
                 : null,
-            child: Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SafeArea(
-                    child: SizedBox(
-                      height: 8,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.of(context).viewInsets.bottom,
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        InkWell(
-                          onTap: () {
-                            Get.back();
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Icon(
-                              Icons.arrow_back_ios_new_rounded,
-                              size: 20,
-                              color: textColor,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            'Calendar',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontFamily: 'Georgia',
-                              letterSpacing: BibleInfo.letterSpacing,
-                              fontSize: BibleInfo.fontSizeScale * 20,
-                              fontWeight: FontWeight.w700,
-                              color: textColor,
-                            ),
+                        const SafeArea(
+                          bottom: false,
+                          child: SizedBox(
+                            height: 4,
                           ),
                         ),
                         Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Icon(
-                            Icons.calendar_month_outlined,
-                            size: 24,
-                            color: brown,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Row(
+                            children: [
+                              InkWell(
+                                onTap: () {
+                                  Get.back();
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Icon(
+                                    Icons.arrow_back_ios_new_rounded,
+                                    size: 20,
+                                    color: textColor,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  'Calendar',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontFamily: 'Georgia',
+                                    letterSpacing: BibleInfo.letterSpacing,
+                                    fontSize: BibleInfo.fontSizeScale * 20,
+                                    fontWeight: FontWeight.w700,
+                                    color: textColor,
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Icon(
+                                  Icons.calendar_month_outlined,
+                                  size: 24,
+                                  color: brown,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: SingleChildScrollView(
-                        child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const SizedBox(
-                          height: 8,
                         ),
                         TableCalendar(
                           firstDay: DateTime.utc(2010, 10, 16),
@@ -363,128 +388,136 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                                 const SizedBox.shrink(),
                           ),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                          child: Text(
-                            calendarBloc.isTodaySelected
-                                ? 'Today'
-                                : DateFormat('EEEE, MMMM d')
-                                    .format(calendarBloc.focusDate),
-                            style: TextStyle(
-                                fontFamily: 'Georgia',
-                                letterSpacing: BibleInfo.letterSpacing,
-                                fontSize: BibleInfo.fontSizeScale * 16,
-                                fontWeight: FontWeight.w600,
-                                color: textColor),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                          child: TextFormField(
-                            controller: calendarBloc.fieldCon,
-                            focusNode: calendarBloc.fieldNode,
-                            style: TextStyle(
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                    child: Text(
+                      calendarBloc.isTodaySelected
+                          ? 'Today'
+                          : DateFormat('EEEE, MMMM d')
+                              .format(calendarBloc.focusDate),
+                      style: TextStyle(
+                          fontFamily: 'Georgia',
+                          letterSpacing: BibleInfo.letterSpacing,
+                          fontSize: BibleInfo.fontSizeScale * 16,
+                          fontWeight: FontWeight.w600,
+                          color: textColor),
+                    ),
+                  ),
+                  Padding(
+                    key: _eventFieldKey,
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                    child: TextFormField(
+                      controller: calendarBloc.fieldCon,
+                      focusNode: calendarBloc.fieldNode,
+                      style: TextStyle(
+                        fontFamily: 'Georgia',
+                        color: textColor,
+                      ),
+                      decoration: InputDecoration(
+                          filled: true,
+                          fillColor: CommanColor.whiteAndDark(context)
+                              .withOpacity(0.55),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          hintText: 'Add an event or reminder',
+                          hintStyle: TextStyle(
                               fontFamily: 'Georgia',
-                              color: textColor,
-                            ),
-                            decoration: InputDecoration(
-                                filled: true,
-                                fillColor: CommanColor.whiteAndDark(context)
-                                    .withOpacity(0.55),
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 14),
-                                hintText: 'Add an event or reminder',
-                                hintStyle: TextStyle(
-                                    fontFamily: 'Georgia',
-                                    fontWeight: FontWeight.w400,
-                                    color: textColor.withOpacity(0.45)),
-                                focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(
-                                        width: 1.5, color: brown)),
-                                enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(
-                                        width: 1.5,
-                                        color: brown.withOpacity(0.35))),
-                                border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(
-                                        width: 1.5,
-                                        color: brown.withOpacity(0.35)))),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        if (!calendarBloc.isTextEmpty) ...[
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                OutlinedButton(
-                                    style: OutlinedButton.styleFrom(
-                                        side: BorderSide(
-                                            color: brown.withOpacity(0.5)),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 20, vertical: 10)),
-                                    onPressed: () {
-                                      calendarBloc.cancelField();
-                                    },
-                                    child: Text(
-                                      'Cancel',
-                                      style: TextStyle(
-                                        fontFamily: 'Georgia',
-                                        color: textColor,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    )),
-                                const SizedBox(width: 12),
-                                ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                        backgroundColor: brown,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 20, vertical: 10)),
-                                    onPressed: () {
-                                      calendarBloc.addCalendarData();
-                                    },
-                                    child: const Text(
-                                      'Save',
-                                      style: TextStyle(
-                                        fontFamily: 'Georgia',
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    )),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
+                              fontWeight: FontWeight.w400,
+                              color: textColor.withOpacity(0.45)),
+                          focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide:
+                                  BorderSide(width: 1.5, color: brown)),
+                          enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                  width: 1.5,
+                                  color: brown.withOpacity(0.35))),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                  width: 1.5,
+                                  color: brown.withOpacity(0.35)))),
+                    ),
+                  ),
+                  if (!calendarBloc.isTextEmpty) ...[
+                    const SizedBox(height: 10),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                  side: BorderSide(
+                                      color: brown.withOpacity(0.5)),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 20, vertical: 10)),
+                              onPressed: () {
+                                calendarBloc.cancelField();
+                              },
+                              child: Text(
+                                'Cancel',
+                                style: TextStyle(
+                                  fontFamily: 'Georgia',
+                                  color: textColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              )),
+                          const SizedBox(width: 12),
+                          ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor: brown,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 20, vertical: 10)),
+                              onPressed: () {
+                                calendarBloc.addCalendarData();
+                              },
+                              child: const Text(
+                                'Save',
+                                style: TextStyle(
+                                  fontFamily: 'Georgia',
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              )),
                         ],
-                        ListView.separated(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemBuilder: (context, index) => CalendarEventItem(
-                                calendarModel: calendarBloc
-                                    .kEvents[calendarBloc.focusDate]![index]),
-                            separatorBuilder: (context, index) =>
-                                const SizedBox(height: 12),
-                            itemCount: calendarBloc
-                                    .kEvents[calendarBloc.focusDate]?.length ??
-                                0),
-                        _buildLegend(context),
+                      ),
+                    ),
+                  ],
+                  if (calendarBloc.kEvents[calendarBloc.focusDate]
+                          ?.isNotEmpty ??
+                      false)
+                    ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(0, 8, 0, 0),
+                      itemBuilder: (context, index) => CalendarEventItem(
+                          calendarModel: calendarBloc
+                              .kEvents[calendarBloc.focusDate]![index]),
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 8),
+                      itemCount: calendarBloc
+                              .kEvents[calendarBloc.focusDate]
+                              ?.length ??
+                          0,
+                    ),
                       ],
-                    )),
-                  )
-                ],
-              ),
+                    ),
+                  ),
+                ),
+                SafeArea(
+                  top: false,
+                  minimum: const EdgeInsets.only(bottom: 4),
+                  child: _buildLegend(context),
+                ),
+              ],
             ),
           ),
         ));

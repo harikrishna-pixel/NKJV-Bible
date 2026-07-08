@@ -139,6 +139,9 @@ class SharPreferences {
   static const deferUpgradeAlert = 'defer_upgrade_alert';
   /// Intro update popup: user tapped Remind Later (show full popup after 3 days).
   static const upgradeIntroRemindLaterAt = 'upgrade_intro_remind_later_at';
+  /// User closed the update alert — do not show it again.
+  static const upgradeAlertDismissedPermanently =
+      'upgrade_alert_dismissed_permanently';
 
   static Future<bool?> getBoolean(String key) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();

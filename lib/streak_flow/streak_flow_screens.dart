@@ -1,21 +1,27 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:math' as math;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:screenshot/screenshot.dart';
+import 'package:biblebookapp/streak_flow/leave_rating_screen.dart';
 import 'package:biblebookapp/streak_flow/mood_prayer_data.dart';
 import 'package:biblebookapp/streak_flow/streak_saved_storage.dart';
 import 'package:biblebookapp/streak/streak_service.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
+import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -1260,6 +1266,45 @@ Widget _streakShareCardForCapture(
   );
 }
 
+String _streakCompletionShareBody(int streakDays) {
+  if (streakDays == 1) {
+    return 'I completed my first daily Bible streak today. One step closer to building a lasting habit with God.';
+  }
+  if (streakDays == 5) {
+    return "Five days of staying connected with God's Word. Looking forward to tomorrow!";
+  }
+  if (streakDays > 0) {
+    return "I've completed my $streakDays-day Bible streak and I'm growing closer to God every day.";
+  }
+  return "You're building a beautiful habit of seeking God daily.";
+}
+
+String _streakCompletionShareHeadline(int streakDays) {
+  if (streakDays > 0) {
+    return '🔥 Day $streakDays Streak Completed!';
+  }
+  return '🔥 Streak Completed!';
+}
+
+String _streakCompletionShareMessage(int streakDays) {
+  return '${_streakCompletionShareHeadline(streakDays)}\n${_streakCompletionShareBody(streakDays)}';
+}
+
+String _streakCompletionShareMessageWithLink(int streakDays) {
+  final androidLink =
+      'https://play.google.com/store/apps/details?id=${BibleInfo.android_Package_Name}';
+  final iosLink = 'https://itunes.apple.com/app/id${BibleInfo.apple_AppId}';
+  final appUrl = Platform.isIOS ? iosLink : androidLink;
+  return '${_streakCompletionShareMessage(streakDays)}\nJoin me:\n$appUrl';
+}
+
+String _streakCompletionShareImageFileName(int streakDays) {
+  if (streakDays > 0) {
+    return 'Day_${streakDays}_Streak_Completed.png';
+  }
+  return 'Streak_Completed.png';
+}
+
 Widget _streakCompleteShareContent(int streakDays) {
   final creditsEarned = streakDays * 20;
   return Column(
@@ -1326,7 +1371,7 @@ Widget _streakCompleteShareContent(int streakDays) {
       ),
       const SizedBox(height: 10),
       Text(
-        'You\'re building a beautiful habit of seeking God daily.',
+        _streakCompletionShareBody(streakDays),
         textAlign: TextAlign.center,
         style: _streakShareBodyStyle().copyWith(fontSize: 14),
       ),
@@ -1356,7 +1401,7 @@ Future<Uint8List?> _captureStreakShareImage(
         content,
         backgroundAsset: backgroundAsset,
       ),
-      delay: const Duration(milliseconds: 350),
+      delay: const Duration(milliseconds: 50),
       pixelRatio: (dpr * 2).clamp(2.5, 4.0),
       context: context,
     );
@@ -1374,9 +1419,14 @@ String _shareTextWithAppUrl(String content) {
   return '$content\n\nRead more at: $appUrl';
 }
 
-Future<void> _shareText(BuildContext context, String text) async {
+Future<void> _shareText(
+  BuildContext context,
+  String text, {
+  bool appendAppUrl = true,
+}) async {
   try {
-    final shareContent = _shareTextWithAppUrl(text);
+    final shareContent =
+        appendAppUrl ? _shareTextWithAppUrl(text) : text;
     final RenderObject? renderObject = context.findRenderObject();
     final RenderBox? box = renderObject is RenderBox ? renderObject : null;
     await Share.share(
@@ -1393,13 +1443,18 @@ Future<void> _shareAsImage(
   BuildContext context, {
   Uint8List? imageBytes,
   required String fallbackText,
+  String? imageFileName,
+  bool appendAppUrlToFallback = true,
 }) async {
   if (imageBytes != null && imageBytes.isNotEmpty) {
     try {
       final directory = await getTemporaryDirectory();
-      final imageFile = File(
-        '${directory.path}/streak_share_${DateTime.now().millisecondsSinceEpoch}.png',
-      );
+      final shareFileName = (imageFileName != null && imageFileName.trim().isNotEmpty)
+          ? (imageFileName.endsWith('.png')
+              ? imageFileName
+              : '$imageFileName.png')
+          : 'streak_share_${DateTime.now().millisecondsSinceEpoch}.png';
+      final imageFile = File('${directory.path}/$shareFileName');
       await imageFile.writeAsBytes(imageBytes, flush: true);
 
       final box = context.findRenderObject() as RenderBox?;
@@ -1408,9 +1463,9 @@ Future<void> _shareAsImage(
           XFile(
             imageFile.path,
             mimeType: 'image/png',
+            name: shareFileName,
           ),
         ],
-        text: _shareTextWithAppUrl(fallbackText),
         sharePositionOrigin: box != null
             ? box.localToGlobal(Offset.zero) & box.size
             : null,
@@ -1421,7 +1476,46 @@ Future<void> _shareAsImage(
       // fall through to text share
     }
   }
-  if (context.mounted) _shareText(context, fallbackText);
+  if (context.mounted) {
+    _shareText(
+      context,
+      fallbackText,
+      appendAppUrl: appendAppUrlToFallback,
+    );
+  }
+}
+
+Future<void> _shareStreakFlowImageWithLoader(
+  BuildContext shareContext, {
+  required String backgroundAsset,
+  required Widget content,
+  required String fallbackText,
+  String? imageFileName,
+  bool appendAppUrlToFallback = true,
+}) async {
+  HapticFeedback.lightImpact();
+  EasyLoading.show(
+    status: 'Preparing...',
+    maskType: EasyLoadingMaskType.clear,
+  );
+  try {
+    final image = await _captureStreakShareImage(
+      shareContext,
+      backgroundAsset: backgroundAsset,
+      content: content,
+    );
+    await EasyLoading.dismiss();
+    if (!shareContext.mounted) return;
+    await _shareAsImage(
+      shareContext,
+      imageBytes: image,
+      imageFileName: imageFileName,
+      fallbackText: fallbackText,
+      appendAppUrlToFallback: appendAppUrlToFallback,
+    );
+  } catch (_) {
+    await EasyLoading.dismiss();
+  }
 }
 
 void _showSavedToast(BuildContext context, {required bool saved}) {
@@ -1452,7 +1546,7 @@ void _showSavedToast(BuildContext context, {required bool saved}) {
           ),
           const SizedBox(width: 12),
           Text(
-            saved ? 'Saved' : 'Removed',
+            saved ? 'Saved to Faith Journey' : 'Removed',
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -1649,27 +1743,213 @@ Future<void> _recordStreakActivityForDay(String dayKey) async {
 }
 
 void _goToHome(BuildContext context) {
-  Future.microtask(() async {
-    try {
-      final provider = Provider.of<DownloadProvider>(context, listen: false);
-      await provider.warmDataBeforeHomeScreen();
-    } catch (e) {
-      debugPrint('warmDataBeforeHomeScreen error: $e');
-    }
-    if (!context.mounted) return;
-    Get.offAll(
-      () => HomeScreen(
-        From: "splash",
-        selectedVerseNumForRead: "",
-        selectedBookForRead: "",
-        selectedChapterForRead: "",
-        selectedBookNameForRead: "",
-        selectedVerseForRead: "",
-      ),
-      transition: Transition.cupertino,
-      duration: const Duration(milliseconds: 350),
-    );
+  // Navigate immediately; warm data in the background so Close (X) does not
+  // pause on the streak screen then flash a yellow/brown frame.
+  try {
+    final provider = Provider.of<DownloadProvider>(context, listen: false);
+    provider.warmDataBeforeHomeScreen();
+  } catch (e) {
+    debugPrint('warmDataBeforeHomeScreen error: $e');
+  }
+  Get.offAll(
+    () => HomeScreen(
+      From: "splash",
+      selectedVerseNumForRead: "",
+      selectedBookForRead: "",
+      selectedChapterForRead: "",
+      selectedBookNameForRead: "",
+      selectedVerseForRead: "",
+    ),
+    transition: Transition.fadeIn,
+    duration: const Duration(milliseconds: 280),
+    opaque: true,
+  );
+}
+
+Future<void> _startNewJourneyFromPaused(BuildContext context) async {
+  final today = DateTime.now().toIso8601String().split('T')[0];
+  await SharPreferences.setBoolean(
+      SharPreferences.streakFlowRestoreActive, false);
+  await SharPreferences.setString(SharPreferences.streakFlowRestoreDate, '');
+  await SharPreferences.setString(SharPreferences.streakFlowPausedDate, '');
+  await SharPreferences.setString(SharPreferences.streakFlowPausedAt, '');
+  await SharPreferences.setString(
+      SharPreferences.streakFlowLastShownDate, today);
+  await SharPreferences.setInt(SharPreferences.streakFlowStepsCompletedToday, 0);
+  await SharPreferences.setString(
+      SharPreferences.streakFlowStartedDate, today);
+  if (!context.mounted) return;
+  Get.offAll(
+    () => const StreakConnectionScreen(),
+    transition: Transition.cupertino,
+    duration: const Duration(milliseconds: 350),
+  );
+}
+
+void _popBackToFaithJourney(BuildContext context) {
+  if (Navigator.of(context).canPop()) {
+    Navigator.of(context).pop();
+    return;
+  }
+  Get.back();
+}
+
+Future<void> _animateFaithJourneyPage(
+  PageController? controller,
+  int pageIndex,
+) async {
+  if (controller == null || !controller.hasClients) return;
+  await controller.animateToPage(
+    pageIndex,
+    duration: const Duration(milliseconds: 320),
+    curve: Curves.easeInOutCubic,
+  );
+}
+
+Future<MoodPrayerItem?> _resolveFaithJourneyItem({
+  MoodPrayerItem? item,
+  int connectionIndex = 1,
+}) async {
+  if (item != null) return item;
+  final dayKey = await _currentStreakFlowProgressDayKey();
+  final byDay = await _readStreakFlowItemByDay();
+  final stored = _deserializeMoodPrayerItem(byDay[dayKey]);
+  return stored ?? await MoodPrayerLoader.pickItem(connectionIndex: connectionIndex);
+}
+
+/// Swipeable pager for Home → Faith Journey (Connect, Verse, Devotional, Prayer).
+class FaithJourneyStepPager extends StatefulWidget {
+  const FaithJourneyStepPager({
+    super.key,
+    required this.initialStep,
+    this.item,
+    this.initialSliderValue,
+    this.viewOnly = false,
+    this.connectionIndex = 1,
+    this.stepsCompleted = 4,
   });
+
+  /// 1 = Connect, 2 = Verse, 3 = Devotional, 4 = Prayer
+  final int initialStep;
+  final MoodPrayerItem? item;
+  final double? initialSliderValue;
+  final bool viewOnly;
+  final int connectionIndex;
+  /// Highest completed step (1–4); limits which pages are reachable in the pager.
+  final int stepsCompleted;
+
+  @override
+  State<FaithJourneyStepPager> createState() => _FaithJourneyStepPagerState();
+}
+
+class _FaithJourneyStepPagerState extends State<FaithJourneyStepPager> {
+  late final PageController _pageController;
+  MoodPrayerItem? _item;
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _item = widget.item;
+    _pageController =
+        PageController(initialPage: widget.initialStep.clamp(1, 4) - 1);
+    _pageController.addListener(_handlePageChange);
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    _item ??= await _resolveFaithJourneyItem(
+      connectionIndex: widget.connectionIndex,
+    );
+    if (!mounted) return;
+    precacheStreakPhotoBackgrounds(context);
+    await _syncMusicForPage(widget.initialStep.clamp(1, 4) - 1);
+    if (mounted) setState(() => _ready = true);
+  }
+
+  void _handlePageChange() {
+    if (!_pageController.hasClients) return;
+    final page = _pageController.page;
+    if (page == null) return;
+    _syncMusicForPage(page.round());
+  }
+
+  Future<void> _syncMusicForPage(int pageIndex) async {
+    if (pageIndex == 2 || pageIndex == 3) {
+      final muted = await _StreakFlowBgMusic.getMuted();
+      if (!muted) {
+        await _StreakFlowBgMusic.play();
+      }
+    } else {
+      await _StreakFlowBgMusic.stop();
+    }
+  }
+
+  void _onFaithJourneyItemResolved(MoodPrayerItem item) {
+    if (!mounted) return;
+    setState(() => _item = item);
+  }
+
+  @override
+  void dispose() {
+    _pageController.removeListener(_handlePageChange);
+    _pageController.dispose();
+    _StreakFlowBgMusic.stop();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_ready) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    final item = _item;
+    final canSwipe = widget.stepsCompleted >= 4;
+    return PageView(
+      controller: _pageController,
+      physics: canSwipe
+          ? const BouncingScrollPhysics()
+          : const NeverScrollableScrollPhysics(),
+      children: [
+        StreakConnectionScreen(
+          viewOnly: widget.viewOnly && widget.stepsCompleted >= 1,
+          initialSliderValue: widget.initialSliderValue,
+          openedFromFaithJourney: true,
+          faithJourneyPageController: _pageController,
+          onFaithJourneyItemResolved: _onFaithJourneyItemResolved,
+        ),
+        if (item != null)
+          StreakVerseScreen(
+            item: item,
+            viewOnly: widget.viewOnly && widget.stepsCompleted >= 2,
+            openedFromFaithJourney: true,
+            faithJourneyPageController: _pageController,
+          )
+        else
+          const SizedBox.expand(),
+        if (item != null)
+          StreakDevotionalScreen(
+            item: item,
+            viewOnly: widget.viewOnly && widget.stepsCompleted >= 3,
+            openedFromFaithJourney: true,
+            faithJourneyPageController: _pageController,
+          )
+        else
+          const SizedBox.expand(),
+        if (item != null)
+          StreakPrayerScreen(
+            item: item,
+            viewOnly: widget.viewOnly && widget.stepsCompleted >= 4,
+            openedFromFaithJourney: true,
+            faithJourneyPageController: _pageController,
+          )
+        else
+          const SizedBox.expand(),
+      ],
+    );
+  }
 }
 
 /// Entry point for streak flow. Call when navigating to Home; shows flow once per day first.
@@ -1706,7 +1986,8 @@ class StreakFlowNavigation {
         steps > 0;
     final isMissedYesterdayWithoutOpen = (last == dayBeforeYesterday);
 
-    if (isIncompleteYesterday || isMissedYesterdayWithoutOpen) {
+    if ((isIncompleteYesterday || isMissedYesterdayWithoutOpen) &&
+        started != today) {
       await SharPreferences.setString(
         SharPreferences.streakFlowPausedDate,
         isIncompleteYesterday ? started : yesterday,
@@ -1720,7 +2001,11 @@ class StreakFlowNavigation {
         );
       }
       if (!context.mounted) return;
-      Get.offAll(() => const StreakPausedScreen());
+      Get.offAll(
+        () => const StreakPausedScreen(),
+        transition: Transition.cupertino,
+        duration: const Duration(milliseconds: 350),
+      );
       return;
     }
 
@@ -1728,8 +2013,28 @@ class StreakFlowNavigation {
       _goToHome(context);
       return;
     }
+
+    // Already completed Connection (and maybe more) today — do not restart at
+    // Connection on reopen. Open Reading screen; user can resume pending steps
+    // from Faith Journey.
+    final stepsByDay = await _readStreakFlowStepsByDay();
+    final stepsTodayFromMap = stepsByDay[today] ?? 0;
+    final effectiveSteps =
+        stepsTodayFromMap > steps ? stepsTodayFromMap : steps;
+    if (started == today && effectiveSteps > 0) {
+      _goToHome(context);
+      return;
+    }
+
     if (!context.mounted) return;
-    Get.offAll(() => const StreakConnectionScreen());
+    Get.offAll(
+      () => const UpgradeCheckWrapper(
+        showUpgradeAlert: true,
+        child: StreakConnectionScreen(),
+      ),
+      transition: Transition.cupertino,
+      duration: const Duration(milliseconds: 350),
+    );
   }
 }
 
@@ -1750,6 +2055,9 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) precacheStreakPhotoBackgrounds(context);
+    });
     _loadPausedDate();
   }
 
@@ -1900,27 +2208,28 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
     final isDark = _isStreakDark(context);
     final warmText = isDark ? Colors.white : const Color(0xFF4A2F1D);
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          image: const DecorationImage(
-            image: AssetImage('assets/back1.png'),
-            fit: BoxFit.cover,
+      backgroundColor: _kStreakPhotoPlaceholder,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          _streakPhotoBackgroundImage('assets/back1.png'),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withOpacity(isDark ? 0.52 : 0.42),
+                  Colors.black.withOpacity(isDark ? 0.34 : 0.28),
+                  Colors.black.withOpacity(isDark ? 0.58 : 0.55),
+                ],
+              ),
+            ),
           ),
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              _streakGradientColors(context).first.withOpacity(0.70),
-              _streakGradientColors(context)[1].withOpacity(0.72),
-              _streakGradientColors(context).last.withOpacity(0.74),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
+          _streakPhotoReadabilityOverlays(context),
+          SafeArea(
+            child: Column(
+              children: [
               Padding(
                 padding: EdgeInsets.fromLTRB(
                   isTablet ? 22 : 14,
@@ -2099,8 +2408,20 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
                                     style: TextStyle(
                                       fontSize: isTablet ? 20 : 18,
                                       fontWeight: FontWeight.w600,
-                                      color: warmText,
+                                      color: Colors.white.withOpacity(0.95),
                                       fontFamily: 'Georgia',
+                                      shadows: const [
+                                        Shadow(
+                                          color: Color(0xE6000000),
+                                          blurRadius: 16,
+                                          offset: Offset(0, 2),
+                                        ),
+                                        Shadow(
+                                          color: Color(0x99000000),
+                                          blurRadius: 8,
+                                          offset: Offset(0, 1),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                   const SizedBox(height: 4),
@@ -2246,7 +2567,7 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
                     child: _buildParchmentButton(
                       context: context,
                       label: 'Start New Journey',
-                      onTap: () => _goToHome(context),
+                      onTap: () => _startNewJourneyFromPaused(context),
                       isSecondary: true,
                     ),
                   ),
@@ -2255,6 +2576,7 @@ class _StreakPausedScreenState extends State<StreakPausedScreen> {
             ],
           ),
         ),
+        ],
       ),
     );
   }
@@ -2266,6 +2588,9 @@ class StreakConnectionScreen extends StatefulWidget {
     super.key,
     this.viewOnly = false,
     this.initialSliderValue,
+    this.openedFromFaithJourney = false,
+    this.faithJourneyPageController,
+    this.onFaithJourneyItemResolved,
   });
 
   /// When true, slider is read-only and the flow does not advance / touch streak prefs.
@@ -2273,6 +2598,14 @@ class StreakConnectionScreen extends StatefulWidget {
 
   /// Restored slider position from stored day item (0–1).
   final double? initialSliderValue;
+
+  /// Opened from Home → Faith Journey → Connect (stacked on Daily Journey).
+  final bool openedFromFaithJourney;
+
+  /// When set, this screen is inside [FaithJourneyStepPager] (swipe handled by PageView).
+  final PageController? faithJourneyPageController;
+
+  final ValueChanged<MoodPrayerItem>? onFaithJourneyItemResolved;
 
   @override
   State<StreakConnectionScreen> createState() => _StreakConnectionScreenState();
@@ -2289,7 +2622,9 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
     super.initState();
     if (widget.initialSliderValue != null) {
       _value = _snap(widget.initialSliderValue!.clamp(0.0, 1.0));
-      _sliderInteracted = true;
+      if (!widget.viewOnly) {
+        _sliderInteracted = true;
+      }
     }
     if (!widget.viewOnly) {
       _markStreakFlowStartedToday();
@@ -2329,6 +2664,30 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
   }
 
   double _snap(double v) => (v * 4).round() / 4;
+
+  void _popBackToFaithJourney() {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+      return;
+    }
+    Get.back();
+  }
+
+  void _dismissConnection() {
+    if (widget.openedFromFaithJourney) {
+      _popBackToFaithJourney();
+      return;
+    }
+    if (widget.viewOnly && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+      return;
+    }
+    _goToHome(context);
+  }
+
+  void _returnToHomeFromFaithJourney() {
+    _goToHome(context);
+  }
 
   Widget _connectionHonestyCard(BuildContext context) {
     final textColor = _streakTextColor(context);
@@ -2454,7 +2813,10 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final gradientColors = _streakGradientColors(context);
     return Scaffold(
+      // Prevent yellow/brown flash when this route is dismissed or replaced.
+      backgroundColor: gradientColors.first,
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -2462,7 +2824,7 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: _streakGradientColors(context),
+            colors: gradientColors,
           ),
         ),
         child: SafeArea(
@@ -2471,23 +2833,24 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
               _streakCenteredStepHeader(
                 context: context,
                 step: 1,
-                leftActions: widget.viewOnly
+                leftActions: widget.openedFromFaithJourney
                     ? IconButton(
                         icon: Icon(Icons.arrow_back_ios,
                             color: _streakTextColor(context)),
-                        onPressed: () async {
-                          if (context.mounted &&
-                              Navigator.of(context).canPop()) {
-                            Navigator.of(context).pop();
-                          } else {
-                            Get.back();
-                          }
-                        },
+                        onPressed: _popBackToFaithJourney,
                       )
-                    : const SizedBox(width: 48, height: 48),
+                    : widget.viewOnly
+                        ? IconButton(
+                            icon: Icon(Icons.arrow_back_ios,
+                                color: _streakTextColor(context)),
+                            onPressed: _dismissConnection,
+                          )
+                        : const SizedBox(width: 48, height: 48),
                 rightActions: IconButton(
                   icon: Icon(Icons.close, color: _streakTextColor(context)),
-                  onPressed: () => _goToHome(context),
+                  onPressed: widget.openedFromFaithJourney
+                      ? _returnToHomeFromFaithJourney
+                      : _dismissConnection,
                   tooltip: 'Close',
                 ),
               ),
@@ -2710,7 +3073,7 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                 duration: const Duration(milliseconds: 280),
                 switchInCurve: Curves.easeOutCubic,
                 switchOutCurve: Curves.easeInCubic,
-                child: _sliderInteracted
+                child: _sliderInteracted && !widget.viewOnly
                     ? Padding(
                         key: const ValueKey('honesty-card'),
                         padding: const EdgeInsets.only(top: 28),
@@ -2753,9 +3116,24 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                                   1);
                               await _storeActiveStreakFlowSteps(1);
                               if (!mounted) return;
+                              final storedItem =
+                                  item!.copyWith(connectionSliderValue: _value);
+                              if (widget.faithJourneyPageController != null) {
+                                widget.onFaithJourneyItemResolved
+                                    ?.call(storedItem);
+                                await _animateFaithJourneyPage(
+                                  widget.faithJourneyPageController,
+                                  1,
+                                );
+                                return;
+                              }
                               await precacheStreakPhotoBackgrounds(context);
                               if (!mounted) return;
-                              Get.to(() => StreakVerseScreen(item: item!));
+                              Get.to(() => StreakVerseScreen(
+                                    item: storedItem,
+                                    openedFromFaithJourney:
+                                        widget.openedFromFaithJourney,
+                                  ));
                             },
                           ),
                           const SizedBox(height: 10),
@@ -2769,6 +3147,13 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                               await SharPreferences.setString(
                                   SharPreferences.streakFlowDismissedDate,
                                   today);
+                              // Skip is not streak completion — never queue rating.
+                              await SharPreferences.setInt(
+                                  SharPreferences
+                                      .pendingStreakCompleteCelebration,
+                                  0);
+                              await SharPreferences.setBoolean(
+                                  SharPreferences.deferUpgradeAlert, false);
                               _goToHome(context);
                             },
                             child: Text(
@@ -3000,9 +3385,13 @@ class StreakVerseScreen extends StatefulWidget {
     super.key,
     required this.item,
     this.viewOnly = false,
+    this.openedFromFaithJourney = false,
+    this.faithJourneyPageController,
   });
   final MoodPrayerItem item;
   final bool viewOnly;
+  final bool openedFromFaithJourney;
+  final PageController? faithJourneyPageController;
 
   @override
   State<StreakVerseScreen> createState() => _StreakVerseScreenState();
@@ -3041,21 +3430,27 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
               _streakPhotoTopBar(
                 context: context,
                 step: 2,
-                onBack: () => Get.back(),
-                onClose: () => _goToHome(context),
+                onBack: () {
+                  if (widget.openedFromFaithJourney) {
+                    _popBackToFaithJourney(context);
+                  } else {
+                    Get.back();
+                  }
+                },
+                onClose: () {
+                  if (widget.openedFromFaithJourney) {
+                    _goToHome(context);
+                  } else {
+                    _goToHome(context);
+                  }
+                },
               ),
-              _streakPhotoVerseHeader(
+              _streakPhotoStepHeader(
                 context: context,
+                icon: Icons.menu_book_rounded,
                 title: 'Verse of the Day',
                 subtitle: 'God\'s Word for your heart today.',
               ),
-              Image.asset(
-                'assets/verse-streak-book.png',
-                width: MediaQuery.of(context).size.width > 450 ? 72 : 64,
-                height: MediaQuery.of(context).size.width > 450 ? 72 : 64,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(height: 8),
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
@@ -3122,84 +3517,89 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                   },
                 ),
               ),
-              if (!widget.viewOnly)
-                _streakPhotoVerseBottomShadow(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _streakPhotoVerseSaveShareRow(
-                          saved: _saved,
-                          saveLabel: _saved ? 'Saved' : 'Save',
-                          onSave: () async {
-                            if (_saved) {
-                              await StreakSavedStorage.remove(
-                                  'verse', item.verseReference, item.verseText);
-                              if (mounted) setState(() => _saved = false);
-                              if (context.mounted) {
-                                _showSavedToast(context, saved: false);
-                              }
-                            } else {
-                              await StreakSavedStorage.add(StreakSavedItem(
-                                type: 'verse',
-                                title: item.verseReference,
-                                body: item.verseText,
-                                savedAt: DateTime.now().toIso8601String(),
-                              ));
-                              if (mounted) setState(() => _saved = true);
-                              if (context.mounted) {
-                                _showSavedToast(context, saved: true);
-                              }
+              _streakPhotoVerseBottomShadow(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Always show Save & Share (including after all steps completed).
+                      _streakPhotoVerseSaveShareRow(
+                        saved: _saved,
+                        saveLabel: _saved ? 'Saved' : 'Save',
+                        onSave: () async {
+                          if (_saved) {
+                            await StreakSavedStorage.remove(
+                                'verse', item.verseReference, item.verseText);
+                            if (mounted) setState(() => _saved = false);
+                            if (context.mounted) {
+                              _showSavedToast(context, saved: false);
                             }
-                          },
-                          onShare: () async {
-                            final shareContext = context;
-                            final image = await _captureStreakShareImage(
-                              shareContext,
-                              backgroundAsset: 'assets/back1.png',
-                              content: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    '"${item.verseText}"',
-                                    textAlign: TextAlign.center,
-                                    style: _streakShareBodyStyle(),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    item.verseReference,
-                                    textAlign: TextAlign.center,
-                                    style: _streakShareReferenceStyle(),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (shareContext.mounted) {
-                              await _shareAsImage(
-                                shareContext,
-                                imageBytes: image,
-                                fallbackText:
-                                    '${item.verseText}\n- ${item.verseReference}',
-                              );
+                          } else {
+                            await StreakSavedStorage.add(StreakSavedItem(
+                              type: 'verse',
+                              title: item.verseReference,
+                              body: item.verseText,
+                              savedAt: DateTime.now().toIso8601String(),
+                            ));
+                            if (mounted) setState(() => _saved = true);
+                            if (context.mounted) {
+                              _showSavedToast(context, saved: true);
                             }
-                          },
-                        ),
+                          }
+                        },
+                        onShare: () async {
+                          final shareContext = context;
+                          await _shareStreakFlowImageWithLoader(
+                            shareContext,
+                            backgroundAsset: 'assets/back1.png',
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '"${item.verseText}"',
+                                  textAlign: TextAlign.center,
+                                  style: _streakShareBodyStyle(),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  item.verseReference,
+                                  textAlign: TextAlign.center,
+                                  style: _streakShareReferenceStyle(),
+                                ),
+                              ],
+                            ),
+                            fallbackText:
+                                '${item.verseText}\n- ${item.verseReference}',
+                          );
+                        },
+                      ),
+                      if (!widget.viewOnly) ...[
                         const SizedBox(height: 24),
                         _streakPhotoPrimaryButton(
                           context: context,
                           label: 'Read Devotional',
                           onPressed: () async {
                             await SharPreferences.setInt(
-                                SharPreferences.streakFlowStepsCompletedToday, 2);
+                                SharPreferences.streakFlowStepsCompletedToday,
+                                2);
                             await _storeActiveStreakFlowSteps(2);
                             if (!mounted) return;
+                            if (widget.faithJourneyPageController != null) {
+                              await _animateFaithJourneyPage(
+                                widget.faithJourneyPageController,
+                                2,
+                              );
+                              return;
+                            }
                             await precacheStreakPhotoBackgrounds(context);
                             if (!mounted) return;
                             Get.to(() => StreakDevotionalScreen(
                                   item: item,
                                   viewOnly: widget.viewOnly,
+                                  openedFromFaithJourney:
+                                      widget.openedFromFaithJourney,
                                 ));
                           },
                         ),
@@ -3210,11 +3610,10 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                           style: _streakPhotoCaptionStyle(context),
                         ),
                       ],
-                    ),
+                    ],
                   ),
-                )
-              else
-                const SizedBox(height: 24),
+                ),
+              ),
             ],
           ),
         ),
@@ -3229,9 +3628,13 @@ class StreakDevotionalScreen extends StatefulWidget {
     super.key,
     required this.item,
     this.viewOnly = false,
+    this.openedFromFaithJourney = false,
+    this.faithJourneyPageController,
   });
   final MoodPrayerItem item;
   final bool viewOnly;
+  final bool openedFromFaithJourney;
+  final PageController? faithJourneyPageController;
 
   @override
   State<StreakDevotionalScreen> createState() => _StreakDevotionalScreenState();
@@ -3248,6 +3651,10 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       precacheStreakPhotoBackgrounds(context);
       _loadSaved();
+      if (widget.faithJourneyPageController != null) {
+        await _loadMusicMuted();
+        return;
+      }
       await _loadMusicMuted();
       if (!_isAudioMuted) {
         await _StreakFlowBgMusic.play();
@@ -3297,11 +3704,21 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                 onMusicToggle: _toggleAudio,
                 onBack: () async {
                   await _StreakFlowBgMusic.stop();
-                  if (context.mounted) Get.back();
+                  if (!context.mounted) return;
+                  if (widget.openedFromFaithJourney) {
+                    _popBackToFaithJourney(context);
+                  } else {
+                    Get.back();
+                  }
                 },
                 onClose: () async {
                   await _StreakFlowBgMusic.stop();
-                  if (context.mounted) _goToHome(context);
+                  if (!context.mounted) return;
+                  if (widget.openedFromFaithJourney) {
+                    _goToHome(context);
+                  } else {
+                    _goToHome(context);
+                  }
                 },
               ),
               _streakPhotoStepHeader(
@@ -3346,81 +3763,85 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                   },
                 ),
               ),
-              if (!widget.viewOnly)
-                _streakPhotoVerseBottomShadow(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _streakPhotoSaveShareRow(
-                          saved: _saved,
-                          saveLabel: _saved ? 'Saved' : 'Save',
-                          onSave: () async {
-                            const title = 'Devotional Moment';
-                            if (_saved) {
-                              await StreakSavedStorage.remove(
-                                  'devotional', title, item.devotionalText);
-                              if (mounted) setState(() => _saved = false);
-                              if (context.mounted) {
-                                _showSavedToast(context, saved: false);
-                              }
-                            } else {
-                              await StreakSavedStorage.add(StreakSavedItem(
-                                type: 'devotional',
-                                title: title,
-                                body: item.devotionalText,
-                                savedAt: DateTime.now().toIso8601String(),
-                              ));
-                              if (mounted) setState(() => _saved = true);
-                              if (context.mounted) {
-                                _showSavedToast(context, saved: true);
-                              }
+              _streakPhotoVerseBottomShadow(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Always show Save & Share (including after all steps completed).
+                      _streakPhotoSaveShareRow(
+                        saved: _saved,
+                        saveLabel: _saved ? 'Saved' : 'Save',
+                        onSave: () async {
+                          const title = 'Devotional Moment';
+                          if (_saved) {
+                            await StreakSavedStorage.remove(
+                                'devotional', title, item.devotionalText);
+                            if (mounted) setState(() => _saved = false);
+                            if (context.mounted) {
+                              _showSavedToast(context, saved: false);
                             }
-                          },
-                          onShare: () async {
-                            final shareContext = context;
-                            final image = await _captureStreakShareImage(
-                              shareContext,
-                              backgroundAsset: 'assets/back2.png',
-                              content: Text(
-                                item.devotionalText,
-                                textAlign: TextAlign.center,
-                                style: _streakShareBodyStyle(),
-                              ),
-                            );
-                            if (shareContext.mounted) {
-                              await _shareAsImage(
-                                shareContext,
-                                imageBytes: image,
-                                fallbackText: item.devotionalText,
-                              );
+                          } else {
+                            await StreakSavedStorage.add(StreakSavedItem(
+                              type: 'devotional',
+                              title: title,
+                              body: item.devotionalText,
+                              savedAt: DateTime.now().toIso8601String(),
+                            ));
+                            if (mounted) setState(() => _saved = true);
+                            if (context.mounted) {
+                              _showSavedToast(context, saved: true);
                             }
-                          },
-                        ),
+                          }
+                        },
+                        onShare: () async {
+                          final shareContext = context;
+                          await _shareStreakFlowImageWithLoader(
+                            shareContext,
+                            backgroundAsset: 'assets/back2.png',
+                            content: Text(
+                              item.devotionalText,
+                              textAlign: TextAlign.center,
+                              style: _streakShareBodyStyle(),
+                            ),
+                            fallbackText: item.devotionalText,
+                          );
+                        },
+                      ),
+                      if (!widget.viewOnly) ...[
                         const SizedBox(height: 16),
                         _streakPhotoPrimaryButton(
                           context: context,
                           label: 'Continue to Prayer',
                           onPressed: () async {
                             await SharPreferences.setInt(
-                                SharPreferences.streakFlowStepsCompletedToday, 3);
+                                SharPreferences.streakFlowStepsCompletedToday,
+                                3);
                             await _storeActiveStreakFlowSteps(3);
                             if (!mounted) return;
+                            if (widget.faithJourneyPageController != null) {
+                              await _animateFaithJourneyPage(
+                                widget.faithJourneyPageController,
+                                3,
+                              );
+                              return;
+                            }
                             await precacheStreakPhotoBackgrounds(context);
                             if (!mounted) return;
                             Get.to(() => StreakPrayerScreen(
                                   item: item,
                                   viewOnly: widget.viewOnly,
+                                  openedFromFaithJourney:
+                                      widget.openedFromFaithJourney,
                                 ));
                           },
                         ),
                       ],
-                    ),
+                    ],
                   ),
-                )
-              else
-                const SizedBox(height: 24),
+                ),
+              ),
             ],
           ),
         ),
@@ -3435,9 +3856,13 @@ class StreakPrayerScreen extends StatefulWidget {
     super.key,
     required this.item,
     this.viewOnly = false,
+    this.openedFromFaithJourney = false,
+    this.faithJourneyPageController,
   });
   final MoodPrayerItem item;
   final bool viewOnly;
+  final bool openedFromFaithJourney;
+  final PageController? faithJourneyPageController;
 
   @override
   State<StreakPrayerScreen> createState() => _StreakPrayerScreenState();
@@ -3454,6 +3879,10 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       precacheStreakPhotoBackgrounds(context);
       _loadSaved();
+      if (widget.faithJourneyPageController != null) {
+        await _loadMusicMuted();
+        return;
+      }
       await _loadMusicMuted();
       if (!_isAudioMuted) {
         await _StreakFlowBgMusic.play();
@@ -3503,11 +3932,21 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                 onMusicToggle: _toggleAudio,
                 onBack: () async {
                   await _StreakFlowBgMusic.stop();
-                  if (context.mounted) Get.back();
+                  if (!context.mounted) return;
+                  if (widget.openedFromFaithJourney) {
+                    _popBackToFaithJourney(context);
+                  } else {
+                    Get.back();
+                  }
                 },
                 onClose: () async {
                   await _StreakFlowBgMusic.stop();
-                  if (context.mounted) _goToHome(context);
+                  if (!context.mounted) return;
+                  if (widget.openedFromFaithJourney) {
+                    _goToHome(context);
+                  } else {
+                    _goToHome(context);
+                  }
                 },
               ),
               _streakPhotoStepHeader(
@@ -3552,13 +3991,13 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                   },
                 ),
               ),
-              if (!widget.viewOnly)
-                _streakPhotoVerseBottomShadow(
-                  child: Padding(
+              _streakPhotoVerseBottomShadow(
+                child: Padding(
                   padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Always show Save & Share (including after all steps completed).
                       _streakPhotoSaveShareRow(
                         saved: _saved,
                         saveLabel: _saved ? 'Saved' : 'Save',
@@ -3586,7 +4025,7 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                         },
                         onShare: () async {
                           final shareContext = context;
-                          final image = await _captureStreakShareImage(
+                          await _shareStreakFlowImageWithLoader(
                             shareContext,
                             backgroundAsset: 'assets/back1.png',
                             content: Text(
@@ -3594,16 +4033,11 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                               textAlign: TextAlign.center,
                               style: _streakShareBodyStyle(),
                             ),
+                            fallbackText: item.prayerText,
                           );
-                          if (shareContext.mounted) {
-                            await _shareAsImage(
-                              shareContext,
-                              imageBytes: image,
-                              fallbackText: item.prayerText,
-                            );
-                          }
                         },
                       ),
+                      if (!widget.viewOnly) ...[
                       const SizedBox(height: 16),
                       _streakPhotoPrimaryButton(
                         context: context,
@@ -3667,17 +4101,20 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                                 SharPreferences
                                     .pendingStreakCompleteCelebration,
                                 streakCount);
-                            if (streakCount == 1) {
-                              await SharPreferences.setBoolean(
-                                  SharPreferences.deferUpgradeAlert, true);
-                            }
-                            // Do not show app-open ad immediately on streak completion.
-                            // Instead, schedule it for next cold start (Splash shows it after ~2s).
                             try {
                               final prefs =
                                   await SharedPreferences.getInstance();
-                              await prefs.setString("showopenad", "true");
-                              await SharPreferences.setString('OpenAd', '1');
+                              if (streakCount == 1) {
+                                // Day-1 rating only — suppress open ad so they do not overlap.
+                                await SharPreferences.setBoolean(
+                                    SharPreferences.deferUpgradeAlert, true);
+                                await prefs.setString("showopenad", "false");
+                                await SharPreferences.setString('OpenAd', '1');
+                              } else {
+                                // Later streak days: allow open ad on next cold start only.
+                                await prefs.setString("showopenad", "true");
+                                await SharPreferences.setString('OpenAd', '1');
+                              }
                             } catch (_) {}
                             // Stop background music once Prayer moment is completed.
                             try {
@@ -3828,12 +4265,11 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                             Get.offAll(() => const StreakCompletedScreen());
                           },
                       ),
+                      ],
                     ],
                   ),
                 ),
-                )
-              else
-                const SizedBox(height: 24),
+              ),
             ],
           ),
         ),
@@ -3856,28 +4292,71 @@ class StreakCompletedScreen extends StatefulWidget {
 
 class _StreakCompletedScreenState extends State<StreakCompletedScreen>
     with TickerProviderStateMixin {
-  void _goToHome(BuildContext context) {
-    Future.microtask(() async {
-      try {
-        final provider = Provider.of<DownloadProvider>(context, listen: false);
-        await provider.warmDataBeforeHomeScreen();
-      } catch (e) {
-        debugPrint('warmDataBeforeHomeScreen error: $e');
-      }
-      if (!context.mounted) return;
-      Get.offAll(
-        () => HomeScreen(
-          From: "splash",
-          selectedVerseNumForRead: "",
-          selectedBookForRead: "",
-          selectedChapterForRead: "",
-          selectedBookNameForRead: "",
-          selectedVerseForRead: "",
-        ),
-        transition: Transition.cupertino,
-        duration: const Duration(milliseconds: 350),
+  int _streakDays = 0;
+
+  Future<void> _shareStreakCompleted() async {
+    HapticFeedback.lightImpact();
+    EasyLoading.show(
+      status: 'Preparing...',
+      maskType: EasyLoadingMaskType.clear,
+    );
+    final shareContext = context;
+    final streakDays = _streakDays;
+    try {
+      final image = await _captureStreakShareImage(
+        shareContext,
+        backgroundAsset: 'assets/back1.png',
+        content: _streakCompleteShareContent(streakDays),
       );
-    });
+      await EasyLoading.dismiss();
+      if (!shareContext.mounted) return;
+      await _shareAsImage(
+        shareContext,
+        imageBytes: image,
+        imageFileName: _streakCompletionShareImageFileName(streakDays),
+        fallbackText: _streakCompletionShareMessageWithLink(streakDays),
+        appendAppUrlToFallback: false,
+      );
+    } catch (_) {
+      await EasyLoading.dismiss();
+    }
+  }
+
+  void _goToHome(BuildContext context) {
+    try {
+      final provider = Provider.of<DownloadProvider>(context, listen: false);
+      provider.warmDataBeforeHomeScreen();
+    } catch (e) {
+      debugPrint('warmDataBeforeHomeScreen error: $e');
+    }
+    Get.offAll(
+      () => HomeScreen(
+        From: "splash",
+        selectedVerseNumForRead: "",
+        selectedBookForRead: "",
+        selectedChapterForRead: "",
+        selectedBookNameForRead: "",
+        selectedVerseForRead: "",
+      ),
+      transition: Transition.fadeIn,
+      duration: const Duration(milliseconds: 280),
+      opaque: true,
+    );
+  }
+
+  Future<void> _onContinuePressed(BuildContext context) async {
+    final count = await SharPreferences.getInt(
+        SharPreferences.pendingStreakCompleteCelebration);
+    if (count == 1) {
+      Get.to(
+        () => const LeaveRatingScreen(),
+        transition: Transition.rightToLeft,
+        duration: const Duration(milliseconds: 280),
+        opaque: true,
+      );
+      return;
+    }
+    _goToHome(context);
   }
 
   // ── Unchanged controllers (kept identical) ─────────────────────────────────
@@ -3891,6 +4370,14 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
   @override
   void initState() {
     super.initState();
+    SharPreferences.getInt(SharPreferences.pendingStreakCompleteCelebration)
+        .then((value) {
+      if (!mounted) return;
+      setState(() => _streakDays = value ?? 0);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) precacheStreakPhotoBackgrounds(context);
+    });
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
@@ -3922,6 +4409,7 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
         curve: const Interval(0.15, 0.85, curve: Curves.easeOutQuart),
       ),
     );
+
   }
 
   @override
@@ -4109,15 +4597,11 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
     final screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
+      backgroundColor: _kStreakPhotoPlaceholder,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(
-            'assets/back1.png',
-            fit: BoxFit.cover,
-            width: double.infinity,
-            height: double.infinity,
-          ),
+          _streakPhotoBackgroundImage('assets/back1.png'),
           DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -4168,27 +4652,7 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
                               ),
                             ],
                           ),
-                          onPressed: () async {
-                            final streakDays = await SharPreferences.getInt(
-                                    SharPreferences
-                                        .pendingStreakCompleteCelebration) ??
-                                0;
-                            if (!context.mounted) return;
-                            final shareContext = context;
-                            final image = await _captureStreakShareImage(
-                              shareContext,
-                              backgroundAsset: 'assets/back1.png',
-                              content: _streakCompleteShareContent(streakDays),
-                            );
-                            if (!shareContext.mounted) return;
-                            await _shareAsImage(
-                              shareContext,
-                              imageBytes: image,
-                              fallbackText: streakDays > 0
-                                  ? 'Day $streakDays Streak! I completed my daily streak today.'
-                                  : 'Streak Completed! I finished my daily streak today.',
-                            );
-                          },
+                          onPressed: _shareStreakCompleted,
                           tooltip: 'Share',
                         ),
                       ),
@@ -4279,19 +4743,18 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
                                   faithCreditsEarned: creditsEarned,
                                 ),
                               ),
+                              const SizedBox(height: 20),
+                              _streakPhotoPrimaryButton(
+                                context: context,
+                                label: 'Continue My Journey',
+                                onPressed: () => _onContinuePressed(context),
+                              ),
+                              const SizedBox(height: 24),
                             ],
                           ),
                         );
                       },
                     ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                  child: _streakPhotoPrimaryButton(
-                    context: context,
-                    label: 'Continue My Journey',
-                    onPressed: () => _goToHome(context),
                   ),
                 ),
               ],
@@ -4552,7 +5015,9 @@ class _StreakCompleteStatsBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
       decoration: BoxDecoration(
@@ -4561,10 +5026,12 @@ class _StreakCompleteStatsBar extends StatelessWidget {
         border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             child: _StreakCompleteStatItem(
-              icon: Icons.calendar_today_outlined,
+              iconAsset: 'assets/streak_completed_icons/days_strek.png',
+              tintIconAsset: false,
               iconColor: _kStreakPhotoGold,
               value: '$daysStreak',
               label: 'Days Streak',
@@ -4572,7 +5039,8 @@ class _StreakCompleteStatsBar extends StatelessWidget {
           ),
           Expanded(
             child: _StreakCompleteStatItem(
-              icon: Icons.menu_book_outlined,
+              iconAsset: 'assets/streak_completed_icons/verse-read_complete.png',
+              tintIconAsset: false,
               iconColor: const Color(0xFFB39DDB),
               value: '$versesRead',
               label: 'Verses Read',
@@ -4580,24 +5048,26 @@ class _StreakCompleteStatsBar extends StatelessWidget {
           ),
           Expanded(
             child: _StreakCompleteStatItem(
-              iconAsset: 'assets/prayer_guidance_icons/Thanksgiving.png',
+              iconAsset: 'assets/streak_completed_icons/Mask group.png',
               tintIconAsset: false,
-              iconDisplaySize: 24,
               iconColor: const Color(0xFF81C784),
               value: '$prayersOffered',
-              label: 'Prayers Offered',
+              label: 'Prayer\nOffered',
             ),
           ),
           Expanded(
             child: _StreakCompleteStatItem(
-              icon: Icons.star_outline,
+              iconAsset:
+                  'assets/streak_completed_icons/faith_credits_earned.png',
+              tintIconAsset: false,
               iconColor: const Color(0xFF64B5F6),
               value: '$faithCreditsEarned',
-              label: 'Faith Credits Earned',
+              label: 'Faith Credits\nEarned',
             ),
           ),
         ],
       ),
+    ),
     );
   }
 }
@@ -4607,7 +5077,6 @@ class _StreakCompleteStatItem extends StatelessWidget {
     this.icon,
     this.iconAsset,
     this.tintIconAsset = true,
-    this.iconDisplaySize,
     required this.iconColor,
     required this.value,
     required this.label,
@@ -4616,7 +5085,6 @@ class _StreakCompleteStatItem extends StatelessWidget {
   final IconData? icon;
   final String? iconAsset;
   final bool tintIconAsset;
-  final double? iconDisplaySize;
   final Color iconColor;
   final String value;
   final String label;
@@ -4624,50 +5092,77 @@ class _StreakCompleteStatItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final compact = MediaQuery.of(context).size.width < 360;
-    final iconSize = iconDisplaySize ?? (compact ? 18.0 : 20.0);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (iconAsset != null)
-          Image.asset(
-            iconAsset!,
-            width: iconSize,
-            height: iconSize,
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.high,
-            color: tintIconAsset ? iconColor : null,
-            colorBlendMode: tintIconAsset ? BlendMode.srcIn : null,
-            errorBuilder: (_, __, ___) => Icon(
-              Icons.volunteer_activism_outlined,
-              color: iconColor,
-              size: iconSize,
+    final iconSlotHeight = compact ? 30.0 : 32.0;
+    final labelSlotHeight = compact ? 26.0 : 28.0;
+    final iconSize = compact ? 18.0 : 20.0;
+    final labelStyle = TextStyle(
+      fontSize: compact ? 9 : 10,
+      height: 1.2,
+      color: Colors.white.withOpacity(0.72),
+      fontFamily: 'Georgia',
+    );
+    return SizedBox(
+      width: double.infinity,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            height: iconSlotHeight,
+            width: double.infinity,
+            child: Center(
+              child: iconAsset != null
+                  ? Image.asset(
+                      iconAsset!,
+                      width: iconSize,
+                      height: iconSize,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                      color: tintIconAsset ? iconColor : null,
+                      colorBlendMode: tintIconAsset ? BlendMode.srcIn : null,
+                      errorBuilder: (_, __, ___) => Icon(
+                        Icons.volunteer_activism_outlined,
+                        color: iconColor,
+                        size: iconSize,
+                      ),
+                    )
+                  : Icon(icon!, color: iconColor, size: iconSize),
             ),
-          )
-        else
-          Icon(icon!, color: iconColor, size: iconSize),
-        const SizedBox(height: 6),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: compact ? 18 : 20,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-            fontFamily: 'Georgia',
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          style: TextStyle(
-            fontSize: compact ? 9 : 10,
-            height: 1.2,
-            color: Colors.white.withOpacity(0.72),
-            fontFamily: 'Georgia',
+          const SizedBox(height: 6),
+          Text(
+            value,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: compact ? 18 : 20,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              fontFamily: 'Georgia',
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 4),
+          SizedBox(
+            height: labelSlotHeight,
+            width: double.infinity,
+            child: Align(
+              alignment: Alignment.center,
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                strutStyle: StrutStyle(
+                  fontSize: labelStyle.fontSize,
+                  height: labelStyle.height,
+                  fontFamily: labelStyle.fontFamily,
+                  forceStrutHeight: true,
+                ),
+                style: labelStyle,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

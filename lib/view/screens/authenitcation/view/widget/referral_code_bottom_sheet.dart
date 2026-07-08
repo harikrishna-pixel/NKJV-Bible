@@ -58,7 +58,9 @@ class ReferralCodeBottomSheet extends StatefulWidget {
           ),
         );
       },
-    );
+    ).whenComplete(() {
+      FocusManager.instance.primaryFocus?.unfocus();
+    });
   }
 
   @override
@@ -104,8 +106,13 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
     super.dispose();
   }
 
+  void _dismissKeyboard() {
+    _referralFocusNode.unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
   Future<void> _submitReferral() async {
-    FocusScope.of(context).unfocus();
+    _dismissKeyboard();
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     setState(() => _isSubmitting = true);
@@ -119,13 +126,24 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
       );
       const rewardCredits = 100;
       await WalletService.addCredits(rewardCredits);
-      await updateReferralRewardClaimed(value: rewardCredits);
       if (!mounted) return;
+      _dismissKeyboard();
       Navigator.of(context).pop();
       Constants.showToast('You received 100 free coins!');
     } catch (e) {
       final message = e is String ? e : e.toString();
-      Constants.showToast(message);
+      final lower = message.toLowerCase();
+      // Always show a referral-specific message for apply failures.
+      if (lower.contains('invalid referral') ||
+          lower.contains('own referral') ||
+          lower.contains('already applied') ||
+          lower.contains('please enter') ||
+          lower.contains('no internet') ||
+          lower.contains('something went wrong')) {
+        Constants.showToast(message);
+      } else {
+        Constants.showToast('Invalid Referral code');
+      }
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -416,7 +434,10 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
                       TextButton(
                         onPressed: _isSubmitting
                             ? null
-                            : () => Navigator.of(context).pop(),
+                            : () {
+                                _dismissKeyboard();
+                                Navigator.of(context).pop();
+                              },
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           foregroundColor: CommanColor.weekendColor(context),

@@ -220,33 +220,51 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
     return MoodPrayerLoader.pickItem(connectionIndex: 1);
   }
 
-  /// Same destinations as [_DayJourneyCardsScreen] per step, without pushing the summary screen first.
+  /// Opens a completed step. All 4 done → swipeable pager; otherwise single screen only.
   Future<void> _openTodayFaithStep(int step) async {
     final todayKey = DateTime.now().toIso8601String().split('T')[0];
-    if (step == 1) {
-      if (!mounted) return;
-      final item = await _resolveDayItem(todayKey);
-      if (!mounted) return;
-      Get.to(() => StreakConnectionScreen(
-            viewOnly: true,
+    final item = await _resolveDayItem(todayKey);
+    if (!mounted) return;
+
+    if (_stepsCompletedToday >= 4) {
+      Get.to(() => FaithJourneyStepPager(
+            initialStep: step,
+            item: item,
             initialSliderValue: item?.connectionSliderValue,
+            viewOnly: true,
+            stepsCompleted: 4,
           ));
       return;
     }
-    final item = await _resolveDayItem(todayKey);
-    if (!mounted || item == null) return;
-    await precacheStreakPhotoBackgrounds(context);
-    if (!mounted) return;
+
     switch (step) {
+      case 1:
+        Get.to(() => StreakConnectionScreen(
+              viewOnly: false,
+              initialSliderValue: item?.connectionSliderValue,
+            ));
+        return;
       case 2:
-        Get.to(() => StreakVerseScreen(item: item, viewOnly: true));
-        break;
+        if (item == null) return;
+        Get.to(() => StreakVerseScreen(
+              item: item,
+              viewOnly: false,
+            ));
+        return;
       case 3:
-        Get.to(() => StreakDevotionalScreen(item: item, viewOnly: true));
-        break;
+        if (item == null) return;
+        Get.to(() => StreakDevotionalScreen(
+              item: item,
+              viewOnly: false,
+            ));
+        return;
       case 4:
-        Get.to(() => StreakPrayerScreen(item: item, viewOnly: true));
-        break;
+        if (item == null) return;
+        Get.to(() => StreakPrayerScreen(
+              item: item,
+              viewOnly: false,
+            ));
+        return;
     }
   }
 
@@ -367,7 +385,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                     IconButton(
                       icon: Icon(Icons.library_books_rounded,
                           color: textColor, size: 26),
-                      tooltip: 'Saved',
+                      tooltip: 'Saved to Faith Journey',
                       onPressed: () =>
                           Get.to(() => const StreakSavedListScreen()),
                     ),
@@ -655,8 +673,11 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         completed: _stepsCompletedToday >= 1,
                         onTap: _stepsCompletedToday >= 1
                             ? () async => _openTodayFaithStep(1)
-                            : () =>
-                                Get.to(() => const StreakConnectionScreen()),
+                            : () => Get.to(
+                                  () => const FaithJourneyStepPager(
+                                    initialStep: 1,
+                                  ),
+                                ),
                         textColor: textColor,
                         panelColor: panelColor,
                         isDark: isDark,
@@ -680,10 +701,10 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                                 2);
                             await _storeTodaySteps(2);
                             if (mounted) {
-                              await precacheStreakPhotoBackgrounds(context);
-                              if (mounted) {
-                                Get.to(() => StreakVerseScreen(item: item));
-                              }
+                              Get.to(() => FaithJourneyStepPager(
+                                    initialStep: 2,
+                                    item: item,
+                                  ));
                             }
                           }
                         },
@@ -710,11 +731,10 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                                 2);
                             await _storeTodaySteps(2);
                             if (mounted) {
-                              await precacheStreakPhotoBackgrounds(context);
-                              if (mounted) {
-                                Get.to(
-                                    () => StreakDevotionalScreen(item: item));
-                              }
+                              Get.to(() => FaithJourneyStepPager(
+                                    initialStep: 3,
+                                    item: item,
+                                  ));
                             }
                           }
                         },
@@ -740,8 +760,12 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                                 SharPreferences.streakFlowStepsCompletedToday,
                                 3);
                             await _storeTodaySteps(3);
-                            if (mounted)
-                              Get.to(() => StreakPrayerScreen(item: item));
+                            if (mounted) {
+                              Get.to(() => FaithJourneyStepPager(
+                                    initialStep: 4,
+                                    item: item,
+                                  ));
+                            }
                           }
                         },
                         textColor: textColor,
@@ -1030,6 +1054,66 @@ class _DayJourneyCardsScreen extends StatelessWidget {
   final bool isDark;
   final int stepsCompletedForDay;
 
+  void _openDayStep(BuildContext context, int step) {
+    if (stepsCompletedForDay >= 4) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => FaithJourneyStepPager(
+            initialStep: step,
+            item: item,
+            initialSliderValue: item.connectionSliderValue,
+            viewOnly: true,
+            stepsCompleted: 4,
+          ),
+        ),
+      );
+      return;
+    }
+
+    switch (step) {
+      case 1:
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => StreakConnectionScreen(
+              viewOnly: false,
+              initialSliderValue: item.connectionSliderValue,
+            ),
+          ),
+        );
+        return;
+      case 2:
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => StreakVerseScreen(
+              item: item,
+              viewOnly: false,
+            ),
+          ),
+        );
+        return;
+      case 3:
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => StreakDevotionalScreen(
+              item: item,
+              viewOnly: false,
+            ),
+          ),
+        );
+        return;
+      case 4:
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => StreakPrayerScreen(
+              item: item,
+              viewOnly: false,
+            ),
+          ),
+        );
+        return;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1071,16 +1155,7 @@ class _DayJourneyCardsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 _journeyCard(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => StreakConnectionScreen(
-                          viewOnly: stepsCompletedForDay >= 1,
-                          initialSliderValue: item.connectionSliderValue,
-                        ),
-                      ),
-                    );
-                  },
+                  onTap: () => _openDayStep(context, 1),
                   icon: Icons.favorite,
                   title: 'Connect',
                   subtitle: '1 min · Share how you feel.',
@@ -1090,16 +1165,7 @@ class _DayJourneyCardsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 _journeyCard(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => StreakVerseScreen(
-                          item: item,
-                          viewOnly: stepsCompletedForDay >= 2,
-                        ),
-                      ),
-                    );
-                  },
+                  onTap: () => _openDayStep(context, 2),
                   icon: Icons.menu_book,
                   title: 'Verse of the Day',
                   subtitle: '1 min · Daily reading.',
@@ -1109,16 +1175,7 @@ class _DayJourneyCardsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 _journeyCard(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => StreakDevotionalScreen(
-                          item: item,
-                          viewOnly: stepsCompletedForDay >= 3,
-                        ),
-                      ),
-                    );
-                  },
+                  onTap: () => _openDayStep(context, 3),
                   icon: Icons.auto_stories,
                   title: 'Devotional',
                   subtitle: '2 min · Insight for today.',
@@ -1128,16 +1185,7 @@ class _DayJourneyCardsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 _journeyCard(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => StreakPrayerScreen(
-                          item: item,
-                          viewOnly: stepsCompletedForDay >= 4,
-                        ),
-                      ),
-                    );
-                  },
+                  onTap: () => _openDayStep(context, 4),
                   icon: Icons.local_fire_department,
                   title: 'Prayer',
                   subtitle: '2 min · Talk with Him.',

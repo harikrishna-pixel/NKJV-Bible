@@ -14,6 +14,7 @@ import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:biblebookapp/utils/email_validator.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:get/get.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -127,6 +128,7 @@ class LoginScreen extends HookConsumerWidget {
                               errorText: 'Please enter your email address'),
                           FormBuilderValidators.email(
                               errorText: 'Email is not valid'),
+                          AppEmailValidator.validate,
                         ]),
                       ),
                       const SizedBox(height: 20),

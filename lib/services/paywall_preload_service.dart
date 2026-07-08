@@ -9,6 +9,7 @@ import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/Model/product_details_model.dart' as m;
 import 'package:biblebookapp/view/screens/dashboard/remove_add-screen.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Service to preload Paywall Screen data at app startup
@@ -192,6 +193,55 @@ class PaywallPreloadService {
   /// Check if data has been preloaded
   static bool isPreloaded() {
     return _isPreloaded;
+  }
+
+  /// Whether onboarding should show the IAP paywall (internet + product data).
+  static Future<bool> canShowOnboardingPaywall() async {
+    try {
+      final hasInternet = await InternetConnection().hasInternetAccess;
+      if (!hasInternet) {
+        debugPrint(
+            'PaywallPreloadService: Skip onboarding paywall — no internet');
+        return false;
+      }
+
+      final sixMonthPlan = AppApiConstant.resolveSubscriptionProductId(
+        await SharPreferences.getString('sixMonthPlan'),
+        BibleInfo.sixMonthPlanid,
+      );
+      final oneYearPlan = AppApiConstant.resolveSubscriptionProductId(
+        await SharPreferences.getString('oneYearPlan'),
+        BibleInfo.oneYearPlanid,
+      );
+      if (sixMonthPlan.isEmpty || oneYearPlan.isEmpty) {
+        debugPrint(
+            'PaywallPreloadService: Skip onboarding paywall — product IDs missing');
+        return false;
+      }
+
+      if (_preloadedProducts.isNotEmpty) {
+        return true;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final cachedList = prefs.getStringList(_cacheKey);
+      if (cachedList != null && cachedList.isNotEmpty) {
+        return true;
+      }
+
+      if (_isAvailable == false) {
+        debugPrint(
+            'PaywallPreloadService: Skip onboarding paywall — IAP unavailable');
+        return false;
+      }
+
+      debugPrint(
+          'PaywallPreloadService: Skip onboarding paywall — no product data');
+      return false;
+    } catch (e) {
+      debugPrint('PaywallPreloadService: canShowOnboardingPaywall error: $e');
+      return false;
+    }
   }
 
   /// Reset preload status (useful for testing or re-preloading)
