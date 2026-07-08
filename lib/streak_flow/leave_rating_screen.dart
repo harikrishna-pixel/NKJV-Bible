@@ -29,6 +29,7 @@ class _LeaveRatingScreenState extends State<LeaveRatingScreen> {
   static const String _kBookIcon = 'assets/leave_rating/Book icon.png';
   static const String _kShieldIcon = 'assets/leave_rating/Shield icon.png';
   static const String _kStarsIcon = 'assets/leave_rating/Star icon.png';
+  static const String _kThumbsUpIcon = 'assets/leave_rating/thumbsup_icon.png';
 
   bool _showRatedLink = false;
   bool _ratingRequestStarted = false;
@@ -167,27 +168,12 @@ class _LeaveRatingScreenState extends State<LeaveRatingScreen> {
     return SizedBox(
       width: size,
       height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Icon(
-            Icons.thumb_up_alt_rounded,
-            size: size * 0.92,
-            color: Colors.white,
-            shadows: [
-              Shadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          Icon(
-            Icons.thumb_up_alt_outlined,
-            size: size * 0.92,
-            color: _kGold,
-          ),
-        ],
+      child: Image.asset(
+        _kThumbsUpIcon,
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
       ),
     );
   }
