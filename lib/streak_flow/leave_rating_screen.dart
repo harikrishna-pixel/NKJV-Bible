@@ -249,33 +249,6 @@ class _LeaveRatingScreenState extends State<LeaveRatingScreen> {
             right: ringSize * 0.2,
             child: _sparkle(size: 10, opacity: 0.68),
           ),
-          // Soft drop shadow under thumb — must stay inside the circle.
-          Positioned(
-            bottom: ringSize * 0.06,
-            child: Container(
-              width: thumbSize * 0.72,
-              height: 8,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(999),
-                gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [
-                    Colors.black.withOpacity(0.0),
-                    Colors.black.withOpacity(0.12),
-                    Colors.black.withOpacity(0.0),
-                  ],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 8,
-                    spreadRadius: 0,
-                  ),
-                ],
-              ),
-            ),
-          ),
           Positioned(
             bottom: ringSize * 0.12,
             child: _referenceThumb(thumbSize),
