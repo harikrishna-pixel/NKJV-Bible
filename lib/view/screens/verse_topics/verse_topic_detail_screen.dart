@@ -80,24 +80,28 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
           Navigator.of(dialogContext).pop();
           await _shareAsText(verse);
         },
-        onShareAsImage: () {
+        onShareAsImage: () async {
           Navigator.of(dialogContext).pop();
-          // Reuse existing controller when available; avoid PackageInfo await (footer unused).
-          final controller = Get.isRegistered<DashBoardController>()
-              ? Get.find<DashBoardController>()
-              : DashBoardController();
+          final appPackageName =
+              (await PackageInfo.fromPlatform()).packageName;
+          final appid = BibleInfo.apple_AppId;
+          final shareFooterMessage = Platform.isAndroid
+              ? '\n\nYou can read more at:\nhttps://play.google.com/store/apps/details?id=$appPackageName'
+              : '\n\nYou can read more at:\nhttps://itunes.apple.com/app/id$appid';
+          final controller = DashBoardController();
           if (!mounted) return;
-          showModalBottomSheet<void>(
+          await showModalBottomSheet<void>(
             isScrollControlled: true,
             backgroundColor: Colors.transparent,
             context: context,
             builder: (sheetContext) {
-              return ImageBottomSheets(
+              return ImageBottomSheets.dailyVerse(
                 controller: controller,
                 content: verse.contentHtml,
                 selectedBook: verse.bookName,
                 selectedChapter: '${verse.chapterNum + 1}',
                 selectedVerseView: '${verse.verseNum + 1}',
+                shareFooterMessage: shareFooterMessage,
               );
             },
           );
@@ -157,7 +161,10 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
       controller.selectedBookNumForRead.value = '$bookNum';
       controller.selectedChapterForRead.value = '$chapter';
       controller.selectedVerseForRead.value = '$verseIndex';
+      controller.isFetchContent.value = true;
+      controller.selectedBookContent.clear();
       await controller.getSelectedChapterAndBook();
+      controller.isFetchContent.value = false;
       controller.readHighlight.value = true;
       controller.selectedIndex.value = verseIndex;
       if (Navigator.of(context).canPop()) {

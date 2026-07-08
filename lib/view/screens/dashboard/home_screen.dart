@@ -1269,7 +1269,10 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _runDeferredHomeStartupTasks() async {
     final pendingCelebration = await SharPreferences.getInt(
         SharPreferences.pendingStreakCompleteCelebration);
-    if (pendingCelebration == 1) {
+    final hasShownLeaveRating = await SharPreferences.getBoolean(
+            SharPreferences.hasShownLeaveRatingScreen) ??
+        false;
+    if (pendingCelebration == 1 && !hasShownLeaveRating) {
       await SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, true);
       _deferUpgradeAfterStreakRating = true;
       _streakRatingSawLifecyclePause = false;
@@ -1332,7 +1335,13 @@ class _HomeScreenState extends State<HomeScreen>
     // Fallback only: rating was not shown on Streak Completed screen.
     await SharPreferences.setString(
         SharPreferences.streakCelebrationShownDate, today);
-    if (count == 1) {
+    final hasShownLeaveRating = await SharPreferences.getBoolean(
+            SharPreferences.hasShownLeaveRatingScreen) ??
+        false;
+    // Day-1 review only once ever (same rule as LeaveRatingScreen).
+    if (count == 1 && !hasShownLeaveRating) {
+      await SharPreferences.setBoolean(
+          SharPreferences.hasShownLeaveRatingScreen, true);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('showopenad', 'false');
       await SharPreferences.setString('OpenAd', '1');
@@ -1489,8 +1498,12 @@ class _HomeScreenState extends State<HomeScreen>
     required double screenWidth,
     required VoidCallback onTap,
   }) {
+    final controllerBook = controller.selectedBook.value.toString().trim();
+    final effectiveBookName = controllerBook.isNotEmpty
+        ? controllerBook
+        : (selectedBookname?.toString().trim() ?? '');
     final displayBookName = _formatAppBarBookName(
-      '${selectedBookname ?? controller.selectedBook}',
+      effectiveBookName,
     );
     final arrowSize = screenWidth > 450 ? 39.0 : 24.0;
 
@@ -5355,6 +5368,8 @@ class _HomeScreenState extends State<HomeScreen>
                                 return false;
                               },
                               child: ListView.builder(
+                              key: ValueKey(
+                                  'reader_chapter_${controller.selectedChapter.value}'),
                               scrollDirection: controller.scrollDirection,
                               controller: controller.autoScrollController.value,
                               itemCount: readerVerses.length,
@@ -5376,7 +5391,8 @@ class _HomeScreenState extends State<HomeScreen>
                               itemBuilder: (context, index) {
                                 var data = readerVerses[index];
                                 return AutoScrollTag(
-                                  key: ValueKey(index),
+                                  key: ValueKey(
+                                      '${controller.selectedChapter.value}_$index'),
                                   controller:
                                       controller.autoScrollController.value,
                                   index: index,

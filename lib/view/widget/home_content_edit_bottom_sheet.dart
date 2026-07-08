@@ -6977,22 +6977,8 @@ class ImageBottomSheet extends StatelessWidget {
 const String _kVerseImageBg = 'assets/verse_image_bg.png';
 
 Color verseShareTextColorForBackgroundIndex(int index) {
-  const lightText = Color(0xFFF8F4EB);
-  const darkText = Color(0xFF2E2118);
-  const warmDark = Color(0xFF3D2914);
-  const colors = <Color>[
-    darkText,
-    lightText,
-    warmDark,
-    lightText,
-    darkText,
-    lightText,
-    warmDark,
-    lightText,
-    darkText,
-    lightText,
-  ];
-  return colors[index % colors.length];
+  // Keep verse text black for all backgrounds when tapping to change image.
+  return const Color(0xFF000000);
 }
 
 /// Decorative verse share card used when capturing verse wallpaper images.

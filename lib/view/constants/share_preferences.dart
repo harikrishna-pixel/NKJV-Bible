@@ -137,6 +137,8 @@ class SharPreferences {
   static const mainFeedbackFromVerseActions = 'main_feedback_from_verse_actions';
   /// Home: hold update alert until streak day-1 rating is dismissed.
   static const deferUpgradeAlert = 'defer_upgrade_alert';
+  /// Leave Rating screen after first streak completion — show once ever.
+  static const hasShownLeaveRatingScreen = 'has_shown_leave_rating_screen';
   /// Intro update popup: user tapped Remind Later (show full popup after 3 days).
   static const upgradeIntroRemindLaterAt = 'upgrade_intro_remind_later_at';
   /// User closed the update alert — do not show it again.

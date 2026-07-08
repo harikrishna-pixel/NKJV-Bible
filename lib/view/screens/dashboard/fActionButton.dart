@@ -872,24 +872,24 @@ class floatingButtonState extends State<floatingButton>
       // Update the reading screen via controller
       try {
         final controller = Get.find<DashBoardController>();
-        // Update controller's observable values directly first to ensure UI updates immediately
-        controller.selectedChapter.value = chapterNum.toString();
-        controller.selectChapterChange.value = chapterNum;
-
-        // Also update the "ForRead" values which are used by getBookContentForRead
+        // Drive the reload via prefs + "ForRead" values, so the controller doesn't
+        // early-return thinking the already-visible content matches the new chapter.
         controller.selectedChapterForRead.value = chapterNum.toString();
+        controller.selectChapterChange.value = chapterNum;
 
-        // Then call getSelectedChapterAndBook to load content from database
-        // This method reads from SharedPreferences (which we just updated) and updates controller values
-        controller.getSelectedChapterAndBook();
-        // Also call getBookContentForRead to ensure content is loaded
-        controller.getBookContentForRead();
-        // Give enough time for all nested async operations to complete
-        await Future.delayed(const Duration(milliseconds: 500));
+        // Await chapter loads sequentially so ListView/AutoScrollTag does not
+        // rebuild from overlapping content updates (avoids LateInitializationError).
+        await controller.getSelectedChapterAndBook();
+        await controller.getBookContentForRead();
 
-        // Final update to ensure values are set after database operations
+        // Ensure the in-memory selected chapter matches what we just loaded.
         controller.selectedChapter.value = chapterNum.toString();
         controller.selectChapterChange.value = chapterNum;
+
+        final scrollCtrl = controller.autoScrollController.value;
+        if (scrollCtrl.hasClients) {
+          scrollCtrl.jumpTo(0);
+        }
 
         // Update _storedBookName from controller or SharedPreferences
         final updatedBookName = controller.selectedBook.value.isNotEmpty
@@ -995,13 +995,10 @@ class floatingButtonState extends State<floatingButton>
           controller.selectChapterChange.value = chapterNum;
           controller.selectedBookChapterCount.value = chapterCount.toString();
 
-          // Now call getSelectedChapterAndBook to load content from database
-          // This will read from SharedPreferences and ensure all data is loaded
-          controller.getSelectedChapterAndBook();
-          // Also call getBookContentForRead to ensure content is loaded
-          controller.getBookContentForRead();
-          // Give enough time for all nested async operations to complete
-          await Future.delayed(const Duration(milliseconds: 600));
+          // Await chapter loads sequentially so ListView/AutoScrollTag does not
+          // rebuild from overlapping content updates (avoids LateInitializationError).
+          await controller.getSelectedChapterAndBook();
+          await controller.getBookContentForRead();
 
           // One more update to ensure values are set after database operations
           controller.selectedBook.value = bookName;
@@ -1016,9 +1013,8 @@ class floatingButtonState extends State<floatingButton>
             controller.selectedChapter.value = chapterNum.toString();
             controller.selectChapterChange.value = chapterNum;
             controller.selectedBookChapterCount.value = chapterCount.toString();
-            controller.getSelectedChapterAndBook();
-            controller.getBookContentForRead();
-            await Future.delayed(const Duration(milliseconds: 600));
+            await controller.getSelectedChapterAndBook();
+            await controller.getBookContentForRead();
             controller.selectedBook.value = bookName;
             controller.selectedChapter.value = chapterNum.toString();
           } catch (retryError) {

@@ -251,6 +251,7 @@ class ProfileUpdateApi {
     required String referralCode,
     String? email,
     String? name,
+    String? password,
   }) async {
     final Uri uri =
         Uri.parse(AppApiConstant.baseurl + AppApiConstant.updateprofleapi);
@@ -259,35 +260,26 @@ class ProfileUpdateApi {
 
     try {
       final cachedName = await cacheNotifier.readCache(key: 'name');
+      final cachedEmail = await cacheNotifier.readCache(key: 'user');
       final resolvedName = (name?.trim().isNotEmpty == true
               ? name!.trim()
               : cachedName?.toString().trim()) ??
           '';
+      final resolvedEmail = (email?.trim().isNotEmpty == true
+              ? email!.trim()
+              : cachedEmail?.toString().trim()) ??
+          '';
+      final resolvedPassword = password?.trim() ?? '';
       final code = referralCode.trim();
       final userId = userid.toString();
       final appId = BibleInfo.appID.toString();
 
       String? lastBody;
 
-      // Skip email in profile-update payloads — existing accounts return 400
-      // "Email already exists" whenever email is included with referral fields.
+      // Backend profile-update requires name+email for action 1 (see 422 logs).
+      // Action 2 requires password + old_password when provided.
       final profileAttempts = <Map<String, String>>[
-        {
-          'action': '2',
-          'key': 'referred_by',
-          'value': code,
-          'user_id': userId,
-          'app_id': appId,
-          if (resolvedName.isNotEmpty) 'name': resolvedName,
-        },
-        {
-          'action': '1',
-          'key': 'referred_by',
-          'value': code,
-          'user_id': userId,
-          'app_id': appId,
-        },
-        if (resolvedName.isNotEmpty)
+        if (resolvedName.isNotEmpty && resolvedEmail.isNotEmpty)
           {
             'action': '1',
             'key': 'referred_by',
@@ -295,6 +287,43 @@ class ProfileUpdateApi {
             'user_id': userId,
             'app_id': appId,
             'name': resolvedName,
+            'email': resolvedEmail,
+          },
+        if (resolvedEmail.isNotEmpty)
+          {
+            'action': '1',
+            'key': 'referred_by',
+            'value': code,
+            'user_id': userId,
+            'app_id': appId,
+            'email': resolvedEmail,
+            if (resolvedName.isNotEmpty) 'name': resolvedName,
+          },
+        if (resolvedPassword.isNotEmpty &&
+            resolvedName.isNotEmpty &&
+            resolvedEmail.isNotEmpty)
+          {
+            'action': '2',
+            'key': 'referred_by',
+            'value': code,
+            'user_id': userId,
+            'app_id': appId,
+            'name': resolvedName,
+            'email': resolvedEmail,
+            'password': resolvedPassword,
+            'old_password': resolvedPassword,
+          },
+        // Also try sending the invite code as referral_code (same action 1 shape).
+        if (resolvedName.isNotEmpty && resolvedEmail.isNotEmpty)
+          {
+            'action': '1',
+            'key': 'referral_code',
+            'value': code,
+            'user_id': userId,
+            'app_id': appId,
+            'name': resolvedName,
+            'email': resolvedEmail,
+            'referred_by': code,
           },
       ];
 

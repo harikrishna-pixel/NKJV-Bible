@@ -78,6 +78,8 @@ class _LeaveRatingScreenState extends State<LeaveRatingScreen> {
     final today = DateTime.now().toIso8601String().split('T')[0];
     await SharPreferences.setString(
         SharPreferences.streakCelebrationShownDate, today);
+    await SharPreferences.setBoolean(
+        SharPreferences.hasShownLeaveRatingScreen, true);
     await SharPreferences.setInt(
         SharPreferences.pendingStreakCompleteCelebration, 0);
   }
@@ -195,99 +197,105 @@ class _LeaveRatingScreenState extends State<LeaveRatingScreen> {
     final starsWidth = isCompact ? 176.0 : 196.0;
     final thumbSize = isCompact ? 108.0 : 120.0;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          width: ringSize,
-          height: ringSize,
-          child: Stack(
-            alignment: Alignment.center,
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: ringSize,
-                height: ringSize,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFF9F1DC).withOpacity(0.9),
-                  border: Border.all(
-                    color: _kGold.withOpacity(0.34),
-                    width: 1.4,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _kGold.withOpacity(0.22),
-                      blurRadius: 26,
-                      spreadRadius: 1,
-                    ),
+    return SizedBox(
+      width: ringSize,
+      height: ringSize,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.hardEdge,
+        children: [
+          Container(
+            width: ringSize,
+            height: ringSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFFF9F1DC).withOpacity(0.9),
+              border: Border.all(
+                color: _kGold.withOpacity(0.34),
+                width: 1.4,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: _kGold.withOpacity(0.22),
+                  blurRadius: 26,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: ringSize * 0.9,
+            height: ringSize * 0.9,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: _kGold.withOpacity(0.14),
+                width: 1,
+              ),
+            ),
+          ),
+          Positioned(
+            top: ringSize * 0.07,
+            child: Image.asset(
+              _kStarsIcon,
+              width: starsWidth,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+            ),
+          ),
+          Positioned(
+            top: ringSize * 0.34,
+            left: ringSize * 0.14,
+            child: _sparkle(size: 10, opacity: 0.7),
+          ),
+          Positioned(
+            top: ringSize * 0.36,
+            right: ringSize * 0.14,
+            child: _sparkle(size: 11, opacity: 0.75),
+          ),
+          Positioned(
+            bottom: ringSize * 0.28,
+            left: ringSize * 0.2,
+            child: _sparkle(size: 9, opacity: 0.65),
+          ),
+          Positioned(
+            bottom: ringSize * 0.3,
+            right: ringSize * 0.2,
+            child: _sparkle(size: 10, opacity: 0.68),
+          ),
+          // Soft drop shadow under thumb — must stay inside the circle.
+          Positioned(
+            bottom: ringSize * 0.06,
+            child: Container(
+              width: thumbSize * 0.72,
+              height: 8,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Colors.black.withOpacity(0.0),
+                    Colors.black.withOpacity(0.12),
+                    Colors.black.withOpacity(0.0),
                   ],
                 ),
-              ),
-              Container(
-                width: ringSize * 0.9,
-                height: ringSize * 0.9,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: _kGold.withOpacity(0.14),
-                    width: 1,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    spreadRadius: 0,
                   ),
-                ),
+                ],
               ),
-              Positioned(
-                top: ringSize * 0.07,
-                child: Image.asset(
-                  _kStarsIcon,
-                  width: starsWidth,
-                  fit: BoxFit.contain,
-                  filterQuality: FilterQuality.high,
-                ),
-              ),
-              Positioned(
-                top: ringSize * 0.34,
-                left: ringSize * 0.14,
-                child: _sparkle(size: 10, opacity: 0.7),
-              ),
-              Positioned(
-                top: ringSize * 0.36,
-                right: ringSize * 0.14,
-                child: _sparkle(size: 11, opacity: 0.75),
-              ),
-              Positioned(
-                bottom: ringSize * 0.28,
-                left: ringSize * 0.2,
-                child: _sparkle(size: 9, opacity: 0.65),
-              ),
-              Positioned(
-                bottom: ringSize * 0.3,
-                right: ringSize * 0.2,
-                child: _sparkle(size: 10, opacity: 0.68),
-              ),
-              Positioned(
-                bottom: ringSize * 0.1,
-                child: _referenceThumb(thumbSize),
-              ),
-            ],
+            ),
           ),
-        ),
-        const SizedBox(height: 10),
-        Container(
-          width: ringSize * 0.48,
-          height: 9,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            color: Colors.black.withOpacity(0.1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.16),
-                blurRadius: 10,
-                spreadRadius: 1,
-              ),
-            ],
+          Positioned(
+            bottom: ringSize * 0.12,
+            child: _referenceThumb(thumbSize),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

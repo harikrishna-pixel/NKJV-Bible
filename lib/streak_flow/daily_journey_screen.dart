@@ -33,41 +33,54 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   bool _loaded = false;
   int _currentStreak = 0;
   Map<String, int> _stepsByDay = {};
-  // Rotates the weekly calendar to start from the app install day.
-  // 0=Sun, 1=Mon, ..., 6=Sat (matches StreakService.getWeekDayStatuses order).
-  int _installWeekStartIndexInSun = 0;
+  List<String> _completedDates = [];
   DateTime? _installDateOnly;
 
   DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
-  /// First day of the current 7-day Faith Journey week (anchored to install weekday).
-  DateTime _currentInstallWeekStart() {
-    final now = DateTime.now();
-    final todayWeekdayIndexInSun = now.weekday % 7;
-    final todayViewIndex =
-        (todayWeekdayIndexInSun - _installWeekStartIndexInSun + 7) % 7;
-    return _dateOnly(now).subtract(Duration(days: todayViewIndex));
+  DateTime _journeyAnchor() => _installDateOnly ?? _dateOnly(DateTime.now());
+
+  /// Journey slots 0–6 map to install day through install+6 (7-day challenge from start).
+  DateTime _dayDateForViewIndex(int viewIndex) =>
+      _journeyAnchor().add(Duration(days: viewIndex));
+
+  int? _todayJourneyViewIndex() {
+    final anchor = _journeyAnchor();
+    final today = _dateOnly(DateTime.now());
+    final diff = today.difference(anchor).inDays;
+    if (diff < 0 || diff > 6) return null;
+    return diff;
   }
 
-  DateTime _dayDateForViewIndex(int viewIndex) =>
-      _currentInstallWeekStart().add(Duration(days: viewIndex));
+  String _weekdayLabelForDate(DateTime d) {
+    const labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return labels[d.weekday % 7];
+  }
 
-  String _dayKeyForViewIndex(int viewIndex) =>
-      _dayDateForViewIndex(viewIndex).toIso8601String().split('T')[0];
+  bool _isDayFullyCompleted(String dayKey) {
+    return (_stepsByDay[dayKey] ?? 0) >= 4 ||
+        _completedDates.contains(dayKey);
+  }
 
   WeekDayStatus _statusForInstallWeekDay(DateTime dayDate) {
     final today = _dateOnly(DateTime.now());
     final d = _dateOnly(dayDate);
-    if (_installDateOnly != null && d.isBefore(_installDateOnly!)) {
+    final anchor = _journeyAnchor();
+    final journeyEnd = anchor.add(const Duration(days: 6));
+
+    if (d.isBefore(anchor) || d.isAfter(journeyEnd)) {
       return WeekDayStatus.future;
     }
     if (d.isAfter(today)) return WeekDayStatus.future;
     if (d == today) return WeekDayStatus.ongoing;
+
     final dayKey = d.toIso8601String().split('T')[0];
-    final steps = _stepsByDay[dayKey] ?? 0;
-    if (steps >= 4) return WeekDayStatus.completed;
+    if (_isDayFullyCompleted(dayKey)) return WeekDayStatus.completed;
     return WeekDayStatus.missed;
   }
+
+  String _dayKeyForViewIndex(int viewIndex) =>
+      _dayDateForViewIndex(viewIndex).toIso8601String().split('T')[0];
 
   @override
   void initState() {
@@ -106,9 +119,11 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
         todayKey,
       );
     }
-    final installIndexInSun = installDate.weekday % 7;
     final rawStepsMap =
         await SharPreferences.getString(SharPreferences.streakFlowStepsByDay);
+    final completedDates =
+        await SharPreferences.getStringList(SharPreferences.streakCompletedDates) ??
+            <String>[];
     Map<String, int> parsedStepsMap = {};
     if (rawStepsMap != null && rawStepsMap.trim().isNotEmpty) {
       try {
@@ -128,7 +143,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
         _stepsCompletedToday = steps;
         _currentStreak = streak;
         _stepsByDay = parsedStepsMap;
-        _installWeekStartIndexInSun = installIndexInSun;
+        _completedDates = List<String>.from(completedDates);
         _installDateOnly = _dateOnly(installDate);
         _loaded = true;
       });
@@ -318,8 +333,6 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width > 450;
 
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isVintage =
         themeProvider.currentCustomTheme == AppCustomTheme.vintage;
@@ -340,12 +353,8 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
         ? Colors.white.withOpacity(0.12)
         : (isWhiteLight ? const Color(0xFFF0F0F0) : _panel);
 
-    // Rotated calendar: view index 0 corresponds to install weekday.
-    final int todayWeekdayIndexInSun =
-        DateTime.now().weekday % 7; // Sun=0..Sat=6
-    final int todayViewIndex =
-        (todayWeekdayIndexInSun - _installWeekStartIndexInSun + 7) % 7; 
-
+    // Journey slots 0–6 = install day through install+6.
+    final int? todayViewIndex = _todayJourneyViewIndex();
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -428,12 +437,11 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                           Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: List.generate(7, (i) {
-                          final baseIndex =
-                              (i + _installWeekStartIndexInSun) % 7;
                           final dayDate = _dayDateForViewIndex(i);
                           final dayKey = dayDate.toIso8601String().split('T')[0];
+                          final dayLabel = _weekdayLabelForDate(dayDate);
                           final status = _statusForInstallWeekDay(dayDate);
-                          final isToday = i == todayViewIndex;
+                          final isToday = todayViewIndex == i;
                           final todayFullyCompleted =
                               isToday && _stepsCompletedToday >= 4;
                           final storedSteps = _stepsByDay[dayKey];
@@ -444,7 +452,8 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                               ? ((_stepsByDay[dayKey] ?? 0) > 0
                                   ? (_stepsByDay[dayKey] ?? 0)
                                   : _stepsCompletedToday)
-                              : (storedSteps ?? 0);
+                              : (storedSteps ??
+                                  (_completedDates.contains(dayKey) ? 4 : 0));
                           final bool storedCompleted =
                               effectiveStepsForDay >= 4;
 
@@ -456,6 +465,11 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                           final bool isMissed = status == WeekDayStatus.missed;
                           final bool isFutureDay =
                               status == WeekDayStatus.future;
+                          final bool isStartedNotFinished = !isFutureDay &&
+                              !isCompleted &&
+                              !isToday &&
+                              effectiveStepsForDay > 0 &&
+                              effectiveStepsForDay < 4;
                           Color circleColor = panelColor.withOpacity(0.8);
                           Color borderColor = textColor.withOpacity(0.2);
                           Color iconColor = textColor.withOpacity(
@@ -465,7 +479,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                             circleColor = panelColor.withOpacity(0.75);
                             borderColor = textColor.withOpacity(0.25);
                             borderWidth = 1;
-                          } else if (isOngoing) {
+                          } else if (isOngoing || isStartedNotFinished) {
                             circleColor = _gold.withOpacity(0.2);
                             borderColor = _gold.withOpacity(0.35);
                             borderWidth = 1.5;
@@ -479,8 +493,8 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                             borderColor = textColor.withOpacity(0.3);
                             iconColor = textColor.withOpacity(0.4);
                           }
-                          final showLock =
-                              isFutureDay || isMissed && !storedCompleted;
+                          final showLock = isFutureDay ||
+                              (isMissed && effectiveStepsForDay == 0);
                           return Column(
                             children: [
                               GestureDetector(
@@ -490,7 +504,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                                   effectiveCompleted: isCompleted,
                                   textColor: textColor,
                                   panelColor: panelColor,
-                                  dayLabel: days[baseIndex],
+                                  dayLabel: dayLabel,
                                 ),
                                 child: Container(
                                   width: isTablet ? 44 : 38,
@@ -508,7 +522,9 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                                     children: [
                                       // Show correct partial/full ring based on the real
                                       // number of steps completed for this day (0-4).
-                                      if ((isOngoing || isCompleted) &&
+                                      if ((isOngoing ||
+                                              isStartedNotFinished ||
+                                              isCompleted) &&
                                           effectiveStepsForDay > 0)
                                         SizedBox(
                                           width: isTablet ? 44 : 38,
@@ -552,7 +568,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                days[baseIndex],
+                                dayLabel,
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: textColor,

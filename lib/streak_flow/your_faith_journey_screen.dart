@@ -125,7 +125,9 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
     final todayOnly = _dateOnly(today);
     if (d.isAfter(todayOnly) || d == todayOnly) return false;
     if (_completedDates.contains(key)) return false;
-    if ((_stepsByDay[key] ?? 0) >= 4) return false;
+    final steps = _stepsByDay[key] ?? 0;
+    if (steps >= 4) return false;
+    if (steps > 0) return false;
     if (_installDateOnly != null && d.isBefore(_installDateOnly!)) return false;
     return true;
   }
@@ -369,9 +371,12 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
                   final isToday = date.year == today.year &&
                       date.month == today.month &&
                       date.day == today.day;
+                  final steps = _stepsByDay[key] ?? 0;
                   final isCompleted = _completedDates.contains(key) ||
-                      (_stepsByDay[key] ?? 0) >= 4;
-                  final isStartedNotFinished = _startedNotFinishedDate == key;
+                      steps >= 4;
+                  final isStartedNotFinished =
+                      (steps > 0 && steps < 4 && !isCompleted) ||
+                      (_startedNotFinishedDate == key && !isCompleted);
                   final isMissed = _isMissedDay(date, key, today);
                   rowChildren.add(
                     SizedBox(

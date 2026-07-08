@@ -4293,6 +4293,8 @@ class StreakCompletedScreen extends StatefulWidget {
 class _StreakCompletedScreenState extends State<StreakCompletedScreen>
     with TickerProviderStateMixin {
   int _streakDays = 0;
+  bool _showStreakCompletedToast = true;
+  Timer? _streakCompletedToastTimer;
 
   Future<void> _shareStreakCompleted() async {
     HapticFeedback.lightImpact();
@@ -4347,7 +4349,13 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
   Future<void> _onContinuePressed(BuildContext context) async {
     final count = await SharPreferences.getInt(
         SharPreferences.pendingStreakCompleteCelebration);
-    if (count == 1) {
+    final hasShownLeaveRating = await SharPreferences.getBoolean(
+            SharPreferences.hasShownLeaveRatingScreen) ??
+        false;
+    // Leave Rating only after the very first streak completion — never again.
+    if (count == 1 && !hasShownLeaveRating) {
+      await SharPreferences.setBoolean(
+          SharPreferences.hasShownLeaveRatingScreen, true);
       Get.to(
         () => const LeaveRatingScreen(),
         transition: Transition.rightToLeft,
@@ -4377,6 +4385,11 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) precacheStreakPhotoBackgrounds(context);
+    });
+    // Top "Streak Completed!" should feel like a short toast, not a fixed header.
+    _streakCompletedToastTimer = Timer(const Duration(milliseconds: 1600), () {
+      if (!mounted) return;
+      setState(() => _showStreakCompletedToast = false);
     });
     _ctrl = AnimationController(
       vsync: this,
@@ -4414,6 +4427,7 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
 
   @override
   void dispose() {
+    _streakCompletedToastTimer?.cancel();
     _ctrl.dispose();
     _twinkleCtrl.dispose();
     _rayCtrl.dispose();
@@ -4626,15 +4640,22 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      Text(
-                        'Streak Completed!',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: screenWidth > 450 ? 18 : 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white.withOpacity(0.95),
-                          fontFamily: 'Georgia',
-                          shadows: _kStreakPhotoSoftTextShadows,
+                      AnimatedOpacity(
+                        opacity: _showStreakCompletedToast ? 1 : 0,
+                        duration: const Duration(milliseconds: 250),
+                        child: IgnorePointer(
+                          ignoring: !_showStreakCompletedToast,
+                          child: Text(
+                            'Streak Completed!',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: screenWidth > 450 ? 18 : 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white.withOpacity(0.95),
+                              fontFamily: 'Georgia',
+                              shadows: _kStreakPhotoSoftTextShadows,
+                            ),
+                          ),
                         ),
                       ),
                       Align(

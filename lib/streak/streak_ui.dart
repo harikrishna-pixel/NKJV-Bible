@@ -29,9 +29,11 @@ class StreakIconButton extends StatelessWidget {
       // Fetch once immediately (avoid initial "blank"), then refresh periodically.
       // Provide a computation so this never emits null (required for non-nullable int).
       stream: (() async* {
-        yield await StreakService.getTotalCompletedDays();
+        // Show current consecutive streak (resets after a missed day without restore),
+        // not lifetime completed-day total.
+        yield await StreakService.getCurrentStreak();
         yield* Stream<int>.periodic(const Duration(seconds: 2), (_) => 0)
-            .asyncMap((_) => StreakService.getTotalCompletedDays());
+            .asyncMap((_) => StreakService.getCurrentStreak());
       })(),
       initialData: 0,
       builder: (context, snapshot) {

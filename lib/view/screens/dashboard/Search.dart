@@ -301,7 +301,10 @@ class _SearchScreenState extends State<SearchScreen> {
       controller.selectedBookNumForRead.value = '$bookNum';
       controller.selectedChapterForRead.value = '$chapter';
       controller.selectedVerseForRead.value = '$verseIndex';
+      controller.isFetchContent.value = true;
+      controller.selectedBookContent.clear();
       await controller.getSelectedChapterAndBook();
+      controller.isFetchContent.value = false;
       controller.readHighlight.value = true;
       controller.selectedIndex.value = verseIndex;
       if (Navigator.of(context).canPop()) {
