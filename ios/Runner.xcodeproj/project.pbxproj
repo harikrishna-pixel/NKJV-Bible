@@ -14,8 +14,8 @@
 		B15A371D2F29E552006454BA /* bell.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B15A371C2F29E552006454BA /* bell.mp3 */; };
 		B15A371E2F29E552006454BA /* church_bell.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B15A371F2F29E552006454BA /* church_bell.mp3 */; };
 		B1D7E0010001000000010001 /* BibleHomeWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D7E0010001000000010002 /* BibleHomeWidget.swift */; };
-		B1D7E0020001000000010001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B1D7E0020001000000010002 /* Assets.xcassets */; };
 		B1D7E0010001000000050002 /* BibleHomeWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B1D7E0010001000000010003 /* BibleHomeWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B1D7E0020001000000010001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B1D7E0020001000000010002 /* Assets.xcassets */; };
 		C1EA71597E67699CD62D1CC5 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 413BDC41C4F0F89A62B893A3 /* Pods_Runner.framework */; };
 		D46DC1882CB8003400AC7AD7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = D46DC1872CB8003300AC7AD7 /* GoogleService-Info.plist */; };
 		D4A3F9352CA194B000866824 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D4A3F9332CA194B000866824 /* Main.storyboard */; };
@@ -475,20 +475,20 @@
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 69;
+				CURRENT_PROJECT_VERSION = 115;
 				DEVELOPMENT_TEAM = SX5458VF7R;
 				ENABLE_BITCODE = NO;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Geneva Bible";
+				INFOPLIST_KEY_CFBundleDisplayName = "NKJV Bible";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.69;
-				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.bibliasagradacatolica;
+				MARKETING_VERSION = 1.0.115;
+				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.newkingsjamesversion;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -619,20 +619,20 @@
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 69;
+				CURRENT_PROJECT_VERSION = 115;
 				DEVELOPMENT_TEAM = SX5458VF7R;
 				ENABLE_BITCODE = NO;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Geneva Bible";
+				INFOPLIST_KEY_CFBundleDisplayName = "NKJV Bible";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.69;
-				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.bibliasagradacatolica;
+				MARKETING_VERSION = 1.0.115;
+				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.newkingsjamesversion;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -651,20 +651,20 @@
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 69;
+				CURRENT_PROJECT_VERSION = 115;
 				DEVELOPMENT_TEAM = SX5458VF7R;
 				ENABLE_BITCODE = NO;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Geneva Bible";
+				INFOPLIST_KEY_CFBundleDisplayName = "NKJV Bible";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.69;
-				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.bibliasagradacatolica;
+				MARKETING_VERSION = 1.0.115;
+				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.newkingsjamesversion;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -678,7 +678,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = BibleHomeWidget/BibleHomeWidgetDebug.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 69;
+				CURRENT_PROJECT_VERSION = 115;
 				DEVELOPMENT_TEAM = SX5458VF7R;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BibleHomeWidget/Info.plist;
@@ -688,8 +688,8 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.69;
-				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.bibliasagradacatolica.BibleHomeWidget;
+				MARKETING_VERSION = 1.0.115;
+				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.newkingsjamesversion.BibleHomeWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -703,7 +703,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = BibleHomeWidget/BibleHomeWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 69;
+				CURRENT_PROJECT_VERSION = 115;
 				DEVELOPMENT_TEAM = SX5458VF7R;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BibleHomeWidget/Info.plist;
@@ -713,8 +713,8 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.69;
-				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.bibliasagradacatolica.BibleHomeWidget;
+				MARKETING_VERSION = 1.0.115;
+				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.newkingsjamesversion.BibleHomeWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -728,7 +728,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = BibleHomeWidget/BibleHomeWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 69;
+				CURRENT_PROJECT_VERSION = 115;
 				DEVELOPMENT_TEAM = SX5458VF7R;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BibleHomeWidget/Info.plist;
@@ -738,8 +738,8 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.69;
-				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.bibliasagradacatolica.BibleHomeWidget;
+				MARKETING_VERSION = 1.0.115;
+				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.newkingsjamesversion.BibleHomeWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;

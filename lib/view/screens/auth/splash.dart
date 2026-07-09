@@ -512,6 +512,13 @@ class _SplashScreenState extends State<SplashScreen>
     final isOnboardingCompleted =
         await SharPreferences.getBoolean(SharPreferences.onboarding);
 
+    // First launch: show welcome -> onboarding questions
+    if (isOnboardingCompleted == null || !isOnboardingCompleted) {
+      _schedulePostSplashAtt();
+      Get.offAll(() => const WelcomeScreen());
+      return;
+    }
+
     // Hard safety: if core bible data missing, route user to restore/select Bible.
     // If DB cannot be opened, do NOT fall through to Home (infinite loader / empty content).
     try {
@@ -574,23 +581,17 @@ class _SplashScreenState extends State<SplashScreen>
       return;
     }
 
-    // First launch: show welcome -> onboarding questions
-    if (isOnboardingCompleted == null || !isOnboardingCompleted) {
-      _schedulePostSplashAtt();
-      Get.offAll(() => const WelcomeScreen());
-    } else {
-      _schedulePostSplashAtt();
-      await SharPreferences.setBoolean(SharPreferences.isLoadBookContent, true);
-      try {
-        final provider =
-            Provider.of<DownloadProvider>(context, listen: false);
-        unawaited(provider.warmDataBeforeHomeScreen());
-      } catch (e) {
-        debugPrint('warmDataBeforeHomeScreen error: $e');
-      }
-      if (!mounted) return;
-      await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
+    _schedulePostSplashAtt();
+    await SharPreferences.setBoolean(SharPreferences.isLoadBookContent, true);
+    try {
+      final provider =
+          Provider.of<DownloadProvider>(context, listen: false);
+      unawaited(provider.warmDataBeforeHomeScreen());
+    } catch (e) {
+      debugPrint('warmDataBeforeHomeScreen error: $e');
     }
+    if (!mounted) return;
+    await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
   }
 
   loadBookContent() async {

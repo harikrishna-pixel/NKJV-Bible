@@ -1,0 +1,530 @@
+[
+  {
+    "book_num": 0,
+    "chapter_count": 50,
+    "read_per": 0,
+    "short_title": "Gen",
+    "title": "Genesis",
+    "mode": 1
+  },
+  {
+    "book_num": 1,
+    "chapter_count": 40,
+    "read_per": 0,
+    "short_title": "Exo",
+    "title": "Exodus",
+    "mode": 1
+  },
+  {
+    "book_num": 2,
+    "chapter_count": 27,
+    "read_per": 0,
+    "short_title": "Lev",
+    "title": "Leviticus",
+    "mode": 1
+  },
+  {
+    "book_num": 3,
+    "chapter_count": 36,
+    "read_per": 0,
+    "short_title": "Num",
+    "title": "Numbers",
+    "mode": 1
+  },
+  {
+    "book_num": 4,
+    "chapter_count": 34,
+    "read_per": 0,
+    "short_title": "Deu",
+    "title": "Deuteronomy",
+    "mode": 1
+  },
+  {
+    "book_num": 5,
+    "chapter_count": 24,
+    "read_per": 0,
+    "short_title": "Jos",
+    "title": "Joshua",
+    "mode": 1
+  },
+  {
+    "book_num": 6,
+    "chapter_count": 21,
+    "read_per": 0,
+    "short_title": "Jud",
+    "title": "Judges",
+    "mode": 1
+  },
+  {
+    "book_num": 7,
+    "chapter_count": 4,
+    "read_per": 0,
+    "short_title": "Rth",
+    "title": "Ruth",
+    "mode": 1
+  },
+  {
+    "book_num": 8,
+    "chapter_count": 31,
+    "read_per": 0,
+    "short_title": null,
+    "title": "1 Samuel",
+    "mode": 1
+  },
+  {
+    "book_num": 9,
+    "chapter_count": 24,
+    "read_per": 0,
+    "short_title": null,
+    "title": "2 Samuel",
+    "mode": 1
+  },
+  {
+    "book_num": 10,
+    "chapter_count": 22,
+    "read_per": 0,
+    "short_title": null,
+    "title": "1 Kings",
+    "mode": 1
+  },
+  {
+    "book_num": 11,
+    "chapter_count": 25,
+    "read_per": 0,
+    "short_title": null,
+    "title": "2 Kings",
+    "mode": 1
+  },
+  {
+    "book_num": 12,
+    "chapter_count": 29,
+    "read_per": 0,
+    "short_title": null,
+    "title": "1 Chronicles",
+    "mode": 1
+  },
+  {
+    "book_num": 13,
+    "chapter_count": 36,
+    "read_per": 0,
+    "short_title": null,
+    "title": "2 Chronicles",
+    "mode": 1
+  },
+  {
+    "book_num": 14,
+    "chapter_count": 10,
+    "read_per": 0,
+    "short_title": "Ezr",
+    "title": "Ezra",
+    "mode": 1
+  },
+  {
+    "book_num": 15,
+    "chapter_count": 13,
+    "read_per": 0,
+    "short_title": "Neh",
+    "title": "Nehemiah",
+    "mode": 1
+  },
+  {
+    "book_num": 16,
+    "chapter_count": 10,
+    "read_per": 0,
+    "short_title": "Est",
+    "title": "Esther",
+    "mode": 1
+  },
+  {
+    "book_num": 17,
+    "chapter_count": 42,
+    "read_per": 0,
+    "short_title": "Job",
+    "title": "Job",
+    "mode": 1
+  },
+  {
+    "book_num": 18,
+    "chapter_count": 150,
+    "read_per": 0,
+    "short_title": "Psa",
+    "title": "Psalms",
+    "mode": 1
+  },
+  {
+    "book_num": 19,
+    "chapter_count": 31,
+    "read_per": 0,
+    "short_title": "Pro",
+    "title": "Proverbs",
+    "mode": 1
+  },
+  {
+    "book_num": 20,
+    "chapter_count": 12,
+    "read_per": 0,
+    "short_title": "Ecc",
+    "title": "Ecclesiastes",
+    "mode": 1
+  },
+  {
+    "book_num": 21,
+    "chapter_count": 8,
+    "read_per": 0,
+    "short_title": "Son",
+    "title": "Song of Solomon",
+    "mode": 1
+  },
+  {
+    "book_num": 22,
+    "chapter_count": 66,
+    "read_per": 0,
+    "short_title": "Isa",
+    "title": "Isaiah",
+    "mode": 1
+  },
+  {
+    "book_num": 23,
+    "chapter_count": 52,
+    "read_per": 0,
+    "short_title": "Jer",
+    "title": "Jeremiah",
+    "mode": 1
+  },
+  {
+    "book_num": 24,
+    "chapter_count": 5,
+    "read_per": 0,
+    "short_title": "Lam",
+    "title": "Lamentations",
+    "mode": 1
+  },
+  {
+    "book_num": 25,
+    "chapter_count": 48,
+    "read_per": 0,
+    "short_title": "Eze",
+    "title": "Ezekiel",
+    "mode": 1
+  },
+  {
+    "book_num": 26,
+    "chapter_count": 12,
+    "read_per": 0,
+    "short_title": "Dan",
+    "title": "Daniel",
+    "mode": 1
+  },
+  {
+    "book_num": 27,
+    "chapter_count": 14,
+    "read_per": 0,
+    "short_title": "Hos",
+    "title": "Hosea",
+    "mode": 1
+  },
+  {
+    "book_num": 28,
+    "chapter_count": 3,
+    "read_per": 0,
+    "short_title": "Joe",
+    "title": "Joel",
+    "mode": 1
+  },
+  {
+    "book_num": 29,
+    "chapter_count": 9,
+    "read_per": 0,
+    "short_title": "Amo",
+    "title": "Amos",
+    "mode": 1
+  },
+  {
+    "book_num": 30,
+    "chapter_count": 1,
+    "read_per": 0,
+    "short_title": "Oba",
+    "title": "Obadiah",
+    "mode": 1
+  },
+  {
+    "book_num": 31,
+    "chapter_count": 4,
+    "read_per": 0,
+    "short_title": "Jon",
+    "title": "Jonah",
+    "mode": 1
+  },
+  {
+    "book_num": 32,
+    "chapter_count": 7,
+    "read_per": 0,
+    "short_title": "Mic",
+    "title": "Micah",
+    "mode": 1
+  },
+  {
+    "book_num": 33,
+    "chapter_count": 3,
+    "read_per": 0,
+    "short_title": "Nah",
+    "title": "Nahum",
+    "mode": 1
+  },
+  {
+    "book_num": 34,
+    "chapter_count": 3,
+    "read_per": 0,
+    "short_title": "Hab",
+    "title": "Habakkuk",
+    "mode": 1
+  },
+  {
+    "book_num": 35,
+    "chapter_count": 3,
+    "read_per": 0,
+    "short_title": "Zep",
+    "title": "Zephaniah",
+    "mode": 1
+  },
+  {
+    "book_num": 36,
+    "chapter_count": 2,
+    "read_per": 0,
+    "short_title": "Hag",
+    "title": "Haggai",
+    "mode": 1
+  },
+  {
+    "book_num": 37,
+    "chapter_count": 14,
+    "read_per": 0,
+    "short_title": "Zec",
+    "title": "Zechariah",
+    "mode": 1
+  },
+  {
+    "book_num": 38,
+    "chapter_count": 4,
+    "read_per": 0,
+    "short_title": "Mal",
+    "title": "Malachi",
+    "mode": 1
+  },
+  {
+    "book_num": 39,
+    "chapter_count": 28,
+    "read_per": 0,
+    "short_title": "Mat",
+    "title": "Matthew",
+    "mode": 2
+  },
+  {
+    "book_num": 40,
+    "chapter_count": 16,
+    "read_per": 0,
+    "short_title": "Mar",
+    "title": "Mark",
+    "mode": 2
+  },
+  {
+    "book_num": 41,
+    "chapter_count": 24,
+    "read_per": 0,
+    "short_title": "Luk",
+    "title": "Luke",
+    "mode": 2
+  },
+  {
+    "book_num": 42,
+    "chapter_count": 21,
+    "read_per": 0,
+    "short_title": "Joh",
+    "title": "John",
+    "mode": 2
+  },
+  {
+    "book_num": 43,
+    "chapter_count": 28,
+    "read_per": 0,
+    "short_title": "Act",
+    "title": "Acts",
+    "mode": 2
+  },
+  {
+    "book_num": 44,
+    "chapter_count": 16,
+    "read_per": 0,
+    "short_title": "Rom",
+    "title": "Romans",
+    "mode": 2
+  },
+  {
+    "book_num": 45,
+    "chapter_count": 16,
+    "read_per": 0,
+    "short_title": null,
+    "title": "1 Corinthians",
+    "mode": 2
+  },
+  {
+    "book_num": 46,
+    "chapter_count": 13,
+    "read_per": 0,
+    "short_title": null,
+    "title": "2 Corinthians",
+    "mode": 2
+  },
+  {
+    "book_num": 47,
+    "chapter_count": 6,
+    "read_per": 0,
+    "short_title": "Gal",
+    "title": "Galatians",
+    "mode": 2
+  },
+  {
+    "book_num": 48,
+    "chapter_count": 6,
+    "read_per": 0,
+    "short_title": "Eph",
+    "title": "Ephesians",
+    "mode": 2
+  },
+  {
+    "book_num": 49,
+    "chapter_count": 4,
+    "read_per": 0,
+    "short_title": "Phi",
+    "title": "Philippians",
+    "mode": 2
+  },
+  {
+    "book_num": 50,
+    "chapter_count": 4,
+    "read_per": 0,
+    "short_title": "Col",
+    "title": "Colossians",
+    "mode": 2
+  },
+  {
+    "book_num": 51,
+    "chapter_count": 5,
+    "read_per": 0,
+    "short_title": null,
+    "title": "1 Thessalonians",
+    "mode": 2
+  },
+  {
+    "book_num": 52,
+    "chapter_count": 3,
+    "read_per": 0,
+    "short_title": null,
+    "title": "2 Thessalonians",
+    "mode": 2
+  },
+  {
+    "book_num": 53,
+    "chapter_count": 6,
+    "read_per": 0,
+    "short_title": null,
+    "title": "1 Timothy",
+    "mode": 2
+  },
+  {
+    "book_num": 54,
+    "chapter_count": 4,
+    "read_per": 0,
+    "short_title": null,
+    "title": "2 Timothy",
+    "mode": 2
+  },
+  {
+    "book_num": 55,
+    "chapter_count": 3,
+    "read_per": 0,
+    "short_title": "Tit",
+    "title": "Titus",
+    "mode": 2
+  },
+  {
+    "book_num": 56,
+    "chapter_count": 1,
+    "read_per": 0,
+    "short_title": "Phi",
+    "title": "Philemon",
+    "mode": 2
+  },
+  {
+    "book_num": 57,
+    "chapter_count": 13,
+    "read_per": 0,
+    "short_title": "Heb",
+    "title": "Hebrews",
+    "mode": 2
+  },
+  {
+    "book_num": 58,
+    "chapter_count": 5,
+    "read_per": 0,
+    "short_title": "Jam",
+    "title": "James",
+    "mode": 2
+  },
+  {
+    "book_num": 59,
+    "chapter_count": 5,
+    "read_per": 0,
+    "short_title": null,
+    "title": "1 Peter",
+    "mode": 2
+  },
+  {
+    "book_num": 60,
+    "chapter_count": 3,
+    "read_per": 0,
+    "short_title": null,
+    "title": "2 Peter",
+    "mode": 2
+  },
+  {
+    "book_num": 61,
+    "chapter_count": 5,
+    "read_per": 0,
+    "short_title": null,
+    "title": "1 John",
+    "mode": 2
+  },
+  {
+    "book_num": 62,
+    "chapter_count": 1,
+    "read_per": 0,
+    "short_title": null,
+    "title": "2 John",
+    "mode": 2
+  },
+  {
+    "book_num": 63,
+    "chapter_count": 1,
+    "read_per": 0,
+    "short_title": null,
+    "title": "3 John",
+    "mode": 2
+  },
+  {
+    "book_num": 64,
+    "chapter_count": 1,
+    "read_per": 0,
+    "short_title": "Jud",
+    "title": "Jude",
+    "mode": 2
+  },
+  {
+    "book_num": 65,
+    "chapter_count": 22,
+    "read_per": 0,
+    "short_title": "Rev",
+    "title": "Revelation",
+    "mode": 2
+  }
+]

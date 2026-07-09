@@ -22,7 +22,7 @@ BibleWidgetRoute getBibleWidgetRouteFromUri(Uri? uri) {
 
 /// App Group ID for sharing data between the app and the Widget Extension.
 /// Must match the App Group identifier added in Xcode for both Runner and the Widget Extension.
-const String _kAppGroupId = 'group.com.balaklrapps.genevabible';
+const String _kAppGroupId = 'group.com.balaklrapps.newkingsjamesversion';
 
 /// Widget kinds (must match the `kind` in each Widget struct in the iOS Widget Extension).
 const String _kVerseOfTheDayKind = 'VerseOfTheDayWidget';

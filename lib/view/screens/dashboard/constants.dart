@@ -1,41 +1,46 @@
 class BibleInfo {
-  static String apple_AppId = "6484271788";
+  static String apple_AppId = "6459794212";
 
   // 6484270584  //6459793603
-  static String ios_Bundle_Id = "com.balaklrapps.bibliasagradacatolica";
-  static String bible_shortName = "Biblia Sagrada Catolica";
-  static String current_Version = "1.0.110";
+  static String ios_Bundle_Id = "com.balaklrapps.newkingsjamesversion";
+  static String bible_shortName = "NKJV Bible";
+  static String current_Version = "1.0.115";
   static String android_Package_Name = "com.whitebibles.genevabible";
-  static String appID = 'cc8fede9-ed17-11ef-b28e-fa163e8c011b';
+  static String appID = '03a0762a-ed0b-11ef-b28e-fa163e8c011b';
   //static int surveyAppId = 3;
 
 //IAP
-  static String sixMonthPlanid = 'com.balaklrapps.bibliasagradacatolica.sixmonthadsfree';
-  static String oneYearPlanid = 'com.balaklrapps.bibliasagradacatolica.oneyearadsfree';
-  static String twoYearPlanid = 'com.balaklrapps.bibliasagradacatolica.twoyearadsfree';
-  static String lifeTimePlanid = 'com.balaklrapps.bibliasagradacatolica.lifetimeadsfree';
+  static String sixMonthPlanid =
+      'com.balaklrapps.newkingsjamesversion.sixmonthadsfree';
+  static String oneYearPlanid =
+      'com.balaklrapps.newkingsjamesversion.oneyearadsfree';
+  static String twoYearPlanid =
+      'com.balaklrapps.newkingsjamesversion.twoyearadsfree';
+  static String lifeTimePlanid =
+      'com.balaklrapps.newkingsjamesversion.lifetimeadsfree';
   static String subIdentifierTwoYear = twoYearPlanid;
   static String exitOfferPlanid =
-      'com.balaklrapps.bibliasagradacatolica.lifetime.exitoffer';
-
-
+      'com.balaklrapps.newkingsjamesversion.lifetime.exitoffer';
 
   // IAP Discounts (for offline mode)
   static String sixMonthPlanDiscount = '0';
-  static String oneYearPlanDiscount = '50';
+  static String oneYearPlanDiscount = '30';
   static String twoYearPlanDiscount = '50';
   static String lifeTimePlanDiscount = 'Best Value';
   static String exitOfferPlanDiscount = '0';
 
   // Coin Pack IDs
-  static String coinPack1Id = 'com.balaklrapps.bibliasagradacatolica.creditpack1';
-  static String coinPack2Id = 'com.balaklrapps.bibliasagradacatolica.creditpack2';
-  static String coinPack3Id = 'com.balaklrapps.bibliasagradacatolica.creditpack3';
+  static String coinPack1Id =
+      'com.balaklrapps.newkingsjamesversion.creditpack1';
+  static String coinPack2Id =
+      'com.balaklrapps.newkingsjamesversion.creditpack2';
+  static String coinPack3Id =
+      'com.balaklrapps.newkingsjamesversion.creditpack3';
 
   // Coin Pack Credits (for offline mode)
-  static String coinPack1Credits = '100';
-  static String coinPack2Credits = '500';
-  static String coinPack3Credits = '1000';
+  static String coinPack1Credits = '500';
+  static String coinPack2Credits = '1500';
+  static String coinPack3Credits = '3000';
 
   // Coin Pack Discounts (for offline mode)
   static String coinPack1Discount = '0';
@@ -66,36 +71,35 @@ class BibleInfo {
   static String adsGoogleRewardInterstitialIdAndroid = "";
 
   // Ads IDs - iOS
-  static String adsGoogleBannerIdIos = "ca-app-pub-4194577750257069/5888490615";
+  static String adsGoogleBannerIdIos = "ca-app-pub-4194577750257069/3139244514";
   static String adsGoogleBannerId_2Ios = "";
   static String adsGoogleBannerId_3Ios = "";
   static String adsGoogleInterstitialIdIos =
-      "ca-app-pub-4194577750257069/3990737976";
-  static String adsGoogleRewardIdIos = "ca-app-pub-4194577750257069/3262327277";
+      "ca-app-pub-4194577750257069/4647434167";
+  static String adsGoogleRewardIdIos = "ca-app-pub-4194577750257069/5194562213";
   static String adsGoogleOpenAppIdIos =
-      "ca-app-pub-4194577750257069/1949245605";
-  static String adsGoogleNativeIdIos = "ca-app-pub-4194577750257069/2933990334";
+      "ca-app-pub-4194577750257069/5080965858";
+  static String adsGoogleNativeIdIos = "ca-app-pub-4194577750257069/5995854674";
   static String adsGoogleRewardInterstitialIdIos = "";
 
   // TEST Ads IDs - iOS
-  // static String adsGoogleBannerIdIos = "ca-app-pub-3940256099942544/2934735716";
+  // static String adsGoogleBannerIdIos = "ca-app-pub-4194577750257069~7649128990";
   // static String adsGoogleBannerId_2Ios =
-  //     "ca-app-pub-3940256099942544/2934735716";
+  //     "ca-app-pub-4194577750257069/8207532192";
   // static String adsGoogleBannerId_3Ios =
-  //     "ca-app-pub-3940256099942544/2934735716";
+  //     "ca-app-pub-4194577750257069/8207532192";
   // static String adsGoogleInterstitialIdIos =
-  //     "ca-app-pub-3940256099942544/4411468910";
-  // static String adsGoogleRewardIdIos = "ca-app-pub-3940256099942544/1712485313";
+  //     "ca-app-pub-4194577750257069/4182309663";
+  // static String adsGoogleRewardIdIos = "ca-app-pub-4194577750257069/1556146326";
   // static String adsGoogleOpenAppIdIos =
-  //     "ca-app-pub-3940256099942544/5575463023";
-  // static String adsGoogleNativeIdIos = "ca-app-pub-3940256099942544/3986624511";
+  //     "ca-app-pub-4194577750257069/6029797702";
+  // static String adsGoogleNativeIdIos = "ca-app-pub-4194577750257069/1528575170";
   // static String adsGoogleRewardInterstitialIdIos =
-  //     "ca-app-pub-3940256099942544/6978759866";
+  //     "ca-app-pub-4194577750257069/8842883017";
 
-// Must match subfolder names under assets/zipped/ (not bible_shortName).
+// add folder names here  assets/zipped/
   static List<String> folders = [
-    "Sagrada Catolica"
-    // "Bengali Bible",
+    "NKJV"
   ];
 
   static String emailVerify = "0";
@@ -107,14 +111,12 @@ class BibleInfo {
   static String thankyoutitle = " 🙏 Help Us Keep the Bible App Free ";
 
   static int old_testament_count =
-      46; // 73 books: OT book_num 0–45 (46 books), NT starts at 46 (Mateus)
+      39; //book count 65 - olt 39, book count 72 - olt 45
   static String new_testament_count = "27";
 
   static String exportText =
       'Save your Bookmarked verses, Highlights, Notes and Verse Images directly to your device. This option stores a backup file locally, which can be transferred or accessed later. You can import this file into the app whenever needed, even on another device.';
   static String importText = 'Please select the file you exported last time.';
-
-
 
   static String termsandConditionURL =
       "https://bibleoffice.com/terms_conditions.html";
@@ -132,14 +134,15 @@ class BibleInfo {
   // Audio and Text to Speech Constants (fallback when API data is not available)
   // Audio Settings
   static String audioBasePath =
-      "https://bibleoffice.com/BibleReplications/dev/v1/uploads/bible_audio/English/";
+      "https://bibleoffice.com/BibleReplications/dev/v1/uploads/bible_audio/Portuguese/";
   static String audioBasePathType = "3";
   static String isShowMp3Audio = "1";
 
   // Text to Speech Settings - iOS
-  static String isTextToSpeechAvailableIos = "0";
-  static String textToSpeechLanguageCodeIos = "";
-  static String textToSpeechIdentifierIos = "";
+  static String isTextToSpeechAvailableIos = "1";
+  static String textToSpeechLanguageCodeIos = "en-GB";
+  static String textToSpeechIdentifierIos =
+      "com.apple.ttsbundle.siri_male_en-GB_compact";
 
   // Text to Speech Settings - Android
   static String isTextToSpeechAvailableAndroid = "0";

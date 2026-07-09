@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Geneva Bible</string>
+	<string>NKJV Bible</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -46,7 +46,7 @@
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>GADApplicationIdentifier</key>
-	<string>ca-app-pub-4194577750257069~4892756107</string>
+	<string>ca-app-pub-4194577750257069~7649128990</string>
 	<key>GIDClientID</key>
 	<string>727999460969-6ph3vmtbq4o76rbtomvpe1aff341bgdo.apps.googleusercontent.com</string>
 	<key>LSRequiresIPhoneOS</key>
