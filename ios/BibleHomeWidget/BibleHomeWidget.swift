@@ -87,6 +87,7 @@ private struct WidgetImageSurface<Content: View>: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .containerBackground(for: .widget) {
           ZStack {
+            fallback
             Image(imageName)
               .resizable()
               .scaledToFill()
@@ -182,8 +183,8 @@ private struct StaticWidgetProvider: TimelineProvider {
 }
 
 // Default content when app has not sent data
-private let defaultVerseText = "The Lord is my shepherd; I shall not want."
-private let defaultVerseRef = "Psalm 23:1"
+private let defaultVerseText = "Be still and know that I am God."
+private let defaultVerseRef = "Psalm 46:10"
 private let defaultPrayerText = "Lord, guide my heart today. Give me strength to face challenges and peace in uncertainty. May I reflect Your love to others. Amen."
 private let defaultChatQuestion = "What is faith?"
 private let defaultChatAnswer = "Faith is confidence in what we hope for and assurance about what we do not see. — Hebrews 11:1"
@@ -215,6 +216,10 @@ struct VerseOfTheDayProvider: TimelineProvider {
   }
 
   func getSnapshot(in context: Context, completion: @escaping (VerseOfTheDayEntry) -> Void) {
+    if context.isPreview {
+      completion(placeholder(in: context))
+      return
+    }
     let defaults = UserDefaults(suiteName: appGroupId)
     var text = defaults?.string(forKey: "widget_verse_text") ?? ""
     var ref = defaults?.string(forKey: "widget_verse_reference") ?? ""
@@ -245,7 +250,7 @@ struct VerseOfTheDayView: View {
             .foregroundColor(oldPaperText)
             .offset(y: -1)
         }
-        OldPaperTitleRow(title: "Today's Verse")
+        OldPaperTitleRow(title: "Daily Verse")
         Text(plainVerseTextForWidget(entry.verseText))
           .font(.system(size: 13, weight: .bold, design: .serif))
           .foregroundColor(oldPaperText)
@@ -276,6 +281,17 @@ struct VerseOfTheDayWidget: Widget {
     }
     .configurationDisplayName("Daily Verse")
     .description("Today's Bible verse on your home screen.")
+    .contentMarginsDisabledIfAvailable()
+  }
+}
+
+/// iOS 17+ requires edge-to-edge widget backgrounds; without this the picker shows a grey placeholder.
+private extension WidgetConfiguration {
+  func contentMarginsDisabledIfAvailable() -> some WidgetConfiguration {
+    if #available(iOSApplicationExtension 17.0, *) {
+      return contentMarginsDisabled()
+    }
+    return self
   }
 }
 
@@ -506,6 +522,7 @@ struct BiblePrayerWidget: Widget {
     }
     .configurationDisplayName("Bible Prayer")
     .description("A moment of prayer on your home screen.")
+    .contentMarginsDisabledIfAvailable()
     // Remove default widget content padding so the design is full-bleed (iOS 17+).
     .contentMarginsDisabled()
   }
@@ -581,6 +598,7 @@ struct BibleChatWidget: Widget {
     }
     .configurationDisplayName("Bible Chat")
     .description("A Bible Q&A on your home screen.")
+    .contentMarginsDisabledIfAvailable()
   }
 }
 
@@ -652,6 +670,7 @@ struct ContinueReadingWidget: Widget {
     }
     .configurationDisplayName("Continue Reading")
     .description("Pick up where you left off in Scripture.")
+    .contentMarginsDisabledIfAvailable()
   }
 }
 
@@ -713,6 +732,7 @@ struct ReadingPlanWidget: Widget {
     }
     .configurationDisplayName("Reading Plan")
     .description("Track today's Bible reading plan.")
+    .contentMarginsDisabledIfAvailable()
   }
 }
 
@@ -773,6 +793,7 @@ struct WeeklyReadingStreakWidget: Widget {
     }
     .configurationDisplayName("Weekly Reading Streak")
     .description("See your weekly reading streak.")
+    .contentMarginsDisabledIfAvailable()
   }
 }
 
@@ -821,6 +842,7 @@ struct FavoriteVerseWidget: Widget {
     }
     .configurationDisplayName("Favorite Verse")
     .description("Your saved favorite verse.")
+    .contentMarginsDisabledIfAvailable()
   }
 }
 
@@ -876,6 +898,7 @@ struct HourlyVerseWidget: Widget {
     }
     .configurationDisplayName("Hourly Verse")
     .description("A fresh verse every hour.")
+    .contentMarginsDisabledIfAvailable()
   }
 }
 
@@ -929,6 +952,7 @@ struct RandomBibleVerseWidget: Widget {
     }
     .configurationDisplayName("Random Bible Verse")
     .description("Discover a random Scripture verse.")
+    .contentMarginsDisabledIfAvailable()
   }
 }
 
@@ -966,6 +990,7 @@ struct VerseImageWidget: Widget {
     }
     .configurationDisplayName("Verse Image")
     .description("A scenic verse image for your home screen.")
+    .contentMarginsDisabledIfAvailable()
     .contentMarginsDisabled()
   }
 }
@@ -1009,6 +1034,7 @@ struct BibleTriviaWidget: Widget {
     }
     .configurationDisplayName("Bible Trivia")
     .description("Answer a daily Bible question.")
+    .contentMarginsDisabledIfAvailable()
   }
 }
 
@@ -1054,6 +1080,7 @@ struct PrayerReminderWidget: Widget {
     }
     .configurationDisplayName("Prayer Reminder")
     .description("A gentle reminder to pray.")
+    .contentMarginsDisabledIfAvailable()
   }
 }
 

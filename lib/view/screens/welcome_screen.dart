@@ -1,3 +1,4 @@
+import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/onboard_faith_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -78,7 +79,7 @@ class WelcomeScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Geneva Bible',
+                      BibleInfo.bible_shortName,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: isTablet ? 34 : 28,

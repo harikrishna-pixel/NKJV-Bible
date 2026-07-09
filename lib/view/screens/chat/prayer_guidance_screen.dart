@@ -284,52 +284,52 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
     {
       'titleKey': 'prayer_thanksgiving',
       'prompt':
-          'Write a short prayer of thanksgiving to God. Include 1-2 Geneva Bible verse references.',
+          'Write a short prayer of thanksgiving to God. Include 1-2 Bible verse references.',
     },
     {
       'titleKey': 'prayer_forgiveness',
       'prompt':
-          'Help me pray for forgiveness and to forgive others. Include 1-2 Geneva Bible verse references.',
+          'Help me pray for forgiveness and to forgive others. Include 1-2 Bible verse references.',
     },
     {
       'titleKey': 'prayer_guidance',
       'prompt':
-          'Give me a prayer asking God for guidance and wisdom for decisions. Include 1-2 Geneva Bible verse references.',
+          'Give me a prayer asking God for guidance and wisdom for decisions. Include 1-2 Bible verse references.',
     },
     {
       'titleKey': 'prayer_anxiety_peace',
       'prompt':
-          'Give me a prayer for peace when I feel anxious. Include 1-2 Geneva Bible verse references.',
+          'Give me a prayer for peace when I feel anxious. Include 1-2 Bible verse references.',
     },
     {
       'titleKey': 'prayer_healing',
       'prompt':
-          'Give me a prayer for healing (body and heart). Include 1-2 Geneva Bible verse references.',
+          'Give me a prayer for healing (body and heart). Include 1-2 Bible verse references.',
     },
     {
       'titleKey': 'prayer_family',
       'prompt':
-          'Give me a prayer for family unity and protection. Include 1-2 Geneva Bible verse references.',
+          'Give me a prayer for family unity and protection. Include 1-2 Bible verse references.',
     },
     {
       'titleKey': 'prayer_strength',
       'prompt':
-          'Give me a prayer for strength and courage during difficult times. Include 1-2 Geneva Bible verse references.',
+          'Give me a prayer for strength and courage during difficult times. Include 1-2 Bible verse references.',
     },
     {
       'titleKey': 'prayer_protection',
       'prompt':
-          'Give me a prayer for protection and safety. Include 1-2 Geneva Bible verse references.',
+          'Give me a prayer for protection and safety. Include 1-2 Bible verse references.',
     },
     {
       'titleKey': 'prayer_feelings',
       'prompt':
-          'Give me a prayer to bring my feelings and emotions before God. Include 1-2 Geneva Bible verse references.',
+          'Give me a prayer to bring my feelings and emotions before God. Include 1-2 Bible verse references.',
     },
     {
       'titleKey': 'prayer_praise',
       'prompt':
-          'Write a short prayer of praise and worship to God. Include 1-2 Geneva Bible verse references.',
+          'Write a short prayer of praise and worship to God. Include 1-2 Bible verse references.',
     },
   ];
 
@@ -413,6 +413,13 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
           },
         ),
       ),
+    );
+  }
+
+  String _sanitizePrayerResponseText(String text) {
+    return text.replaceAll(
+      RegExp(r'\s*\(Geneva(?:\s+Bible)?\)', caseSensitive: false),
+      '',
     );
   }
 
@@ -691,6 +698,8 @@ ${category.prompt}
         responseText =
             'Error: Failed to get response (Status: ${response.statusCode})';
       }
+
+      responseText = _sanitizePrayerResponseText(responseText);
 
       if (!mounted || requestId != _prayerRequestGeneration) return;
       setState(() {
@@ -1115,6 +1124,8 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
         responseText =
             'Error: Failed to get response (Status: ${response.statusCode})';
       }
+
+      responseText = _sanitizePrayerResponseText(responseText);
 
       if (!mounted || requestId != _prayerRequestGeneration) return;
       setState(() {

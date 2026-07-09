@@ -153,12 +153,14 @@ class floatingButtonState extends State<floatingButton>
     super.didUpdateWidget(oldWidget);
 
     // Check if chapter changed (swipe to next chapter)
-    final oldChapterNum = int.parse(oldWidget.chapterNum);
-    final newChapterNum = int.parse(widget.chapterNum);
+    final oldChapterNum = int.tryParse(oldWidget.chapterNum) ?? audioChapterNum;
+    final newChapterNum = int.tryParse(widget.chapterNum) ?? audioChapterNum;
 
     // Check if book number changed (in case user swiped to different book)
-    final oldBookNum = int.parse(oldWidget.bookNum.toString());
-    final newBookNum = int.parse(widget.bookNum.toString());
+    final oldBookNum =
+        int.tryParse(oldWidget.bookNum.toString()) ?? (audioBookNum - 1);
+    final newBookNum =
+        int.tryParse(widget.bookNum.toString()) ?? (audioBookNum - 1);
 
     if (oldChapterNum != newChapterNum) {
       // Chapter changed - update audio chapter number
@@ -168,7 +170,9 @@ class floatingButtonState extends State<floatingButton>
       // Also check if book number changed and update accordingly
       if (oldBookNum != newBookNum) {
         audioBookNum = newBookNum + 1;
-        currentBookChapterCount = int.parse(widget.chapterCount.toString());
+        currentBookChapterCount =
+            int.tryParse(widget.chapterCount.toString()) ??
+                currentBookChapterCount;
         // Update book name from widget if available, otherwise keep stored name
         if (widget.bookName.isNotEmpty) {
           _storedBookName = widget.bookName;
@@ -183,7 +187,9 @@ class floatingButtonState extends State<floatingButton>
             _storedBookName = widget.bookName;
           }
           audioBookNum = newBookNum + 1;
-          currentBookChapterCount = int.parse(widget.chapterCount.toString());
+          currentBookChapterCount =
+            int.tryParse(widget.chapterCount.toString()) ??
+                currentBookChapterCount;
         }
 
         // Auto-start audio on new chapter
@@ -205,13 +211,17 @@ class floatingButtonState extends State<floatingButton>
     if (widget.bookName != oldWidget.bookName && widget.bookName.isNotEmpty) {
       _storedBookName = widget.bookName;
       audioBookNum = newBookNum + 1;
-      currentBookChapterCount = int.parse(widget.chapterCount.toString());
+      currentBookChapterCount =
+          int.tryParse(widget.chapterCount.toString()) ??
+              currentBookChapterCount;
     }
 
     // Additional check: if only book number changed without chapter change
     if (oldBookNum != newBookNum && oldChapterNum == newChapterNum) {
       audioBookNum = newBookNum + 1;
-      currentBookChapterCount = int.parse(widget.chapterCount.toString());
+      currentBookChapterCount =
+          int.tryParse(widget.chapterCount.toString()) ??
+              currentBookChapterCount;
       // Update book name from widget if available, otherwise keep stored name
       if (widget.bookName.isNotEmpty) {
         _storedBookName = widget.bookName;
@@ -1319,7 +1329,9 @@ class floatingButtonState extends State<floatingButton>
         setState(() {
           audioBookNum = currentBookNum + 1;
           audioChapterNum = currentChapterNum;
-          currentBookChapterCount = int.parse(widget.chapterCount.toString());
+          currentBookChapterCount =
+            int.tryParse(widget.chapterCount.toString()) ??
+                currentBookChapterCount;
           if (currentBookName != null && currentBookName.isNotEmpty) {
             _storedBookName = currentBookName;
             print("AUDIO: Updated _storedBookName to: '$_storedBookName'");
@@ -2046,7 +2058,9 @@ class floatingButtonState extends State<floatingButton>
                         width: 20,
                       ),
                       onPressed: () async {
-                        final lastChapter = int.parse(widget.chapterCount);
+                        final lastChapter =
+                            int.tryParse(widget.chapterCount) ??
+                                currentBookChapterCount;
                         if (audioChapterNum < lastChapter) {
                           setState(() {
                             isAudioPlaying = false;
@@ -3078,7 +3092,9 @@ class floatingButtonState extends State<floatingButton>
         setState(() {
           audioBookNum = currentBookNum + 1;
           audioChapterNum = currentChapterNum;
-          currentBookChapterCount = int.parse(widget.chapterCount.toString());
+          currentBookChapterCount =
+            int.tryParse(widget.chapterCount.toString()) ??
+                currentBookChapterCount;
           if (currentBookName != null && currentBookName.isNotEmpty) {
             _storedBookName = currentBookName;
           }

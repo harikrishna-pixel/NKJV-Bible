@@ -1,0 +1,440 @@
+{
+  "source": "/Users/vijay/Downloads/NKJV/ios/BibleHomeWidget/BibleHomeWidget.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "❦",
+        "location": {
+          "startingColumn": 10,
+          "startingLine": 73
+        }
+      },
+      {
+        "comment": "",
+        "key": "Daily Verse",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 282
+        }
+      },
+      {
+        "comment": "",
+        "key": "Today's Bible verse on your home screen.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 283
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pray Now",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 424
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld days",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 372
+        }
+      },
+      {
+        "comment": "",
+        "key": "Bible Prayer",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 523
+        }
+      },
+      {
+        "comment": "",
+        "key": "A moment of prayer on your home screen.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 524
+        }
+      },
+      {
+        "comment": "",
+        "key": "Bible Chat",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 570
+        }
+      },
+      {
+        "comment": "",
+        "key": "Bible Chat",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 599
+        }
+      },
+      {
+        "comment": "",
+        "key": "A Bible Q&A on your home screen.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 600
+        }
+      },
+      {
+        "comment": "",
+        "key": "Continue Reading",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 622
+        }
+      },
+      {
+        "comment": "",
+        "key": "Genesis 12",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 625
+        }
+      },
+      {
+        "comment": "",
+        "key": "Verse 8 of 26",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 628
+        }
+      },
+      {
+        "comment": "",
+        "key": "32%",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 641
+        }
+      },
+      {
+        "comment": "",
+        "key": "Keep reading God's Word",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 647
+        }
+      },
+      {
+        "comment": "",
+        "key": "Continue Reading",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 671
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pick up where you left off in Scripture.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 672
+        }
+      },
+      {
+        "comment": "",
+        "key": "Today's Reading",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 684
+        }
+      },
+      {
+        "comment": "",
+        "key": "1 / 3 Completed",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 697
+        }
+      },
+      {
+        "comment": "",
+        "key": "Reading Plan",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 733
+        }
+      },
+      {
+        "comment": "",
+        "key": "Track today's Bible reading plan.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 734
+        }
+      },
+      {
+        "comment": "",
+        "key": "7 Days",
+        "location": {
+          "startingColumn": 14,
+          "startingLine": 772
+        }
+      },
+      {
+        "comment": "",
+        "key": "Keep it up!",
+        "location": {
+          "startingColumn": 14,
+          "startingLine": 775
+        }
+      },
+      {
+        "comment": "",
+        "key": "Reading Streak",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 751
+        }
+      },
+      {
+        "comment": "",
+        "key": "Weekly Reading Streak",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 794
+        }
+      },
+      {
+        "comment": "",
+        "key": "See your weekly reading streak.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 795
+        }
+      },
+      {
+        "comment": "",
+        "key": "For God so loved the world, that he gave his only begotten Son, that whoever believes in him should not perish but have eternal life.",
+        "location": {
+          "startingColumn": 14,
+          "startingLine": 817
+        }
+      },
+      {
+        "comment": "",
+        "key": "John 3:16",
+        "location": {
+          "startingColumn": 14,
+          "startingLine": 824
+        }
+      },
+      {
+        "comment": "",
+        "key": "Favorite Verse",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 843
+        }
+      },
+      {
+        "comment": "",
+        "key": "Your saved favorite verse.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 844
+        }
+      },
+      {
+        "comment": "",
+        "key": "Commit your work to the Lord, and your plans will be established.",
+        "location": {
+          "startingColumn": 14,
+          "startingLine": 864
+        }
+      },
+      {
+        "comment": "",
+        "key": "Proverbs 16:3",
+        "location": {
+          "startingColumn": 14,
+          "startingLine": 870
+        }
+      },
+      {
+        "comment": "",
+        "key": "Hourly Verse",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 859
+        }
+      },
+      {
+        "comment": "",
+        "key": "Next verse in 42 min",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 876
+        }
+      },
+      {
+        "comment": "",
+        "key": "Hourly Verse",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 899
+        }
+      },
+      {
+        "comment": "",
+        "key": "A fresh verse every hour.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 900
+        }
+      },
+      {
+        "comment": "",
+        "key": "Be still, and know that I am God.",
+        "location": {
+          "startingColumn": 14,
+          "startingLine": 920
+        }
+      },
+      {
+        "comment": "",
+        "key": "Psalm 46:10",
+        "location": {
+          "startingColumn": 14,
+          "startingLine": 925
+        }
+      },
+      {
+        "comment": "",
+        "key": "Random Verse",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 915
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tap to get a new verse",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 930
+        }
+      },
+      {
+        "comment": "",
+        "key": "Random Bible Verse",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 953
+        }
+      },
+      {
+        "comment": "",
+        "key": "Discover a random Scripture verse.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 954
+        }
+      },
+      {
+        "comment": "",
+        "key": "I can do all things through Christ who strengthens me.",
+        "location": {
+          "startingColumn": 12,
+          "startingLine": 965
+        }
+      },
+      {
+        "comment": "",
+        "key": "Philippians 4:13",
+        "location": {
+          "startingColumn": 12,
+          "startingLine": 971
+        }
+      },
+      {
+        "comment": "",
+        "key": "Verse Image",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 991
+        }
+      },
+      {
+        "comment": "",
+        "key": "A scenic verse image for your home screen.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 992
+        }
+      },
+      {
+        "comment": "",
+        "key": "Who built the ark?",
+        "location": {
+          "startingColumn": 14,
+          "startingLine": 1013
+        }
+      },
+      {
+        "comment": "",
+        "key": "?",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 1008
+        }
+      },
+      {
+        "comment": "",
+        "key": "Bible Trivia",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 1035
+        }
+      },
+      {
+        "comment": "",
+        "key": "Answer a daily Bible question.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 1036
+        }
+      },
+      {
+        "comment": "",
+        "key": "Take one minute to talk to God.",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 1060
+        }
+      },
+      {
+        "comment": "",
+        "key": "Prayer Reminder",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 1053
+        }
+      },
+      {
+        "comment": "",
+        "key": "Prayer Reminder",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 1081
+        }
+      },
+      {
+        "comment": "",
+        "key": "A gentle reminder to pray.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 1082
+        }
+      }
+    ]
+  },
+  "version": 1
+}

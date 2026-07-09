@@ -351,6 +351,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Future<void> _navigateAfterNonLifetimePurchaseSuccess() async {
+    if (widget.invisiblePurchaseHost) {
+      await _addLifetimeWalletBonusOnce();
+    }
     await _navigateToHomeAfterPurchaseSuccess(invisibleHostPopValue: true);
   }
 
@@ -1463,6 +1466,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         await SharPreferences.setBoolean('closead', true);
         await _completePaywallSubscriptionNavigation(
           startFlag: startFlag == true,
+          lifetimeWalletBonus:
+              startFlag == true && widget.invisiblePurchaseHost,
           invisiblePopSuccess: true,
         );
         return;

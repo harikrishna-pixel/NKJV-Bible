@@ -4,6 +4,7 @@ import 'package:biblebookapp/streak_flow/streak_saved_list_screen.dart';
 import 'package:biblebookapp/streak_flow/your_faith_journey_screen.dart';
 import 'package:biblebookapp/streak_flow/pour_out_worries_screen.dart';
 import 'package:biblebookapp/streak_flow/streak_flow_screens.dart';
+import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/streak/streak_service.dart'
     show StreakService, WeekDayStatus;
@@ -298,9 +299,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
 
     if (resolvedStatus == WeekDayStatus.future) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Your streak days are coming soon.')),
-      );
+      Constants.showToast('Your streak days are coming soon.');
       return;
     }
 
@@ -311,10 +310,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
 
     if (stepsForDay <= 0) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('No completed faith journey for this day.')),
-      );
+      Constants.showToast('No completed faith journey for this day.');
       return;
     }
 
