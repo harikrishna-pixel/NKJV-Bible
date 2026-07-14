@@ -1,8 +1,7 @@
 import 'dart:convert';
 
-import 'package:biblebookapp/services/smart_notification_helper.dart';
+import 'package:biblebookapp/services/daily_slot_notification_helper.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
-import 'package:biblebookapp/view/widget/notification_service.dart';
 import 'package:flutter/services.dart';
 
 /// Streak state for notification content.
@@ -123,7 +122,7 @@ class StreakNotificationHelper {
   static Future<StreakNotificationContent> getNightContent() =>
       getContentForSlot('night');
 
-  static Future<({int hh, int mm})> _timeForSlot(String slot) async {
+  static Future<({int hh, int mm})> timeForSlot(String slot) async {
     switch (slot) {
       case 'afternoon':
         final h = int.tryParse(
@@ -165,35 +164,8 @@ class StreakNotificationHelper {
     }
   }
 
-  /// Reschedule morning/afternoon/evening streak notifications with current streak state.
-  /// Call on app open so notification text matches current scenario and all enabled slots are registered.
+  /// Reschedule enabled slots with single-notification priority (streak → chat → verse).
   static Future<void> rescheduleStreakNotificationsIfEnabled() async {
-    final on1 = await SharPreferences.getBoolean(SharPreferences.isNotificationOn);
-    final on2 = await SharPreferences.getBoolean(SharPreferences.isNotificationOn1);
-    final on3 = await SharPreferences.getBoolean(SharPreferences.isNotificationOn2);
-    final hasAny = (on1 ?? false) || (on2 ?? false) || (on3 ?? false);
-    if (!hasAny) return;
-
-    await NotificationsServices.ensureInitialized();
-    await SmartNotificationHelper.cancelSmartNotification();
-    final svc = NotificationsServices();
-    if (on1 == true) {
-      final content = await getMorningContent();
-      final time = await _timeForSlot('morning');
-      await svc.showNotification(1, content.title, content.message, time.hh,
-          time.mm, payload: content.action);
-    }
-    if (on2 == true) {
-      final content = await getAfternoonContent();
-      final time = await _timeForSlot('afternoon');
-      await svc.showNotification(2, content.title, content.message, time.hh,
-          time.mm, payload: content.action);
-    }
-    if (on3 == true) {
-      final content = await getNightContent();
-      final time = await _timeForSlot('night');
-      await svc.showNotification(3, content.title, content.message, time.hh,
-          time.mm, payload: content.action);
-    }
+    await DailySlotNotificationHelper.rescheduleEnabledSlots();
   }
 }

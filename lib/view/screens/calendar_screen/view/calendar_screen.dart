@@ -22,27 +22,29 @@ class CalendarScreen extends StatefulHookConsumerWidget {
 class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   static const Color _tanCircle = Color(0xFFD4A96A);
   final _eventFieldKey = GlobalKey();
+  FocusNode? _eventFieldNode;
 
   @override
   void initState() {
     super.initState();
     final bloc = ref.read(calendarDataBloc);
     bloc.initState();
-    bloc.fieldNode.addListener(_scrollEventFieldIntoView);
+    _eventFieldNode = bloc.fieldNode;
+    _eventFieldNode!.addListener(_scrollEventFieldIntoView);
   }
 
   @override
   void dispose() {
-    ref.read(calendarDataBloc).fieldNode.removeListener(_scrollEventFieldIntoView);
+    _eventFieldNode?.removeListener(_scrollEventFieldIntoView);
     super.dispose();
   }
 
   void _scrollEventFieldIntoView() {
-    final bloc = ref.read(calendarDataBloc);
-    if (!bloc.fieldNode.hasFocus) return;
+    final fieldNode = _eventFieldNode;
+    if (fieldNode == null || !fieldNode.hasFocus) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(milliseconds: 280), () {
-        if (!mounted || !bloc.fieldNode.hasFocus) return;
+        if (!mounted || !fieldNode.hasFocus) return;
         final fieldContext = _eventFieldKey.currentContext;
         if (fieldContext == null) return;
         Scrollable.ensureVisible(

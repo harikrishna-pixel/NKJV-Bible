@@ -16,6 +16,7 @@ import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
+import 'package:biblebookapp/services/daily_slot_notification_helper.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -4081,6 +4082,9 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                             await SharPreferences.setString(
                                 SharPreferences.streakFlowLastShownDate,
                                 completionDate);
+                            // One notif only after streak done: cancel streak nudges, prefer chat/verse.
+                            await DailySlotNotificationHelper
+                                .rescheduleEnabledSlots();
                             if (isRestoreRun) {
                               final completed =
                                   await SharPreferences.getStringList(

@@ -756,56 +756,79 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                                     ),
                                     borderRadius: BorderRadius.circular(7),
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      ColorFiltered(
-                                        colorFilter: ColorFilter.mode(
-                                          // White/Black for normal (unselected) based on theme
-                                          // Theme color (805531) when selected in light mode, white when selected in dark mode
-                                          selected
-                                              ? (isDark
-                                                  ? Colors.white
-                                                  : const Color(0xFF805531))
-                                              : (isDark
-                                                  ? CommanColor.whiteBlack(
-                                                      context)
-                                                  : const Color(0xFF805531)),
-                                          BlendMode.srcIn,
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      maxWidth: screenWidth -
+                                          (screenWidth > 600 ? 80 : 56),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        ColorFiltered(
+                                          colorFilter: ColorFilter.mode(
+                                            // White/Black for normal (unselected) based on theme
+                                            // Theme color (805531) when selected in light mode, white when selected in dark mode
+                                            selected
+                                                ? (isDark
+                                                    ? Colors.white
+                                                    : const Color(0xFF805531))
+                                                : (isDark
+                                                    ? CommanColor.whiteBlack(
+                                                        context)
+                                                    : const Color(0xFF805531)),
+                                            BlendMode.srcIn,
+                                          ),
+                                          child: Image.asset(
+                                            _getIconPath(
+                                                category.key,
+                                                Provider.of<ThemeProvider>(
+                                                                context,
+                                                                listen: false)
+                                                            .themeMode ==
+                                                        ThemeMode.dark
+                                                    ? !selected
+                                                    : selected),
+                                            width: screenWidth > 600 ? 40 : 20,
+                                            height: screenWidth > 600 ? 40 : 20,
+                                            errorBuilder: (_, __, ___) =>
+                                                SizedBox(
+                                              width:
+                                                  screenWidth > 600 ? 40 : 20,
+                                              height:
+                                                  screenWidth > 600 ? 40 : 20,
+                                              child: Icon(
+                                                Icons.menu_book_outlined,
+                                                size: screenWidth > 600
+                                                    ? 28
+                                                    : 16,
+                                              ),
+                                            ),
+                                          ),
                                         ),
-                                        child: Image.asset(
-                                          _getIconPath(
-                                              category.key,
-                                              Provider.of<ThemeProvider>(
-                                                              context,
-                                                              listen: false)
-                                                          .themeMode ==
-                                                      ThemeMode.dark
-                                                  ? !selected
-                                                  : selected),
-                                          width: screenWidth > 600 ? 40 : 20,
-                                          height: screenWidth > 600 ? 40 : 20,
+                                        const SizedBox(width: 6),
+                                        Flexible(
+                                          child: Text(
+                                            category.key,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize:
+                                                  screenWidth > 600 ? 19 : null,
+                                              // White/Black for normal (unselected) based on theme
+                                              // Theme color (805531) when selected in light mode, white when selected in dark mode
+                                              color: selected
+                                                  ? (isDark
+                                                      ? Colors.white
+                                                      : const Color(0xFF805531))
+                                                  : (isDark
+                                                      ? CommanColor.whiteBlack(
+                                                          context)
+                                                      : const Color(
+                                                          0xFF805531)),
+                                            ),
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        category.key,
-                                        style: TextStyle(
-                                          fontSize:
-                                              screenWidth > 600 ? 19 : null,
-                                          // White/Black for normal (unselected) based on theme
-                                          // Theme color (805531) when selected in light mode, white when selected in dark mode
-                                          color: selected
-                                              ? (isDark
-                                                  ? Colors.white
-                                                  : const Color(0xFF805531))
-                                              : (isDark
-                                                  ? CommanColor.whiteBlack(
-                                                      context)
-                                                  : const Color(0xFF805531)),
-                                        ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ),
                               );

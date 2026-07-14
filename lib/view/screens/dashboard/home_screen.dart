@@ -45,8 +45,7 @@ import 'package:biblebookapp/view/screens/chat/chat_screen.dart';
 import 'package:biblebookapp/view/screens/chat/prayer_guidance_screen.dart';
 import 'package:biblebookapp/streak/streak_ui.dart';
 import 'package:biblebookapp/services/smart_notification_helper.dart';
-import 'package:biblebookapp/services/scenario_notification_helper.dart';
-import 'package:biblebookapp/services/streak_notification_helper.dart';
+import 'package:biblebookapp/services/daily_slot_notification_helper.dart';
 import 'package:biblebookapp/streak_flow/streak_flow_screens.dart' hide SharPreferences;
 import 'package:biblebookapp/streak_flow/streak_saved_list_screen.dart';
 import '../../constants/share_preferences.dart';
@@ -1296,8 +1295,7 @@ class _HomeScreenState extends State<HomeScreen>
     await Future.wait([
       _handlePendingNotificationAction(),
       _showStreakCompleteCelebrationIfNeeded(),
-      StreakNotificationHelper.rescheduleStreakNotificationsIfEnabled(),
-      ScenarioNotificationHelper.rescheduleScenarioNotificationsIfEnabled(),
+      DailySlotNotificationHelper.rescheduleEnabledSlots(),
     ]);
     if (!mounted) return;
 

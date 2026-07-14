@@ -118,6 +118,8 @@ class SharPreferences {
   static const appOpenTimes = 'app_open_times';
   /// Scenario-based notifications (notification_matrix.json). Separate from streak notifications.
   static const isScenarioNotificationOn = 'is_scenario_notification_on';
+  /// Last calendar day (YYYY-MM-DD) the user opened Bible Chat. Used to skip chat notifications.
+  static const chatOpenedDate = 'chat_opened_date';
   /// When user completes daily streak and will reach Home next: show "Day X Complete" celebration. Value = streak count (e.g. "1"); 0 or missing = don't show.
   static const pendingStreakCompleteCelebration = 'pending_streak_complete_celebration';
   /// Last calendar day (YYYY-MM-DD) the streak celebration dialog was shown. Used to show at most once per day.

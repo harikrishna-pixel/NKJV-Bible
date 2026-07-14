@@ -802,18 +802,8 @@ class _SettingScreenState extends State<SettingScreen>
 
   void setNotification(NotificationTime notificationTime) async {
     await SmartNotificationHelper.cancelSmartNotification();
-    final int id = getNotificationId(notificationTime);
-    final int hh = _notificationHour24(notificationTime);
-    final int mm = _notificationMinute(notificationTime);
-    final content = notificationTime == NotificationTime.morning
-        ? await StreakNotificationHelper.getMorningContent()
-        : notificationTime == NotificationTime.afternoon
-            ? await StreakNotificationHelper.getAfternoonContent()
-            : await StreakNotificationHelper.getNightContent();
-    await NotificationsServices().showNotification(
-        id, content.title, content.message, hh, mm,
-        payload: content.action);
-    await ScenarioNotificationHelper.rescheduleScenarioNotificationsIfEnabled();
+    // Single-slot priority schedule (streak → chat → verse); no dual notifs.
+    await StreakNotificationHelper.rescheduleStreakNotificationsIfEnabled();
   }
 
   disableNotification(NotificationTime notificationTime) {

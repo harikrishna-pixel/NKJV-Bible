@@ -1,7 +1,7 @@
 import 'dart:convert';
 
+import 'package:biblebookapp/services/daily_slot_notification_helper.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
-import 'package:biblebookapp/view/widget/notification_service.dart';
 import 'package:flutter/services.dart';
 
 /// Separate scenario-based notifications (IDs 11/12/13).
@@ -136,6 +136,20 @@ class ScenarioNotificationHelper {
     return last == _todayKey();
   }
 
+  /// True when Bible Chat was opened on today's date.
+  static Future<bool> openedChatToday() async {
+    final opened =
+        await SharPreferences.getString(SharPreferences.chatOpenedDate);
+    return opened == _todayKey();
+  }
+
+  /// Mark chat opened today and refresh the single-notif schedule.
+  static Future<void> markChatOpenedToday() async {
+    await SharPreferences.setString(
+        SharPreferences.chatOpenedDate, _todayKey());
+    await DailySlotNotificationHelper.rescheduleEnabledSlots();
+  }
+
   static Future<bool> _startedStreakToday() async {
     final started =
         await SharPreferences.getString(SharPreferences.streakFlowStartedDate);
@@ -253,14 +267,25 @@ class ScenarioNotificationHelper {
     final templateCategory =
         _scheduleToTemplateCategory[scheduleKey] ?? 'VERSE_OF_THE_DAY';
 
-    final categoryTemplates = templates
+    return getTemplateContentForCategory(templateCategory, templates: templates);
+  }
+
+  /// Pick a rotating template from [templateCategory] (e.g. AI_CHAT, VERSE_OF_THE_DAY).
+  static Future<ScenarioNotificationContent> getTemplateContentForCategory(
+    String templateCategory, {
+    List<Map<String, dynamic>>? templates,
+  }) async {
+    final allTemplates = templates ?? await _loadTemplates();
+    final categoryTemplates = allTemplates
         .where((t) => t['category'] == templateCategory)
         .toList();
     if (categoryTemplates.isEmpty) {
-      return const ScenarioNotificationContent(
+      return ScenarioNotificationContent(
         title: 'Bible',
-        message: 'Take a moment with God today.',
-        action: 'open_verse',
+        message: templateCategory == 'AI_CHAT'
+            ? 'A Scripture-centred chat is waiting for you.'
+            : 'Take a moment with God today.',
+        action: _actionForTemplateCategory(templateCategory),
       );
     }
 
@@ -280,116 +305,8 @@ class ScenarioNotificationHelper {
     );
   }
 
-  static Future<({int hh, int mm})> _timeForSlot(String slot) async {
-    switch (slot) {
-      case 'afternoon':
-        final h = int.tryParse(
-                await SharPreferences.getString(
-                        SharPreferences.notificationTimeHour1) ??
-                    '14') ??
-            14;
-        final m = int.tryParse(
-                await SharPreferences.getString(
-                        SharPreferences.notificationTimeMinute1) ??
-                    '0') ??
-            0;
-        return (hh: h, mm: m);
-      case 'evening':
-        final h = int.tryParse(
-                await SharPreferences.getString(
-                        SharPreferences.notificationTimeHour2) ??
-                    '20') ??
-            20;
-        final m = int.tryParse(
-                await SharPreferences.getString(
-                        SharPreferences.notificationTimeMinute2) ??
-                    '0') ??
-            0;
-        return (hh: h, mm: m);
-      case 'morning':
-      default:
-        final h = int.tryParse(
-                await SharPreferences.getString(
-                        SharPreferences.notificationTimeHour) ??
-                    '8') ??
-            8;
-        final m = int.tryParse(
-                await SharPreferences.getString(
-                        SharPreferences.notificationTimeMinute) ??
-                    '0') ??
-            0;
-        return (hh: h, mm: m);
-    }
-  }
-
-  static Future<void> _cancelAll() async {
-    final svc = NotificationsServices();
-    svc.stopNotification(scenarioMorningNotificationId);
-    svc.stopNotification(scenarioAfternoonNotificationId);
-    svc.stopNotification(scenarioEveningNotificationId);
-  }
-
-  /// Schedules scenario notifications when enabled. Uses separate IDs/channel
-  /// from streak notifications (1/2/3).
+  /// Schedules scenario path via single-slot priority (streak → chat → verse).
   static Future<void> rescheduleScenarioNotificationsIfEnabled() async {
-    final enabled =
-        await SharPreferences.getBoolean(SharPreferences.isScenarioNotificationOn);
-    if (enabled == false) {
-      await _cancelAll();
-      return;
-    }
-
-    final onMorning =
-        await SharPreferences.getBoolean(SharPreferences.isNotificationOn);
-    final onAfternoon =
-        await SharPreferences.getBoolean(SharPreferences.isNotificationOn1);
-    final onEvening =
-        await SharPreferences.getBoolean(SharPreferences.isNotificationOn2);
-
-    await NotificationsServices.ensureInitialized();
-    await _cancelAll();
-
-    final hasAny =
-        (onMorning ?? false) || (onAfternoon ?? false) || (onEvening ?? false);
-    if (!hasAny) return;
-
-    final svc = NotificationsServices();
-
-    if (onMorning == true) {
-      final content = await getContentForSlot('morning');
-      final time = await _timeForSlot('morning');
-      await svc.showScenarioNotification(
-        scenarioMorningNotificationId,
-        content.title,
-        content.message,
-        time.hh,
-        time.mm,
-        payload: content.action,
-      );
-    }
-    if (onAfternoon == true) {
-      final content = await getContentForSlot('afternoon');
-      final time = await _timeForSlot('afternoon');
-      await svc.showScenarioNotification(
-        scenarioAfternoonNotificationId,
-        content.title,
-        content.message,
-        time.hh,
-        time.mm,
-        payload: content.action,
-      );
-    }
-    if (onEvening == true) {
-      final content = await getContentForSlot('evening');
-      final time = await _timeForSlot('evening');
-      await svc.showScenarioNotification(
-        scenarioEveningNotificationId,
-        content.title,
-        content.message,
-        time.hh,
-        time.mm,
-        payload: content.action,
-      );
-    }
+    await DailySlotNotificationHelper.rescheduleEnabledSlots();
   }
 }

@@ -24,6 +24,7 @@ import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/services/analytics/analytics_service.dart';
+import 'package:biblebookapp/services/scenario_notification_helper.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -136,6 +137,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     });
     // Track Geneva Bible Chat event
     AnalyticsService.trackGenevaBibleChat();
+    // Skip chat notifications for the rest of today once chat is opened.
+    ScenarioNotificationHelper.markChatOpenedToday();
     _showChatIntroIfNeeded();
     _loadRecentConversations();
 

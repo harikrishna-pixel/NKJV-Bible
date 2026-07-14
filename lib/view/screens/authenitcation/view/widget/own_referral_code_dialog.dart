@@ -63,7 +63,7 @@ class OwnReferralCodeDialog {
   static String _referralShareMessage(String code) {
     return '''Grow closer to God with me!
 
-Download the Geneva Bible app and use my referral code $code when you sign up to start your own Bible journey.
+Download the ${BibleInfo.bible_shortName} app and use my referral code $code when you sign up to start your own Bible journey.
 
 Download here:
 ${_appStoreLink()}''';

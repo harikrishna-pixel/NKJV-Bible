@@ -931,7 +931,7 @@ class DownloadProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
 
     final bool dataIsChanged = prefs.getBool('dataIsChanged') ?? true;
-    final String? cachedJson = prefs.getString('cachedDailyVerseList');
+    final String? cachedJson = prefs.getString('cachedDailyVerseList_v2');
 
     // Already in memory from splash/home/preference preload.
     if (!dataIsChanged && dailyVerseList.isNotEmpty) {
@@ -1048,9 +1048,12 @@ class DownloadProvider with ChangeNotifier {
     for (var verse in verseRows) {
       final bookIdStored = int.parse(verse['Book_Id'].toString());
       final bookNum = bookIdStored > 0 ? bookIdStored - 1 : bookIdStored;
-      final bookName = _resolveDailyVerseBookTitle(bookTitleByNum, bookIdStored) ??
-          _resolveDailyVerseBookTitle(bookTitleByNum, bookNum) ??
-          'Unknown';
+      final storedBook = verse['Book']?.toString().trim() ?? '';
+      final bookName = storedBook.isNotEmpty
+          ? storedBook
+          : (_resolveDailyVerseBookTitle(bookTitleByNum, bookNum) ??
+              _resolveDailyVerseBookTitle(bookTitleByNum, bookIdStored) ??
+              'Unknown');
 
       enrichedList.add(DailyVerseList(
         categoryName: verse['Category_Name'],
@@ -1069,7 +1072,7 @@ class DownloadProvider with ChangeNotifier {
     // Cache in SharedPreferences
     final String jsonList =
         jsonEncode(dailyVerseList.map((e) => e.toJson()).toSet().toList());
-    await prefs.setString('cachedDailyVerseList', jsonList);
+    await prefs.setString('cachedDailyVerseList_v2', jsonList);
     await prefs.setBool('dataIsChanged', false); // Reset the flag
 
     isLoadingDailyVerse = false;
@@ -1244,7 +1247,7 @@ class DownloadProvider with ChangeNotifier {
     return verseList.isNotEmpty;
   }
 
-  /// Reads [cachedDailyVerseList] prefs only — for instant Daily Verse UI.
+  /// Reads [cachedDailyVerseList_v2] prefs only — for instant Daily Verse UI.
   Future<bool> tryHydrateDailyVersesFromLocalCache() async {
     if (dailyVerseList.isNotEmpty) return true;
 
@@ -1252,7 +1255,7 @@ class DownloadProvider with ChangeNotifier {
     final dataIsChanged = prefs.getBool('dataIsChanged') ?? true;
     if (dataIsChanged) return false;
 
-    final cachedJson = prefs.getString('cachedDailyVerseList');
+    final cachedJson = prefs.getString('cachedDailyVerseList_v2');
     if (cachedJson == null || cachedJson.isEmpty) return false;
 
     return _hydrateDailyVersesFromPrefsJson(cachedJson);
