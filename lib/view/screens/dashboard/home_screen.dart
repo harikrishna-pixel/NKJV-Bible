@@ -46,8 +46,8 @@ import 'package:biblebookapp/view/screens/chat/prayer_guidance_screen.dart';
 import 'package:biblebookapp/streak/streak_ui.dart';
 import 'package:biblebookapp/services/smart_notification_helper.dart';
 import 'package:biblebookapp/services/daily_slot_notification_helper.dart';
+import 'package:biblebookapp/streak_flow/daily_journey_screen.dart';
 import 'package:biblebookapp/streak_flow/streak_flow_screens.dart' hide SharPreferences;
-import 'package:biblebookapp/streak_flow/streak_saved_list_screen.dart';
 import '../../constants/share_preferences.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:home_widget/home_widget.dart';
@@ -4102,7 +4102,7 @@ class _HomeScreenState extends State<HomeScreen>
                             Get.back();
                             Future.microtask(() {
                               Get.to(
-                                () => const StreakSavedListScreen(),
+                                () => const DailyJourneyScreen(),
                                 transition: Transition.cupertino,
                                 duration: const Duration(milliseconds: 350),
                               );
