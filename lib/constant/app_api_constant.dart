@@ -61,13 +61,17 @@ class AppApiConstant {
   static Set<String> paywallStoreQueryIds({
     required String sixMonthPlan,
     required String oneYearPlan,
-    required String twoYearPlan,
+    String twoYearPlan = '',
   }) {
-    return {
+    final ids = <String>{
       ...subscriptionProductIdQueryVariants(sixMonthPlan),
       ...subscriptionProductIdQueryVariants(oneYearPlan),
-      ...subscriptionProductIdQueryVariants(twoYearPlan),
     };
+    // Temporarily disabled — only 6-month and 1-year plans on paywall
+    // if (twoYearPlan.trim().isNotEmpty) {
+    //   ids.addAll(subscriptionProductIdQueryVariants(twoYearPlan));
+    // }
+    return ids;
   }
 
 }

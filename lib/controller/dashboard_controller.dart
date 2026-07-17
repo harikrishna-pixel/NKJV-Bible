@@ -408,19 +408,25 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     isSubscriptionEnabled = value.data?.isSubscriptionEnabled == '1';
     sharedSecret = value.data?.subSharedsecret ?? "";
 
-    // Use constants as fallback when API data is not available
-    sixMonthPlan = AppApiConstant.resolveSubscriptionProductId(
-      value.data?.subIdentifierSixMonth,
-      BibleInfo.sixMonthPlanid,
-    );
-    oneYearPlan = AppApiConstant.resolveSubscriptionProductId(
-      value.data?.subIdentifierOneyear,
-      BibleInfo.oneYearPlanid,
-    );
-    lifeTimePlan = AppApiConstant.resolveSubscriptionProductId(
-      value.data?.subIdentifierLifetime,
-      BibleInfo.lifeTimePlanid,
-    );
+    // Prefer BibleInfo constants (holybible 6M / 1Y) over API newkingsjamesversion IDs
+    sixMonthPlan = BibleInfo.sixMonthPlanid.isNotEmpty
+        ? BibleInfo.sixMonthPlanid
+        : AppApiConstant.resolveSubscriptionProductId(
+            value.data?.subIdentifierSixMonth,
+            BibleInfo.sixMonthPlanid,
+          );
+    oneYearPlan = BibleInfo.oneYearPlanid.isNotEmpty
+        ? BibleInfo.oneYearPlanid
+        : AppApiConstant.resolveSubscriptionProductId(
+            value.data?.subIdentifierOneyear,
+            BibleInfo.oneYearPlanid,
+          );
+    lifeTimePlan = BibleInfo.lifeTimePlanid.isNotEmpty
+        ? BibleInfo.lifeTimePlanid
+        : AppApiConstant.resolveSubscriptionProductId(
+            value.data?.subIdentifierLifetime,
+            BibleInfo.lifeTimePlanid,
+          );
 
     final iapdatacheck = value.data?.subIdentifierSixMonth;
 

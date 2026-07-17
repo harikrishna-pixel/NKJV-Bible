@@ -13,16 +13,16 @@ class BibleInfo {
 
 //IAP
   static String sixMonthPlanid =
-      'com.balaklrapps.newkingsjamesversion.sixmonthadsfree';
+      'com.balaklrapps.holybible.sixmonthpremium';
   static String oneYearPlanid =
-      'com.balaklrapps.newkingsjamesversion.oneyearadsfree';
+      'com.balaklrapps.holybible.oneyearpremium';
   static String twoYearPlanid =
-      'com.balaklrapps.newkingsjamesversion.twoyearadsfree';
+      '';
   static String lifeTimePlanid =
-      'com.balaklrapps.newkingsjamesversion.lifetimeadsfree';
+      '';
   static String subIdentifierTwoYear = twoYearPlanid;
   static String exitOfferPlanid =
-      'com.balaklrapps.newkingsjamesversion.lifetime.exitoffer';
+      '';
 
   // IAP Discounts (for offline mode)
   static String sixMonthPlanDiscount = '0';

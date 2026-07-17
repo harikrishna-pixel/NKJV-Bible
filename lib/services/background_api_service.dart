@@ -196,25 +196,31 @@ class BackgroundApiService {
       await prefs.setBool('isSubscriptionEnabled', value.data?.isSubscriptionEnabled == '1');
       await prefs.setString('subSharedsecret', value.data?.subSharedsecret ?? '');
       
-      // Save subscription plans - Use constants as fallback when API data is not available
+      // Save subscription plans — prefer BibleInfo constants (holybible 6M / 1Y)
       await prefs.setString(
           'sixMonthPlan',
-          AppApiConstant.resolveSubscriptionProductId(
-            value.data?.subIdentifierSixMonth,
-            BibleInfo.sixMonthPlanid,
-          ));
+          BibleInfo.sixMonthPlanid.isNotEmpty
+              ? BibleInfo.sixMonthPlanid
+              : AppApiConstant.resolveSubscriptionProductId(
+                  value.data?.subIdentifierSixMonth,
+                  BibleInfo.sixMonthPlanid,
+                ));
       await prefs.setString(
           'oneYearPlan',
-          AppApiConstant.resolveSubscriptionProductId(
-            value.data?.subIdentifierOneyear,
-            BibleInfo.oneYearPlanid,
-          ));
+          BibleInfo.oneYearPlanid.isNotEmpty
+              ? BibleInfo.oneYearPlanid
+              : AppApiConstant.resolveSubscriptionProductId(
+                  value.data?.subIdentifierOneyear,
+                  BibleInfo.oneYearPlanid,
+                ));
       await prefs.setString(
           'lifeTimePlan',
-          AppApiConstant.resolveSubscriptionProductId(
-            value.data?.subIdentifierLifetime,
-            BibleInfo.lifeTimePlanid,
-          ));
+          BibleInfo.lifeTimePlanid.isNotEmpty
+              ? BibleInfo.lifeTimePlanid
+              : AppApiConstant.resolveSubscriptionProductId(
+                  value.data?.subIdentifierLifetime,
+                  BibleInfo.lifeTimePlanid,
+                ));
       await prefs.setString('sixMonthPlanvalue', value.data?.subIdentifierSixMonthValue ?? '');
       await prefs.setString('oneYearPlanvalue', value.data?.subIdentifierOneyearValue ?? '');
       await prefs.setString('lifeTimePlanvalue', value.data?.subIdentifierLifetimeValue ?? '');

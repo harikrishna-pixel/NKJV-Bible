@@ -1,4 +1,5 @@
 import 'package:biblebookapp/view/constants/colors.dart';
+import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -14,54 +15,48 @@ class AddWidgetIntroScreen extends StatefulWidget {
 }
 
 class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
-  static const List<String> _lightImagePaths = [
-    'assets/home-widgets/light-home_1.png',
-    'assets/home-widgets/light-home_2.png',
-    'assets/home-widgets/light-home_3.png',
-    'assets/home-widgets/light-home_4.png',
-    'assets/home-widgets/light-home_5.png',
+  static const List<String> _imagePaths = [
+    'assets/home-widgets/widget Mockup 1.png',
+    'assets/home-widgets/widget Mockup 2.png',
+    'assets/home-widgets/widget Mockup 3.png',
+    'assets/home-widgets/widget Mockup 4.png',
+    'assets/home-widgets/widget Mockup 5.png',
   ];
 
-  static const List<String> _darkImagePaths = [
-    'assets/home-widgets/Dark-home_1.png',
-    'assets/home-widgets/Dark-home_2.png',
-    'assets/home-widgets/Dark-home_3.png',
-    'assets/home-widgets/Dark-home_4.png',
-    'assets/home-widgets/Dark-home_5.png',
+  static const List<String> _titles = [
+    'Try Home Screen Widget',
+    'Press & Hold Screen',
+    'Tap \'Edit\' or "+" icon',
+    'Search & Find the App',
+    'Pick a Widget Style',
   ];
 
-  /// Shifts cover downward to hide baked-in dots/title baked into slide PNGs.
-  static const Alignment _slideAlignment = Alignment(0, 0.18);
+  static const List<String> _subtitles = [
+    'Get daily Bible verses and prayers directly on your Home screen',
+    'Hold the home screen until apps begin to Shake.',
+    'Tap Edit in the top corner and select Add Widget.',
+    'Scroll or search "Bible" to locate the widget.',
+    'Select a widget size and tap Add Widget',
+  ];
 
   late final PageController _pageController;
   int _currentPage = 0;
 
-  List<String> _imagePathsForTheme(bool isDark) =>
-      isDark ? _darkImagePaths : _lightImagePaths;
+  int get _pageCount => _imagePaths.length;
 
-  int _pageCount(bool isDark) => _imagePathsForTheme(isDark).length;
-
-  bool _isLastPage(bool isDark) =>
-      _currentPage >= _pageCount(isDark) - 1;
+  bool get _isLastPage => _currentPage >= _pageCount - 1;
 
   Widget _buildFullScreenSlide(String path) {
-    final isDark = Provider.of<ThemeProvider>(context, listen: false)
-            .themeMode ==
-        ThemeMode.dark;
     return Image.asset(
       path,
-      fit: BoxFit.cover,
+      fit: BoxFit.contain,
       width: double.infinity,
       height: double.infinity,
-      alignment: _slideAlignment,
       gaplessPlayback: true,
       frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
         if (wasSynchronouslyLoaded || frame != null) return child;
         return ColoredBox(
-          color: isDark
-              ? CommanColor.darkPrimaryColor
-              : Provider.of<ThemeProvider>(context, listen: false)
-                  .backgroundColor,
+          color: const Color(0xFFF5F0E6),
           child: child,
         );
       },
@@ -73,7 +68,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
     const slotWidth = 28.0;
     final activeColor = CommanColor.lightDarkPrimary(context);
     final inactiveColor =
-    isDark ? activeColor.withOpacity(0.35) : const Color(0xFFE5B889);
+        isDark ? activeColor.withOpacity(0.35) : const Color(0xFFE5B889);
 
     // Directionality ensures dots always render left-to-right (index 0 → last)
     return Directionality(
@@ -101,8 +96,44 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
     );
   }
 
+  Widget _buildTopText(bool isTablet, bool isDark) {
+    final title = _titles[_currentPage.clamp(0, _titles.length - 1)];
+    final subtitle = _subtitles[_currentPage.clamp(0, _subtitles.length - 1)];
+    final textColor = CommanColor.whiteBlack(context);
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: isTablet ? 40 : 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: isTablet ? 26 : 22,
+              fontWeight: FontWeight.w700,
+              color: textColor,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: isTablet ? 16 : 14,
+              fontWeight: FontWeight.w400,
+              color: isDark ? Colors.white70 : Colors.black54,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _onNextTap(bool isDark) {
-    if (!_isLastPage(isDark)) {
+    if (!_isLastPage) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -216,10 +247,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
     _pageController = PageController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final isDark = Provider.of<ThemeProvider>(context, listen: false)
-              .themeMode ==
-          ThemeMode.dark;
-      for (final path in _imagePathsForTheme(isDark)) {
+      for (final path in _imagePaths) {
         precacheImage(AssetImage(path), context);
       }
     });
@@ -235,38 +263,62 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.themeMode == ThemeMode.dark;
-    final imagePaths = _imagePathsForTheme(isDark);
-    final isLastPage = _isLastPage(isDark);
+    final isDark =
+        Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark;
+    final isLastPage = _isLastPage;
     final isFirstPage = _currentPage == 0;
-    final pageCount = _pageCount(isDark);
+    final pageCount = _pageCount;
+    final topInset = MediaQuery.of(context).padding.top;
 
     return Scaffold(
-      // Solid theme color avoids yellow flash during route transition.
-      backgroundColor: isDark
-          ? CommanColor.darkPrimaryColor
-          : (themeProvider.currentCustomTheme == AppCustomTheme.vintage
-              ? const Color(0xFFF5F0E6)
-              : themeProvider.backgroundColor),
+      // Always use old paper theme background for this walkthrough.
+      backgroundColor: const Color(0xFFF5F0E6),
       body: Stack(
         fit: StackFit.expand,
         children: [
-          PageView.builder(
-            controller: _pageController,
-            physics: const BouncingScrollPhysics(),
-            onPageChanged: (index) => setState(() => _currentPage = index),
-            itemCount: imagePaths.length,
-            itemBuilder: (context, index) =>
-                _buildFullScreenSlide(imagePaths[index]),
+          // Old paper theme background
+          Positioned.fill(
+            child: Image.asset(
+              Images.bgImage(context),
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+            ),
           ),
 
-          // Top page dots indicator
+          // Mockup images — leave room at top for title + dots
+          Positioned(
+            top: topInset + (isTablet ? 140 : 128),
+            left: isTablet ? 48 : 28,
+            right: isTablet ? 48 : 28,
+            bottom: isTablet ? 110 : 96,
+            child: PageView.builder(
+              controller: _pageController,
+              physics: const BouncingScrollPhysics(),
+              onPageChanged: (index) => setState(() => _currentPage = index),
+              itemCount: _imagePaths.length,
+              itemBuilder: (context, index) =>
+                  _buildFullScreenSlide(_imagePaths[index]),
+            ),
+          ),
+
+          // Title + subtitle above dots (same as before)
           Align(
             alignment: Alignment.topCenter,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 700),
-              child: _buildPageDots(context, pageCount, isDark),
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Dots first (top), then title/subtitle below
+                    _buildPageDots(context, pageCount, isDark),
+                    const SizedBox(height: 14),
+                    _buildTopText(isTablet, isDark),
+                  ],
+                ),
+              ),
             ),
           ),
 

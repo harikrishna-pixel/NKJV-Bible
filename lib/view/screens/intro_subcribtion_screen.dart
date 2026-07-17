@@ -91,18 +91,25 @@ class SubscriptionScreen extends StatefulWidget {
 
   /// Navigate to paywall from home (direct, no exit offer).
   static Future<void> navigateToPaywallFromHome(BuildContext context) async {
-    final sixMonthPlan = AppApiConstant.resolveSubscriptionProductId(
-      await SharPreferences.getString('sixMonthPlan'),
-      BibleInfo.sixMonthPlanid,
-    );
-    final oneYearPlan = AppApiConstant.resolveSubscriptionProductId(
-      await SharPreferences.getString('oneYearPlan'),
-      BibleInfo.oneYearPlanid,
-    );
-    final lifeTimePlan = AppApiConstant.resolveSubscriptionProductId(
-      await SharPreferences.getString('lifeTimePlan'),
-      BibleInfo.lifeTimePlanid,
-    );
+    // Use BibleInfo constants so paywall always loads holybible 6M / 1Y plans
+    final sixMonthPlan = BibleInfo.sixMonthPlanid.isNotEmpty
+        ? BibleInfo.sixMonthPlanid
+        : AppApiConstant.resolveSubscriptionProductId(
+            await SharPreferences.getString('sixMonthPlan'),
+            BibleInfo.sixMonthPlanid,
+          );
+    final oneYearPlan = BibleInfo.oneYearPlanid.isNotEmpty
+        ? BibleInfo.oneYearPlanid
+        : AppApiConstant.resolveSubscriptionProductId(
+            await SharPreferences.getString('oneYearPlan'),
+            BibleInfo.oneYearPlanid,
+          );
+    final lifeTimePlan = BibleInfo.lifeTimePlanid.isNotEmpty
+        ? BibleInfo.lifeTimePlanid
+        : AppApiConstant.resolveSubscriptionProductId(
+            await SharPreferences.getString('lifeTimePlan'),
+            BibleInfo.lifeTimePlanid,
+          );
     openPaywallStacked(
       sixMonthPlan: sixMonthPlan,
       oneYearPlan: oneYearPlan,
@@ -154,32 +161,40 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   /// 2Y ID uses the same bundle prefix as 6M/1Y (not a hardcoded Geneva id).
   String get _twoYearPlanId => '$_planBundlePrefix.twoyearadsfree';
 
-  String get _resolvedSixMonthPlanId => AppApiConstant.resolveSubscriptionProductId(
-        widget.sixMonthPlan,
-        BibleInfo.sixMonthPlanid,
-      );
+  // Prefer BibleInfo constants so stale prefs/API IDs (e.g. newkingsjamesversion)
+  // do not override the configured holybible plan IDs.
+  String get _resolvedSixMonthPlanId => BibleInfo.sixMonthPlanid.isNotEmpty
+      ? BibleInfo.sixMonthPlanid
+      : AppApiConstant.resolveSubscriptionProductId(
+          widget.sixMonthPlan,
+          BibleInfo.sixMonthPlanid,
+        );
 
-  String get _resolvedOneYearPlanId => AppApiConstant.resolveSubscriptionProductId(
-        widget.oneYearPlan,
-        BibleInfo.oneYearPlanid,
-      );
+  String get _resolvedOneYearPlanId => BibleInfo.oneYearPlanid.isNotEmpty
+      ? BibleInfo.oneYearPlanid
+      : AppApiConstant.resolveSubscriptionProductId(
+          widget.oneYearPlan,
+          BibleInfo.oneYearPlanid,
+        );
 
-  String get _resolvedLifeTimePlanId => AppApiConstant.resolveSubscriptionProductId(
-        widget.lifeTimePlan,
-        BibleInfo.lifeTimePlanid,
-      );
+  String get _resolvedLifeTimePlanId => BibleInfo.lifeTimePlanid.isNotEmpty
+      ? BibleInfo.lifeTimePlanid
+      : AppApiConstant.resolveSubscriptionProductId(
+          widget.lifeTimePlan,
+          BibleInfo.lifeTimePlanid,
+        );
 
   List<String> get _expectedPaywallPlanIds => [
         _resolvedSixMonthPlanId,
         _resolvedOneYearPlanId,
-        _twoYearPlanId,
+        // _twoYearPlanId, // Temporarily disabled - only showing 6-month and 1-year plans
       ];
 
   Set<String> get _paywallQueryProductIds =>
       AppApiConstant.paywallStoreQueryIds(
         sixMonthPlan: _resolvedSixMonthPlanId,
         oneYearPlan: _resolvedOneYearPlanId,
-        twoYearPlan: _twoYearPlanId,
+        // twoYearPlan: _twoYearPlanId, // Temporarily disabled
       );
 
   bool _isPaywallProductForThisApp(String productId) =>
@@ -1841,8 +1856,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
     final preloadedHasAllSlots = preloadedProducts.isNotEmpty &&
         _cacheHasPaywallSlot(preloadedProducts.map((p) => p.id), 'sixmonth') &&
-        _cacheHasPaywallSlot(preloadedProducts.map((p) => p.id), 'oneyear') &&
-        _cacheHasPaywallSlot(preloadedProducts.map((p) => p.id), 'twoyear');
+        _cacheHasPaywallSlot(preloadedProducts.map((p) => p.id), 'oneyear');
+        // Temporarily disabled - only showing 6-month and 1-year plans
+        // && _cacheHasPaywallSlot(preloadedProducts.map((p) => p.id), 'twoyear');
 
     if (preloadedAvailability != null &&
         preloadedProducts.isNotEmpty &&
@@ -2027,8 +2043,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         final cachedIds = datafn.map((product) => product.id).toList();
         final missingExpectedPlans =
             !_cacheHasPaywallSlot(cachedIds, 'sixmonth') ||
-            !_cacheHasPaywallSlot(cachedIds, 'oneyear') ||
-            !_cacheHasPaywallSlot(cachedIds, 'twoyear');
+            !_cacheHasPaywallSlot(cachedIds, 'oneyear');
+            // Temporarily disabled - only showing 6-month and 1-year plans
+            // || !_cacheHasPaywallSlot(cachedIds, 'twoyear');
 
         if (missingExpectedPlans) {
           debugPrint(
@@ -2106,15 +2123,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       currencySymbol: '\$',
     ));
 
-    fallbackProducts.add(ProductDetails(
-      id: _twoYearPlanId,
-      title: '2 Years Premium',
-      description: 'Get 2 years of premium access',
-      price: '\$24.99',
-      rawPrice: 24.99,
-      currencyCode: 'USD',
-      currencySymbol: '\$',
-    ));
+    // Temporarily disabled - only showing 6-month and 1-year plans
+    // fallbackProducts.add(ProductDetails(
+    //   id: _twoYearPlanId,
+    //   title: '2 Years Premium',
+    //   description: 'Get 2 years of premium access',
+    //   price: '\$24.99',
+    //   rawPrice: 24.99,
+    //   currencyCode: 'USD',
+    //   currencySymbol: '\$',
+    // ));
 
     return fallbackProducts;
   }
@@ -2122,9 +2140,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   void _applyPaywallProductDisplayFilter() {
     final hadLifetime =
         _products.any((product) => product.id == _resolvedLifeTimePlanId);
-    if (!hadLifetime) return;
+    // Temporarily disabled - only showing 6-month and 1-year plans
+    final hadTwoYear =
+        _products.any((product) => _isTwoYearProductId(product.id));
+    
+    if (!hadLifetime && !hadTwoYear) return;
 
     _products.removeWhere((product) => product.id == _resolvedLifeTimePlanId);
+    // Temporarily disabled - remove 2-year plan from display
+    _products.removeWhere((product) => _isTwoYearProductId(product.id));
     if (selectedindex >= _products.length) {
       selectedindex = _products.length >= 2 ? 1 : 0;
     }
@@ -2137,8 +2161,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         _products.any((product) => _isSixMonthProductId(product.id));
     final hasOneYear =
         _products.any((product) => _isOneYearProductId(product.id));
-    final hasTwoYear =
-        _products.any((product) => _isTwoYearProductId(product.id));
+    // Temporarily disabled - only showing 6-month and 1-year plans
+    // final hasTwoYear =
+    //     _products.any((product) => _isTwoYearProductId(product.id));
     for (final fallback in _buildAllFallbackProducts()) {
       if (fallback.id.contains('sixmonth')) {
         if (!hasSixMonth) {
@@ -2152,12 +2177,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         }
         continue;
       }
-      if (fallback.id.contains('twoyear')) {
-        if (!hasTwoYear) {
-          _products.add(fallback);
-        }
-        continue;
-      }
+      // Temporarily disabled - only showing 6-month and 1-year plans
+      // if (fallback.id.contains('twoyear')) {
+      //   if (!hasTwoYear) {
+      //     _products.add(fallback);
+      //   }
+      //   continue;
+      // }
     }
     _sortProducts();
     _applyPaywallProductDisplayFilter();

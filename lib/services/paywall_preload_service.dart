@@ -32,15 +32,19 @@ class PaywallPreloadService {
     debugPrint('PaywallPreloadService: Starting preload...');
 
     try {
-      // Get product IDs from SharedPreferences
-      final sixMonthPlan = AppApiConstant.resolveSubscriptionProductId(
-        await SharPreferences.getString('sixMonthPlan'),
-        BibleInfo.sixMonthPlanid,
-      );
-      final oneYearPlan = AppApiConstant.resolveSubscriptionProductId(
-        await SharPreferences.getString('oneYearPlan'),
-        BibleInfo.oneYearPlanid,
-      );
+      // Prefer BibleInfo constants (holybible 6M / 1Y) over stale prefs/API IDs
+      final sixMonthPlan = BibleInfo.sixMonthPlanid.isNotEmpty
+          ? BibleInfo.sixMonthPlanid
+          : AppApiConstant.resolveSubscriptionProductId(
+              await SharPreferences.getString('sixMonthPlan'),
+              BibleInfo.sixMonthPlanid,
+            );
+      final oneYearPlan = BibleInfo.oneYearPlanid.isNotEmpty
+          ? BibleInfo.oneYearPlanid
+          : AppApiConstant.resolveSubscriptionProductId(
+              await SharPreferences.getString('oneYearPlan'),
+              BibleInfo.oneYearPlanid,
+            );
       // Skip if product IDs are not available yet
       if (sixMonthPlan.isEmpty || oneYearPlan.isEmpty) {
         debugPrint('PaywallPreloadService: Product IDs not available yet, skipping preload');
@@ -72,13 +76,14 @@ class PaywallPreloadService {
       final bundlePrefix = dotIndex > 0
           ? sixMonthPlan.substring(0, dotIndex)
           : BibleInfo.ios_Bundle_Id;
-      final twoYearPlanId = '$bundlePrefix.twoyearadsfree';
+      // Temporarily disabled — only 6-month and 1-year plans
+      // final twoYearPlanId = '$bundlePrefix.twoyearadsfree';
 
-      // Query product details (include adfree/adsfree spelling variants)
+      // Query product details (6M + 1Y only)
         final Set<String> ids = AppApiConstant.paywallStoreQueryIds(
           sixMonthPlan: sixMonthPlan,
-          oneYearPlan: oneYearPlan,
-          twoYearPlan: twoYearPlanId,
+          oneYearPlan: oneYearPlan, twoYearPlan: '',
+          // twoYearPlan: twoYearPlanId,
         );
         debugPrint('PaywallPreloadService: App bundle prefix: $bundlePrefix');
         debugPrint('PaywallPreloadService: Querying product details for: $ids');
@@ -109,7 +114,8 @@ class PaywallPreloadService {
             int order(String id) {
               if (id == sixMonthPlan || id.contains('sixmonth')) return 0;
               if (id == oneYearPlan || id.contains('oneyear')) return 1;
-              if (id == twoYearPlanId || id.contains('twoyear')) return 2;
+              // Temporarily disabled — only 6-month and 1-year plans
+              // if (id == twoYearPlanId || id.contains('twoyear')) return 2;
               return 3;
             }
 
@@ -205,14 +211,18 @@ class PaywallPreloadService {
         return false;
       }
 
-      final sixMonthPlan = AppApiConstant.resolveSubscriptionProductId(
-        await SharPreferences.getString('sixMonthPlan'),
-        BibleInfo.sixMonthPlanid,
-      );
-      final oneYearPlan = AppApiConstant.resolveSubscriptionProductId(
-        await SharPreferences.getString('oneYearPlan'),
-        BibleInfo.oneYearPlanid,
-      );
+      final sixMonthPlan = BibleInfo.sixMonthPlanid.isNotEmpty
+          ? BibleInfo.sixMonthPlanid
+          : AppApiConstant.resolveSubscriptionProductId(
+              await SharPreferences.getString('sixMonthPlan'),
+              BibleInfo.sixMonthPlanid,
+            );
+      final oneYearPlan = BibleInfo.oneYearPlanid.isNotEmpty
+          ? BibleInfo.oneYearPlanid
+          : AppApiConstant.resolveSubscriptionProductId(
+              await SharPreferences.getString('oneYearPlan'),
+              BibleInfo.oneYearPlanid,
+            );
       if (sixMonthPlan.isEmpty || oneYearPlan.isEmpty) {
         debugPrint(
             'PaywallPreloadService: Skip onboarding paywall — product IDs missing');
