@@ -37,6 +37,7 @@ import '../../constants/share_preferences.dart';
 import '../../widget/notification_service.dart';
 
 import 'FontType.dart';
+import 'package:biblebookapp/view/screens/bible_select_screen.dart';
 
 enum NotificationTime { morning, afternoon, evening }
 
@@ -1346,6 +1347,35 @@ class _SettingScreenState extends State<SettingScreen>
                     ),
                   ),
                 ),
+                // Bible Version - only show if more than one version available
+                if (BibleInfo.folders.length > 1)
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 20, vertical: screenWidth < 380 ? 5 : 10),
+                    child: InkWell(
+                      onTap: () {
+                        Get.to(() => const BibleVersionsScreen(from: 'home'),
+                            transition: Transition.cupertinoDialog,
+                            duration: const Duration(milliseconds: 300));
+                      },
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Bible Version",
+                            style: CommanStyle.bw16500(context),
+                          ),
+                          const Spacer(),
+                          Icon(
+                            Icons.navigate_next,
+                            color: CommanColor.whiteBlack(context),
+                            size: 24,
+                          )
+                        ],
+                      ),
+                    ),
+                  ),
                 // Padding(
                 //   padding: EdgeInsets.symmetric(
                 //       horizontal: 20, vertical: screenWidth < 380 ? 5 : 10),
