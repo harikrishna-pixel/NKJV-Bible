@@ -155,6 +155,29 @@ class DBHelper {
           debugPrint('highlight: verse_id already exists or error: $e');
         }
       }
+      if (oldVersion < 4) {
+        // Add bible_version column to library tables for cross-version support
+        try {
+          await db.execute('ALTER TABLE bookmark ADD COLUMN bible_version VARCHAR');
+        } catch (e) {
+          debugPrint('bookmark: bible_version already exists or error: $e');
+        }
+        try {
+          await db.execute('ALTER TABLE highlight ADD COLUMN bible_version VARCHAR');
+        } catch (e) {
+          debugPrint('highlight: bible_version already exists or error: $e');
+        }
+        try {
+          await db.execute('ALTER TABLE underline ADD COLUMN bible_version VARCHAR');
+        } catch (e) {
+          debugPrint('underline: bible_version already exists or error: $e');
+        }
+        try {
+          await db.execute('ALTER TABLE save_notes ADD COLUMN bible_version VARCHAR');
+        } catch (e) {
+          debugPrint('save_notes: bible_version already exists or error: $e');
+        }
+      }
     }
 
     debugPrint(
@@ -165,7 +188,7 @@ class DBHelper {
       try {
         return await sqlcipher.openDatabase(
           path,
-          version: 3,
+          version: 4,
           password: password,
           onCreate: _onCreate,
           onUpgrade: onUpgrade,
@@ -179,7 +202,7 @@ class DBHelper {
     // on disk isn't actually encrypted (or password/encryption format mismatch).
     return await plain.openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: onUpgrade,
     );
@@ -192,13 +215,13 @@ class DBHelper {
       await db.execute(
           'CREATE TABLE "verse" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num"	INTEGER, "chapter_num"	INTEGER, "verse_num"	INTEGER,"content"	TEXT,"is_read"	TEXT,"is_bookmarked"	TEXT,"is_underlined"	TEXT,"is_highlighted"	TEXT,"is_noted"	TEXT)');
       await db.execute(
-          'CREATE TABLE "bookmark" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER, "content" VARCHAR, "plaincontent" VARCHAR,"bookName" VARCHAR, "timestamp" DATETIME DEFAULT CURRENT_TIMESTAMP)');
+          'CREATE TABLE "bookmark" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER, "content" VARCHAR, "plaincontent" VARCHAR,"bookName" VARCHAR, "bible_version" VARCHAR, "timestamp" DATETIME DEFAULT CURRENT_TIMESTAMP)');
       await db.execute(
-          'CREATE TABLE "save_notes" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER, "content" VARCHAR,"book_name" VARCHAR, "notes" VARCHAR, "plaincontent" VARCHAR, "timestamp" DATETIME DEFAULT CURRENT_TIMESTAMP)');
+          'CREATE TABLE "save_notes" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER, "content" VARCHAR,"book_name" VARCHAR, "notes" VARCHAR, "plaincontent" VARCHAR, "bible_version" VARCHAR, "timestamp" DATETIME DEFAULT CURRENT_TIMESTAMP)');
       await db.execute(
-          'CREATE TABLE "highlight" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER, "content" VARCHAR, "plain_content" VARCHAR, verse_id VARCHAR, "book_name" VARCHAR,"color" VARCHAR, "timestamp" DATETIME DEFAULT CURRENT_TIMESTAMP)');
+          'CREATE TABLE "highlight" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER, "content" VARCHAR, "plain_content" VARCHAR, verse_id VARCHAR, "book_name" VARCHAR,"color" VARCHAR, "bible_version" VARCHAR, "timestamp" DATETIME DEFAULT CURRENT_TIMESTAMP)');
       await db.execute(
-          'CREATE TABLE "underline" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER, "content" VARCHAR, "plaincontent" VARCHAR, "bookName" VARCHAR, "timestamp" DATETIME DEFAULT CURRENT_TIMESTAMP)');
+          'CREATE TABLE "underline" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER, "content" VARCHAR, "plaincontent" VARCHAR, "bookName" VARCHAR, "bible_version" VARCHAR, "timestamp" DATETIME DEFAULT CURRENT_TIMESTAMP)');
       await db.execute(
           'CREATE TABLE "book" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num"	INTEGER,"title"	TEXT,"short_title"	TEXT,"chapter_count"	INTEGER,"read_per"	TEXT)');
       await db.execute(
@@ -1552,13 +1575,13 @@ class DBMigrationHelper {
       await db.execute(
           'CREATE TABLE "verse" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER,"content" TEXT,"is_read" TEXT,"is_bookmarked" TEXT,"is_underlined" TEXT,"is_highlighted" TEXT,"is_noted" TEXT)');
       await db.execute(
-          'CREATE TABLE "bookmark" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER, "content" VARCHAR, "plaincontent" VARCHAR,"bookName" VARCHAR, "timestamp" DATETIME DEFAULT CURRENT_TIMESTAMP)');
+          'CREATE TABLE "bookmark" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER, "content" VARCHAR, "plaincontent" VARCHAR,"bookName" VARCHAR, "bible_version" VARCHAR, "timestamp" DATETIME DEFAULT CURRENT_TIMESTAMP)');
       await db.execute(
-          'CREATE TABLE "save_notes" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER, "content" VARCHAR,"book_name" VARCHAR, "notes" VARCHAR, "plaincontent" VARCHAR, "timestamp" DATETIME DEFAULT CURRENT_TIMESTAMP)');
+          'CREATE TABLE "save_notes" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER, "content" VARCHAR,"book_name" VARCHAR, "notes" VARCHAR, "plaincontent" VARCHAR, "bible_version" VARCHAR, "timestamp" DATETIME DEFAULT CURRENT_TIMESTAMP)');
       await db.execute(
-          'CREATE TABLE "highlight" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER, "content" VARCHAR, "plain_content" VARCHAR, verse_id VARCHAR, "book_name" VARCHAR,"color" VARCHAR, "timestamp" DATETIME DEFAULT CURRENT_TIMESTAMP)');
+          'CREATE TABLE "highlight" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER, "content" VARCHAR, "plain_content" VARCHAR, verse_id VARCHAR, "book_name" VARCHAR,"color" VARCHAR, "bible_version" VARCHAR, "timestamp" DATETIME DEFAULT CURRENT_TIMESTAMP)');
       await db.execute(
-          'CREATE TABLE "underline" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER, "content" VARCHAR, "plaincontent" VARCHAR, "bookName" VARCHAR, "timestamp" DATETIME DEFAULT CURRENT_TIMESTAMP)');
+          'CREATE TABLE "underline" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER, "content" VARCHAR, "plaincontent" VARCHAR, "bookName" VARCHAR, "bible_version" VARCHAR, "timestamp" DATETIME DEFAULT CURRENT_TIMESTAMP)');
       await db.execute(
           'CREATE TABLE "book" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER,"title" TEXT,"short_title" TEXT,"chapter_count" INTEGER,"read_per" TEXT)');
       await db.execute(

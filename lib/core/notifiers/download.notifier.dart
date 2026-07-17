@@ -1036,22 +1036,12 @@ class DownloadProvider with ChangeNotifier {
     final verseRows =
         result.isNotEmpty ? result : List<Map<String, dynamic>>.from(dailyVerses);
 
-    // Fetch book names (single query — same titles as per-verse lookups).
-    final bookRows = await dbClient.rawQuery("SELECT book_num, title FROM book");
-    final bookTitleByNum = <int, String>{
-      for (final row in bookRows)
-        int.parse(row['book_num'].toString()): row['title'] as String,
-    };
-
     final List<DailyVerseList> enrichedList = [];
 
     for (var verse in verseRows) {
-      final bookIdStored = int.parse(verse['Book_Id'].toString());
-      final bookNum = bookIdStored > 0 ? bookIdStored - 1 : bookIdStored;
+      // Keep original book name from server (don't translate to current Bible version)
       final storedBook = verse['Book']?.toString().trim() ?? '';
-      final bookName = _resolveDailyVerseBookTitle(bookTitleByNum, bookNum) ??
-          _resolveDailyVerseBookTitle(bookTitleByNum, bookIdStored) ??
-          (storedBook.isNotEmpty ? storedBook : 'Unknown');
+      final bookName = storedBook.isNotEmpty ? storedBook : 'Unknown';
 
       enrichedList.add(DailyVerseList(
         categoryName: verse['Category_Name'],

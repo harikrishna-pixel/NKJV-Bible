@@ -18,6 +18,7 @@ class SaveNotesModel {
     String? timestamp,
     String? plaincontent,
     num? verseNum,
+    String? bibleVersion,
   }) {
     _id = id;
     _bookNum = bookNum;
@@ -28,6 +29,7 @@ class SaveNotesModel {
     _timestamp = timestamp;
     _verseNum = verseNum;
     _plaincontent = plaincontent;
+    _bibleVersion = bibleVersion;
   }
 
   SaveNotesModel.fromJson(dynamic json) {
@@ -40,6 +42,7 @@ class SaveNotesModel {
     _timestamp = json['timestamp'];
     _verseNum = json['verse_num'];
     _plaincontent = json['plaincontent'];
+    _bibleVersion = json['bible_version'];
   }
   int? _id;
   num? _bookNum;
@@ -50,6 +53,7 @@ class SaveNotesModel {
   String? _timestamp;
   String? _plaincontent;
   num? _verseNum;
+  String? _bibleVersion;
   SaveNotesModel copyWith({
     int? id,
     num? bookNum,
@@ -60,6 +64,7 @@ class SaveNotesModel {
     String? timestamp,
     String? plaincontent,
     num? verseNum,
+    String? bibleVersion,
   }) =>
       SaveNotesModel(
           id: id ?? _id,
@@ -70,7 +75,8 @@ class SaveNotesModel {
           bookName: bookName ?? _bookName,
           timestamp: timestamp ?? _timestamp,
           verseNum: verseNum ?? _verseNum,
-          plaincontent: plaincontent ?? _plaincontent);
+          plaincontent: plaincontent ?? _plaincontent,
+          bibleVersion: bibleVersion ?? _bibleVersion);
   int? get id => _id;
   num? get bookNum => _bookNum;
   num? get chapterNum => _chapterNum;
@@ -80,6 +86,7 @@ class SaveNotesModel {
   String? get timestamp => _timestamp;
   String? get plaincontent => _plaincontent;
   num? get verseNum => _verseNum;
+  String? get bibleVersion => _bibleVersion;
 
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{};
@@ -92,6 +99,7 @@ class SaveNotesModel {
     map['timestamp'] = _timestamp;
     map['plaincontent'] = _plaincontent;
     map['verse_num'] = _verseNum;
+    map['bible_version'] = _bibleVersion;
 
     return map;
   }

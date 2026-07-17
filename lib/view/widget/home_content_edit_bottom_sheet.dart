@@ -4606,6 +4606,7 @@ class HomeContentEditBottomSheetState
                               color: color.value.toString(),
                               timestamp: DateTime.now().toString(),
                               verseNum: int.parse(widget.verNum.toString()),
+                              bibleVersion: BibleInfo.currentBibleVersion,
                             ),
                           )
                               .whenComplete(() async {
@@ -4857,6 +4858,7 @@ class HomeContentEditBottomSheetState
                   bookName: controller.selectedBook.value.toString(),
                   timestamp: DateTime.now().toString(),
                   verseNum: int.parse(widget.verNum.toString()),
+                  bibleVersion: BibleInfo.currentBibleVersion,
                 );
 
                 await bookmarkProvider.toggleBookmark(
@@ -4938,6 +4940,7 @@ class HomeContentEditBottomSheetState
                   bookName: controller.selectedBook.value,
                   timestamp: DateTime.now().toString(),
                   verseNum: int.parse(widget.verNum.toString()),
+                  bibleVersion: BibleInfo.currentBibleVersion,
                 );
 
                 await bookmarkProvider.toggleUnderline(
@@ -6228,6 +6231,7 @@ class NotesBottomSheet extends StatelessWidget {
                                 notes: controller.notesController.value.text,
                                 timestamp: DateTime.now().toString(),
                                 verseNum: int.parse(verNum.toString()),
+                                bibleVersion: BibleInfo.currentBibleVersion,
                               ),
                               updateVerseCallback: (updated) {
                                 controller.selectedBookContent[

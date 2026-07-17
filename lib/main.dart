@@ -12,6 +12,7 @@ import 'package:biblebookapp/view/screens/welcome_screen.dart';
 import 'package:biblebookapp/view/widget/adhelper.dart';
 import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
+import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:flutter/foundation.dart';
@@ -161,6 +162,12 @@ Future<void> _bootstrapBackgroundStartup() async {
     await AppApiConstant.loadChatLanguage().timeout(const Duration(seconds: 8));
   } catch (e) {
     debugPrint("main: chat language load failed: $e");
+  }
+
+  try {
+    await BibleInfo.loadCurrentBibleVersion().timeout(const Duration(seconds: 8));
+  } catch (e) {
+    debugPrint("main: Bible version load failed: $e");
   }
 
   try {

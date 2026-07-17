@@ -70,6 +70,118 @@ class _HighLightScreenState extends State<HighLightScreen> {
     return highlights;
   }
 
+  // Check version and navigate to read the highlight
+  void _navigateToRead(HighLightContentModal data) async {
+    final itemVersion = data.bibleVersion;
+    
+    // If item has a version and it doesn't match current, show dialog
+    if (itemVersion != null && itemVersion.isNotEmpty && itemVersion != BibleInfo.currentBibleVersion) {
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isTablet = screenWidth > 600;
+      
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          insetPadding: EdgeInsets.symmetric(
+            horizontal: isTablet ? screenWidth * 0.2 : 24,
+            vertical: 24,
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(isTablet ? 32 : 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Bible Icon
+                Image.asset(
+                  "assets/Icon-1024.png",
+                  height: isTablet ? 80 : 60,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 20),
+                // Title
+                Text(
+                  "Different Bible Version",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: isTablet ? 22 : 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Description
+                Text(
+                  'This highlight was saved in "${BibleInfo.getBibleVersionDisplayName(itemVersion)}".\n\n'
+                  'You are currently using "${BibleInfo.getBibleVersionDisplayName(BibleInfo.currentBibleVersion)}".\n\n'
+                  'Switch to the correct version from Settings to view this content.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: isTablet ? 16 : 14,
+                    height: 1.5,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                // OK Button
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 45),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF7B5C3D),
+                        padding: EdgeInsets.symmetric(
+                          vertical: isTablet ? 16 : 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(
+                        "OK",
+                        style: TextStyle(
+                          fontSize: isTablet ? 18 : 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+    
+    // Proceed with navigation
+    await SharPreferences.setString(
+        SharPreferences.selectedBook, data.bookName.toString());
+    await SharPreferences.setString(SharPreferences.selectedChapter,
+        "${int.parse(data.chapterNum.toString())}");
+    await SharPreferences.setString(SharPreferences.selectedBookNum,
+        "${int.parse(data.bookNum.toString())}");
+    
+    Get.offAll(
+      () => HomeScreen(
+        From: "Read",
+        selectedBookForRead: int.parse(data.bookNum.toString()),
+        selectedChapterForRead: int.parse(data.chapterNum.toString()),
+        selectedVerseNumForRead: int.parse(data.verseNum.toString()),
+        selectedBookNameForRead: data.bookName.toString(),
+        selectedVerseForRead: parse(data.content).body?.text.toString(),
+      ),
+      transition: Transition.cupertinoDialog,
+      duration: const Duration(milliseconds: 300),
+    );
+  }
+
   void loadData() {
     if (!mounted) return;
     setState(() {
@@ -288,54 +400,7 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                         width: 30,
                                                       ),
                                                       InkWell(
-                                                        onTap: () async {
-                                                          await SharPreferences
-                                                              .setString(
-                                                                  SharPreferences
-                                                                      .selectedBook,
-                                                                  data.bookName
-                                                                      .toString());
-
-                                                          await SharPreferences
-                                                              .setString(
-                                                                  SharPreferences
-                                                                      .selectedChapter,
-                                                                  "${int.parse(data.chapterNum.toString())}");
-                                                          await SharPreferences
-                                                              .setString(
-                                                                  SharPreferences
-                                                                      .selectedBookNum,
-                                                                  "${int.parse(data.bookNum.toString())}");
-                                                          Future.delayed(
-                                                            Duration.zero,
-                                                            () {
-                                                              Get.offAll(
-                                                                  () => HomeScreen(
-                                                                      From:
-                                                                          "Read",
-                                                                      selectedBookForRead: int.parse(data
-                                                                          .bookNum
-                                                                          .toString()),
-                                                                      selectedChapterForRead: int.parse(data
-                                                                          .chapterNum
-                                                                          .toString()),
-                                                                      selectedVerseNumForRead: int.parse(data
-                                                                          .verseNum
-                                                                          .toString()),
-                                                                      selectedBookNameForRead: data
-                                                                          .bookName
-                                                                          .toString(),
-                                                                      selectedVerseForRead: data
-                                                                          .content
-                                                                          .toString()),
-                                                                  transition: Transition
-                                                                      .cupertinoDialog,
-                                                                  duration:
-                                                                      const Duration(milliseconds: 300));
-                                                            },
-                                                          );
-                                                          // Navigator.push(context, MaterialPageRoute(builder: (context) => );
-                                                        },
+                                                        onTap: () => _navigateToRead(data),
                                                         child: Column(
                                                           children: [
                                                             Container(
@@ -910,54 +975,7 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                   width: 30,
                                                 ),
                                                 InkWell(
-                                                  onTap: () {
-                                                    Future.delayed(
-                                                      Duration.zero,
-                                                      () async {
-                                                        await SharPreferences
-                                                            .setString(
-                                                                SharPreferences
-                                                                    .selectedBook,
-                                                                data.bookName
-                                                                    .toString());
-
-                                                        await SharPreferences.setString(
-                                                            SharPreferences
-                                                                .selectedChapter,
-                                                            "${int.parse(data.chapterNum.toString())}");
-                                                        await SharPreferences.setString(
-                                                            SharPreferences
-                                                                .selectedBookNum,
-                                                            "${int.parse(data.bookNum.toString())}");
-                                                        Get.offAll(
-                                                            () => HomeScreen(
-                                                                From: "Read",
-                                                                selectedBookForRead:
-                                                                    int.parse(data
-                                                                        .bookNum
-                                                                        .toString()),
-                                                                selectedChapterForRead: int.parse(data
-                                                                    .chapterNum
-                                                                    .toString()),
-                                                                selectedVerseNumForRead:
-                                                                    int.parse(data
-                                                                        .verseNum
-                                                                        .toString()),
-                                                                selectedBookNameForRead: data
-                                                                    .bookName
-                                                                    .toString(),
-                                                                selectedVerseForRead:
-                                                                    parse(data.content)
-                                                                        .body
-                                                                        ?.text
-                                                                        .toString()),
-                                                            transition: Transition
-                                                                .cupertinoDialog,
-                                                            duration: const Duration(milliseconds: 300));
-                                                      },
-                                                    );
-                                                    // Navigator.push(context, MaterialPageRoute(builder: (context) => );
-                                                  },
+                                                  onTap: () => _navigateToRead(data),
                                                   child: Column(
                                                     children: [
                                                       Container(

@@ -19,6 +19,7 @@ class HighLightContentModal {
     String? color,
     String? timestamp,
     num? verseNum,
+    String? bibleVersion,
   }) {
     _id = id;
     _bookNum = bookNum;
@@ -30,6 +31,7 @@ class HighLightContentModal {
     _timestamp = timestamp;
     _verseNum = verseNum;
     _plaincontent = plain_content;
+    _bibleVersion = bibleVersion;
   }
 
   HighLightContentModal.fromJson(dynamic json) {
@@ -43,6 +45,7 @@ class HighLightContentModal {
     _verseNum = json['verse_num'];
     _plaincontent = json['plain_content'];
     _verseid = json['verse_id'];
+    _bibleVersion = json['bible_version'];
   }
   int? _id;
   num? _bookNum;
@@ -54,6 +57,7 @@ class HighLightContentModal {
   String? _color;
   String? _timestamp;
   num? _verseNum;
+  String? _bibleVersion;
   HighLightContentModal With({
     int? id,
     num? bookNum,
@@ -65,6 +69,7 @@ class HighLightContentModal {
     String? color,
     String? timestamp,
     num? verseNum,
+    String? bibleVersion,
   }) =>
       HighLightContentModal(
           id: id ?? _id,
@@ -76,7 +81,8 @@ class HighLightContentModal {
           timestamp: timestamp ?? _timestamp,
           verseNum: verseNum ?? _verseNum,
           plain_content: plain_content ?? _plaincontent,
-          verseid: verseid ?? _verseid);
+          verseid: verseid ?? _verseid,
+          bibleVersion: bibleVersion ?? _bibleVersion);
   int? get id => _id;
   num? get bookNum => _bookNum;
   num? get chapterNum => _chapterNum;
@@ -87,6 +93,7 @@ class HighLightContentModal {
   String? get color => _color;
   String? get timestamp => _timestamp;
   num? get verseNum => _verseNum;
+  String? get bibleVersion => _bibleVersion;
 
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{};
@@ -100,6 +107,7 @@ class HighLightContentModal {
     map['timestamp'] = _timestamp;
     map['verse_num'] = _verseNum;
     map['verse_id'] = _verseid;
+    map['bible_version'] = _bibleVersion;
     return map;
   }
 }

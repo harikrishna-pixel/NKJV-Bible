@@ -267,163 +267,264 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
+    final iconSize = isTablet ? 90.0 : 70.0;
+    
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
       },
       child: Scaffold(
-        // appBar: AppBar(title: Text("Bible versions")),
-        body: Container(
-          height: MediaQuery.of(context).size.height,
-          width: MediaQuery.of(context).size.width,
-          decoration: Provider.of<ThemeProvider>(context).currentCustomTheme ==
-                  AppCustomTheme.vintage
-              ? BoxDecoration(
-                  image: DecorationImage(
-                      image: AssetImage(Images.bgImage(context)),
-                      fit: BoxFit.fill))
-              : null,
-          child: BibleInfo.folders.isEmpty
-              ? Center(child: CircularProgressIndicator())
-              : SafeArea(
-                  child: Column(
-                    children: [
-                      widget.from.toString() == "home"
-                          ? Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 15.0),
-                                  child: GestureDetector(
-                                    onTap: () async {
-                                      Get.back();
-                                    },
-                                    child: Icon(
-                                      Icons.arrow_back_ios,
-                                      size: 20,
-                                      color: CommanColor.whiteBlack(context),
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Background Image
+            Image.asset(
+              'assets/splash-bg.png',
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+            ),
+            // Content
+            SafeArea(
+              child: BibleInfo.folders.isEmpty
+                  ? Center(child: CircularProgressIndicator(color: Colors.white))
+                  : Column(
+                      children: [
+                        // App Bar
+                        widget.from.toString() == "home"
+                            ? Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                child: Row(
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () => Get.back(),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: const Icon(
+                                          Icons.arrow_back_ios_new,
+                                          size: 20,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                  ],
+                                ),
+                              )
+                            : const SizedBox(height: 20),
+                        
+                        // App Icon with glow
+                        Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFD4A574).withOpacity(0.5),
+                                blurRadius: 30,
+                                spreadRadius: 5,
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: Image.asset(
+                              'assets/Icon-1024.png',
+                              width: iconSize,
+                              height: iconSize,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: isTablet ? 24 : 16),
+                        
+                        // Title
+                        Text(
+                          "Choose Your Bible",
+                          style: TextStyle(
+                            fontFamily: 'Georgia',
+                            fontSize: isTablet ? 28 : 24,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF3E2723),
+                            shadows: [
+                              Shadow(
+                                color: Colors.white.withOpacity(0.5),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "Select a version to begin your journey",
+                          style: TextStyle(
+                            fontFamily: 'Georgia',
+                            fontSize: isTablet ? 16 : 14,
+                            color: const Color(0xFF5D4037),
+                            shadows: [
+                              Shadow(
+                                color: Colors.white.withOpacity(0.4),
+                                blurRadius: 3,
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: isTablet ? 32 : 24),
+                        
+                        // Bible versions list
+                        Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: isTablet ? 60 : 20),
+                            child: ListView.builder(
+                              itemCount: BibleInfo.folders.length,
+                              itemBuilder: (context, index) {
+                                final folder = BibleInfo.folders[index];
+                                final state = buttonStates[folder] ?? DownloadButtonState.download;
+                                final progress = progressMap[folder] ?? 0.0;
+                                final isActive = state == DownloadButtonState.active;
+                                
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  decoration: BoxDecoration(
+                                    color: isActive 
+                                        ? Colors.white.withOpacity(0.95)
+                                        : Colors.white.withOpacity(0.85),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: isActive 
+                                        ? Border.all(color: const Color(0xFF7B5C3D), width: 2)
+                                        : Border.all(color: const Color(0xFF8B7355).withOpacity(0.3), width: 1),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                    child: Row(
+                                      children: [
+                                        // Bible icon
+                                        Container(
+                                          width: 45,
+                                          height: 45,
+                                          decoration: BoxDecoration(
+                                            color: isActive 
+                                                ? const Color(0xFF7B5C3D).withOpacity(0.1)
+                                                : const Color(0xFF8B7355).withOpacity(0.15),
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          child: Icon(
+                                            Icons.menu_book_rounded,
+                                            color: isActive 
+                                                ? const Color(0xFF7B5C3D)
+                                                : const Color(0xFF6D4C41),
+                                            size: 24,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 14),
+                                        // Title
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                BibleInfo.getBibleVersionDisplayName(folder),
+                                                style: TextStyle(
+                                                  fontSize: isTablet ? 18 : 16,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: isActive ? Colors.black87 : const Color(0xFF3E2723),
+                                                ),
+                                              ),
+                                              if (isActive)
+                                                Text(
+                                                  "Currently selected",
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: const Color(0xFF7B5C3D),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                        // Action button
+                                        SizedBox(
+                                          width: 110,
+                                          height: 32,
+                                          child: DownloadButton(
+                                            state: state,
+                                            progress: progress,
+                                            onDownload: () async {
+                                              final prefs = await SharedPreferences.getInstance();
+                                              final data = prefs.getString("appreview1") ?? "1";
+                                              if (data == '1') {
+                                                // await _requestReview();
+                                              }
+                                              extractFromFolder(
+                                                folderName: folder,
+                                                password: dotenv.env[AssetsConstants.holybibleKey].toString(),
+                                              );
+                                            },
+                                            onOpen: () async {
+                                              final prefs = await SharedPreferences.getInstance();
+                                              final data = prefs.getString("appreview1") ?? "1";
+                                              if (data == '1') {
+                                                // Removed: Rating pop-up on first install
+                                              }
+                                              setState(() {
+                                                // Step 1: Reset all active folders to "open"
+                                                buttonStates.updateAll((key, value) {
+                                                  if (value == DownloadButtonState.active) {
+                                                    return DownloadButtonState.open;
+                                                  }
+                                                  return value;
+                                                });
+                                                // Step 2: Mark only the tapped folder as "active"
+                                                foldername = folder;
+                                                buttonStates[folder] = DownloadButtonState.active;
+                                              });
+                                            },
+                                            onactive: () {},
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 15.0),
-                                  child: Text("Bible versions",
-                                      style: CommanStyle.appBarStyle(context)),
-                                ),
-                                SizedBox(),
-                              ],
-                            )
-                          : Padding(
-                              padding: const EdgeInsets.only(right: 15.0),
-                              child: Text("Bible versions",
-                                  style: CommanStyle.appBarStyle(context)),
+                                );
+                              },
                             ),
-                      Expanded(
-                        child: ListView.builder(
-                          itemCount: BibleInfo.folders.length,
-                          itemBuilder: (context, index) {
-                            final folder = BibleInfo.folders[index];
-                            final state = buttonStates[folder] ??
-                                DownloadButtonState.download;
-                            final progress = progressMap[folder] ?? 0.0;
-
-                            return ListTile(
-                              title: Text(folder),
-                              trailing: SizedBox(
-                                width: 100,
-                                height: 27,
-                                child: DownloadButton(
-                                  state: state,
-                                  progress: progress,
-                                  onDownload: () async {
-                                    final prefs =
-                                        await SharedPreferences.getInstance();
-                                    final data =
-                                        prefs.getString("appreview1") ?? "1";
-                                    if (data == '1') {
-                                      // await _requestReview();
-                                      // await prefs.setString('appreview1', '2');
-                                    }
-                                    extractFromFolder(
-                                      folderName: folder,
-                                      password: dotenv
-                                          .env[AssetsConstants.holybibleKey]
-                                          .toString(),
-                                    );
-                                  },
-                                  onOpen: () async {
-                                    // ScaffoldMessenger.of(context).showSnackBar(
-                                    //   SnackBar(
-                                    //       content: Text("Opening $folder...")),
-                                    // );
-                                    // if (widget.from == 'onboard') {
-                                    //   Get.to(() => PreferenceSelectionScreen(
-                                    //         isSetting: false,
-                                    //         selectedbible: folder,
-                                    //       ));
-                                    // } else {
-                                    //   await loadBookContent(folder);
-                                    //   await loadBookList(folder);
-                                    //   await deleteFiles(folder);
-                                    //   return Get.back();
-                                    // }
-                                    // setState(() {
-                                    //   foldername = folder;
-                                    //   buttonStates[folder] =
-                                    //       DownloadButtonState.active;
-                                    // });
-                                    final prefs =
-                                        await SharedPreferences.getInstance();
-                                    final data =
-                                        prefs.getString("appreview1") ?? "1";
-                                    if (data == '1') {
-                                      // Removed: Rating pop-up on first install
-                                      // await _requestReview();
-                                    }
-                                    setState(() {
-                                      // Step 1: Reset all active folders to "open"
-                                      buttonStates.updateAll((key, value) {
-                                        if (value ==
-                                            DownloadButtonState.active) {
-                                          return DownloadButtonState.open;
-                                        }
-                                        return value;
-                                      });
-
-                                      // Step 2: Mark only the tapped folder as "active"
-                                      foldername = folder;
-                                      buttonStates[folder] =
-                                          DownloadButtonState.active;
-                                    });
-                                  },
-                                  onactive: () {},
-                                ),
-                              ),
-                            );
-                          },
+                          ),
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 65),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Provider.of<ThemeProvider>(
-                                              context,
-                                              listen: false)
-                                          .themeMode ==
-                                      ThemeMode.dark
-                                  ? CommanColor.white
-                                  : const Color(0xFF7B5C3D),
-                              padding: EdgeInsets.symmetric(
-                                vertical: isTablet ? 20 : 14,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
+                        // Continue Button / Progress Bar
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isTablet ? 80 : 40,
+                            vertical: 20,
+                          ),
+                          child: isloading == true
+                              ? _buildSplashStyleProgressBar(isTablet)
+                              : Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(14),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF7B5C3D).withOpacity(0.4),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF7B5C3D),
+                                        padding: EdgeInsets.symmetric(
+                                          vertical: isTablet ? 18 : 16,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(14),
+                                        ),
+                                        elevation: 0,
+                                      ),
                             onPressed: () async {
                               setState(() {
                                 isloading = true;
@@ -443,6 +544,9 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                                   final chatLang = BibleInfo.folderLanguageMap[foldername] ?? 'EN';
                                   await SharPreferences.setString(SharPreferences.chatLanguage, chatLang);
                                   AppApiConstant.chatLanguage = chatLang;
+                                  // Set current Bible version
+                                  BibleInfo.currentBibleVersion = foldername ?? 'NKJV';
+                                  await SharPreferences.setString('currentBibleVersion', foldername ?? 'NKJV');
                                   CustomAlertBox.show(context, () {
                                     Get.to(() => PreferenceSelectionScreen(
                                           isSetting: false,
@@ -450,7 +554,8 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                                         ));
                                   });
                                 } else {
-                                  await showClearDatabaseDialog(context);
+                                  // Library data is now preserved, so no confirmation needed
+                                  await _performVersionSwitch();
                                   // await extractFromFolder(
                                   //     folderName: foldername.toString(),
                                   //     password: "Mtech2023",
@@ -480,30 +585,98 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                                 Constants.showToast("Click Set as Default");
                               }
                             },
-                            child: Text(
-                              isloading == false ? "Continue" : "loading...",
-                              style: TextStyle(
-                                fontSize: isTablet ? 20 : 16,
-                                fontWeight: FontWeight.w600,
-                                color: Provider.of<ThemeProvider>(context,
-                                                listen: false)
-                                            .themeMode ==
-                                        ThemeMode.dark
-                                    ? CommanColor.black
-                                    : Colors.white,
-                              ),
-                            ),
-                          ),
+                                      child: Text(
+                                        "Continue",
+                                        style: TextStyle(
+                                          fontSize: isTablet ? 18 : 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
                         ),
-                      ),
-                      SizedBox(
-                        height: 5,
-                      )
-                    ],
-                  ),
-                ),
+                        const SizedBox(height: 10),
+                      ],
+                    ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  // Loading message for inline progress bar
+  String _loadingMessage = "Preparing...";
+
+  // Splash-style progress bar for Continue button loading state
+  Widget _buildSplashStyleProgressBar(bool isTablet) {
+    final barHeight = isTablet ? 52.0 : 48.0;
+    final percent = (_progress * 100).toInt().clamp(0, 100);
+    
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Progress message
+        Text(
+          _loadingMessage,
+          style: TextStyle(
+            fontFamily: 'Georgia',
+            fontSize: isTablet ? 14 : 12,
+            fontWeight: FontWeight.w500,
+            color: const Color(0xFF5D4037),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Progress bar
+        Container(
+          height: barHeight,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(barHeight / 2),
+            color: const Color(0xFFE8D9C4).withOpacity(0.88),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FractionallySizedBox(
+                  widthFactor: _progress.clamp(0.0, 1.0),
+                  heightFactor: 1,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(barHeight / 2),
+                      gradient: const LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          Color(0xFFD4A04A),
+                          Color(0xFFC59434),
+                          Color(0xFF9A6B2F),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Text(
+                '$percent%',
+                style: TextStyle(
+                  fontFamily: 'Georgia',
+                  fontSize: isTablet ? 14 : 12,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF5D4037),
+                  height: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -771,6 +944,296 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
     debugPrint("✅ All database data cleared");
   }
 
+  // Perform version switch directly without confirmation dialog (library data is preserved)
+  Future<void> _performVersionSwitch() async {
+    if (foldername == null || foldername!.isEmpty) return;
+
+    setState(() {
+      isbtnloading = true;
+      _progress = 0.05;
+      _loadingMessage = "Preparing...";
+    });
+
+    await _saveButtonStates();
+
+    setState(() {
+      _progress = 0.10;
+      _loadingMessage = "Extracting Bible data...";
+    });
+    await extractFromFolder(
+        folderName: foldername.toString(),
+        password: dotenv.env[AssetsConstants.holybibleKey].toString(),
+        from: "home");
+
+    setState(() {
+      _progress = 0.25;
+      _loadingMessage = "Loading content...";
+    });
+    await loadBookContent(foldername);
+
+    setState(() {
+      _progress = 0.40;
+      _loadingMessage = "Loading books...";
+    });
+    await loadBookList(foldername);
+
+    setState(() {
+      _progress = 0.55;
+      _loadingMessage = "Saving preferences...";
+    });
+    _savePreferences();
+
+    setState(() {
+      _progress = 0.65;
+      _loadingMessage = "Preparing Bible...";
+    });
+    await loadLocal();
+
+    setState(() {
+      _progress = 0.75;
+      _loadingMessage = "Setting up...";
+    });
+    await DBHelper().db.then((db) async {
+      if (db != null) {
+        final result = await db.rawQuery(
+          "SELECT * FROM book WHERE book_num = ?",
+          [int.parse("0")],
+        );
+
+        if (result.isNotEmpty && result[0]["title"] != null) {
+          final title = result[0]["title"].toString();
+          await SharPreferences.setString(
+            SharPreferences.selectedBook,
+            title,
+          );
+        } else {
+          debugPrint("testapp No book found with book_num = 0");
+        }
+      } else {
+        debugPrint("testapp Database instance is null");
+      }
+    });
+
+    setState(() {
+      _progress = 0.85;
+      _loadingMessage = "Cleaning up...";
+    });
+    await deleteFiles(foldername);
+
+    setState(() {
+      _progress = 0.95;
+      _loadingMessage = "Almost done...";
+    });
+
+    // Set chat language based on selected Bible version
+    final chatLang = BibleInfo.folderLanguageMap[foldername] ?? 'EN';
+    await SharPreferences.setString(SharPreferences.chatLanguage, chatLang);
+    AppApiConstant.chatLanguage = chatLang;
+    // Set current Bible version
+    BibleInfo.currentBibleVersion = foldername ?? 'NKJV';
+    await SharPreferences.setString('currentBibleVersion', foldername ?? 'NKJV');
+
+    setState(() {
+      _progress = 1.0;
+      _loadingMessage = "Complete!";
+    });
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    Constants.showToast("Updated Successfully");
+    setState(() {
+      isloading = false;
+      isbtnloading = false;
+      _progress = 0;
+    });
+
+    Get.offAll(() => HomeScreen(
+          From: "splash",
+          selectedVerseNumForRead: "",
+          selectedBookForRead: "",
+          selectedChapterForRead: "",
+          selectedBookNameForRead: "",
+          selectedVerseForRead: "",
+        ));
+  }
+
+  // Loader state
+  double _loaderProgress = 0;
+  String _loaderMessage = "Preparing...";
+
+  void _updateLoaderProgress(double progress, String message) {
+    setState(() {
+      _loaderProgress = progress;
+      _loaderMessage = message;
+    });
+  }
+
+  void _showVersionSwitchLoader() {
+    _loaderProgress = 0;
+    _loaderMessage = "Preparing...";
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black87,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            // Update dialog state when parent state changes
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                setDialogState(() {});
+              }
+            });
+            
+            final screenWidth = MediaQuery.of(context).size.width;
+            final isTablet = screenWidth > 600;
+            final iconSize = isTablet ? 100.0 : 80.0;
+            
+            return WillPopScope(
+              onWillPop: () async => false,
+              child: Scaffold(
+                backgroundColor: Colors.transparent,
+                body: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Background
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            const Color(0xFF8B7355),
+                            const Color(0xFF6B5344),
+                            const Color(0xFF4A3728),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Content
+                    SafeArea(
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // App Icon with shadow
+                            Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(22),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFD4A574).withOpacity(0.45),
+                                    blurRadius: 36,
+                                    spreadRadius: 6,
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(22),
+                                child: Image.asset(
+                                  'assets/Icon-1024.png',
+                                  width: iconSize,
+                                  height: iconSize,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: isTablet ? 32 : 24),
+                            // Title
+                            Text(
+                              "Switching Bible Version",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: 'Georgia',
+                                fontSize: isTablet ? 24 : 20,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                            SizedBox(height: isTablet ? 16 : 12),
+                            // Message
+                            Text(
+                              _loaderMessage,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: 'Georgia',
+                                fontSize: isTablet ? 16 : 14,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white70,
+                              ),
+                            ),
+                            SizedBox(height: isTablet ? 32 : 24),
+                            // Progress bar
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: isTablet ? 80 : 50),
+                              child: Container(
+                                height: isTablet ? 14 : 12,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(7),
+                                  color: Colors.white24,
+                                ),
+                                child: Stack(
+                                  alignment: Alignment.centerLeft,
+                                  children: [
+                                    FractionallySizedBox(
+                                      widthFactor: (_loaderProgress / 100).clamp(0.0, 1.0),
+                                      heightFactor: 1,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(7),
+                                          gradient: const LinearGradient(
+                                            begin: Alignment.centerLeft,
+                                            end: Alignment.centerRight,
+                                            colors: [
+                                              Color(0xFFD4A04A),
+                                              Color(0xFFC59434),
+                                              Color(0xFF9A6B2F),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Center(
+                                      child: Text(
+                                        '${_loaderProgress.toInt()}%',
+                                        style: TextStyle(
+                                          fontFamily: 'Georgia',
+                                          fontSize: isTablet ? 11 : 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: isTablet ? 16 : 12),
+                            // Sub message
+                            Text(
+                              'Please wait...',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: 'Georgia',
+                                fontSize: isTablet ? 13 : 11,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white54,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> showClearDatabaseDialog(BuildContext context) async {
     //final dbHelper = DBHelper();
 
@@ -839,6 +1302,9 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                     final chatLang = BibleInfo.folderLanguageMap[foldername] ?? 'EN';
                     await SharPreferences.setString(SharPreferences.chatLanguage, chatLang);
                     AppApiConstant.chatLanguage = chatLang;
+                    // Set current Bible version
+                    BibleInfo.currentBibleVersion = foldername ?? 'NKJV';
+                    await SharPreferences.setString('currentBibleVersion', foldername ?? 'NKJV');
                     // Navigate next
                     if (widget.from == 'onboard') {
                       setState(() {
@@ -924,12 +1390,16 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                       setState(() {
                         _progress = 89;
                       });
-                      await clearAllData(); // clear DB
+                      // Note: Library data (bookmarks, highlights, notes) is now preserved across versions
+                      // await clearAllData(); // Removed to keep library data
 
                       // Set chat language based on selected Bible version
                       final chatLang = BibleInfo.folderLanguageMap[foldername] ?? 'EN';
                       await SharPreferences.setString(SharPreferences.chatLanguage, chatLang);
                       AppApiConstant.chatLanguage = chatLang;
+                      // Set current Bible version
+                      BibleInfo.currentBibleVersion = foldername ?? 'NKJV';
+                      await SharPreferences.setString('currentBibleVersion', foldername ?? 'NKJV');
 
                       setState(() {
                         _progress = 97;
@@ -1671,8 +2141,7 @@ class CustomAlertBox {
                   style: TextStyle(
                       fontSize: isTablet ? 24 : 18,
                       fontWeight: FontWeight.w600,
-                      color: Colors.black,
-                      fontStyle: FontStyle.italic),
+                      color: Colors.black),
                 ),
                 const SizedBox(height: 12),
 

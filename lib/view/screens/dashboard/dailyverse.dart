@@ -373,19 +373,8 @@ class _DailyVerseState extends State<DailyVerse> {
                 topLeft: Radius.circular(20), topRight: Radius.circular(20))),
         context: context,
         builder: (BuildContext context) {
-          final bookId = int.parse(data.bookId.toString());
-          final bookNum = dailyVerseBookNum(bookId);
-          final providerBooks = Provider.of<DownloadProvider>(context, listen: false).bookList;
-          String? resolvedBookName;
-          for (var b in providerBooks) {
-            if (b.bookNum == bookNum) {
-              resolvedBookName = b.title;
-              break;
-            }
-          }
-          final displayBookName = (resolvedBookName != null && resolvedBookName.isNotEmpty)
-              ? resolvedBookName
-              : data.book.toString();
+          // Use original book name from server data (don't translate)
+          final displayBookName = data.book.toString();
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
             decoration: BoxDecoration(
@@ -473,19 +462,97 @@ class _DailyVerseState extends State<DailyVerse> {
                       InkWell(
                         onTap: () async {
                           final sheetContext = context;
+                          
+                          // Daily Verse data comes from server (typically English)
+                          // Show version mismatch popup if current version is different
+                          if (BibleInfo.currentBibleVersion != "NKJV") {
+                            final screenWidth = MediaQuery.of(sheetContext).size.width;
+                            final isTablet = screenWidth > 600;
+                            
+                            await showDialog<void>(
+                              context: sheetContext,
+                              builder: (ctx) => Dialog(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                insetPadding: EdgeInsets.symmetric(
+                                  horizontal: isTablet ? screenWidth * 0.2 : 24,
+                                  vertical: 24,
+                                ),
+                                child: Padding(
+                                  padding: EdgeInsets.all(isTablet ? 32 : 20),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      // Bible Icon
+                                      Image.asset(
+                                        "assets/Icon-1024.png",
+                                        height: isTablet ? 80 : 60,
+                                        fit: BoxFit.contain,
+                                      ),
+                                      const SizedBox(height: 20),
+                                      // Title
+                                      Text(
+                                        "Different Bible Version",
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: isTablet ? 22 : 18,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.black,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      // Description
+                                      Text(
+                                        'Daily Verses are based on the NKJV Bible.\n\n'
+                                        'You are currently using "${BibleInfo.getBibleVersionDisplayName(BibleInfo.currentBibleVersion)}".\n\n'
+                                        'Switch to the correct version from Settings to view this content.',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: isTablet ? 16 : 14,
+                                          height: 1.5,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 24),
+                                      // OK Button
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 45),
+                                        child: SizedBox(
+                                          width: double.infinity,
+                                          child: ElevatedButton(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFF7B5C3D),
+                                              padding: EdgeInsets.symmetric(
+                                                vertical: isTablet ? 16 : 12,
+                                              ),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(10),
+                                              ),
+                                            ),
+                                            onPressed: () => Navigator.pop(ctx),
+                                            child: Text(
+                                              "OK",
+                                              style: TextStyle(
+                                                fontSize: isTablet ? 18 : 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                          
                           final bookId = int.parse(data.bookId.toString());
                           final bookNum = dailyVerseBookNum(bookId);
-                          final providerBooks = Provider.of<DownloadProvider>(context, listen: false).bookList;
-                          String? resolvedBookName;
-                          for (var b in providerBooks) {
-                            if (b.bookNum == bookNum) {
-                              resolvedBookName = b.title;
-                              break;
-                            }
-                          }
-                          final bookName = (resolvedBookName != null && resolvedBookName.isNotEmpty)
-                              ? resolvedBookName
-                              : data.book.toString();
+                          final bookName = data.book.toString();
                           final chapter = dailyVerseUiChapter(data.chapter);
                           final verseNum =
                               int.parse(data.verseNum.toString());
@@ -917,19 +984,8 @@ class _DailyVerseState extends State<DailyVerse> {
                                 // debugPrint(
                                 //     "reversedDailyVerseList - ${reversedDailyVerseList[0].date}, ${reversedDailyVerseList[1].date}");
                                 var data = reversedDailyVerseList[index];
-                                final listBookId = int.parse(data.bookId.toString());
-                                final listBookNum = dailyVerseBookNum(listBookId);
-                                final listProviderBooks = Provider.of<DownloadProvider>(context, listen: false).bookList;
-                                String? listResolvedBookName;
-                                for (var b in listProviderBooks) {
-                                  if (b.bookNum == listBookNum) {
-                                    listResolvedBookName = b.title;
-                                    break;
-                                  }
-                                }
-                                final listDisplayBookName = (listResolvedBookName != null && listResolvedBookName.isNotEmpty)
-                                    ? listResolvedBookName
-                                    : data.book.toString();
+                                // Use original book name from server data (don't translate)
+                                final listDisplayBookName = data.book.toString();
                                 DateTime date =
                                     DateTime.parse(data.date.toString());
                                 String currentDate = DateFormat("dd-MM-yyyy")

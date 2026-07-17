@@ -15,6 +15,7 @@ class BookMarkModel {
     String? timestamp,
     String? plaincontent,
     num? verseNum,
+    String? bibleVersion,
   }) {
     _id = id;
     _bookNum = bookNum;
@@ -24,6 +25,7 @@ class BookMarkModel {
     _timestamp = timestamp;
     _verseNum = verseNum;
     _plaincontent = plaincontent;
+    _bibleVersion = bibleVersion;
   }
 
   BookMarkModel.fromJson(dynamic json) {
@@ -35,6 +37,7 @@ class BookMarkModel {
     _timestamp = json['timestamp'];
     _verseNum = json['verse_num'];
     _plaincontent = json['plaincontent'];
+    _bibleVersion = json['bible_version'];
   }
   int? _id;
   num? _bookNum;
@@ -44,6 +47,7 @@ class BookMarkModel {
   String? _timestamp;
   String? _plaincontent;
   num? _verseNum;
+  String? _bibleVersion;
   BookMarkModel copyWith({
     int? id,
     num? bookNum,
@@ -53,6 +57,7 @@ class BookMarkModel {
     String? timestamp,
     String? plaincontent,
     num? verseNum,
+    String? bibleVersion,
   }) =>
       BookMarkModel(
         id: id ?? _id,
@@ -63,6 +68,7 @@ class BookMarkModel {
         timestamp: timestamp ?? _timestamp,
         verseNum: verseNum ?? _verseNum,
         plaincontent: plaincontent ?? _plaincontent,
+        bibleVersion: bibleVersion ?? _bibleVersion,
       );
   int? get id => _id;
   num? get bookNum => _bookNum;
@@ -72,6 +78,7 @@ class BookMarkModel {
   String? get timestamp => _timestamp;
   String? get plaincontent => _plaincontent;
   num? get verseNum => _verseNum;
+  String? get bibleVersion => _bibleVersion;
 
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{};
@@ -83,6 +90,7 @@ class BookMarkModel {
     map['timestamp'] = _timestamp;
     map['plaincontent'] = _plaincontent;
     map['verse_num'] = _verseNum;
+    map['bible_version'] = _bibleVersion;
     return map;
   }
 }

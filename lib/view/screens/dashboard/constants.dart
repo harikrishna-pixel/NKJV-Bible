@@ -1,3 +1,5 @@
+import 'package:biblebookapp/view/constants/share_preferences.dart';
+
 class BibleInfo {
   static String apple_AppId = "6459794212";
 
@@ -110,6 +112,49 @@ class BibleInfo {
     "NKJV": "EN",      // English
     "catholic": "PT",  // Portuguese
   };
+
+  // Current active Bible version (set when version is selected)
+  static String currentBibleVersion = "NKJV";
+
+  // Load current Bible version from SharedPreferences on app startup
+  static Future<void> loadCurrentBibleVersion() async {
+    try {
+      final version = await SharPreferences.getString('currentBibleVersion');
+      if (version != null && version.isNotEmpty) {
+        currentBibleVersion = version;
+      }
+    } catch (e) {
+      // Use default if loading fails
+    }
+  }
+
+  // Check if library item's Bible version matches current version
+  // Returns true if user should proceed with reading (same version or user chose to continue)
+  // Returns false if versions differ and user chose not to continue
+  static bool checkLibraryItemVersion(String? itemBibleVersion) {
+    // If item has no version recorded (legacy data), allow reading
+    if (itemBibleVersion == null || itemBibleVersion.isEmpty) {
+      return true;
+    }
+    // If versions match, allow reading
+    if (itemBibleVersion == currentBibleVersion) {
+      return true;
+    }
+    // Versions differ
+    return false;
+  }
+
+  // Get display name for Bible version folder
+  static String getBibleVersionDisplayName(String folderName) {
+    switch (folderName.toLowerCase()) {
+      case 'nkjv':
+        return 'NKJV Bible';
+      case 'catholic':
+        return 'Catholic Bible';
+      default:
+        return folderName;
+    }
+  }
 
   static String emailVerify = "0";
 
