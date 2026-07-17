@@ -2695,7 +2695,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
-                                  'Start Growing Today',
+                                  'Start Your 3-Day Free Trial',
                                   style: TextStyle(
                                     fontSize: 17,
                                     fontWeight: FontWeight.w700,
@@ -2725,15 +2725,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                             child: Padding(
                               padding: const EdgeInsets.only(right: 5),
                               child: Icon(
-                                Icons.favorite,
-                                size: 13,
-                                color: Colors.amber.shade700,
+                                Icons.autorenew,
+                                size: 14,
+                                color: Colors.brown.shade400,
                               ),
                             ),
                           ),
                           TextSpan(
                             text:
-                                'Join thousands of believers growing closer to God every day',
+                                'Auto-renews after your 3-day free trial unless canceled before it ends.',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.brown.shade400,
@@ -4055,7 +4055,7 @@ class _ExitOfferBottomSheetContentState
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
-                                  'Start Growing Today',
+                                  'Start Your 3-Day Free Trial',
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,

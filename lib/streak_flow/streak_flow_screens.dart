@@ -501,6 +501,35 @@ Widget _streakPhotoReadabilityOverlays(BuildContext context) {
   );
 }
 
+/// Bottom fade only (no top bar vignette) for streak completed photo screen.
+Widget _streakPhotoBottomReadabilityOverlay(BuildContext context) {
+  final h = MediaQuery.sizeOf(context).height;
+  final bottomH = h * 0.58;
+
+  return Positioned(
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: bottomH,
+    child: IgnorePointer(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+            colors: [
+              Colors.black.withOpacity(0.88),
+              Colors.black.withOpacity(0.58),
+              Colors.transparent,
+            ],
+            stops: const [0.0, 0.48, 1.0],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 Widget _streakPhotoBackgroundStack({
   required BuildContext context,
   required String assetPath,
@@ -4633,7 +4662,8 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
               ),
             ),
           ),
-          _streakPhotoReadabilityOverlays(context),
+          // Bottom fade only — skip top vignette (was showing a hard top bar)
+          _streakPhotoBottomReadabilityOverlay(context),
           _lightRaysOverlay(true),
           _celebrationBurstOverlay(true),
           SafeArea(
