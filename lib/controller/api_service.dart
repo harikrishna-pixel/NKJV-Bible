@@ -656,6 +656,15 @@ String _referralApplyFailureMessage(String? profileResult) {
     return 'Invalid Referral code';
   }
   final lower = profileError.toLowerCase();
+  // If error explicitly mentions referral issues, show it to the user.
+  if (lower.contains('referral') ||
+      lower.contains('already applied') ||
+      lower.contains('already used') ||
+      lower.contains('does not exist') ||
+      lower.contains('not found') ||
+      lower.contains('expired')) {
+    return profileError;
+  }
   // Ignore non-referral noise (404 endpoints, password/email field validation).
   if (lower.contains('email already exists') ||
       lower.contains('validation failed') ||
@@ -1095,11 +1104,15 @@ Future<void> applyReferralViaLogin({
         message.contains('referral code not found') ||
         message.contains('referral not found');
 
-    if (resp.statusCode != 200 ||
-        statusFalse ||
-        !statusTrue ||
-        _hasReferralErrorInResponse(data) ||
-        messageSaysInvalid) {
+    // Only throw immediately if the login itself failed or message explicitly
+    // says the referral is invalid. If login succeeded (statusTrue), continue
+    // to check referred_by and try profile update if needed.
+    if (resp.statusCode != 200 || statusFalse || messageSaysInvalid) {
+      throw 'Invalid Referral code';
+    }
+    // If status is not clearly true but also not false, and there's a referral
+    // error, throw early. Otherwise continue to try profile update.
+    if (!statusTrue && _hasReferralErrorInResponse(data)) {
       throw 'Invalid Referral code';
     }
 

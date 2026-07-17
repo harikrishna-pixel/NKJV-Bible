@@ -146,6 +146,7 @@ flutter:
     - assets/offer/
     - assets/zipped/
     - assets/zipped/NKJV/
+    - assets/zipped/catholic/
     - assets/icons/
     - assets/prayer_guidance_icons/
     - assets/onboarding/

@@ -1100,6 +1100,22 @@ class floatingButtonState extends State<floatingButton>
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      if (isAudioPlaying) {
+        audioPlayer.pause();
+        if (mounted) {
+          setState(() {
+            isAudioPlaying = false;
+          });
+        }
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
     debugPrint("sz current width - $screenWidth ");

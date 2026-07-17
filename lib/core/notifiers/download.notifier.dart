@@ -1049,11 +1049,9 @@ class DownloadProvider with ChangeNotifier {
       final bookIdStored = int.parse(verse['Book_Id'].toString());
       final bookNum = bookIdStored > 0 ? bookIdStored - 1 : bookIdStored;
       final storedBook = verse['Book']?.toString().trim() ?? '';
-      final bookName = storedBook.isNotEmpty
-          ? storedBook
-          : (_resolveDailyVerseBookTitle(bookTitleByNum, bookNum) ??
-              _resolveDailyVerseBookTitle(bookTitleByNum, bookIdStored) ??
-              'Unknown');
+      final bookName = _resolveDailyVerseBookTitle(bookTitleByNum, bookNum) ??
+          _resolveDailyVerseBookTitle(bookTitleByNum, bookIdStored) ??
+          (storedBook.isNotEmpty ? storedBook : 'Unknown');
 
       enrichedList.add(DailyVerseList(
         categoryName: verse['Category_Name'],

@@ -99,8 +99,17 @@ class BibleInfo {
 
 // add folder names here  assets/zipped/
   static List<String> folders = [
-    "NKJV"
+    "NKJV",
+    "catholic"
   ];
+
+  // Language code mapping for Chat & Prayer Guidance
+  // When adding new Bible versions, add the corresponding language code here
+  // Supported codes: EN, HI, TN, PT, SQ, AM, AR, BN, ZH, FR, DE, EL, HE, IG, ID, IT, JA, KI, RW, KO, etc.
+  static Map<String, String> folderLanguageMap = {
+    "NKJV": "EN",      // English
+    "catholic": "PT",  // Portuguese
+  };
 
   static String emailVerify = "0";
 

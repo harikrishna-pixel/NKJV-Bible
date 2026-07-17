@@ -16,6 +16,7 @@ import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
+import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -377,7 +378,8 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                                     final data =
                                         prefs.getString("appreview1") ?? "1";
                                     if (data == '1') {
-                                      await _requestReview();
+                                      // Removed: Rating pop-up on first install
+                                      // await _requestReview();
                                     }
                                     setState(() {
                                       // Step 1: Reset all active folders to "open"
@@ -437,6 +439,10 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                                     isloading = false;
                                   });
                                   await _saveButtonStates();
+                                  // Set chat language based on selected Bible version
+                                  final chatLang = BibleInfo.folderLanguageMap[foldername] ?? 'EN';
+                                  await SharPreferences.setString(SharPreferences.chatLanguage, chatLang);
+                                  AppApiConstant.chatLanguage = chatLang;
                                   CustomAlertBox.show(context, () {
                                     Get.to(() => PreferenceSelectionScreen(
                                           isSetting: false,
@@ -829,6 +835,10 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                   if (foldername != null && foldername!.isNotEmpty) {
                     // 🔹 Save state after change
                     await _saveButtonStates();
+                    // Set chat language based on selected Bible version
+                    final chatLang = BibleInfo.folderLanguageMap[foldername] ?? 'EN';
+                    await SharPreferences.setString(SharPreferences.chatLanguage, chatLang);
+                    AppApiConstant.chatLanguage = chatLang;
                     // Navigate next
                     if (widget.from == 'onboard') {
                       setState(() {
@@ -915,6 +925,11 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                         _progress = 89;
                       });
                       await clearAllData(); // clear DB
+
+                      // Set chat language based on selected Bible version
+                      final chatLang = BibleInfo.folderLanguageMap[foldername] ?? 'EN';
+                      await SharPreferences.setString(SharPreferences.chatLanguage, chatLang);
+                      AppApiConstant.chatLanguage = chatLang;
 
                       setState(() {
                         _progress = 97;

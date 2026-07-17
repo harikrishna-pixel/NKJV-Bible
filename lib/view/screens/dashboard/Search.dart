@@ -1737,9 +1737,19 @@ class _SearchScreenState extends State<SearchScreen> {
                                   print(filterSelectedVersesContent.length);
                                   var data = filterSelectedVersesContent[index];
                                   String? bookName;
-                                  for (var name in bookList) {
+                                  final providerBooks = Provider.of<DownloadProvider>(context, listen: false).bookList;
+                                  for (var name in providerBooks) {
                                     if (name.bookNum == data.bookNum) {
                                       bookName = name.title;
+                                      break;
+                                    }
+                                  }
+                                  if (bookName == null || bookName.isEmpty) {
+                                    for (var name in bookList) {
+                                      if (name.bookNum == data.bookNum) {
+                                        bookName = name.title;
+                                        break;
+                                      }
                                     }
                                   }
 

@@ -373,6 +373,19 @@ class _DailyVerseState extends State<DailyVerse> {
                 topLeft: Radius.circular(20), topRight: Radius.circular(20))),
         context: context,
         builder: (BuildContext context) {
+          final bookId = int.parse(data.bookId.toString());
+          final bookNum = dailyVerseBookNum(bookId);
+          final providerBooks = Provider.of<DownloadProvider>(context, listen: false).bookList;
+          String? resolvedBookName;
+          for (var b in providerBooks) {
+            if (b.bookNum == bookNum) {
+              resolvedBookName = b.title;
+              break;
+            }
+          }
+          final displayBookName = (resolvedBookName != null && resolvedBookName.isNotEmpty)
+              ? resolvedBookName
+              : data.book.toString();
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
             decoration: BoxDecoration(
@@ -409,7 +422,7 @@ class _DailyVerseState extends State<DailyVerse> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       Text(
-                          "${data.book} ${dailyVerseUiChapter(data.chapter)}: ${dailyVerseUiVerse(data.verseNum)}",
+                          "$displayBookName ${dailyVerseUiChapter(data.chapter)}: ${dailyVerseUiVerse(data.verseNum)}",
                           textAlign: TextAlign.right,
                           style: CommanStyle.black15400),
                     ],
@@ -424,7 +437,7 @@ class _DailyVerseState extends State<DailyVerse> {
                         onTap: () async {
                           await Clipboard.setData(ClipboardData(
                               text:
-                                  "${parse(data.verse).body?.text} \n${data.book} ${dailyVerseUiChapter(data.chapter)}:${dailyVerseUiVerse(data.verseNum)}"));
+                                  "${parse(data.verse).body?.text} \n$displayBookName ${dailyVerseUiChapter(data.chapter)}:${dailyVerseUiVerse(data.verseNum)}"));
                           Constants.showToast("Copied");
                         },
                         child: Column(
@@ -460,9 +473,19 @@ class _DailyVerseState extends State<DailyVerse> {
                       InkWell(
                         onTap: () async {
                           final sheetContext = context;
-                          final bookName = data.book.toString();
                           final bookId = int.parse(data.bookId.toString());
                           final bookNum = dailyVerseBookNum(bookId);
+                          final providerBooks = Provider.of<DownloadProvider>(context, listen: false).bookList;
+                          String? resolvedBookName;
+                          for (var b in providerBooks) {
+                            if (b.bookNum == bookNum) {
+                              resolvedBookName = b.title;
+                              break;
+                            }
+                          }
+                          final bookName = (resolvedBookName != null && resolvedBookName.isNotEmpty)
+                              ? resolvedBookName
+                              : data.book.toString();
                           final chapter = dailyVerseUiChapter(data.chapter);
                           final verseNum =
                               int.parse(data.verseNum.toString());
@@ -594,7 +617,7 @@ class _DailyVerseState extends State<DailyVerse> {
                             context: context,
                             builder: (context) => ShareAlertBox(
                               verseTitle:
-                                  " ${data.book} ${dailyVerseUiChapter(data.chapter)}:${dailyVerseUiVerse(data.verseNum)}",
+                                  " $displayBookName ${dailyVerseUiChapter(data.chapter)}:${dailyVerseUiVerse(data.verseNum)}",
                               onShareAsText: () async {
                                 Navigator.of(context).pop();
                                 // Your logic here
@@ -610,7 +633,7 @@ class _DailyVerseState extends State<DailyVerse> {
                                       "${html.parse("${data.verse}").body?.text ?? ''}.\n\nYou can read more at:\nhttps://play.google.com/store/apps/details?id=$appPackageName";
                                 } else if (Platform.isIOS) {
                                   message =
-                                      '${html.parse("${data.verse}").body?.text ?? ''}.\n${data.book} ${dailyVerseUiChapter(data.chapter)}:${dailyVerseUiVerse(data.verseNum)}\n\nYou can read more at:\nhttps://itunes.apple.com/app/id$appid'; // Example iTunes URL
+                                      '${html.parse("${data.verse}").body?.text ?? ''}.\n$displayBookName ${dailyVerseUiChapter(data.chapter)}:${dailyVerseUiVerse(data.verseNum)}\n\nYou can read more at:\nhttps://itunes.apple.com/app/id$appid'; // Example iTunes URL
                                 }
 
                                 if (message.isNotEmpty) {
@@ -894,6 +917,19 @@ class _DailyVerseState extends State<DailyVerse> {
                                 // debugPrint(
                                 //     "reversedDailyVerseList - ${reversedDailyVerseList[0].date}, ${reversedDailyVerseList[1].date}");
                                 var data = reversedDailyVerseList[index];
+                                final listBookId = int.parse(data.bookId.toString());
+                                final listBookNum = dailyVerseBookNum(listBookId);
+                                final listProviderBooks = Provider.of<DownloadProvider>(context, listen: false).bookList;
+                                String? listResolvedBookName;
+                                for (var b in listProviderBooks) {
+                                  if (b.bookNum == listBookNum) {
+                                    listResolvedBookName = b.title;
+                                    break;
+                                  }
+                                }
+                                final listDisplayBookName = (listResolvedBookName != null && listResolvedBookName.isNotEmpty)
+                                    ? listResolvedBookName
+                                    : data.book.toString();
                                 DateTime date =
                                     DateTime.parse(data.date.toString());
                                 String currentDate = DateFormat("dd-MM-yyyy")
@@ -1007,7 +1043,7 @@ class _DailyVerseState extends State<DailyVerse> {
                                           children: [
                                             Expanded(
                                               child: Text(
-                                                "${data.book} ${dailyVerseUiChapter(data.chapter)}:${dailyVerseUiVerse(data.verseNum)}",
+                                                "$listDisplayBookName ${dailyVerseUiChapter(data.chapter)}:${dailyVerseUiVerse(data.verseNum)}",
                                                 style: CommanStyle
                                                     .bwWithChangeFont(
                                                         context,

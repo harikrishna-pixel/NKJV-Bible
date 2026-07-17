@@ -36,6 +36,7 @@ import 'package:biblebookapp/view/screens/dashboard/dailyverse.dart';
 import 'package:biblebookapp/view/screens/dashboard/fActionButton.dart';
 import 'package:biblebookapp/view/screens/dashboard/remove_add-screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/setting_screen.dart';
+import 'package:biblebookapp/view/screens/dashboard/social_links_screen.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 import 'package:biblebookapp/view/screens/more_apps/more_apps_screen.dart';
 import 'package:biblebookapp/view/screens/profile/view/profile_screen.dart';
@@ -4851,6 +4852,34 @@ class _HomeScreenState extends State<HomeScreen>
                           ),
                           title: Text(
                             "Settings",
+                            style: CommanStyle.bothPrimary16600(context),
+                          ),
+                        ),
+                        ListTile(
+                          dense: true,
+                          onTap: () {
+                            Get.back();
+                            Future.microtask(() {
+                              Get.to(
+                                () => const SocialLinksScreen(),
+                                transition: Transition.cupertino,
+                                duration: const Duration(milliseconds: 350),
+                              );
+                            });
+                          },
+                          visualDensity:
+                              const VisualDensity(horizontal: 0, vertical: 0),
+                          leading: Icon(
+                            Icons.public,
+                            size: 24,
+                            color:
+                                Provider.of<ThemeProvider>(context).themeMode ==
+                                        ThemeMode.dark
+                                    ? CommanColor.darkPrimaryColor
+                                    : CommanColor.lightModePrimary,
+                          ),
+                          title: Text(
+                            'Social Links',
                             style: CommanStyle.bothPrimary16600(context),
                           ),
                         ),
