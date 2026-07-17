@@ -38,6 +38,7 @@ import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/dashboard/preference_selection_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:biblebookapp/view/widget/webview.dart';
+import 'package:biblebookapp/controller/dashboard_controller.dart';
 
 class BibleVersionsScreen extends StatefulWidget {
   final String from;
@@ -1038,6 +1039,19 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
       _loadingMessage = "Complete!";
     });
     await Future.delayed(const Duration(milliseconds: 300));
+
+    // Clear DashBoardController's cached content to force reload with new version data
+    // This is safe: only clears in-memory verse cache, reading position is preserved in SharedPreferences
+    try {
+      if (Get.isRegistered<DashBoardController>()) {
+        final dashController = Get.find<DashBoardController>();
+        dashController.selectedBookContent.clear();
+        dashController.selectedVersesContent.clear();
+        debugPrint("✅ Cleared DashBoardController cache for version switch");
+      }
+    } catch (e) {
+      debugPrint("⚠️ Could not clear controller cache: $e");
+    }
 
     Constants.showToast("Updated Successfully");
     setState(() {
