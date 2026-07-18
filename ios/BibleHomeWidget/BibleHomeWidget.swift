@@ -1101,5 +1101,8 @@ struct BibleHomeWidgetBundle: WidgetBundle {
     PrayerReminderWidget()
     BiblePrayerWidget()
     BibleChatWidget()
+    if #available(iOSApplicationExtension 16.2, *) {
+      StreakLiveActivityWidget()
+    }
   }
 }

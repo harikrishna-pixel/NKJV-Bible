@@ -7,6 +7,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:biblebookapp/streak_flow/leave_rating_screen.dart';
 import 'package:biblebookapp/streak_flow/mood_prayer_data.dart';
+import 'package:biblebookapp/streak_flow/streak_live_activity.dart';
 import 'package:biblebookapp/streak_flow/streak_saved_storage.dart';
 import 'package:biblebookapp/streak/streak_service.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
@@ -1647,12 +1648,20 @@ Future<Map<String, int>> _readStreakFlowStepsByDay() async {
 Future<void> _storeStreakFlowStepsForDay(String dayKey, int steps) async {
   final safeDayKey = dayKey.trim();
   if (safeDayKey.isEmpty) return;
+  final clamped = steps.clamp(0, 4);
   final map = await _readStreakFlowStepsByDay();
-  map[safeDayKey] = steps.clamp(0, 4);
+  map[safeDayKey] = clamped;
   await SharPreferences.setString(
     SharPreferences.streakFlowStepsByDay,
     jsonEncode(map),
   );
+  // Additive Live Activity sync only — does not affect streak logic.
+  unawaited(StreakLiveActivity.syncProgress(stepsCompleted: clamped));
+  if (clamped >= 4) {
+    unawaited(Future<void>.delayed(const Duration(seconds: 2), () {
+      return StreakLiveActivity.end();
+    }));
+  }
 }
 
 Future<String> _currentStreakFlowProgressDayKey() async {
@@ -1986,6 +1995,10 @@ class _FaithJourneyStepPagerState extends State<FaithJourneyStepPager> {
 class StreakFlowNavigation {
   /// Show streak flow if not yet shown today, else go to Home.
   static Future<void> navigateToStreakFlowOrHome(BuildContext context) async {
+    // Prefer a still-mounted context (dialog contexts die after pop).
+    BuildContext? navContext = context.mounted ? context : Get.context;
+    navContext ??= Get.context;
+
     final today = DateTime.now().toIso8601String().split('T')[0];
     final todayDate = DateTime.now();
     final yesterdayDate = todayDate.subtract(const Duration(days: 1));
@@ -2030,7 +2043,6 @@ class StreakFlowNavigation {
           DateTime.now().toIso8601String(),
         );
       }
-      if (!context.mounted) return;
       Get.offAll(
         () => const StreakPausedScreen(),
         transition: Transition.cupertino,
@@ -2040,7 +2052,23 @@ class StreakFlowNavigation {
     }
 
     if (last == today || dismissed == today) {
-      _goToHome(context);
+      if (navContext != null && navContext.mounted) {
+        _goToHome(navContext);
+      } else {
+        Get.offAll(
+          () => HomeScreen(
+            From: "splash",
+            selectedVerseNumForRead: "",
+            selectedBookForRead: "",
+            selectedChapterForRead: "",
+            selectedBookNameForRead: "",
+            selectedVerseForRead: "",
+          ),
+          transition: Transition.fadeIn,
+          duration: const Duration(milliseconds: 280),
+          opaque: true,
+        );
+      }
       return;
     }
 
@@ -2052,11 +2080,26 @@ class StreakFlowNavigation {
     final effectiveSteps =
         stepsTodayFromMap > steps ? stepsTodayFromMap : steps;
     if (started == today && effectiveSteps > 0) {
-      _goToHome(context);
+      if (navContext != null && navContext.mounted) {
+        _goToHome(navContext);
+      } else {
+        Get.offAll(
+          () => HomeScreen(
+            From: "splash",
+            selectedVerseNumForRead: "",
+            selectedBookForRead: "",
+            selectedChapterForRead: "",
+            selectedBookNameForRead: "",
+            selectedVerseForRead: "",
+          ),
+          transition: Transition.fadeIn,
+          duration: const Duration(milliseconds: 280),
+          opaque: true,
+        );
+      }
       return;
     }
 
-    if (!context.mounted) return;
     Get.offAll(
       () => const UpgradeCheckWrapper(
         showUpgradeAlert: true,
@@ -2672,6 +2715,8 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
       await SharPreferences.setInt(
           SharPreferences.streakFlowStepsCompletedToday, 0);
     }
+    // Start Live Activity when daily journey is opened (UI only).
+    unawaited(StreakLiveActivity.syncProgress(stepsCompleted: 0));
   }
 
   int get _connectionIndex {
@@ -4411,6 +4456,8 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
   @override
   void initState() {
     super.initState();
+    // End Live Activity when completion screen is shown (UI only).
+    unawaited(StreakLiveActivity.end());
     SharPreferences.getInt(SharPreferences.pendingStreakCompleteCelebration)
         .then((value) {
       if (!mounted) return;

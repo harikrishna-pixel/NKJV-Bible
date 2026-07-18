@@ -876,102 +876,54 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                                 );
                                 debugPrint(
                                     "folders leng - ${BibleInfo.folders.length}");
-                                if (BibleInfo.folders.length == 1) {
-                                  await extractFromFolder(
-                                    folderName: BibleInfo.folders.first,
-                                    password: dotenv
-                                        .env[AssetsConstants.holybibleKey]
-                                        .toString(),
-                                  );
+                                // Always extract selected bible before load.
+                                // With folders.length > 1, onboard only passes
+                                // selectedbible and does not extract earlier —
+                                // skipping extract here caused PathNotFoundException.
+                                final bibleFolder = BibleInfo.folders.length == 1
+                                    ? BibleInfo.folders.first
+                                    : widget.selectedbible!;
+                                await extractFromFolder(
+                                  folderName: bibleFolder,
+                                  password: dotenv
+                                      .env[AssetsConstants.holybibleKey]
+                                      .toString(),
+                                );
 
-                                  await loadBookContent(
-                                      BibleInfo.folders.first);
-                                  await loadBookList(BibleInfo.folders.first);
-                                  await _finalizeBibleSetupAndPreloadHomeData();
-                                  await DBHelper().db.then((db) async {
-                                    if (db != null) {
-                                      final result = await db.rawQuery(
-                                        "SELECT * FROM book WHERE book_num = ?",
-                                        [int.parse("0")],
+                                await loadBookContent(bibleFolder);
+                                await loadBookList(bibleFolder);
+                                await _finalizeBibleSetupAndPreloadHomeData();
+                                await DBHelper().db.then((db) async {
+                                  if (db != null) {
+                                    final result = await db.rawQuery(
+                                      "SELECT * FROM book WHERE book_num = ?",
+                                      [int.parse("0")],
+                                    );
+
+                                    if (result.isNotEmpty &&
+                                        result[0]["title"] != null) {
+                                      final title =
+                                          result[0]["title"].toString();
+                                      await SharPreferences.setString(
+                                        SharPreferences.selectedBook,
+                                        title,
                                       );
-
-                                      if (result.isNotEmpty &&
-                                          result[0]["title"] != null) {
-                                        final title =
-                                            result[0]["title"].toString();
-                                        // final data =
-                                        //     await SharPreferences.getString(
-                                        //           SharPreferences.selectedBook,
-                                        //         ) ??
-                                        //         "";
-                                        // if (data.isEmpty) {
-                                        await SharPreferences.setString(
-                                          SharPreferences.selectedBook,
-                                          title,
-                                        );
-                                        // }
-                                      } else {
-                                        debugPrint(
-                                            "testapp No book found with book_num = 0");
-                                      }
                                     } else {
                                       debugPrint(
-                                          "testapp Database instance is null");
+                                          "testapp No book found with book_num = 0");
                                     }
-                                  });
-                                  await deleteFiles(BibleInfo.folders.first);
-                                  if (!mounted) return;
-                                  setState(() {
-                                    isLoading = false;
-                                  });
-                                  // Don't auto-dismiss - let user tap Continue button
-                                  // Navigator.pop(context); // Close loading
-                                  // Show success dialog after user dismisses loading dialog
-                                  // This will be handled when user taps Continue button
-                                } else {
-                                  await loadBookContent(widget.selectedbible);
-                                  await loadBookList(widget.selectedbible);
-                                  await _finalizeBibleSetupAndPreloadHomeData();
-                                  await DBHelper().db.then((db) async {
-                                    if (db != null) {
-                                      final result = await db.rawQuery(
-                                        "SELECT * FROM book WHERE book_num = ?",
-                                        [int.parse("0")],
-                                      );
-
-                                      if (result.isNotEmpty &&
-                                          result[0]["title"] != null) {
-                                        final title =
-                                            result[0]["title"].toString();
-                                        // final data =
-                                        //     await SharPreferences.getString(
-                                        //           SharPreferences.selectedBook,
-                                        //         ) ??
-                                        //         "";
-                                        // if (data.isEmpty) {
-                                        await SharPreferences.setString(
-                                          SharPreferences.selectedBook,
-                                          title,
-                                        );
-                                        // }
-                                      } else {
-                                        debugPrint(
-                                            "testapp No book found with book_num = 0");
-                                      }
-                                    } else {
-                                      debugPrint(
-                                          "testapp Database instance is null");
-                                    }
-                                  });
-                                  await deleteFiles(widget.selectedbible);
-                                  if (!mounted) return;
-                                  setState(() {
-                                    isLoading = false;
-                                  });
-                                  // Don't auto-dismiss - let user tap Continue button
-                                  // Navigator.pop(context); // Close loading
-                                  // Success dialog will be shown when user taps Continue
-                                }
+                                  } else {
+                                    debugPrint(
+                                        "testapp Database instance is null");
+                                  }
+                                });
+                                await deleteFiles(bibleFolder);
+                                if (!mounted) return;
+                                setState(() {
+                                  isLoading = false;
+                                });
+                                // Don't auto-dismiss - let user tap Continue button
+                                // Success dialog will be shown when user taps Continue
                                 // Get.offAll(() => HomeScreen(
                                 //       From: "splash",
                                 //       selectedVerseNumForRead: "",
@@ -1527,17 +1479,35 @@ class FaithJourneyDialog {
                 ElevatedButton(
                   onPressed: () async {
                     Navigator.of(ctx).pop(); // Close dialog
+                    // Dialog context is disposed after pop — use Get.context for nav.
+                    final navContext = Get.context;
                     if (isFromOnboarding) {
                       // Mark onboarding complete only when user taps Start now (so
                       // closing on preference/category screen reopens to onboarding).
                       await SharPreferences.setBoolean(
                           SharPreferences.onboarding, true);
 
-                      // Skip IAP when offline or paywall product data is unavailable.
+                      // Paywall only when product data is available; otherwise skip it.
                       final shouldShowPaywall =
                           await PaywallPreloadService.canShowOnboardingPaywall();
                       if (!shouldShowPaywall) {
-                        await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
+                        debugPrint(
+                            'Onboarding: no paywall data — skipping SubscriptionScreen');
+                        if (navContext != null && navContext.mounted) {
+                          await StreakFlowNavigation.navigateToStreakFlowOrHome(
+                              navContext);
+                        } else {
+                          Get.offAll(
+                            () => HomeScreen(
+                              From: "splash",
+                              selectedVerseNumForRead: "",
+                              selectedBookForRead: "",
+                              selectedChapterForRead: "",
+                              selectedBookNameForRead: "",
+                              selectedVerseForRead: "",
+                            ),
+                          );
+                        }
                         return;
                       }
 
@@ -1550,7 +1520,21 @@ class FaithJourneyDialog {
                         final isVerySlowConnection = connectionSpeed != null &&
                             connectionSpeed > 12000;
                         if (isVerySlowConnection) {
-                          await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
+                          if (navContext != null && navContext.mounted) {
+                            await StreakFlowNavigation
+                                .navigateToStreakFlowOrHome(navContext);
+                          } else {
+                            Get.offAll(
+                              () => HomeScreen(
+                                From: "splash",
+                                selectedVerseNumForRead: "",
+                                selectedBookForRead: "",
+                                selectedChapterForRead: "",
+                                selectedBookNameForRead: "",
+                                selectedVerseForRead: "",
+                              ),
+                            );
+                          }
                           return;
                         }
                       } catch (e) {
@@ -1558,7 +1542,7 @@ class FaithJourneyDialog {
                             'Error checking connection speed in onboarding: $e');
                       }
 
-                      // Proceed to SubscriptionScreen when internet + product data exist.
+                      // Product data exists — show paywall.
                       final sixMonthPlan = BibleInfo.sixMonthPlanid;
                       final oneYearPlan = BibleInfo.oneYearPlanid;
                       final lifeTimePlan = BibleInfo.lifeTimePlanid;
@@ -1570,8 +1554,20 @@ class FaithJourneyDialog {
                           ),
                           transition: SubscriptionScreen.paywallRouteTransition,
                           duration: SubscriptionScreen.paywallRouteDuration);
+                    } else if (navContext != null && navContext.mounted) {
+                      await StreakFlowNavigation.navigateToStreakFlowOrHome(
+                          navContext);
                     } else {
-                      await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
+                      Get.offAll(
+                        () => HomeScreen(
+                          From: "splash",
+                          selectedVerseNumForRead: "",
+                          selectedBookForRead: "",
+                          selectedChapterForRead: "",
+                          selectedBookNameForRead: "",
+                          selectedVerseForRead: "",
+                        ),
+                      );
                     }
                   },
                   style: ElevatedButton.styleFrom(

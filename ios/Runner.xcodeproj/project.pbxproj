@@ -16,6 +16,10 @@
 		B1D7E0010001000000010001 /* BibleHomeWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D7E0010001000000010002 /* BibleHomeWidget.swift */; };
 		B1D7E0010001000000050002 /* BibleHomeWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B1D7E0010001000000010003 /* BibleHomeWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B1D7E0020001000000010001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B1D7E0020001000000010002 /* Assets.xcassets */; };
+		B1LA00010001000000010001 /* StreakLiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1LA00010001000000010002 /* StreakLiveActivityAttributes.swift */; };
+		B1LA00010001000000010003 /* StreakLiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1LA00010001000000010002 /* StreakLiveActivityAttributes.swift */; };
+		B1LA00010001000000010004 /* StreakLiveActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1LA00010001000000010005 /* StreakLiveActivityManager.swift */; };
+		B1LA00010001000000010006 /* StreakLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1LA00010001000000010007 /* StreakLiveActivityWidget.swift */; };
 		C1EA71597E67699CD62D1CC5 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 413BDC41C4F0F89A62B893A3 /* Pods_Runner.framework */; };
 		D46DC1882CB8003400AC7AD7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = D46DC1872CB8003300AC7AD7 /* GoogleService-Info.plist */; };
 		D4A3F9352CA194B000866824 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D4A3F9332CA194B000866824 /* Main.storyboard */; };
@@ -79,6 +83,9 @@
 		B1D7E0010001000000010004 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B1D7E0010001000000010005 /* BibleHomeWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BibleHomeWidget.entitlements; sourceTree = "<group>"; };
 		B1D7E0020001000000010002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B1LA00010001000000010002 /* StreakLiveActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = StreakLiveActivityAttributes.swift; path = Shared/StreakLiveActivityAttributes.swift; sourceTree = "<group>"; };
+		B1LA00010001000000010005 /* StreakLiveActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreakLiveActivityManager.swift; sourceTree = "<group>"; };
+		B1LA00010001000000010007 /* StreakLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreakLiveActivityWidget.swift; sourceTree = "<group>"; };
 		D26F2C5DAD1D80C6510EDE6B /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
 		D46DC1872CB8003300AC7AD7 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		D4A3F9322CA1909300866824 /* Runner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
@@ -130,10 +137,19 @@
 				9740EEB11CF90186004384FC /* Flutter */,
 				97C146F01CF9000F007C117D /* Runner */,
 				B1D7E0010001000000020001 /* BibleHomeWidget */,
+				B1LA00010001000000010008 /* Shared */,
 				97C146EF1CF9000F007C117D /* Products */,
 				F9EF5C28E50270D8A315E617 /* Pods */,
 				28FF84A888F15D3AC61E01BF /* Frameworks */,
 			);
+			sourceTree = "<group>";
+		};
+		B1LA00010001000000010008 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				B1LA00010001000000010002 /* StreakLiveActivityAttributes.swift */,
+			);
+			name = Shared;
 			sourceTree = "<group>";
 		};
 		97C146EF1CF9000F007C117D /* Products */ = {
@@ -159,6 +175,7 @@
 				1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */,
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
+				B1LA00010001000000010005 /* StreakLiveActivityManager.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 			);
 			path = Runner;
@@ -170,6 +187,7 @@
 				B10D01082FD6880F00FD0523 /* BibleHomeWidgetDebug.entitlements */,
 				B1D7E0020001000000010002 /* Assets.xcassets */,
 				B1D7E0010001000000010002 /* BibleHomeWidget.swift */,
+				B1LA00010001000000010007 /* StreakLiveActivityWidget.swift */,
 				B1D7E0010001000000010004 /* Info.plist */,
 				B1D7E0010001000000010005 /* BibleHomeWidget.entitlements */,
 			);
@@ -390,6 +408,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
+				B1LA00010001000000010004 /* StreakLiveActivityManager.swift in Sources */,
+				B1LA00010001000000010001 /* StreakLiveActivityAttributes.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -399,6 +419,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				B1D7E0010001000000010001 /* BibleHomeWidget.swift in Sources */,
+				B1LA00010001000000010006 /* StreakLiveActivityWidget.swift in Sources */,
+				B1LA00010001000000010003 /* StreakLiveActivityAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -46,6 +46,32 @@ import flutter_local_notifications
       }
     }
 
+    // Daily Streak Live Activity (iOS 16.1+) — additive only, no other logic changes
+    if let registrar = self.registrar(forPlugin: "com.biblebookapp.live_activity") {
+      let liveChannel = FlutterMethodChannel(
+        name: "com.biblebookapp/live_activity",
+        binaryMessenger: registrar.messenger()
+      )
+      liveChannel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
+        switch call.method {
+        case "startOrUpdate":
+          let args = call.arguments as? [String: Any]
+          let streakDays = args?["streakDays"] as? Int ?? 0
+          let stepsCompleted = args?["stepsCompleted"] as? Int ?? 0
+          StreakLiveActivityManager.startOrUpdate(
+            streakDays: streakDays,
+            stepsCompleted: stepsCompleted
+          )
+          result(nil)
+        case "end":
+          StreakLiveActivityManager.end()
+          result(nil)
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+    }
+
     return result
   }
 }
