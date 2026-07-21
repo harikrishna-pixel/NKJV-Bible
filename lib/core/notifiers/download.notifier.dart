@@ -8,6 +8,7 @@ import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/utils/custom_alert.dart';
+import 'package:biblebookapp/utils/daily_verse_book_resolve.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
@@ -391,41 +392,10 @@ class DownloadProvider with ChangeNotifier {
     required DateTime startDate,
   }) async {
     DateTime currentDate = startDate;
-    // for (final data in filteredData) {
-    //   final bookId = int.parse(data["Book_Id"].toString());
-    //   final chapter = int.parse(data["Chapter"].toString());
-    //   final verse = int.parse(
-    //     data["Verse"].toString().contains("-")
-    //         ? data["Verse"].toString().split("-").first
-    //         : data["Verse"].toString(),
-    //   );
-
-    //   final verseResult = await dbClient.rawQuery(
-    //     "SELECT * FROM verse WHERE book_num = ? AND chapter_num = ? AND verse_num = ?",
-    //     [bookId, chapter, verse],
-    //   );
-
-    //   if (verseResult.isNotEmpty) {
-    //     final insertData = {
-    //       "Category_Name": data["Category_Name"],
-    //       "Category_Id": data["Category_Id"],
-    //       "Book": data["Book"],
-    //       "Book_Id": bookId,
-    //       "Chapter": chapter,
-    //       "Verse": verseResult[0]["content"],
-    //       "Date": "$currentDate",
-    //       "Verse_Num": verse,
-    //     };
-
-    //     await dbClient.transaction((txn) async {
-    //       final batch = txn.batch();
-    //       batch.insert('dailyVersesnew', insertData);
-    //       await batch.commit(noResult: true);
-    //     });
-
-    //     currentDate = currentDate.add(const Duration(days: 1));
-    //   }
-    // }
+    // Additive: map main-list English book titles onto the active Bible's
+    // book_num (Catholic/Parole differ from NKJV). Existing schedule algorithm
+    // is unchanged — only the verse-table lookup indices are corrected.
+    final bookLookup = await buildDailyVerseBookLookup(dbClient);
     for (final row in data) {
       final bookId = int.tryParse(row["Book_Id"].toString());
 
@@ -455,18 +425,29 @@ class DownloadProvider with ChangeNotifier {
         chapter: chapter,
         verseRaw: verseStr,
       );
+      final resolvedBook = resolveDailyVerseBookRef(
+        lookup: bookLookup,
+        bookTitle: row["Book"]?.toString(),
+        bookId: bookId,
+      );
+      final verseBookNum = resolvedBook?.bookNum ?? lookup.$1;
+      final storeBookId = resolvedBook?.bookId ?? bookId;
+      final storeBookTitle =
+          (resolvedBook?.title.isNotEmpty == true)
+              ? resolvedBook!.title
+              : (row["Book"]?.toString() ?? '');
 
       final verseResult = await dbClient.rawQuery(
         "SELECT * FROM verse WHERE book_num = ? AND chapter_num = ? AND verse_num = ?",
-        [lookup.$1, lookup.$2, lookup.$3],
+        [verseBookNum, lookup.$2, lookup.$3],
       );
 
       if (verseResult.isNotEmpty) {
         final insertData = {
           "Category_Name": row["Category_Name"],
           "Category_Id": row["Category_Id"],
-          "Book": row["Book"],
-          "Book_Id": bookId,
+          "Book": storeBookTitle,
+          "Book_Id": storeBookId,
           "Chapter": chapter,
           "Verse": verseResult[0]["content"],
           "Date": "$currentDate",
@@ -516,8 +497,10 @@ class DownloadProvider with ChangeNotifier {
     return categories.any((c) => !represented.contains(c));
   }
 
-  /// Rebuilds today-and-future rows so every selected topic (including newly added)
-  /// shares the same round-robin rotation from today onward.
+  /// Rebuilds *future* rows (after today) so every selected topic shares the
+  /// same round-robin rotation going forward.
+  /// Additive guard: never rewrite past or already-generated today history
+  /// (version switch / device-date change must not replace Faith→Forgiveness).
   Future<void> _rebalanceFutureDailyVerseSchedule({
     required dynamic dbClient,
     required List<Map<String, dynamic>> filteredData,
@@ -526,16 +509,24 @@ class DownloadProvider with ChangeNotifier {
   }) async {
     final today = _dailyVerseDateOnly(DateTime.now());
     final idsToDelete = <int>[];
-    final pastKeys = <String>{};
+    final lockedKeys = <String>{};
+    var hasTodayRow = false;
 
     for (final row in survivingRows) {
       try {
         final day = _dailyVerseDateOnly(DateTime.parse(row['Date'].toString()));
-        if (day.isBefore(today)) {
-          pastKeys.add(_dailyVerseScheduleKeyFromInserted(row));
+        if (!day.isAfter(today)) {
+          // Keep past + today snapshots immutable.
+          lockedKeys.add(_dailyVerseScheduleKeyFromInserted(row));
+          if (day == today) hasTodayRow = true;
         } else {
           final id = row['id'];
-          if (id is int) idsToDelete.add(id);
+          if (id is int) {
+            idsToDelete.add(id);
+          } else {
+            final parsedId = int.tryParse(id?.toString() ?? '');
+            if (parsedId != null) idsToDelete.add(parsedId);
+          }
         }
       } catch (_) {}
     }
@@ -551,13 +542,19 @@ class DownloadProvider with ChangeNotifier {
     final interleaved =
         _interleaveDailyVersesByCategory(filteredData, categories);
     final toSchedule = interleaved
-        .where((row) => !pastKeys.contains(_dailyVerseScheduleKeyFromMain(row)))
+        .where(
+            (row) => !lockedKeys.contains(_dailyVerseScheduleKeyFromMain(row)))
         .toList();
+
+    // If today already exists, only fill tomorrow onward. If somehow missing,
+    // fall back to starting at today (first-time / recovery).
+    final startDate =
+        hasTodayRow ? today.add(const Duration(days: 1)) : today;
 
     await _insertDailyVersesFromMainList(
       dbClient: dbClient,
       data: toSchedule,
-      startDate: today,
+      startDate: startDate,
     );
   }
 
@@ -1008,9 +1005,18 @@ class DownloadProvider with ChangeNotifier {
     final table = selectedCategories.isEmpty ? "dailyVerses" : "dailyVersesnew";
     var dailyVerses = await dbClient.rawQuery("SELECT * FROM $table");
 
+    // Additive: if Bible version changed, refresh *future* schedule only so new
+    // days use the active verse table — past/today history stays untouched.
+    final scheduleVersion =
+        prefs.getString('dailyVerseScheduleBibleVersion') ?? '';
+    final activeVersion = BibleInfo.currentBibleVersion;
+    final bibleVersionChanged =
+        scheduleVersion.isNotEmpty && scheduleVersion != activeVersion;
+
     if (table == 'dailyVersesnew' &&
         selectedCategories.isNotEmpty &&
-        _categoriesMissingFromPastSchedule(dailyVerses, selectedCategories)) {
+        (_categoriesMissingFromPastSchedule(dailyVerses, selectedCategories) ||
+            bibleVersionChanged)) {
       final rawData =
           await dbClient.rawQuery("SELECT * FROM dailyVersesMainList");
       final filteredData = await compute(_filterVerses, {
@@ -1024,6 +1030,11 @@ class DownloadProvider with ChangeNotifier {
         survivingRows: dailyVerses,
       );
       dailyVerses = await dbClient.rawQuery("SELECT * FROM $table");
+    }
+
+    if (table == 'dailyVersesnew') {
+      await prefs.setString(
+          'dailyVerseScheduleBibleVersion', activeVersion);
     }
 
     final today = DateTime.now();

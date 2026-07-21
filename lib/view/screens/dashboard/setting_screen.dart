@@ -1205,7 +1205,7 @@ class _SettingScreenState extends State<SettingScreen>
                   screenWidth: screenWidth,
                 ),
                 SizedBox(height: screenWidth < 380 ? 10 : 12),
-                _buildSettingsSectionHeader('Verse of the Day', screenWidth),
+                _buildSettingsSectionHeader('Preferences', screenWidth),
                 const SizedBox(
                   height: 5,
                 ),
@@ -1223,7 +1223,7 @@ class _SettingScreenState extends State<SettingScreen>
                       mainAxisAlignment: MainAxisAlignment.start,
                       children: [
                         Text(
-                          "Change Preferences",
+                          "Daily Verse",
                           style: CommanStyle.bw16500(context),
                         ),
                         const Spacer(),
@@ -1236,6 +1236,35 @@ class _SettingScreenState extends State<SettingScreen>
                     ),
                   ),
                 ),
+                // Bible Version - content preference (not appearance)
+                if (BibleInfo.folders.length > 1)
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 20, vertical: screenWidth < 380 ? 5 : 10),
+                    child: InkWell(
+                      onTap: () {
+                        Get.to(() => const BibleVersionsScreen(from: 'home'),
+                            transition: Transition.cupertinoDialog,
+                            duration: const Duration(milliseconds: 300));
+                      },
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Bible Version",
+                            style: CommanStyle.bw16500(context),
+                          ),
+                          const Spacer(),
+                          Icon(
+                            Icons.navigate_next,
+                            color: CommanColor.whiteBlack(context),
+                            size: 24,
+                          )
+                        ],
+                      ),
+                    ),
+                  ),
                 ////
                 ///End of notification
                 ///
@@ -1347,35 +1376,6 @@ class _SettingScreenState extends State<SettingScreen>
                     ),
                   ),
                 ),
-                // Bible Version - only show if more than one version available
-                if (BibleInfo.folders.length > 1)
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: 20, vertical: screenWidth < 380 ? 5 : 10),
-                    child: InkWell(
-                      onTap: () {
-                        Get.to(() => const BibleVersionsScreen(from: 'home'),
-                            transition: Transition.cupertinoDialog,
-                            duration: const Duration(milliseconds: 300));
-                      },
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Bible Version",
-                            style: CommanStyle.bw16500(context),
-                          ),
-                          const Spacer(),
-                          Icon(
-                            Icons.navigate_next,
-                            color: CommanColor.whiteBlack(context),
-                            size: 24,
-                          )
-                        ],
-                      ),
-                    ),
-                  ),
                 // Padding(
                 //   padding: EdgeInsets.symmetric(
                 //       horizontal: 20, vertical: screenWidth < 380 ? 5 : 10),

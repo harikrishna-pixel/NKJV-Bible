@@ -1,4 +1,5 @@
 // ignore_for_file: use_full_hex_values_for_flutter_colors
+import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/core/export_db.dart';
 import 'package:biblebookapp/core/library_backup_upload_service.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
@@ -1034,7 +1035,7 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
 
   static const String _assetRefresh =
       'assets/export_backup/refresh.png';
-  static const String _assetLockCloud = 'assets/export_backup/lock.png';
+  static const String _assetLockCloud = 'assets/export_backup/img.png';
   static const String _assetEncryption =
       'assets/export_backup/encryption.png';
   static const String _assetEncryptionSign =
@@ -1277,6 +1278,7 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
     final ok = await LibraryBackupUploadService.downloadAndImportFromCloud();
     await SharPreferences.setString('OpenAd', '1');
     if (ok) {
+      _invalidateReadingCacheAfterRestore();
       Get.offAll(() => HomeScreen(
             From: "splash",
             selectedVerseNumForRead: "",
@@ -1285,6 +1287,16 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
             selectedBookNameForRead: "",
             selectedVerseForRead: ""));
     }
+  }
+
+  /// Clears in-memory chapter verses so Home reloads from DB (incl. restored highlights).
+  void _invalidateReadingCacheAfterRestore() {
+    try {
+      if (!Get.isRegistered<DashBoardController>()) return;
+      final controller = Get.find<DashBoardController>();
+      controller.selectedBookContent.clear();
+      controller.isFetchContent.value = true;
+    } catch (_) {}
   }
 
   void _onExportLibrary() {
@@ -1322,6 +1334,7 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
             return;
           }
           await SharPreferences.setString('OpenAd', '1');
+          _invalidateReadingCacheAfterRestore();
           Get.offAll(() => HomeScreen(
                 From: "splash",
                 selectedVerseNumForRead: "",

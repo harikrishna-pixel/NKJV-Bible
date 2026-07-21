@@ -229,6 +229,12 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
           password: password,
         );
 
+        if (archive.files.isEmpty) {
+          throw Exception(
+            'Zip archive is empty or could not be decrypted: $zipPath',
+          );
+        }
+
         final file = archive.files.first;
 
         if (!file.isFile) {
@@ -1102,6 +1108,21 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
       }
     } catch (e) {
       debugPrint("⚠️ Could not clear controller cache: $e");
+    }
+
+    // Additive: invalidate Daily Verse *cache* only so future rows can be
+    // filled for the new Bible. Do NOT call loadDailyVerseData() (that wipes
+    // history). Past + today rows stay immutable in rebalance.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('dataIsChanged', true);
+      if (mounted) {
+        final downloadProvider =
+            Provider.of<DownloadProvider>(context, listen: false);
+        downloadProvider.dailyVerseList = [];
+      }
+    } catch (e) {
+      debugPrint('⚠️ Could not invalidate Daily Verse cache: $e');
     }
 
     Constants.showToast("Updated Successfully");

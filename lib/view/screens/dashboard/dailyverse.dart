@@ -4,6 +4,7 @@ import 'package:biblebookapp/constant/size_config.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/utils/custom_share.dart';
+import 'package:biblebookapp/utils/daily_verse_book_resolve.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
@@ -551,7 +552,12 @@ class _DailyVerseState extends State<DailyVerse> {
                           }
                           
                           final bookId = int.parse(data.bookId.toString());
-                          final bookNum = dailyVerseBookNum(bookId);
+                          // Additive: resolve against active Bible book table so
+                          // NKJV Book_Id (e.g. Proverbs=20) opens Provérbios in Catholic.
+                          final bookNum = await resolveDailyVerseReaderBookNum(
+                            bookId: bookId,
+                            bookTitle: data.book?.toString(),
+                          );
                           final bookName = data.book.toString();
                           final chapter = dailyVerseUiChapter(data.chapter);
                           final verseNum =

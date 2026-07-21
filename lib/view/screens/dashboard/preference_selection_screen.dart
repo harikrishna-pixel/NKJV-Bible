@@ -1068,6 +1068,12 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
           password: password,
         );
 
+        if (archive.files.isEmpty) {
+          throw Exception(
+            'Zip archive is empty or could not be decrypted: $zipPath',
+          );
+        }
+
         final file = archive.files.first;
 
         if (!file.isFile) {
