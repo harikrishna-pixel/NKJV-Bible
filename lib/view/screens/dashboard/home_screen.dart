@@ -1756,6 +1756,18 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  /// Additive Mark-as-Read only: pause audio for the ad, then resume.
+  /// Leaves existing [_showInterstitialAdAndWait] logic unchanged.
+  Future<void> _showMarkAsReadAdPausingAudio() async {
+    final fab = _readerAudioFabKey.currentState;
+    await fab?.pausePlaybackForAd();
+    try {
+      await _showInterstitialAdAndWait();
+    } finally {
+      await fab?.resumePlaybackAfterAd();
+    }
+  }
+
   // Future<void> _handleAdDismissed() async {
   //   if (mounted) setState(() => isAdReady = false);
 
@@ -2586,15 +2598,10 @@ class _HomeScreenState extends State<HomeScreen>
 
     _restoreReaderAppBarVisibility();
 
-    final uiChapter = int.tryParse(controller.selectedChapter.value) ?? 1;
-    final safe = uiChapter <= 0 ? 1 : uiChapter;
-    final want = <num?>{safe - 1, safe};
-    final contentMatches = controller.selectedBookContent.isNotEmpty &&
-        controller.selectedBookContent
-            .any((v) => want.contains(v.chapterNum));
-
-    if (!contentMatches) {
-      await controller.getSelectedChapterAndBook();
+    if (!controller.displayedContentMatchesSelection()) {
+      await controller.forceReloadSelectedChapter();
+      _lastVisibleChapterContent = [];
+      _lastContentSource = null;
       if (mounted) setState(() {});
     }
   }
@@ -3350,6 +3357,11 @@ class _HomeScreenState extends State<HomeScreen>
               _lastVisibleChapterContent =
                   List<VerseBookContentModel>.from(content);
             }
+          } else if (_lastVisibleChapterContent.isNotEmpty &&
+              !_staleContentMatchesChapter(controller)) {
+            // Additive: drop stale verses when book/chapter advanced (Mark as Read).
+            _lastVisibleChapterContent = [];
+            _lastContentSource = null;
           }
           final readerVerses = controller.selectedBookContent.isNotEmpty
               ? controller.selectedBookContent
@@ -4450,7 +4462,7 @@ class _HomeScreenState extends State<HomeScreen>
                                                                     await _saveMarkAsReadAdTime();
                                                                     // Show ad FIRST, wait for dismissal, THEN navigate
                                                                     try {
-                                                                      await _showInterstitialAdAndWait();
+                                                                      await _showMarkAsReadAdPausingAudio();
                                                                     } catch (e) {
                                                                       debugPrint(
                                                                           'Error showing ad in Mark as Read: $e');
@@ -4858,7 +4870,7 @@ class _HomeScreenState extends State<HomeScreen>
                                                                               await _saveMarkAsReadAdTime();
                                                                               // Show ad FIRST, wait for dismissal, THEN navigate
                                                                               try {
-                                                                                await _showInterstitialAdAndWait();
+                                                                                await _showMarkAsReadAdPausingAudio();
                                                                               } catch (e) {
                                                                                 debugPrint('Error showing ad in Mark as Read: $e');
                                                                                 // If ad fails, proceed anyway
@@ -6206,11 +6218,20 @@ class _HomeScreenState extends State<HomeScreen>
 
   bool _staleContentMatchesChapter(DashBoardController controller) {
     if (_lastVisibleChapterContent.isEmpty) return false;
+    // Additive: require same book — chapter-number-only match re-shows the
+    // previous book after switching books (e.g. both on chapter 1).
+    final selectedNum = int.tryParse(controller.selectedBookNum.value.trim());
+    if (selectedNum != null) {
+      final contentBook = _lastVisibleChapterContent.first.bookNum?.toInt();
+      if (contentBook == null || contentBook != selectedNum) return false;
+    }
     final ch = int.tryParse(controller.selectedChapter.value) ?? 1;
     final safe = ch <= 0 ? 1 : ch;
-    final want = <num?>{safe - 1, safe};
+    final zeroBased =
+        _lastVisibleChapterContent.any((v) => (v.chapterNum ?? -1) == 0);
+    final stored = zeroBased ? safe - 1 : safe;
     return _lastVisibleChapterContent
-        .any((v) => want.contains(v.chapterNum));
+        .any((v) => v.chapterNum?.toInt() == stored);
   }
 
   bool _homeEntryRequiresContentReload() {
@@ -6291,9 +6312,23 @@ class _HomeScreenState extends State<HomeScreen>
 
     final chapter = int.tryParse(controller.selectedChapter.value) ?? 1;
 
-    if (controller.selectedBookContent.isNotEmpty) {
+    // Additive: non-empty content is not enough — must match book + chapter
+    // (shared controller can still hold the previous book's same chapter #).
+    if (controller.selectedBookContent.isNotEmpty &&
+        controller.displayedContentMatchesSelection()) {
       setState(() {});
       return;
+    }
+
+    if (controller.selectedBookContent.isNotEmpty &&
+        !controller.displayedContentMatchesSelection()) {
+      await controller.forceReloadSelectedChapter();
+      if (!mounted || state.controller == null) return;
+      if (controller.selectedBookContent.isNotEmpty &&
+          controller.displayedContentMatchesSelection()) {
+        setState(() {});
+        return;
+      }
     }
 
     final downloadProvider =
@@ -6304,7 +6339,10 @@ class _HomeScreenState extends State<HomeScreen>
 
     for (var attempt = 0; attempt < 5; attempt++) {
       if (!mounted || state.controller == null) return;
-      if (controller.selectedBookContent.isNotEmpty) return;
+      if (controller.selectedBookContent.isNotEmpty &&
+          controller.displayedContentMatchesSelection()) {
+        return;
+      }
 
       if (attempt > 0) {
         await Future.delayed(Duration(milliseconds: 150 * attempt));
@@ -6313,17 +6351,21 @@ class _HomeScreenState extends State<HomeScreen>
       await preloadFuture;
       if (!mounted || state.controller == null) return;
 
-      if (controller.selectedBookContent.isEmpty) {
+      if (controller.selectedBookContent.isEmpty ||
+          !controller.displayedContentMatchesSelection()) {
         await controller.getSelectedChapterAndBook();
       }
 
-      if (controller.selectedBookContent.isEmpty &&
+      if ((controller.selectedBookContent.isEmpty ||
+              !controller.displayedContentMatchesSelection()) &&
           downloadProvider.verseList.isNotEmpty) {
         final hydrated = await controller.hydrateChapterFromCachedVerses(
           downloadProvider.verseList,
           chapter,
         );
-        if (hydrated && mounted) {
+        if (hydrated &&
+            mounted &&
+            controller.displayedContentMatchesSelection()) {
           setState(() {});
           return;
         }

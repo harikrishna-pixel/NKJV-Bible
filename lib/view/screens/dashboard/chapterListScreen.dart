@@ -182,13 +182,32 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                         return GestureDetector(
                           onTap: () async {
                             final chapterNum = index + 1;
+                            final bookNumStr = widget.book_num.toString();
+                            final chapterCountStr =
+                                widget.chapterCount.toString();
                             await SharPreferences.setString(
                                 SharPreferences.selectedChapter,
                                 "$chapterNum");
+                            await SharPreferences.setString(
+                                SharPreferences.selectedBookNum, bookNumStr);
                             if (Get.isRegistered<DashBoardController>()) {
                               final c = Get.find<DashBoardController>();
                               c.selectedChapter.value = "$chapterNum";
                               c.selectChapterChange.value = chapterNum;
+                              // Additive: keep controller book fields in sync when
+                              // arriving from BookList → ChapterList (prefs-only
+                              // left selectedBookNum/chapterCount on the old book).
+                              c.selectedBookNum.value = bookNumStr;
+                              c.selectedBookChapterCount.value =
+                                  chapterCountStr;
+                              final bookTitle = await SharPreferences.getString(
+                                      SharPreferences.selectedBook) ??
+                                  '';
+                              if (bookTitle.isNotEmpty) {
+                                c.selectedBook.value = bookTitle;
+                              }
+                              c.selectedBookContent.clear();
+                              c.selectedVersesContent.clear();
                             }
                             setState(() {
                               selectedChapter = index;

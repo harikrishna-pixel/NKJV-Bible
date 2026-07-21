@@ -829,57 +829,69 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         .scrollToIndex(index, preferPosition: AutoScrollPosition.middle);
   }
 
-  /// Tries several `chapter_num` values used across Bible DB builds (0- vs 1-based).
+  /// Cache: book_num → whether verse.chapter_num is 0-based (ch.1 stored as 0).
+  final Map<int, bool> _zeroBasedChapterByBook = {};
+
+  Future<bool> _bookChapterNumsAreZeroBased(dynamic db, int bookNum) async {
+    try {
+      final rows = await db.rawQuery(
+        'SELECT MIN(chapter_num) AS m FROM verse WHERE book_num = ?',
+        [bookNum],
+      );
+      // Additive: only cache when MIN is real. Empty/null used to be stored as
+      // zero-based and made Next Chapter reload the previous chapter.
+      if (rows.isEmpty || rows.first['m'] == null) {
+        return _zeroBasedChapterByBook[bookNum] ?? true;
+      }
+      final minCh = int.tryParse('${rows.first['m']}');
+      if (minCh == null) {
+        return _zeroBasedChapterByBook[bookNum] ?? true;
+      }
+      final zeroBased = minCh == 0;
+      _zeroBasedChapterByBook[bookNum] = zeroBased;
+      return zeroBased;
+    } catch (_) {
+      return _zeroBasedChapterByBook[bookNum] ?? true;
+    }
+  }
+
+  bool _versesLookZeroBased(List<VerseBookContentModel> verses) {
+    return verses.any((v) => (v.chapterNum ?? -1) == 0);
+  }
+
+  int _storedChapterNumForUi(int uiChapter, {required bool zeroBased}) {
+    final safe = uiChapter <= 0 ? 1 : uiChapter;
+    return zeroBased ? safe - 1 : safe;
+  }
+
+  /// Tries exact DB chapter_num for the UI chapter (0- vs 1-based aware).
+  /// Additive: prefer exact match so Next Chapter cannot reload previous chapter.
   Future<List<Map<String, dynamic>>> _rawQueryVerseChapter(
       dynamic db, int bookNum, int uiChapter) async {
     final safe = uiChapter <= 0 ? 1 : uiChapter;
-    final candidates = <int>{
-      safe - 1,
-      safe,
-      if (safe > 1) safe - 2,
-      safe + 1,
-      0,
-      1,
-    };
-    for (final ch in candidates) {
-      if (ch < 0) continue;
+    final zeroBased = await _bookChapterNumsAreZeroBased(db, bookNum);
+    final exact = _storedChapterNumForUi(safe, zeroBased: zeroBased);
+
+    Future<List<Map<String, dynamic>>> queryCh(int ch) async {
+      if (ch < 0) return [];
       final rows = await db.rawQuery(
           "SELECT * From verse WHERE book_num ='$bookNum' AND chapter_num = '$ch' ORDER BY verse_num");
-      if (rows.isNotEmpty) return rows;
+      return List<Map<String, dynamic>>.from(rows);
     }
-    final dist = await db.rawQuery(
-        "SELECT DISTINCT chapter_num FROM verse WHERE book_num ='$bookNum'");
-    if (dist.isEmpty) return [];
-    final parsed = <int>[];
-    for (final row in dist) {
-      final n = int.tryParse(row['chapter_num']?.toString() ?? '');
-      if (n != null && n >= 0) parsed.add(n);
-    }
-    parsed.sort();
-    final t0 = safe - 1;
-    final t1 = safe;
-    int? pickNum;
-    for (final n in parsed) {
-      if (n == t0 || n == t1) {
-        pickNum = n;
-        break;
+
+    final exactRows = await queryCh(exact);
+    if (exactRows.isNotEmpty) return exactRows;
+
+    // One alternate basis fallback (mixed/legacy DBs only).
+    final alt = zeroBased ? safe : safe - 1;
+    if (alt >= 0 && alt != exact) {
+      final altRows = await queryCh(alt);
+      if (altRows.isNotEmpty) {
+        _zeroBasedChapterByBook[bookNum] = !zeroBased;
+        return altRows;
       }
     }
-    if (pickNum == null && parsed.isNotEmpty) {
-      final target = t0;
-      pickNum = parsed.first;
-      var bestDist = (pickNum - target).abs();
-      for (final n in parsed.skip(1)) {
-        final d = (n - target).abs();
-        if (d < bestDist) {
-          bestDist = d;
-          pickNum = n;
-        }
-      }
-    }
-    if (pickNum == null) return [];
-    return db.rawQuery(
-        "SELECT * From verse WHERE book_num ='$bookNum' AND chapter_num = '$pickNum' ORDER BY verse_num");
+    return [];
   }
 
   List<int> _bookNumLoadCandidates(int storedBookNum) {
@@ -910,7 +922,11 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     if (rows.isEmpty) return true;
     final dbTitle = rows[0]['title']?.toString().trim() ?? '';
     if (dbTitle.isEmpty) return true;
-    return dbTitle.toLowerCase() == selectedTitle.toLowerCase();
+    if (dbTitle.toLowerCase() == selectedTitle.toLowerCase()) return true;
+    // Additive: same book_num is trusted for in-book chapter changes
+    // (titles may differ after Bible version switch: Matthew vs Mateus).
+    final selectedNum = int.tryParse(selectedBookNum.value.trim());
+    return selectedNum != null && selectedNum == bookNum;
   }
 
   Future<void> _applyBookMetadata(
@@ -949,24 +965,62 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
   bool _displayedContentMatchesUiChapter(int uiChapter) {
     if (selectedBookContent.isEmpty) return false;
     final safe = uiChapter <= 0 ? 1 : uiChapter;
-    final want = <num?>{safe - 1, safe};
-    return selectedBookContent.any((v) => want.contains(v.chapterNum));
+    final sample = selectedVersesContent.isNotEmpty
+        ? selectedVersesContent
+        : selectedBookContent;
+    final zeroBased = _versesLookZeroBased(sample);
+    final stored = _storedChapterNumForUi(safe, zeroBased: zeroBased);
+    return selectedBookContent.any((v) => v.chapterNum?.toInt() == stored);
+  }
+
+  /// Additive: skip/reload must also match book — chapter-only match keeps the
+  /// previous book's verses after a book switch when both are on chapter N.
+  bool _displayedContentMatchesSelectedBook() {
+    if (selectedBookContent.isEmpty) return false;
+    final selectedNum = int.tryParse(selectedBookNum.value.trim());
+    if (selectedNum == null) return true;
+    final contentBook = selectedBookContent.first.bookNum?.toInt();
+    return contentBook == null || contentBook == selectedNum;
+  }
+
+  /// Public for HomeScreen entry checks (From: Chapter / Mark as Read).
+  bool displayedContentMatchesSelection() {
+    final uiChapter = int.tryParse(selectedChapter.value);
+    if (uiChapter == null || uiChapter <= 0) return false;
+    return _displayedContentMatchesSelectedBook() &&
+        _displayedContentMatchesUiChapter(uiChapter);
   }
 
   bool _canSkipChapterReloadSync() {
     if (selectedBookContent.isEmpty || isFetchContent.value) return false;
     final uiChapter = int.tryParse(selectedChapter.value);
     if (uiChapter == null || uiChapter <= 0) return false;
-    return _displayedContentMatchesUiChapter(uiChapter);
+    return _displayedContentMatchesSelectedBook() &&
+        _displayedContentMatchesUiChapter(uiChapter);
   }
 
   bool _versesCacheMatchesBook(int bookNum) {
     if (selectedVersesContent.isEmpty) return false;
     final cachedBook = selectedVersesContent.first.bookNum;
     if (cachedBook == null) return false;
-    return cachedBook == bookNum ||
-        cachedBook == bookNum - 1 ||
-        cachedBook == bookNum + 1;
+    // Exact book only — ±1 allowed wrong-book chapter reuse after switching books.
+    return cachedBook == bookNum;
+  }
+
+  /// Additive: cancel in-flight chapter loads (e.g. didPopNext sync) and reload
+  /// the current book + chapter from DB. Does not change selection algorithms.
+  Future<void> forceReloadSelectedChapter() async {
+    _chapterLoadGeneration++;
+    // Drop possibly-poisoned 0/1-based chapter cache so Next Chapter re-detects.
+    final bookNum = int.tryParse(selectedBookNum.value.trim());
+    if (bookNum != null) {
+      _zeroBasedChapterByBook.remove(bookNum);
+    }
+    selectedBookContent.clear();
+    selectedVersesContent.clear();
+    isFetchContent.value = true;
+    loadTextToSpeech.value = true;
+    await getSelectedChapterAndBook();
   }
 
   List<VerseBookContentModel> _filterChapterFromVerses(
@@ -975,15 +1029,10 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
   ) {
     if (verses.isEmpty) return [];
     final safe = uiChapter <= 0 ? 1 : uiChapter;
-    final want = <num?>{safe - 1, safe};
-    var list = verses.where((v) => want.contains(v.chapterNum)).toList();
-    if (list.isEmpty) {
-      for (final ch in [safe - 2, safe + 1, 0, 1, 2]) {
-        if (ch < 0) continue;
-        list = verses.where((v) => (v.chapterNum ?? -999) == ch).toList();
-        if (list.isNotEmpty) break;
-      }
-    }
+    final zeroBased = _versesLookZeroBased(verses);
+    final stored = _storedChapterNumForUi(safe, zeroBased: zeroBased);
+    final list =
+        verses.where((v) => v.chapterNum?.toInt() == stored).toList();
     if (list.isEmpty) return [];
     return filterContent(list.toSet().toList());
   }
@@ -1251,6 +1300,7 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     if (selectedBookContent.isNotEmpty &&
         _bookIdMatches(selectedBookNum.value, storedBookNum) &&
         targetChapter == (int.tryParse(selectedChapter.value) ?? 1) &&
+        _displayedContentMatchesSelectedBook() &&
         _displayedContentMatchesUiChapter(targetChapter)) {
       return;
     }

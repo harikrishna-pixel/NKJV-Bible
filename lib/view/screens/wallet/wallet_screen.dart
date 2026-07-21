@@ -20,6 +20,7 @@ import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:biblebookapp/utils/internet_speed_checker.dart';
+import 'package:flutter_easyloading/flutter_easyloading.dart';
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
@@ -411,6 +412,7 @@ class _WalletScreenState extends State<WalletScreen> {
       timer.cancel();
     }
     _purchaseTimeouts.clear();
+    EasyLoading.dismiss();
     super.dispose();
   }
 
@@ -798,11 +800,18 @@ class _WalletScreenState extends State<WalletScreen> {
       final productId = purchaseDetails.productID;
 
       if (purchaseDetails.status == PurchaseStatus.purchased) {
-        await _grantCreditsForPurchase(purchaseDetails);
+        // Additive UI only: show loader during post-payment processing delay
+        // before the success toast (no purchase/credit logic changes).
+        EasyLoading.show(status: 'Please wait...');
+        try {
+          await _grantCreditsForPurchase(purchaseDetails);
 
-        // Complete the purchase (important for consumables)
-        if (purchaseDetails.pendingCompletePurchase) {
-          await _inAppPurchase.completePurchase(purchaseDetails);
+          // Complete the purchase (important for consumables)
+          if (purchaseDetails.pendingCompletePurchase) {
+            await _inAppPurchase.completePurchase(purchaseDetails);
+          }
+        } finally {
+          await EasyLoading.dismiss();
         }
 
         if (mounted && _loadingProductId == productId) {
@@ -815,6 +824,7 @@ class _WalletScreenState extends State<WalletScreen> {
           _purchaseTimeouts.remove(productId);
         }
       } else if (purchaseDetails.status == PurchaseStatus.error) {
+        await EasyLoading.dismiss();
         if (mounted && _loadingProductId == productId) {
           setState(() {
             _loadingProductId = null; // Clear loading state on error
@@ -827,10 +837,16 @@ class _WalletScreenState extends State<WalletScreen> {
         Constants.showToast('Purchase failed. Please try again.');
       } else if (purchaseDetails.status == PurchaseStatus.pending) {
         // Purchase is pending, keep loading state
+        EasyLoading.show(status: 'Please wait...');
         debugPrint('Purchase pending...');
       } else if (purchaseDetails.status == PurchaseStatus.restored) {
         // Some stores report "already owned" as restored; grant credits once and clear loading.
-        await _grantCreditsForPurchase(purchaseDetails);
+        EasyLoading.show(status: 'Please wait...');
+        try {
+          await _grantCreditsForPurchase(purchaseDetails);
+        } finally {
+          await EasyLoading.dismiss();
+        }
         if (mounted && _loadingProductId == productId) {
           setState(() {
             _loadingProductId = null;
@@ -842,6 +858,7 @@ class _WalletScreenState extends State<WalletScreen> {
         }
       } else {
         // Handle any other status or cancellation - clear loading state
+        await EasyLoading.dismiss();
         if (mounted && _loadingProductId == productId) {
           setState(() {
             _loadingProductId = null;
@@ -875,6 +892,7 @@ class _WalletScreenState extends State<WalletScreen> {
     // This handles the case where user cancels and no purchase update is sent
     _purchaseTimeouts[productId] = Timer(const Duration(seconds: 10), () {
       if (mounted && _loadingProductId == productId) {
+        EasyLoading.dismiss();
         setState(() {
           _loadingProductId = null; // Clear loading state after timeout
           _selectedProductId = null; // Clear selected state
@@ -898,6 +916,7 @@ class _WalletScreenState extends State<WalletScreen> {
     } catch (e) {
       _purchaseTimeouts[productId]?.cancel();
       _purchaseTimeouts.remove(productId);
+      await EasyLoading.dismiss();
       if (mounted) {
         setState(() {
           _loadingProductId = null; // Clear loading state on error

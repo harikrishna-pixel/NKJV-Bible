@@ -46,6 +46,47 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
     super.initState();
     _loadRotatingMessage();
     _loadReadingPercentage();
+    _syncBookMetaFromDb();
+  }
+
+  /// Additive: after a book switch, MarkAsRead may still hold the previous
+  /// book's chapter_count — refresh from the active book row in prefs.
+  Future<void> _syncBookMetaFromDb() async {
+    try {
+      final bookNumStr =
+          await SharPreferences.getString(SharPreferences.selectedBookNum) ??
+              '0';
+      final bookNum = int.tryParse(bookNumStr) ?? 0;
+      final db = await DBHelper().db;
+      if (db == null) return;
+      final rows = await db.rawQuery(
+        'SELECT title, chapter_count FROM book WHERE book_num = ? LIMIT 1',
+        [bookNum],
+      );
+      if (rows.isEmpty || !mounted) return;
+      final count = rows[0]['chapter_count']?.toString();
+      final title = rows[0]['title']?.toString().trim() ?? '';
+      setState(() {
+        if (count != null && count.isNotEmpty) {
+          widget.SelectedBookChapterCount = count;
+        }
+        if (title.isNotEmpty) {
+          widget.RededBookName = title;
+        }
+      });
+      if (Get.isRegistered<DashBoardController>()) {
+        final c = Get.find<DashBoardController>();
+        c.selectedBookNum.value = bookNum.toString();
+        if (count != null && count.isNotEmpty) {
+          c.selectedBookChapterCount.value = count;
+        }
+        if (title.isNotEmpty) {
+          c.selectedBook.value = title;
+        }
+      }
+    } catch (e) {
+      debugPrint('MarkAsRead sync book meta: $e');
+    }
   }
 
   Future<void> _loadRotatingMessage() async {
@@ -156,11 +197,77 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
   }
 
   Future<void> _loadNextChapterOnReader(DashBoardController controller) async {
-    // Replace stale verses so Home does not keep showing the chapter just read.
-    controller.selectedBookContent.clear();
-    await controller.getSelectedChapterAndBook();
+    // Prefer prefs book_num (source of truth after BookList) over possibly stale
+    // controller.selectedBookNum from a previous book.
+    try {
+      final db = await DBHelper().db;
+      if (db != null) {
+        final bookNumStr =
+            await SharPreferences.getString(SharPreferences.selectedBookNum) ??
+                controller.selectedBookNum.value;
+        final bookNum = int.tryParse(bookNumStr) ?? 0;
+        controller.selectedBookNum.value = bookNum.toString();
+        final rows = await db.rawQuery(
+          'SELECT id, title, chapter_count, read_per FROM book WHERE book_num = ? LIMIT 1',
+          [bookNum],
+        );
+        if (rows.isNotEmpty) {
+          final title = rows[0]['title']?.toString().trim() ?? '';
+          if (title.isNotEmpty) {
+            controller.selectedBook.value = title;
+            await SharPreferences.setString(
+                SharPreferences.selectedBook, title);
+          }
+          if (rows[0]['id'] != null) {
+            controller.selectedBookId.value = rows[0]['id'].toString();
+          }
+          if (rows[0]['chapter_count'] != null) {
+            controller.selectedBookChapterCount.value =
+                rows[0]['chapter_count'].toString();
+          }
+          if (rows[0]['read_per'] != null) {
+            controller.bookReadPer.value = rows[0]['read_per'].toString();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('sync book before next chapter: $e');
+    }
+    await controller.forceReloadSelectedChapter();
     controller.isFetchContent.value = false;
     controller.loadTextToSpeech.value = false;
+  }
+
+  /// Additive: same path as chapter picker — open reader on current prefs chapter.
+  Future<void> _openReaderOnCurrentChapter({
+    required String bookNameHint,
+  }) async {
+    await SharPreferences.setString('OpenAd', '1');
+    // Additive: load the target chapter on the shared controller before replacing
+    // routes so Home cannot briefly keep / skip-reload the previous chapter.
+    if (Get.isRegistered<DashBoardController>()) {
+      try {
+        final c = Get.find<DashBoardController>();
+        await c.forceReloadSelectedChapter();
+        c.isFetchContent.value = false;
+        c.loadTextToSpeech.value = false;
+      } catch (e) {
+        debugPrint('open reader forceReload: $e');
+      }
+    }
+    Get.offAll(
+      () => HomeScreen(
+        From: "Chapter",
+        selectedVerseNumForRead: "",
+        selectedBookForRead: "",
+        selectedChapterForRead: "",
+        selectedBookNameForRead: bookNameHint,
+        selectedVerseForRead: "",
+      ),
+      transition: Transition.fadeIn,
+      duration: const Duration(milliseconds: 280),
+      opaque: true,
+    );
   }
 
   Widget _markAsReadSparkle({double size = 12}) {
@@ -618,8 +725,9 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                     if (int.parse(widget.ReadedChapter) + 1 <=
                         int.parse(
                             "${int.parse(widget.SelectedBookChapterCount)}")) {
-                      // Next Chapter — pop Mark-as-Read before loading new verses so
-                      // the reader underneath does not bleed through this screen.
+                      // Next Chapter — write next chapter, then open reader the same
+                      // way ChapterList does (From: "Chapter") so a prior book cannot
+                      // keep the old chapter on screen.
                       final nextChapter = int.parse(widget.ReadedChapter) + 1;
                       final nextChapterStr = nextChapter.toString();
                       await SharPreferences.setString(
@@ -632,21 +740,53 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                         debugPrint(
                             'DashBoardController not available for next chapter: $e');
                       }
-                      if (!context.mounted) return;
-                      try {
-                        await _popToReaderAfterChapterChange(controller);
-                      } catch (_) {
-                        if (Navigator.of(context).canPop()) {
-                          await Navigator.of(context).maybePop();
-                        }
-                      }
                       if (controller != null) {
                         controller.selectedChapter.value = nextChapterStr;
                         controller.selectChapterChange.value = nextChapter;
                         controller.selectedChapterForRead.value =
                             nextChapterStr;
-                        await _loadNextChapterOnReader(controller);
+                        // Refresh chapter count from the active book (widget may
+                        // still hold the previous book's count after a book switch).
+                        try {
+                          final bookNumStr = await SharPreferences.getString(
+                                  SharPreferences.selectedBookNum) ??
+                              controller.selectedBookNum.value;
+                          final bookNum = int.tryParse(bookNumStr) ?? 0;
+                          controller.selectedBookNum.value = bookNum.toString();
+                          final db = await DBHelper().db;
+                          if (db != null) {
+                            final rows = await db.rawQuery(
+                              'SELECT title, chapter_count FROM book WHERE book_num = ? LIMIT 1',
+                              [bookNum],
+                            );
+                            if (rows.isNotEmpty) {
+                              final title =
+                                  rows[0]['title']?.toString().trim() ?? '';
+                              if (title.isNotEmpty) {
+                                controller.selectedBook.value = title;
+                                await SharPreferences.setString(
+                                    SharPreferences.selectedBook, title);
+                              }
+                              if (rows[0]['chapter_count'] != null) {
+                                controller.selectedBookChapterCount.value =
+                                    rows[0]['chapter_count'].toString();
+                              }
+                            }
+                          }
+                        } catch (e) {
+                          debugPrint('next chapter book sync: $e');
+                        }
+                        controller.selectedBookContent.clear();
+                        controller.selectedVersesContent.clear();
                       }
+                      if (!context.mounted) {
+                        _isNavigating = false;
+                        return;
+                      }
+                      await _openReaderOnCurrentChapter(
+                        bookNameHint: controller?.selectedBook.value ??
+                            widget.RededBookName,
+                      );
                       _isNavigating = false;
                     } else {
                       // Next Book - Get the next book and navigate to first chapter
@@ -689,26 +829,6 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                             } catch (e) {
                               debugPrint("DashBoardController not available: $e");
                             }
-                            try {
-                              await _popToReaderAfterChapterChange(controller);
-                            } catch (_) {
-                              if (Navigator.of(context).canPop()) {
-                                Navigator.of(context).pop();
-                              } else {
-                                Get.offAll(
-                                  () => HomeScreen(
-                                      From: "Chapter",
-                                      selectedVerseNumForRead: "",
-                                      selectedBookForRead: "",
-                                      selectedChapterForRead: "1",
-                                      selectedBookNameForRead: nextBookName,
-                                      selectedVerseForRead: ""),
-                                  transition: Transition.fadeIn,
-                                  duration: const Duration(milliseconds: 280),
-                                  opaque: true,
-                                );
-                              }
-                            }
                             if (controller != null) {
                               controller.selectedBook.value = nextBookName;
                               controller.selectedBookNum.value =
@@ -723,10 +843,15 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                                   nextBookNumValue.toString();
                               controller.selectedChapterForRead.value = "1";
                               controller.selectedBookContent.clear();
-                              await controller.getBookContentForRead();
-                              controller.isFetchContent.value = false;
-                              controller.loadTextToSpeech.value = false;
+                              controller.selectedVersesContent.clear();
                             }
+                            if (!context.mounted) {
+                              _isNavigating = false;
+                              return;
+                            }
+                            await _openReaderOnCurrentChapter(
+                              bookNameHint: nextBookName,
+                            );
                             _isNavigating = false;
                           } else {
                             // No next book found

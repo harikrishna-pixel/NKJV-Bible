@@ -834,6 +834,46 @@ class floatingButtonState extends State<floatingButton>
     closeaudio();
   }
 
+  /// Additive: pause chapter audio while a fullscreen ad is showing.
+  /// Does not stop/seek; only pause so we can resume after the ad.
+  bool _audioPausedForAd = false;
+
+  Future<void> pausePlaybackForAd() async {
+    _audioPausedForAd = false;
+    if (!mounted) return;
+    try {
+      final playing = isAudioPlaying ||
+          audioPlayer.state == PlayerState.playing;
+      if (!playing) return;
+      await audioPlayer.pause();
+      _audioPausedForAd = true;
+      if (mounted) {
+        setState(() {
+          isAudioPlaying = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('pausePlaybackForAd: $e');
+    }
+  }
+
+  /// Additive: resume only if we paused for an ad (no-op otherwise).
+  Future<void> resumePlaybackAfterAd() async {
+    if (!_audioPausedForAd) return;
+    _audioPausedForAd = false;
+    if (!mounted) return;
+    try {
+      await audioPlayer.resume();
+      if (mounted) {
+        setState(() {
+          isAudioPlaying = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('resumePlaybackAfterAd: $e');
+    }
+  }
+
   closeaudio() async {
     debugPrint(" audio  stopped ");
 

@@ -215,6 +215,16 @@ class PaywallPreloadService {
   /// Whether onboarding should show the IAP paywall (internet + product data).
   static Future<bool> canShowOnboardingPaywall() async {
     try {
+      // Additive: honor dashboard `is_subscription_enabled` (saved as
+      // isSubscriptionEnabled). When disabled, skip onboarding paywall.
+      final iapEnabled =
+          await SharPreferences.getBoolean('isSubscriptionEnabled') ?? true;
+      if (!iapEnabled) {
+        debugPrint(
+            'PaywallPreloadService: Skip onboarding paywall — dashboard IAP disabled');
+        return false;
+      }
+
       final hasInternet = await InternetConnection().hasInternetAccess;
       if (!hasInternet) {
         debugPrint(

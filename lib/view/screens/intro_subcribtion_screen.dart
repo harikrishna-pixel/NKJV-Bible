@@ -68,14 +68,32 @@ class SubscriptionScreen extends StatefulWidget {
   static const Transition paywallRouteTransition = Transition.cupertino;
   static const Duration paywallRouteDuration = Duration(milliseconds: 350);
 
+  /// Additive: dashboard IAP flag (`is_subscription_enabled` → prefs/controller).
+  /// Defaults to enabled when unset so first-launch before API is unchanged.
+  static Future<bool> isDashboardIapEnabled() async {
+    bool? fromController;
+    if (Get.isRegistered<DashBoardController>()) {
+      fromController = Get.find<DashBoardController>().isSubscriptionEnabled;
+    }
+    final fromPrefs =
+        await SharPreferences.getBoolean('isSubscriptionEnabled');
+    if (fromController == false || fromPrefs == false) return false;
+    return true;
+  }
+
   /// Opens paywall on top of the current screen with a smooth slide transition.
-  static Future<T?>? openPaywallStacked<T>({
+  static Future<T?> openPaywallStacked<T>({
     required String sixMonthPlan,
     required String oneYearPlan,
     required String lifeTimePlan,
     required String checkad,
     bool fromHomeExitOffer = false,
-  }) {
+  }) async {
+    if (!await isDashboardIapEnabled()) {
+      debugPrint(
+          'SubscriptionScreen: dashboard IAP disabled — skip openPaywallStacked');
+      return null;
+    }
     return Get.to<T>(
       () => SubscriptionScreen(
         sixMonthPlan: sixMonthPlan,
@@ -91,6 +109,11 @@ class SubscriptionScreen extends StatefulWidget {
 
   /// Navigate to paywall from home (direct, no exit offer).
   static Future<void> navigateToPaywallFromHome(BuildContext context) async {
+    if (!await isDashboardIapEnabled()) {
+      debugPrint(
+          'SubscriptionScreen: dashboard IAP disabled — skip navigateToPaywallFromHome');
+      return;
+    }
     final sixMonthPlan = AppApiConstant.resolveSubscriptionProductId(
       await SharPreferences.getString('sixMonthPlan'),
       BibleInfo.sixMonthPlanid,
@@ -103,7 +126,7 @@ class SubscriptionScreen extends StatefulWidget {
       await SharPreferences.getString('lifeTimePlan'),
       BibleInfo.lifeTimePlanid,
     );
-    openPaywallStacked(
+    await openPaywallStacked(
       sixMonthPlan: sixMonthPlan,
       oneYearPlan: oneYearPlan,
       lifeTimePlan: lifeTimePlan,
@@ -139,6 +162,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   bool _autoPurchaseTriggered = false;
   Set<String> _lastQueriedProductIds = {};
   Set<String> _lastStoreNotFoundIds = {};
+  /// Additive: highest restore tier applied in the current Restore session
+  /// (3=lifetime, 2=1Y/2Y, 1=6M). Prevents last-write-wins downgrades.
+  int _highestRestoredTierApplied = 0;
 
   /// Bundle prefix shared by 6M/1Y plans (e.g. com.balaklrapps.bibliasagradacatolica).
   String get _planBundlePrefix {
@@ -208,6 +234,61 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       productId == _resolvedLifeTimePlanId ||
       productId == widget.lifeTimePlan ||
       (productId.contains('lifetime') && _isPaywallProductForThisApp(productId));
+
+  /// Additive: restore plan rank so a later 6M restore cannot overwrite Lifetime/1Y.
+  /// Higher = better. Unknown products = 0 (do not block existing branches).
+  int _restoreProductTier(String productId) {
+    final id = productId.toString();
+    final isExitOfferLifetime =
+        id.toLowerCase().contains('lifetime.exitoffer') ||
+            id.toLowerCase().contains('exitoffer');
+    if (_isLifetimeProductId(id) || isExitOfferLifetime) return 3;
+    if (_isTwoYearProductId(id) || _isOneYearProductId(id)) return 2;
+    if (_isSixMonthProductId(id)) return 1;
+    return 0;
+  }
+
+  int _storedSubscriptionPlanTier(String? plan) {
+    switch ((plan ?? '').toLowerCase()) {
+      case 'platinum':
+        return 3;
+      case 'gold':
+        return 2;
+      case 'silver':
+        return 1;
+      default:
+        return 0;
+    }
+  }
+
+  /// Additive: true when applying [productId] would downgrade an already-restored higher plan.
+  Future<bool> _shouldSkipRestoreDowngrade(
+    String productId,
+    DownloadProvider? downloadProvider,
+  ) async {
+    final incomingTier = _restoreProductTier(productId);
+    if (incomingTier <= 0) return false;
+    int currentTier = _highestRestoredTierApplied;
+    if (downloadProvider != null) {
+      final currentPlan = await downloadProvider.getSubscriptionPlan();
+      final storedTier = _storedSubscriptionPlanTier(currentPlan);
+      if (storedTier > currentTier) currentTier = storedTier;
+    }
+    if (incomingTier < currentTier) {
+      debugPrint(
+        'Restore: skip downgrade $productId (tier $incomingTier) '
+        '< existing tier $currentTier',
+      );
+      return true;
+    }
+    return false;
+  }
+
+  void _claimRestoreTier(int incomingTier) {
+    if (incomingTier > _highestRestoredTierApplied) {
+      _highestRestoredTierApplied = incomingTier;
+    }
+  }
 
   void _sanitizeStalePaywallProducts() {
     final removed = <String>[];
@@ -436,6 +517,58 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     return DateTime(year, month, day);
   }
 
+  /// Additive: 6-month ad-free duration (aligned with 1Y fixed-days style).
+  /// Old restore transaction dates must not produce a past/near-zero duration.
+  Duration _resolveSixMonthAdFreeDuration({DateTime? anchorDate}) {
+    final computedExpiry = addSixMonths(customDate: anchorDate ?? DateTime.now());
+    final diff = computedExpiry.difference(DateTime.now());
+    // Keep existing calendar math when it still yields a real future window.
+    if (!diff.isNegative && diff.inHours >= 24) {
+      return diff;
+    }
+    debugPrint(
+      'Six month: computed duration past/too short ($diff) — '
+      'using fixed 183 days',
+    );
+    return const Duration(days: 183);
+  }
+
+  /// Additive: do not replace a longer existing premium expiry with a shorter one
+  /// (e.g. fresh 6M purchase overwritten by an older restored 6M transaction).
+  Future<bool> _shouldSkipShorterSixMonthExpiry(Duration incoming) async {
+    final existing = await SharPreferences.getString(
+      SharPreferences.isRewardAdViewTime,
+    );
+    if (existing == null || existing.isEmpty) return false;
+    try {
+      final existingExpiry = DateTime.parse(existing);
+      final incomingExpiry = DateTime.now().add(incoming);
+      if (incomingExpiry.isBefore(existingExpiry)) {
+        debugPrint(
+          'Six month: skip shorter expiry overwrite '
+          '($incomingExpiry < $existingExpiry)',
+        );
+        return true;
+      }
+    } catch (e) {
+      debugPrint('Six month: expiry compare parse error: $e');
+    }
+    return false;
+  }
+
+  /// Additive: apply 6-month premium unlock without clobbering a better expiry.
+  Future<void> _applySixMonthPremium(
+    DashBoardController controller, {
+    DateTime? anchorDate,
+  }) async {
+    final diff = _resolveSixMonthAdFreeDuration(anchorDate: anchorDate);
+    if (await _shouldSkipShorterSixMonthExpiry(diff)) {
+      await controller.refreshPremiumStatusFromPrefs();
+      return;
+    }
+    await controller.disableAd(diff);
+  }
+
   /// Check if user has an active subscription for the given product ID
   Future<bool> _hasActiveSubscriptionForPlan(String productId) async {
     try {
@@ -552,6 +685,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Future<void> _buyProduct(ProductDetails prod) async {
+    // Additive: block purchase when dashboard IAP is disabled.
+    if (!await SubscriptionScreen.isDashboardIapEnabled()) {
+      debugPrint(
+          'SubscriptionScreen: dashboard IAP disabled — skip _buyProduct');
+      return;
+    }
+
     // Check connectivity FIRST before showing loader
     final hasInternet = await InternetConnection().hasInternetAccess;
     if (!hasInternet) {
@@ -1411,6 +1551,31 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       String productId, String date, DashBoardController controller,
       {BuildContext? context}) async {
     await SharPreferences.setString('OpenAd', '1');
+    final dataEarly = await SharPreferences.getBoolean('restorepurches');
+    final startFlagEarly = await SharPreferences.getBoolean('startpurches');
+
+    DownloadProvider? downloadProviderEarly;
+    if (context != null) {
+      downloadProviderEarly =
+          Provider.of<DownloadProvider>(context, listen: false);
+    } else {
+      final getContext = Get.context;
+      if (getContext != null) {
+        downloadProviderEarly =
+            Provider.of<DownloadProvider>(getContext, listen: false);
+      }
+    }
+
+    // Additive: claim/skip before the existing delay so parallel 6M restores
+    // cannot race past a Lifetime/1Y restore.
+    if (dataEarly == true || startFlagEarly == true) {
+      if (await _shouldSkipRestoreDowngrade(productId, downloadProviderEarly)) {
+        EasyLoading.dismiss();
+        return;
+      }
+      _claimRestoreTier(_restoreProductTier(productId));
+    }
+
     final dateTime = DateTime.tryParse(date) ?? DateTime.now();
     await Future.delayed(Duration(seconds: 2));
     final data = await SharPreferences.getBoolean('restorepurches');
@@ -1427,20 +1592,34 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               productId.toString().toLowerCase().contains('exitoffer');
 
       // Get DownloadProvider to set subscription plan
-      DownloadProvider? downloadProvider;
-      if (context != null) {
-        downloadProvider =
-            Provider.of<DownloadProvider>(context, listen: false);
-      } else {
-        // Try to get from Get.context as fallback
-        final getContext = Get.context;
-        if (getContext != null) {
+      DownloadProvider? downloadProvider = downloadProviderEarly;
+      if (downloadProvider == null) {
+        if (context != null) {
           downloadProvider =
-              Provider.of<DownloadProvider>(getContext, listen: false);
+              Provider.of<DownloadProvider>(context, listen: false);
+        } else {
+          // Try to get from Get.context as fallback
+          final getContext = Get.context;
+          if (getContext != null) {
+            downloadProvider =
+                Provider.of<DownloadProvider>(getContext, listen: false);
+          }
         }
       }
 
-      if (productId == widget.lifeTimePlan || isExitOfferLifetime) {
+      // Additive: re-check after delay (higher tier may have claimed meanwhile).
+      if (await _shouldSkipRestoreDowngrade(productId, downloadProvider)) {
+        EasyLoading.dismiss();
+        return;
+      }
+      _claimRestoreTier(_restoreProductTier(productId));
+
+      // Additive: match Lifetime the same way as 1Y/6M helpers (not exact ID only).
+      if (_isLifetimeProductId(productId) || isExitOfferLifetime) {
+        if (await _shouldSkipRestoreDowngrade(productId, downloadProvider)) {
+          EasyLoading.dismiss();
+          return;
+        }
         await controller.disableAd(const Duration(days: 3650012345));
         // Set subscription plan to platinum for lifetime plan
         if (downloadProvider != null) {
@@ -1462,6 +1641,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         );
         return;
       } else if (_isOneYearProductId(productId)) {
+        // Additive: final guard before mutating expiry/plan.
+        if (await _shouldSkipRestoreDowngrade(productId, downloadProvider)) {
+          EasyLoading.dismiss();
+          return;
+        }
         final dur = DateTime(dateTime.year + 1, dateTime.month, dateTime.day);
         final diff = dur.difference(DateTime.now());
         await controller.disableAd(diff);
@@ -1481,6 +1665,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         );
         return;
       } else if (_isTwoYearProductId(productId)) {
+        if (await _shouldSkipRestoreDowngrade(productId, downloadProvider)) {
+          EasyLoading.dismiss();
+          return;
+        }
         final dur = DateTime(dateTime.year + 2, dateTime.month, dateTime.day);
         final diff = dur.difference(DateTime.now());
         await controller.disableAd(diff);
@@ -1497,9 +1685,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         );
         return;
       } else if (_isSixMonthProductId(productId)) {
-        final dur = addSixMonths(customDate: dateTime);
-        final diff = dur.difference(DateTime.now());
-        await controller.disableAd(diff);
+        if (await _shouldSkipRestoreDowngrade(productId, downloadProvider)) {
+          EasyLoading.dismiss();
+          return;
+        }
+        await _applySixMonthPremium(controller, anchorDate: dateTime);
         // Set subscription plan to silver for six month plan
         if (downloadProvider != null) {
           await downloadProvider.setSubscriptionPlan('silver');
@@ -1590,13 +1780,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 await purchaseSubmit(
                     receiptData:
                         '${purchaseDetails.purchaseID}-productId:${purchaseDetails.productID}-date:${DateTime.now()}');
-                final todayDate = DateTime.now();
                 await SharPreferences.setBoolean("downloadreward", true);
                 await Future.delayed(Duration(seconds: 1));
                 if (_isSixMonthProductId(purchaseDetails.productID)) {
-                  final expiryDate = addSixMonths();
-                  final diff = expiryDate.difference(todayDate);
-                  await controller.disableAd(diff);
+                  await _applySixMonthPremium(controller);
                   DownloadProvider? downloadProvider = _myProvider;
                   downloadProvider ??= context.mounted
                       ? Provider.of<DownloadProvider>(context, listen: false)
@@ -2262,6 +2449,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   @override
   void initState() {
     super.initState();
+    // Additive: if opened via a path that skipped openPaywallStacked,
+    // leave immediately when dashboard IAP is disabled.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_leaveIfDashboardIapDisabled());
+    });
     if (!widget.invisiblePurchaseHost) {
       // Track Paywall Screen event
       AnalyticsService.trackPaywallScreen();
@@ -2296,6 +2488,28 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     //   });
     // }
     // _loadRewardedAd();
+  }
+
+  /// Additive: close / skip paywall when dashboard IAP flag is off.
+  Future<void> _leaveIfDashboardIapDisabled() async {
+    if (!mounted) return;
+    if (await SubscriptionScreen.isDashboardIapEnabled()) return;
+    debugPrint(
+        'SubscriptionScreen: dashboard IAP disabled — leaving paywall');
+    try {
+      EasyLoading.dismiss();
+    } catch (_) {}
+    if (!mounted) return;
+    if (widget.checkad == 'onboard') {
+      await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
+      return;
+    }
+    if (Get.key.currentState?.canPop() == true ||
+        (mounted && Navigator.of(context).canPop())) {
+      Get.back();
+      return;
+    }
+    await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
   }
 
   /// Check and show exit offer when accessed from home screen
@@ -2767,6 +2981,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         onPressed: () async {
                           await SharPreferences.setBoolean(
                               'restorepurches', true);
+                          // Additive: new Restore tap — allow fresh highest-tier selection.
+                          _highestRestoredTierApplied = 0;
                           await _restorePurchases(controller);
                         },
                         child: const Text(
