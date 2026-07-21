@@ -172,7 +172,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   List<String> get _expectedPaywallPlanIds => [
         _resolvedSixMonthPlanId,
         _resolvedOneYearPlanId,
-        _twoYearPlanId,
+        _resolvedLifeTimePlanId,
       ];
 
   Set<String> get _paywallQueryProductIds =>
@@ -180,6 +180,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         sixMonthPlan: _resolvedSixMonthPlanId,
         oneYearPlan: _resolvedOneYearPlanId,
         twoYearPlan: _twoYearPlanId,
+        lifeTimePlan: _resolvedLifeTimePlanId,
       );
 
   bool _isPaywallProductForThisApp(String productId) =>
@@ -202,6 +203,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       productId == _twoYearPlanId ||
       productId == '$_planBundlePrefix.twoyearadfree' ||
       (productId.contains('twoyear') && _isPaywallProductForThisApp(productId));
+
+  bool _isLifetimeProductId(String productId) =>
+      productId == _resolvedLifeTimePlanId ||
+      productId == widget.lifeTimePlan ||
+      (productId.contains('lifetime') && _isPaywallProductForThisApp(productId));
 
   void _sanitizeStalePaywallProducts() {
     final removed = <String>[];
@@ -234,8 +240,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   int _planSlotForProductId(String productId) {
     if (_isSixMonthProductId(productId)) return 0;
     if (_isOneYearProductId(productId)) return 1;
-    if (_isTwoYearProductId(productId)) return 2;
-    return 3;
+    // Slot 2 is Lifetime on main paywall (matches initialSelectedPlanIndex docs).
+    if (_isLifetimeProductId(productId)) return 2;
+    if (_isTwoYearProductId(productId)) return 3;
+    return 4;
   }
 
   int _indexForPlanSlot(int slot) {
@@ -268,12 +276,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   void _sortProducts() {
     _products.sort((a, b) {
-      // Define order: 6 months (0), 1 year (1), 2 years (2), lifetime (3)
+      // Define order: 6 months (0), 1 year (1), lifetime (2), 2 years (3)
       int getOrder(String id) {
         if (_isSixMonthProductId(id)) return 0;
         if (_isOneYearProductId(id)) return 1;
-        if (_isTwoYearProductId(id)) return 2;
-        return 3;
+        if (_isLifetimeProductId(id)) return 2;
+        if (_isTwoYearProductId(id)) return 3;
+        return 4;
       }
 
       return getOrder(a.id).compareTo(getOrder(b.id));
@@ -1842,7 +1851,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     final preloadedHasAllSlots = preloadedProducts.isNotEmpty &&
         _cacheHasPaywallSlot(preloadedProducts.map((p) => p.id), 'sixmonth') &&
         _cacheHasPaywallSlot(preloadedProducts.map((p) => p.id), 'oneyear') &&
-        _cacheHasPaywallSlot(preloadedProducts.map((p) => p.id), 'twoyear');
+        (_cacheHasPaywallSlot(preloadedProducts.map((p) => p.id), 'lifetime') ||
+            _cacheHasPaywallSlot(preloadedProducts.map((p) => p.id), 'twoyear'));
 
     if (preloadedAvailability != null &&
         preloadedProducts.isNotEmpty &&
@@ -2028,7 +2038,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         final missingExpectedPlans =
             !_cacheHasPaywallSlot(cachedIds, 'sixmonth') ||
             !_cacheHasPaywallSlot(cachedIds, 'oneyear') ||
-            !_cacheHasPaywallSlot(cachedIds, 'twoyear');
+            (!_cacheHasPaywallSlot(cachedIds, 'lifetime') &&
+                !_cacheHasPaywallSlot(cachedIds, 'twoyear'));
 
         if (missingExpectedPlans) {
           debugPrint(
@@ -2107,9 +2118,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     ));
 
     fallbackProducts.add(ProductDetails(
-      id: _twoYearPlanId,
-      title: '2 Years Premium',
-      description: 'Get 2 years of premium access',
+      id: _resolvedLifeTimePlanId,
+      title: 'Lifetime Premium',
+      description: 'Get lifetime premium access',
       price: '\$24.99',
       rawPrice: 24.99,
       currencyCode: 'USD',
@@ -2120,11 +2131,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   void _applyPaywallProductDisplayFilter() {
-    final hadLifetime =
-        _products.any((product) => product.id == _resolvedLifeTimePlanId);
-    if (!hadLifetime) return;
-
-    _products.removeWhere((product) => product.id == _resolvedLifeTimePlanId);
+    final hasLifetime = _products.any((product) => _isLifetimeProductId(product.id));
+    if (hasLifetime) {
+      // Show Lifetime instead of 2-Year when Lifetime is available.
+      _products.removeWhere((product) => _isTwoYearProductId(product.id));
+    }
+    // If Lifetime is unavailable, keep 2-Year as the existing third-slot fallback.
     if (selectedindex >= _products.length) {
       selectedindex = _products.length >= 2 ? 1 : 0;
     }
@@ -2137,6 +2149,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         _products.any((product) => _isSixMonthProductId(product.id));
     final hasOneYear =
         _products.any((product) => _isOneYearProductId(product.id));
+    final hasLifetime =
+        _products.any((product) => _isLifetimeProductId(product.id));
     final hasTwoYear =
         _products.any((product) => _isTwoYearProductId(product.id));
     for (final fallback in _buildAllFallbackProducts()) {
@@ -2152,8 +2166,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         }
         continue;
       }
-      if (fallback.id.contains('twoyear')) {
-        if (!hasTwoYear) {
+      if (fallback.id.contains('lifetime')) {
+        if (!hasLifetime && !hasTwoYear) {
           _products.add(fallback);
         }
         continue;
@@ -3319,7 +3333,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     if (_isTwoYearProductId(product.id)) {
       return double.tryParse(BibleInfo.twoYearPlanDiscount);
     }
-    if (product.id == _resolvedLifeTimePlanId) {
+    if (_isLifetimeProductId(product.id)) {
       return double.tryParse(controller.lifeTimePlanValue ?? '');
     }
     return null;
@@ -3340,7 +3354,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     if (_isSixMonthProductId(_products[index].id)) return '6 Months';
     if (_isOneYearProductId(_products[index].id)) return '1 Year';
     if (_isTwoYearProductId(_products[index].id)) return '2 Years';
-    if (_products[index].id == _resolvedLifeTimePlanId) return 'Lifetime';
+    if (_isLifetimeProductId(_products[index].id)) return 'Lifetime';
     return _products[index].description;
   }
 
@@ -3354,7 +3368,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     if (_isTwoYearProductId(_products[index].id)) {
       return 'Long-term Spiritual Companion';
     }
-    if (_products[index].id == _resolvedLifeTimePlanId) {
+    if (_isLifetimeProductId(_products[index].id)) {
       return 'Long-term Spiritual Companion';
     }
     return '';
@@ -3370,7 +3384,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         label = "Get 500 Bonus credits with this plan";
       } else if (_isOneYearProductId(currentId)) {
         label = "Get 1,000 Bonus credits with this plan";
-      } else if (currentId == widget.lifeTimePlan) {
+      } else if (_isLifetimeProductId(currentId)) {
         label = "Get 5,000 Bonus credits with this plan";
       }
     }
@@ -3387,7 +3401,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         highlight = "500 Bonus credits";
       } else if (_isOneYearProductId(currentId)) {
         highlight = "1,000 Bonus credits";
-      } else if (currentId == widget.lifeTimePlan) {
+      } else if (_isLifetimeProductId(currentId)) {
         highlight = "5,000 Bonus credits";
       }
     }
@@ -3408,7 +3422,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       }
       return 'Best Value';
     }
-    if (_products[index].id == _resolvedLifeTimePlanId) {
+    if (_isLifetimeProductId(_products[index].id)) {
       return 'Best Value';
     }
     return null;
@@ -3421,7 +3435,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     if (_isTwoYearProductId(_products[index].id)) {
       return '💎 BEST VALUE';
     }
-    if (_products[index].id == _resolvedLifeTimePlanId) {
+    if (_isLifetimeProductId(_products[index].id)) {
       return '💎 BEST VALUE';
     }
     return badgeText ?? '';
@@ -3456,7 +3470,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     final isSixMonth = _isSixMonthProductId(_products[index].id);
     final isOneYear = _isOneYearProductId(_products[index].id);
     final isTwoYear = _isTwoYearProductId(_products[index].id);
-    final isLifetime = _products[index].id == _resolvedLifeTimePlanId;
+    final isLifetime = _isLifetimeProductId(_products[index].id);
     final isLongTerm = isTwoYear || isLifetime;
 
     final themedAccent = isOneYear

@@ -46,6 +46,30 @@ import flutter_local_notifications
       }
     }
 
+    // Streak Live Activity bridge (UI mirror only; no streak logic).
+    let streakLiveMessenger: FlutterBinaryMessenger? = {
+      if let controller = self.window?.rootViewController as? FlutterViewController {
+        return controller.binaryMessenger
+      }
+      return self.registrar(forPlugin: "com.biblebookapp.streak_live_activity")?.messenger()
+    }()
+    if let messenger = streakLiveMessenger {
+      let channel = FlutterMethodChannel(
+        name: "com.biblebookapp/streak_live_activity",
+        binaryMessenger: messenger
+      )
+      channel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
+        let args = call.arguments as? [String: Any]
+        if let value = StreakLiveActivityBridge.handle(call: call.method, args: args) {
+          result(value)
+        } else if call.method == "sync" || call.method == "end" {
+          result(true)
+        } else {
+          result(FlutterMethodNotImplemented)
+        }
+      }
+    }
+
     return result
   }
 }

@@ -161,18 +161,14 @@ flutter:
     - assets/paywall_icons/shield_icon.png
     - assets/gold-premium-icons/
     - assets/leave_rating/
+    - assets/social_links/
     - assets/splash_welcome_icons/
     - assets/streak_completed_icons/
-    - assets/home-widgets/light-home_1.png
-    - assets/home-widgets/light-home_2.png
-    - assets/home-widgets/light-home_3.png
-    - assets/home-widgets/light-home_4.png
-    - assets/home-widgets/light-home_5.png
-    - assets/home-widgets/Dark-home_1.png
-    - assets/home-widgets/Dark-home_2.png
-    - assets/home-widgets/Dark-home_3.png
-    - assets/home-widgets/Dark-home_4.png
-    - assets/home-widgets/Dark-home_5.png
+    - assets/home-widgets/widget Mockup 1.png
+    - assets/home-widgets/widget Mockup 2.png
+    - assets/home-widgets/widget Mockup 3.png
+    - assets/home-widgets/widget Mockup 4.png
+    - assets/home-widgets/widget Mockup 5.png
     - .env
 
   fonts:

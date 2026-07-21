@@ -117,6 +117,8 @@
 	<string>We use notifications to keep you informed of important updates.</string>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>Select 'Allow' to receive personalized service content and advertisement. If you select 'Ask App not to Track', you may see irrelevant content and advertisement.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>

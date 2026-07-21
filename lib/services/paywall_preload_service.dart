@@ -68,7 +68,11 @@ class PaywallPreloadService {
           }
         }
 
-        final dotIndex = sixMonthPlan.lastIndexOf('.');
+      final lifeTimePlan = AppApiConstant.resolveSubscriptionProductId(
+        await SharPreferences.getString('lifeTimePlan'),
+        BibleInfo.lifeTimePlanid,
+      );
+      final dotIndex = sixMonthPlan.lastIndexOf('.');
       final bundlePrefix = dotIndex > 0
           ? sixMonthPlan.substring(0, dotIndex)
           : BibleInfo.ios_Bundle_Id;
@@ -79,6 +83,7 @@ class PaywallPreloadService {
           sixMonthPlan: sixMonthPlan,
           oneYearPlan: oneYearPlan,
           twoYearPlan: twoYearPlanId,
+          lifeTimePlan: lifeTimePlan,
         );
         debugPrint('PaywallPreloadService: App bundle prefix: $bundlePrefix');
         debugPrint('PaywallPreloadService: Querying product details for: $ids');
@@ -105,12 +110,22 @@ class PaywallPreloadService {
               '$stale',
             );
           }
+          // Prefer Lifetime over 2-Year in preload display list when both exist.
+          final hasLifetime = _preloadedProducts.any(
+            (p) => p.id == lifeTimePlan || p.id.contains('lifetime'),
+          );
+          if (hasLifetime) {
+            _preloadedProducts.removeWhere(
+              (p) => p.id == twoYearPlanId || p.id.contains('twoyear'),
+            );
+          }
           _preloadedProducts.sort((a, b) {
             int order(String id) {
               if (id == sixMonthPlan || id.contains('sixmonth')) return 0;
               if (id == oneYearPlan || id.contains('oneyear')) return 1;
-              if (id == twoYearPlanId || id.contains('twoyear')) return 2;
-              return 3;
+              if (id == lifeTimePlan || id.contains('lifetime')) return 2;
+              if (id == twoYearPlanId || id.contains('twoyear')) return 3;
+              return 4;
             }
 
             return order(a.id).compareTo(order(b.id));
@@ -129,9 +144,11 @@ class PaywallPreloadService {
                   ? '6M'
                   : product.id.contains('oneyear')
                       ? '1Y'
-                      : product.id.contains('twoyear')
-                          ? '2Y'
-                          : '?';
+                      : product.id.contains('lifetime')
+                          ? 'LT'
+                          : product.id.contains('twoyear')
+                              ? '2Y'
+                              : '?';
               debugPrint(
                 '  preload[$i] slot=$slot | id=${product.id} | '
                 'price=${product.price} | rawPrice=${product.rawPrice} | '

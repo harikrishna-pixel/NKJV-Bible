@@ -2,6 +2,7 @@
 // Consecutive days = streak. Missing a day resets to 1.
 
 import 'package:biblebookapp/services/wallet_service.dart';
+import 'package:biblebookapp/streak/streak_live_activity.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 
 /// Status for each day in the weekly calendar (Sun=0 .. Sat=6).
@@ -30,7 +31,11 @@ class StreakService {
       }
     } catch (_) {}
 
-    if (lastStr == today) return; // already counted today
+    if (lastStr == today) {
+      // Already counted today — still refresh Live Activity UI mirror.
+      StreakLiveActivitySync.sync();
+      return;
+    }
 
     final now = DateTime.now();
     int newCount = 1;
@@ -56,6 +61,9 @@ class StreakService {
     if (newCount == 7) {
       await WalletService.addCredits(100);
     }
+
+    // UI mirror only — never affects streak calculation above.
+    StreakLiveActivitySync.sync();
   }
 
   /// Total distinct days the user completed a streak (never reset by weekly UI).

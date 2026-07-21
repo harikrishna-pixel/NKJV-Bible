@@ -9,6 +9,7 @@ import 'package:biblebookapp/streak_flow/leave_rating_screen.dart';
 import 'package:biblebookapp/streak_flow/mood_prayer_data.dart';
 import 'package:biblebookapp/streak_flow/streak_saved_storage.dart';
 import 'package:biblebookapp/streak/streak_service.dart';
+import 'package:biblebookapp/streak/streak_live_activity.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
@@ -1624,6 +1625,8 @@ Future<void> _storeStreakFlowStepsForDay(String dayKey, int steps) async {
     SharPreferences.streakFlowStepsByDay,
     jsonEncode(map),
   );
+  // UI mirror only — does not change step storage above.
+  StreakLiveActivitySync.sync(forceStart: true);
 }
 
 Future<String> _currentStreakFlowProgressDayKey() async {

@@ -62,11 +62,14 @@ class AppApiConstant {
     required String sixMonthPlan,
     required String oneYearPlan,
     required String twoYearPlan,
+    String? lifeTimePlan,
   }) {
     return {
       ...subscriptionProductIdQueryVariants(sixMonthPlan),
       ...subscriptionProductIdQueryVariants(oneYearPlan),
       ...subscriptionProductIdQueryVariants(twoYearPlan),
+      if (lifeTimePlan != null && lifeTimePlan.trim().isNotEmpty)
+        ...subscriptionProductIdQueryVariants(lifeTimePlan),
     };
   }
 

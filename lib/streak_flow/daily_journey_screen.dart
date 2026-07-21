@@ -8,6 +8,7 @@ import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/streak/streak_service.dart'
     show StreakService, WeekDayStatus;
+import 'package:biblebookapp/streak/streak_live_activity.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/images.dart';
@@ -149,6 +150,8 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
         _loaded = true;
       });
     }
+    // UI mirror only — does not change streak / journey state above.
+    StreakLiveActivitySync.sync(forceStart: true);
   }
 
   Future<void> _storeTodaySteps(int steps) async {

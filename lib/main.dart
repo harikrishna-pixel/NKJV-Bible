@@ -13,6 +13,7 @@ import 'package:biblebookapp/view/widget/adhelper.dart';
 import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
+import 'package:biblebookapp/streak/streak_live_activity.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -168,6 +169,9 @@ Future<void> _bootstrapBackgroundStartup() async {
   } catch (e) {
     debugPrint("main: home widget init failed: $e");
   }
+
+  // Refresh streak Live Activity if one is already active (no-op otherwise).
+  StreakLiveActivitySync.sync();
 
   LibraryBackupUploadService.scheduleDeferredBackupCheck();
 }
