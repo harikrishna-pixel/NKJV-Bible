@@ -1189,11 +1189,17 @@ class DownloadProvider with ChangeNotifier {
         return false;
       }
 
-      final parsedVerses = await compute(parseVerses, verseRaw);
-      final splitVersesMap = await compute(splitVerses, parsedVerses);
       final bookRaw = await db.rawQuery('SELECT * FROM book');
       final parsedBooks = await compute(parseBooks, bookRaw);
+      final otCount = BibleInfo.resolveOldTestamentCount(parsedBooks);
+      BibleInfo.applyOldTestamentCountFromBooks(parsedBooks);
       final splitBooksMap = await compute(splitBooks, parsedBooks);
+
+      final parsedVerses = await compute(parseVerses, verseRaw);
+      final splitVersesMap = await compute(splitVerses, {
+        'verses': parsedVerses,
+        'otCount': otCount,
+      });
 
       setData(
         allVerses: parsedVerses,
@@ -1405,12 +1411,33 @@ List<VerseBookContentModel> parseVerses(dynamic data) {
   return list.map((e) => VerseBookContentModel.fromJson(e)).toList();
 }
 
-Map<String, List<VerseBookContentModel>> splitVerses(
-    List<VerseBookContentModel> all) {
-  List<VerseBookContentModel> ot = [];
-  List<VerseBookContentModel> nt = [];
-  final otCount = BibleInfo.old_testament_count;
+/// Accepts either a verse list (legacy) or `{verses, otCount}` so Catholic
+/// canons can pass the correct OT cutoff into the isolate.
+Map<String, List<VerseBookContentModel>> splitVerses(dynamic input) {
+  List<VerseBookContentModel> all;
+  var otCount = BibleInfo.old_testament_count;
 
+  if (input is Map) {
+    final verses = input['verses'];
+    all = verses is List<VerseBookContentModel>
+        ? verses
+        : (verses as List).cast<VerseBookContentModel>();
+    final rawCount = input['otCount'];
+    if (rawCount is int) {
+      otCount = rawCount;
+    } else if (rawCount is num) {
+      otCount = rawCount.toInt();
+    }
+  } else if (input is List<VerseBookContentModel>) {
+    all = input;
+  } else if (input is List) {
+    all = input.cast<VerseBookContentModel>();
+  } else {
+    all = <VerseBookContentModel>[];
+  }
+
+  final ot = <VerseBookContentModel>[];
+  final nt = <VerseBookContentModel>[];
   for (var v in all) {
     if ((v.bookNum ?? 0) < otCount) {
       ot.add(v);
@@ -1429,9 +1456,10 @@ List<MainBookListModel> parseBooks(dynamic data) {
 }
 
 Map<String, List<MainBookListModel>> splitBooks(List<MainBookListModel> books) {
-  final otCount = BibleInfo.old_testament_count;
-  List<MainBookListModel> ot = [];
-  List<MainBookListModel> nt = [];
+  // Resolve from this list (isolate-safe) — Catholic OT ends before Mateus (46).
+  final otCount = BibleInfo.resolveOldTestamentCount(books);
+  final ot = <MainBookListModel>[];
+  final nt = <MainBookListModel>[];
 
   for (final book in books) {
     if ((book.bookNum ?? 0) < otCount) {

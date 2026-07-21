@@ -916,7 +916,126 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     if (rows.isEmpty) return true;
     final dbTitle = rows[0]['title']?.toString().trim() ?? '';
     if (dbTitle.isEmpty) return true;
-    return dbTitle.toLowerCase() == selectedTitle.toLowerCase();
+    if (dbTitle.toLowerCase() == selectedTitle.toLowerCase()) return true;
+    // Additive: allow EN/PT/FR title variants (Matthew ≈ Mateus ≈ Matthieu).
+    return _canonicalBookKey(dbTitle) != null &&
+        _canonicalBookKey(dbTitle) == _canonicalBookKey(selectedTitle);
+  }
+
+  /// Fold accents/punctuation for cross-version book title matching.
+  static String _normBookKey(String input) {
+    var s = input.trim().toLowerCase();
+    const mapped = {
+      'á': 'a', 'à': 'a', 'â': 'a', 'ä': 'a', 'ã': 'a', 'å': 'a',
+      'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e',
+      'í': 'i', 'ì': 'i', 'î': 'i', 'ï': 'i',
+      'ó': 'o', 'ò': 'o', 'ô': 'o', 'ö': 'o', 'õ': 'o',
+      'ú': 'u', 'ù': 'u', 'û': 'u', 'ü': 'u',
+      'ç': 'c', 'ñ': 'n', 'ý': 'y', 'ÿ': 'y',
+      'ĝ': 'g',
+    };
+    final buf = StringBuffer();
+    for (final r in s.runes) {
+      final ch = String.fromCharCode(r);
+      buf.write(mapped[ch] ?? ch);
+    }
+    return buf.toString().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+
+  /// Map localized/alias titles onto a shared canonical key.
+  static String? _canonicalBookKey(String title) {
+    final n = _normBookKey(title);
+    if (n.isEmpty) return null;
+    const aliases = <String, String>{
+      // Torah / Pentateuch
+      'genesis': 'genesis', 'genes': 'genesis',
+      'exodus': 'exodus', 'exodo': 'exodus', 'exode': 'exodus',
+      'leviticus': 'leviticus', 'levitico': 'leviticus', 'levitique': 'leviticus',
+      'numbers': 'numbers', 'numeros': 'numbers', 'nombres': 'numbers',
+      'deuteronomy': 'deuteronomy', 'deuteronomio': 'deuteronomy',
+      'deuteronome': 'deuteronomy',
+      // History / Wisdom (common)
+      'joshua': 'joshua', 'josue': 'joshua',
+      'judges': 'judges', 'juizes': 'judges', 'juges': 'judges',
+      'ruth': 'ruth', 'rute': 'ruth',
+      '1samuel': '1samuel', 'isamuel': '1samuel', '1sm': '1samuel',
+      '2samuel': '2samuel', 'iisamuel': '2samuel', '2sm': '2samuel',
+      '1kings': '1kings', '1reis': '1kings', '1rois': '1kings',
+      '2kings': '2kings', '2reis': '2kings', '2rois': '2kings',
+      '1chronicles': '1chronicles', '1cronicas': '1chronicles',
+      '1chroniques': '1chronicles',
+      '2chronicles': '2chronicles', '2cronicas': '2chronicles',
+      '2chroniques': '2chronicles',
+      'ezra': 'ezra', 'esdras': 'ezra',
+      'nehemiah': 'nehemiah', 'neemias': 'nehemiah', 'nehemie': 'nehemiah',
+      'esther': 'esther', 'ester': 'esther',
+      'job': 'job',
+      'psalms': 'psalms', 'psalm': 'psalms', 'salmos': 'psalms',
+      'psaumes': 'psalms',
+      'proverbs': 'proverbs', 'proverbios': 'proverbs', 'proverbes': 'proverbs',
+      'ecclesiastes': 'ecclesiastes', 'eclesiastes': 'ecclesiastes',
+      'ecclesiaste': 'ecclesiastes',
+      'songofsolomon': 'songofsolomon', 'songofsongs': 'songofsolomon',
+      'cantares': 'songofsolomon', 'cantique': 'songofsolomon',
+      'cantiquedescantiques': 'songofsolomon',
+      // Major prophets
+      'isaiah': 'isaiah', 'isaias': 'isaiah', 'esaie': 'isaiah',
+      'jeremiah': 'jeremiah', 'jeremias': 'jeremiah', 'jeremie': 'jeremiah',
+      'lamentations': 'lamentations', 'lamentacoes': 'lamentations',
+      'lamentationsdeje': 'lamentations',
+      'ezekiel': 'ezekiel', 'ezequiel': 'ezekiel', 'ezechiel': 'ezekiel',
+      'daniel': 'daniel',
+      // Minor prophets
+      'hosea': 'hosea', 'oseias': 'hosea', 'osee': 'hosea',
+      'joel': 'joel',
+      'amos': 'amos',
+      'obadiah': 'obadiah', 'obadias': 'obadiah', 'abdias': 'obadiah',
+      'jonah': 'jonah', 'jonas': 'jonah',
+      'micah': 'micah', 'miqueias': 'micah', 'michee': 'micah',
+      'nahum': 'nahum', 'naum': 'nahum',
+      'habakkuk': 'habakkuk', 'habacuque': 'habakkuk', 'habacuc': 'habakkuk',
+      'zephaniah': 'zephaniah', 'sofonias': 'zephaniah', 'sophonie': 'zephaniah',
+      'haggai': 'haggai', 'ageu': 'haggai', 'aggee': 'haggai',
+      'zechariah': 'zechariah', 'zacarias': 'zechariah', 'zacharie': 'zechariah',
+      'malachi': 'malachi', 'malaquias': 'malachi', 'malachie': 'malachi',
+      // Gospels / NT
+      'matthew': 'matthew', 'mateus': 'matthew', 'matthieu': 'matthew',
+      'mark': 'mark', 'marcos': 'mark', 'marc': 'mark',
+      'luke': 'luke', 'lucas': 'luke', 'luc': 'luke',
+      'john': 'john', 'joao': 'john', 'jean': 'john',
+      'acts': 'acts', 'actsoftheapostles': 'acts', 'atos': 'acts',
+      'atosdosapostolos': 'acts', 'actes': 'acts', 'actesdesapotres': 'acts',
+      'romans': 'romans', 'romanos': 'romans', 'romains': 'romans',
+      '1corinthians': '1corinthians', '1corintios': '1corinthians',
+      '1corinthiens': '1corinthians',
+      '2corinthians': '2corinthians', '2corintios': '2corinthians',
+      '2corinthiens': '2corinthians',
+      'galatians': 'galatians', 'galatas': 'galatians', 'galates': 'galatians',
+      'ephesians': 'ephesians', 'efesios': 'ephesians', 'ephesiens': 'ephesians',
+      'philippians': 'philippians', 'filipenses': 'philippians',
+      'philippiens': 'philippians',
+      'colossians': 'colossians', 'colossenses': 'colossians',
+      'colossiens': 'colossians',
+      '1thessalonians': '1thessalonians', '1tessalonicenses': '1thessalonians',
+      '1thessaloniciens': '1thessalonians',
+      '2thessalonians': '2thessalonians', '2tessalonicenses': '2thessalonians',
+      '2thessaloniciens': '2thessalonians',
+      '1timothy': '1timothy', '1timoteo': '1timothy', '1timothee': '1timothy',
+      '2timothy': '2timothy', '2timoteo': '2timothy', '2timothee': '2timothy',
+      'titus': 'titus', 'tito': 'titus', 'tite': 'titus',
+      'philemon': 'philemon', 'filemom': 'philemon',
+      'hebrews': 'hebrews', 'hebreus': 'hebrews', 'hebreux': 'hebrews',
+      'james': 'james', 'tiago': 'james', 'jacques': 'james',
+      '1peter': '1peter', '1pedro': '1peter', '1pierre': '1peter',
+      '2peter': '2peter', '2pedro': '2peter', '2pierre': '2peter',
+      '1john': '1john', '1joao': '1john', '1jean': '1john',
+      '2john': '2john', '2joao': '2john', '2jean': '2john',
+      '3john': '3john', '3joao': '3john', '3jean': '3john',
+      'jude': 'jude', 'judas': 'jude',
+      'revelation': 'revelation', 'apocalypse': 'revelation',
+      'apocalipse': 'revelation',
+    };
+    return aliases[n] ?? n;
   }
 
   Future<void> _applyBookMetadata(
@@ -937,10 +1056,153 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         selectedBookChapterCount.value = item['chapter_count'].toString();
         bookReadPer.value = item['read_per'].toString();
         selectedBookId.value = item['id'].toString();
+        // Additive: keep displayed book name in sync with current version's
+        // book.title (fixes stale English labels after version switch).
+        final title = item['title']?.toString().trim() ?? '';
+        if (title.isNotEmpty) {
+          selectedBook.value = title;
+          await SharPreferences.setString(SharPreferences.selectedBook, title);
+          final canonical = _canonicalBookKey(title);
+          if (canonical != null && canonical.isNotEmpty) {
+            await SharPreferences.setString(
+              SharPreferences.selectedBookCanonical,
+              canonical,
+            );
+          }
+        }
         return;
       }
     }
     debugPrint('testapp No book found with book_num = $bookNum');
+  }
+
+  /// Additive helper: map the current reading book onto the active version's
+  /// book table (title aliases + row id). Needed because Catholic/Parole book
+  /// numbers and titles differ from NKJV (e.g. Matthew 39 → Mateus 46).
+  /// Does not change Mark-as-Read / chapter-load algorithms themselves.
+  Future<void> syncSelectedBookTitleFromDb({String? hintTitle}) async {
+    try {
+      final db = await DBHelper().db;
+      if (db == null) return;
+
+      final books = await db.rawQuery(
+        'SELECT id, book_num, title, chapter_count, read_per FROM book ORDER BY book_num ASC',
+      );
+      if (books.isEmpty) return;
+
+      var titleHint = (hintTitle ?? '').trim();
+      if (titleHint.isEmpty) {
+        titleHint = selectedBook.value.trim();
+      }
+      if (titleHint.isEmpty) {
+        titleHint =
+            (await SharPreferences.getString(SharPreferences.selectedBook) ?? '')
+                .trim();
+      }
+
+      final storedCanonical = (await SharPreferences.getString(
+                SharPreferences.selectedBookCanonical,
+              ) ??
+              '')
+          .trim();
+      // Canonicalize stored value too (may be a raw title from older builds).
+      final wantKey = storedCanonical.isNotEmpty
+          ? (_canonicalBookKey(storedCanonical) ?? storedCanonical)
+          : (titleHint.isNotEmpty ? _canonicalBookKey(titleHint) : null);
+
+      final storedNum =
+          await SharPreferences.getString(SharPreferences.selectedBookNum);
+      final parsedNum = int.tryParse(
+        (storedNum != null && storedNum.trim().isNotEmpty)
+            ? storedNum
+            : selectedBookNum.value,
+      );
+
+      Map<String, Object?>? matched;
+
+      // 1) Prefer canonical/alias resolve so NKJV Matthew → Catholic Mateus.
+      if (wantKey != null && wantKey.isNotEmpty) {
+        for (final row in books) {
+          final rowTitle = row['title']?.toString() ?? '';
+          if (_canonicalBookKey(rowTitle) == wantKey) {
+            matched = row;
+            break;
+          }
+        }
+      }
+
+      // 2) Fallback: same book_num when titles already align / unknown alias.
+      if (matched == null && parsedNum != null) {
+        for (final candidate in _bookNumLoadCandidates(parsedNum)) {
+          for (final row in books) {
+            final rowBookNum = (row['book_num'] as num?)?.toInt();
+            if (rowBookNum == candidate) {
+              matched = row;
+              break;
+            }
+          }
+          if (matched != null) break;
+        }
+      }
+
+      if (matched == null) return;
+
+      final newNum = matched['book_num']?.toString() ?? '';
+      final newTitle = matched['title']?.toString().trim() ?? '';
+      if (newNum.isEmpty || newTitle.isEmpty) return;
+
+      selectedBook.value = newTitle;
+      await SharPreferences.setString(SharPreferences.selectedBook, newTitle);
+      selectedBookNum.value = newNum;
+      await SharPreferences.setString(SharPreferences.selectedBookNum, newNum);
+      final canonical = _canonicalBookKey(newTitle) ?? wantKey;
+      if (canonical != null && canonical.isNotEmpty) {
+        await SharPreferences.setString(
+          SharPreferences.selectedBookCanonical,
+          canonical,
+        );
+      }
+
+      final bookId = matched['id']?.toString();
+      if (bookId != null && bookId.isNotEmpty) {
+        selectedBookId.value = bookId;
+      }
+      final chapterCount = matched['chapter_count']?.toString();
+      if (chapterCount != null && chapterCount.isNotEmpty) {
+        selectedBookChapterCount.value = chapterCount;
+      }
+      if (matched['read_per'] != null) {
+        bookReadPer.value = matched['read_per'].toString();
+      }
+
+      // Always drop verse cache after sync so Mark as Read uses fresh row ids
+      // from the current version DB (version switch recreates verse table).
+      selectedBookContent.clear();
+      selectedVersesContent.clear();
+    } catch (e) {
+      debugPrint('syncSelectedBookTitleFromDb error: $e');
+    }
+  }
+
+  /// Additive: remap book for current version, then reload chapter verses/ids.
+  Future<void> prepareMarkAsReadForCurrentVersion({String? hintTitle}) async {
+    await syncSelectedBookTitleFromDb(hintTitle: hintTitle);
+    await getSelectedChapterAndBook();
+  }
+
+  /// Additive: ensure chapter is_read is written by book/chapter ref as well
+  /// as by verse id (ids change after version switch reload).
+  Future<void> markCurrentChapterReadInDb(String isRead) async {
+    try {
+      final bookNum = int.tryParse(selectedBookNum.value);
+      if (bookNum == null || selectedBookContent.isEmpty) return;
+      final chapterNum = selectedBookContent.first.chapterNum?.toInt();
+      if (chapterNum == null) return;
+      await DBHelper()
+          .updateVersesReadByBookChapter(bookNum, chapterNum, isRead);
+    } catch (e) {
+      debugPrint('markCurrentChapterReadInDb error: $e');
+    }
   }
 
   int _chapterLoadGeneration = 0;
@@ -1219,6 +1481,12 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         selectedBookChapterCount.value = rows[0]["chapter_count"].toString();
         bookReadPer.value = rows[0]["read_per"].toString();
         selectedBookId.value = rows[0]["id"].toString();
+        // Additive: align app-bar book name with DB title for this book_num.
+        final title = rows[0]["title"]?.toString().trim() ?? '';
+        if (title.isNotEmpty) {
+          selectedBook.value = title;
+          await SharPreferences.setString(SharPreferences.selectedBook, title);
+        }
       }
     } catch (e, st) {
       log('Error: $e,$st');

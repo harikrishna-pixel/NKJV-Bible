@@ -3,6 +3,7 @@ import 'package:biblebookapp/Model/mainBookListModel.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
+import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:flutter/material.dart';
@@ -158,6 +159,11 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
   Future<void> _loadNextChapterOnReader(DashBoardController controller) async {
     // Replace stale verses so Home does not keep showing the chapter just read.
     controller.selectedBookContent.clear();
+    controller.selectedVersesContent.clear();
+    // Additive: remap book title/num for current version, then load chapter.
+    await controller.syncSelectedBookTitleFromDb(
+      hintTitle: controller.selectedBook.value,
+    );
     await controller.getSelectedChapterAndBook();
     controller.isFetchContent.value = false;
     controller.loadTextToSpeech.value = false;
@@ -584,7 +590,7 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                         ),
                         SizedBox(height: isCompact ? 2 : 4),
                         Text(
-                          'Chapter ${widget.ReadedChapter}',
+                          BibleInfo.chapterLabelSpaced(widget.ReadedChapter),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: isCompact ? 15 : 16,
@@ -618,8 +624,8 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                     if (int.parse(widget.ReadedChapter) + 1 <=
                         int.parse(
                             "${int.parse(widget.SelectedBookChapterCount)}")) {
-                      // Next Chapter — pop Mark-as-Read before loading new verses so
-                      // the reader underneath does not bleed through this screen.
+                      // Next Chapter — update chapter target first, then pop and
+                      // load so in-memory chapter is not still the old one.
                       final nextChapter = int.parse(widget.ReadedChapter) + 1;
                       final nextChapterStr = nextChapter.toString();
                       await SharPreferences.setString(
@@ -632,6 +638,15 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                         debugPrint(
                             'DashBoardController not available for next chapter: $e');
                       }
+                      if (controller != null) {
+                        controller.selectedChapter.value = nextChapterStr;
+                        controller.selectChapterChange.value = nextChapter;
+                        controller.selectedChapterForRead.value =
+                            nextChapterStr;
+                        // Additive: refresh book title for current version before
+                        // pop/reload (avoids English≠French title mismatch block).
+                        await controller.syncSelectedBookTitleFromDb();
+                      }
                       if (!context.mounted) return;
                       try {
                         await _popToReaderAfterChapterChange(controller);
@@ -641,10 +656,6 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                         }
                       }
                       if (controller != null) {
-                        controller.selectedChapter.value = nextChapterStr;
-                        controller.selectChapterChange.value = nextChapter;
-                        controller.selectedChapterForRead.value =
-                            nextChapterStr;
                         await _loadNextChapterOnReader(controller);
                       }
                       _isNavigating = false;

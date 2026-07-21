@@ -5,6 +5,8 @@ class SharPreferences {
   static const onboarding = "onboarding";
   static const selectedBookNum = "selectedBookNum";
   static const selectedBook = "selectedBook";
+  /// Cross-version book identity (e.g. matthew) — survives title language changes.
+  static const selectedBookCanonical = "selectedBookCanonical";
   static const selectedChapter = "selectedChapter";
   static const isLoadBookContent = "isLoadBookContent";
   static const isLoadBookList = "isLoadBookList";

@@ -338,6 +338,23 @@ class DBHelper {
     return 0;
   }
 
+  /// Additive: mark/unmark a whole chapter by book_num + chapter_num.
+  /// Used after version switch when verse row ids may be stale.
+  Future<int> updateVersesReadByBookChapter(
+    int bookNum,
+    int chapterNum,
+    String isRead,
+  ) async {
+    final dbClient = await db;
+    if (dbClient == null) return 0;
+    return dbClient.update(
+      'verse',
+      {'is_read': isRead},
+      where: 'book_num = ? AND chapter_num = ?',
+      whereArgs: [bookNum, chapterNum],
+    );
+  }
+
   Future<int> updateVersesDataBatch(
       int id, Map<String, dynamic> updates) async {
     var dbClient = await db;

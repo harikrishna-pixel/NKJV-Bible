@@ -143,6 +143,13 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
 
     setState(() {
       buttonStates = loadedStates;
+      // Restore selection so Active UI and Continue stay aligned.
+      for (final entry in loadedStates.entries) {
+        if (entry.value == DownloadButtonState.active) {
+          foldername = entry.key;
+          break;
+        }
+      }
     });
   }
 
@@ -160,6 +167,12 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
     final downloaded = prefs.getStringList("downloadedFolders") ?? [];
 
     for (var f in BibleInfo.folders) {
+      // Don't overwrite a version the user already marked Active this session
+      // (or restored via _loadButtonStates) — that race skipped the toast.
+      if (buttonStates[f] == DownloadButtonState.active) {
+        progressMap[f] = 0.0;
+        continue;
+      }
       if (downloaded.contains(f)) {
         buttonStates[f] = DownloadButtonState.open;
       } else {
@@ -527,12 +540,24 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                                         elevation: 0,
                                       ),
                             onPressed: () async {
-                              setState(() {
-                                isloading = true;
-                              });
+                              // Keep foldername in sync with Active UI. A late
+                              // _loadDownloadedFolders() can reset Active → Open
+                              // while foldername stays set, which skipped this toast.
+                              String? activeFolder;
+                              for (final entry in buttonStates.entries) {
+                                if (entry.value == DownloadButtonState.active) {
+                                  activeFolder = entry.key;
+                                  break;
+                                }
+                              }
+                              foldername = activeFolder;
+
                               // await showClearDatabaseDialog(context);
                               if (foldername != null &&
                                   foldername!.isNotEmpty) {
+                                setState(() {
+                                  isloading = true;
+                                });
                                 // 🔹 Save state after change
 
                                 // Navigate next
@@ -583,7 +608,11 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                                 setState(() {
                                   isloading = false;
                                 });
-                                Constants.showToast("Click Set as Default");
+                                // Show after rebuild so EasyLoading isn't dropped
+                                // by the isloading true→false frame swap.
+                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                  Constants.showToast("Tap Set as Default", 2000);
+                                });
                               }
                             },
                                       child: Text(
@@ -889,15 +918,19 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
 
       final db = await DBHelper().db;
 
-      // Load and parse verses
-      final verseRaw = await db!.rawQuery("SELECT * FROM verse");
-      final parsedVerses = await compute(parseVerses, verseRaw);
-      final splitVersesMap = await compute(splitVerses, parsedVerses);
-
-      // Load and parse books
-      final bookRaw = await db.rawQuery("SELECT * FROM book");
+      // Load books first so OT/NT cutoff matches the active canon (Catholic ≠ 39).
+      final bookRaw = await db!.rawQuery("SELECT * FROM book");
       final parsedBooks = await compute(parseBooks, bookRaw);
+      final otCount = BibleInfo.resolveOldTestamentCount(parsedBooks);
+      BibleInfo.applyOldTestamentCountFromBooks(parsedBooks);
       final splitBooksMap = await compute(splitBooks, parsedBooks);
+
+      final verseRaw = await db.rawQuery("SELECT * FROM verse");
+      final parsedVerses = await compute(parseVerses, verseRaw);
+      final splitVersesMap = await compute(splitVerses, {
+        'verses': parsedVerses,
+        'otCount': otCount,
+      });
 
       // Set provider data
       downloadProvider.setData(
@@ -994,6 +1027,20 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
       _progress = 0.75;
       _loadingMessage = "Setting up...";
     });
+    // Capture current book title BEFORE book_num=0 prefs write, so we can
+    // remap Matthew → Mateus/Matthieu after the new version DB is loaded.
+    String resolveHint = '';
+    try {
+      if (Get.isRegistered<DashBoardController>()) {
+        resolveHint =
+            Get.find<DashBoardController>().selectedBook.value.trim();
+      }
+      if (resolveHint.isEmpty) {
+        resolveHint =
+            (await SharPreferences.getString(SharPreferences.selectedBook) ?? '')
+                .trim();
+      }
+    } catch (_) {}
     await DBHelper().db.then((db) async {
       if (db != null) {
         final result = await db.rawQuery(
@@ -1047,6 +1094,10 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
         final dashController = Get.find<DashBoardController>();
         dashController.selectedBookContent.clear();
         dashController.selectedVersesContent.clear();
+        // Additive: remap book by title aliases + refresh row id for new DB.
+        await dashController.syncSelectedBookTitleFromDb(
+          hintTitle: resolveHint,
+        );
         debugPrint("✅ Cleared DashBoardController cache for version switch");
       }
     } catch (e) {
@@ -1418,6 +1469,19 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                       setState(() {
                         _progress = 97;
                       });
+                      // Additive: sync book title to new version before opening Home.
+                      try {
+                        if (Get.isRegistered<DashBoardController>()) {
+                          final dashController =
+                              Get.find<DashBoardController>();
+                          dashController.selectedBookContent.clear();
+                          dashController.selectedVersesContent.clear();
+                          await dashController.syncSelectedBookTitleFromDb();
+                        }
+                      } catch (e) {
+                        debugPrint(
+                            '⚠️ Could not sync book title after version switch: $e');
+                      }
                       // close dialog
                       Constants.showToast("Updated Successfully");
                       setState(() {
@@ -1440,7 +1504,9 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                       isbtnloading = false;
                     });
                     loadingstop();
-                    Constants.showToast("Click Set as Default");
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      Constants.showToast("Tap Set as Default", 2000);
+                    });
                   }
 
                   // ScaffoldMessenger.of(context).showSnackBar(

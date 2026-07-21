@@ -411,15 +411,19 @@ class _SplashScreenState extends State<SplashScreen>
 
       final db = await DBHelper().db;
 
-      // Load and parse verses
-      final verseRaw = await db!.rawQuery("SELECT * FROM verse");
-      final parsedVerses = await compute(parseVerses, verseRaw);
-      final splitVersesMap = await compute(splitVerses, parsedVerses);
-
-      // Load and parse books
-      final bookRaw = await db.rawQuery("SELECT * FROM book");
+      // Load books first so OT/NT cutoff matches the active canon (Catholic ≠ 39).
+      final bookRaw = await db!.rawQuery("SELECT * FROM book");
       final parsedBooks = await compute(parseBooks, bookRaw);
+      final otCount = BibleInfo.resolveOldTestamentCount(parsedBooks);
+      BibleInfo.applyOldTestamentCountFromBooks(parsedBooks);
       final splitBooksMap = await compute(splitBooks, parsedBooks);
+
+      final verseRaw = await db.rawQuery("SELECT * FROM verse");
+      final parsedVerses = await compute(parseVerses, verseRaw);
+      final splitVersesMap = await compute(splitVerses, {
+        'verses': parsedVerses,
+        'otCount': otCount,
+      });
 
       // Set provider data
       downloadProvider.setData(

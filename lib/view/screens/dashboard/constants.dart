@@ -156,6 +156,38 @@ class BibleInfo {
     }
   }
 
+  /// Additive UI label only — "Chapter" in the active Bible version language.
+  static String get chapterWord {
+    final lang =
+        (folderLanguageMap[currentBibleVersion] ?? 'EN').toUpperCase();
+    switch (lang) {
+      case 'PT':
+        return 'Capítulo';
+      case 'FR':
+        return 'Chapitre';
+      case 'ES':
+        return 'Capítulo';
+      case 'DE':
+        return 'Kapitel';
+      case 'IT':
+        return 'Capitolo';
+      default:
+        return 'Chapter';
+    }
+  }
+
+  /// e.g. "Chapter - 3" / "Capítulo - 3"
+  static String chapterLabelWithNumber(Object? chapterNum) {
+    final n = int.tryParse('$chapterNum') ?? 0;
+    return '$chapterWord - $n';
+  }
+
+  /// e.g. "Chapter 3" / "Capítulo 3"
+  static String chapterLabelSpaced(Object? chapterNum) {
+    final n = int.tryParse('$chapterNum') ?? 0;
+    return '$chapterWord $n';
+  }
+
   static String emailVerify = "0";
 
   static int appcount = 5;
@@ -167,6 +199,66 @@ class BibleInfo {
   static int old_testament_count =
       39; //book count 65 - olt 39, book count 72 - olt 45
   static String new_testament_count = "27";
+
+  /// Additive: OT/NT cutoff for the currently loaded book list.
+  /// Protestant NKJV: first NT (Matthew) at 39. Catholic: Mateus at 46.
+  /// Falls back to [old_testament_count] when books are empty/unknown.
+  static int resolveOldTestamentCount(List<dynamic> books) {
+    if (books.isEmpty) return old_testament_count;
+
+    for (final book in books) {
+      final title = () {
+        try {
+          // MainBookListModel
+          return (book.title?.toString() ?? '').trim().toLowerCase();
+        } catch (_) {
+          if (book is Map) {
+            return (book['title']?.toString() ?? '').trim().toLowerCase();
+          }
+          return '';
+        }
+      }();
+      if (title.isEmpty) continue;
+
+      // Normalize common accents for PT/FR titles.
+      final normalized = title
+          .replaceAll('á', 'a')
+          .replaceAll('à', 'a')
+          .replaceAll('â', 'a')
+          .replaceAll('ã', 'a')
+          .replaceAll('é', 'e')
+          .replaceAll('ê', 'e')
+          .replaceAll('í', 'i')
+          .replaceAll('ó', 'o')
+          .replaceAll('ô', 'o')
+          .replaceAll('õ', 'o')
+          .replaceAll('ú', 'u')
+          .replaceAll('ç', 'c')
+          .replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+      if (normalized == 'matthew' ||
+          normalized == 'mateus' ||
+          normalized == 'matthieu') {
+        num? bookNum;
+        try {
+          bookNum = book.bookNum as num?;
+        } catch (_) {
+          if (book is Map) {
+            bookNum = book['book_num'] as num?;
+          }
+        }
+        if (bookNum != null) return bookNum.toInt();
+      }
+    }
+
+    // Heuristic from existing comment: larger canons (Catholic) have more OT books.
+    if (books.length >= 70) return 46;
+    return old_testament_count;
+  }
+
+  static void applyOldTestamentCountFromBooks(List<dynamic> books) {
+    old_testament_count = resolveOldTestamentCount(books);
+  }
 
   static String exportText =
       'Save your Bookmarked verses, Highlights, Notes and Verse Images directly to your device. This option stores a backup file locally, which can be transferred or accessed later. You can import this file into the app whenever needed, even on another device.';

@@ -56,6 +56,9 @@ class _BookListScreenState extends State<BookListScreen> {
   }
 
   void _splitTestaments() {
+    // Additive: Catholic has more OT books (Mateus starts at 46, not 39).
+    testament_num = BibleInfo.resolveOldTestamentCount(bookList);
+    BibleInfo.old_testament_count = testament_num;
     newTestmentBookList.clear();
     for (final book in bookList) {
       if ((book.bookNum ?? 0) >= testament_num) {

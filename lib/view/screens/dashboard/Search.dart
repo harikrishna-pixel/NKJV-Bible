@@ -293,6 +293,8 @@ class _SearchScreenState extends State<SearchScreen> {
         SharPreferences.selectedBookNum, '$bookNum');
     try {
       final controller = Get.find<DashBoardController>();
+      // Additive: remember cross-version book identity for later remap.
+      await controller.syncSelectedBookTitleFromDb(hintTitle: bookName);
       controller.selectedBook.value = bookName;
       controller.selectedBookNum.value = '$bookNum';
       controller.selectedChapter.value = '$chapter';
@@ -1000,15 +1002,19 @@ class _SearchScreenState extends State<SearchScreen> {
         return;
       }
 
-      // Load and parse verses
-      final verseRaw = await db.rawQuery("SELECT * FROM verse");
-      final parsedVerses = await compute(parseVerses, verseRaw);
-      final splitVersesMap = await compute(splitVerses, parsedVerses);
-
-      // Load and parse books
+      // Load books first so OT/NT cutoff matches the active canon (Catholic ≠ 39).
       final bookRaw = await db.rawQuery("SELECT * FROM book");
       final parsedBooks = await compute(parseBooks, bookRaw);
+      final otCount = BibleInfo.resolveOldTestamentCount(parsedBooks);
+      BibleInfo.applyOldTestamentCountFromBooks(parsedBooks);
       final splitBooksMap = await compute(splitBooks, parsedBooks);
+
+      final verseRaw = await db.rawQuery("SELECT * FROM verse");
+      final parsedVerses = await compute(parseVerses, verseRaw);
+      final splitVersesMap = await compute(splitVerses, {
+        'verses': parsedVerses,
+        'otCount': otCount,
+      });
 
       if (parsedVerses.isEmpty) {
         debugPrint('Search loadLocal: no verses in database');

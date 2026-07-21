@@ -3767,7 +3767,10 @@ class _HomeScreenState extends State<HomeScreen>
                                 controller.selectedChapter.value == ""
                                     ? const SizedBox()
                                     : Text(
-                                        "Chapter - ${int.parse(controller.selectedChapter.value)}",
+                                        BibleInfo.chapterLabelWithNumber(
+                                          int.parse(
+                                              controller.selectedChapter.value),
+                                        ),
                                         style: CommanStyle.bw14500(context)
                                             .copyWith(
                                                 fontWeight: FontWeight.w400,
@@ -5489,6 +5492,14 @@ class _HomeScreenState extends State<HomeScreen>
                                                       await SharPreferences
                                                           .setString(
                                                               'OpenAd', '1');
+                                                      // Additive: remap book + reload
+                                                      // verse row ids for current version
+                                                      // before Mark as Read updates.
+                                                      await controller
+                                                          .prepareMarkAsReadForCurrentVersion(
+                                                        hintTitle: controller
+                                                            .selectedBook.value,
+                                                      );
                                                       await DBHelper()
                                                           .db
                                                           .then((value) {
@@ -5497,15 +5508,78 @@ class _HomeScreenState extends State<HomeScreen>
                                                                 "SELECT * From book WHERE book_num = ${int.parse(controller.selectedBookNum.value)}")
                                                             .then(
                                                                 (value) async {
+                                                          if (value.isEmpty) {
+                                                            return;
+                                                          }
                                                           controller.bookReadPer
                                                               .value = value[0]
                                                                   ["read_per"]
                                                               .toString();
-                                                          if (controller
-                                                                  .selectedBookContent[
-                                                                      0]
-                                                                  .isRead ==
-                                                              "no") {
+                                                          // Additive: version switch
+                                                          // recreates book rows — refresh
+                                                          // id/title so Mark as Read
+                                                          // updates the current version.
+                                                          final syncedId =
+                                                              value[0]["id"]
+                                                                  ?.toString();
+                                                          if (syncedId !=
+                                                                  null &&
+                                                              syncedId
+                                                                  .isNotEmpty) {
+                                                            controller
+                                                                .selectedBookId
+                                                                .value = syncedId;
+                                                          }
+                                                          final syncedTitle =
+                                                              value[0]["title"]
+                                                                      ?.toString()
+                                                                      .trim() ??
+                                                                  '';
+                                                          if (syncedTitle
+                                                              .isNotEmpty) {
+                                                            controller
+                                                                .selectedBook
+                                                                .value = syncedTitle;
+                                                            await SharPreferences
+                                                                .setString(
+                                                              SharPreferences
+                                                                  .selectedBook,
+                                                              syncedTitle,
+                                                            );
+                                                          }
+                                                          final syncedCount =
+                                                              value[0][
+                                                                      "chapter_count"]
+                                                                  ?.toString();
+                                                          if (syncedCount !=
+                                                                  null &&
+                                                              syncedCount
+                                                                  .isNotEmpty) {
+                                                            controller
+                                                                    .selectedBookChapterCount
+                                                                    .value =
+                                                                syncedCount;
+                                                          }
+                                                          final unread = controller
+                                                                      .selectedBookContent
+                                                                      .isNotEmpty &&
+                                                                  (controller
+                                                                              .selectedBookContent[
+                                                                                  0]
+                                                                              .isRead ==
+                                                                          "no" ||
+                                                                      controller
+                                                                              .selectedBookContent[
+                                                                                  0]
+                                                                              .isRead ==
+                                                                          null ||
+                                                                      (controller
+                                                                              .selectedBookContent[
+                                                                                  0]
+                                                                              .isRead
+                                                                              ?.isEmpty ??
+                                                                          true));
+                                                          if (unread) {
                                                             if (int.tryParse(
                                                                     controller
                                                                         .bookReadPer
@@ -5569,18 +5643,20 @@ class _HomeScreenState extends State<HomeScreen>
                                                                         .value
                                                                         .length;
                                                                 i++) {
-                                                              DBHelper()
-                                                                  .updateVersesData(
-                                                                      int.parse(controller
-                                                                          .selectedBookContent
-                                                                          .value[
-                                                                              i]
-                                                                          .id
-                                                                          .toString()),
-                                                                      "is_read",
-                                                                      "yes")
-                                                                  .then(
-                                                                      (value) {});
+                                                              final verseId = controller
+                                                                  .selectedBookContent
+                                                                  .value[i]
+                                                                  .id;
+                                                              if (verseId !=
+                                                                  null) {
+                                                                DBHelper()
+                                                                    .updateVersesData(
+                                                                        verseId,
+                                                                        "is_read",
+                                                                        "yes")
+                                                                    .then(
+                                                                        (value) {});
+                                                              }
                                                               var data = VerseBookContentModel(
                                                                   id: controller
                                                                       .selectedBookContent[
@@ -5627,6 +5703,12 @@ class _HomeScreenState extends State<HomeScreen>
                                                                       .selectedBookContent[
                                                                   i] = data;
                                                             }
+                                                            // Additive: also mark by
+                                                            // book/chapter so DB updates
+                                                            // even if verse ids were stale.
+                                                            await controller
+                                                                .markCurrentChapterReadInDb(
+                                                                    "yes");
 
                                                             Future.delayed(
                                                               const Duration(
@@ -5980,6 +6062,15 @@ class _HomeScreenState extends State<HomeScreen>
                                                                     .setString(
                                                                         'OpenAd',
                                                                         '1');
+                                                                // Additive: remap book + reload
+                                                                // verse ids for current version.
+                                                                await controller
+                                                                    .prepareMarkAsReadForCurrentVersion(
+                                                                  hintTitle:
+                                                                      controller
+                                                                          .selectedBook
+                                                                          .value,
+                                                                );
                                                                 await DBHelper()
                                                                     .db
                                                                     .then(
@@ -5989,16 +6080,79 @@ class _HomeScreenState extends State<HomeScreen>
                                                                           "SELECT * From book WHERE book_num = ${int.parse(controller.selectedBookNum.value)}")
                                                                       .then(
                                                                           (value) async {
+                                                                    if (value
+                                                                        .isEmpty) {
+                                                                      return;
+                                                                    }
                                                                     controller
                                                                         .bookReadPer
                                                                         .value = value[0]
                                                                             [
                                                                             "read_per"]
                                                                         .toString();
-                                                                    if (controller
-                                                                            .selectedBookContent[1]
-                                                                            .isRead ==
-                                                                        "no") {
+                                                                    // Additive: version switch
+                                                                    // recreates book rows — refresh
+                                                                    // id/title so Mark as Read
+                                                                    // updates the current version.
+                                                                    final syncedId =
+                                                                        value[0]["id"]
+                                                                            ?.toString();
+                                                                    if (syncedId !=
+                                                                            null &&
+                                                                        syncedId
+                                                                            .isNotEmpty) {
+                                                                      controller
+                                                                          .selectedBookId
+                                                                          .value = syncedId;
+                                                                    }
+                                                                    final syncedTitle =
+                                                                        value[0]["title"]
+                                                                                ?.toString()
+                                                                                .trim() ??
+                                                                            '';
+                                                                    if (syncedTitle
+                                                                        .isNotEmpty) {
+                                                                      controller
+                                                                          .selectedBook
+                                                                          .value = syncedTitle;
+                                                                      await SharPreferences
+                                                                          .setString(
+                                                                        SharPreferences
+                                                                            .selectedBook,
+                                                                        syncedTitle,
+                                                                      );
+                                                                    }
+                                                                    final syncedCount =
+                                                                        value[0][
+                                                                                "chapter_count"]
+                                                                            ?.toString();
+                                                                    if (syncedCount !=
+                                                                            null &&
+                                                                        syncedCount
+                                                                            .isNotEmpty) {
+                                                                      controller
+                                                                              .selectedBookChapterCount
+                                                                              .value =
+                                                                          syncedCount;
+                                                                    }
+                                                                    final unreadIdx = controller
+                                                                            .selectedBookContent
+                                                                            .length >
+                                                                        1
+                                                                        ? 1
+                                                                        : 0;
+                                                                    final unreadStatus = controller
+                                                                        .selectedBookContent[
+                                                                            unreadIdx]
+                                                                        .isRead;
+                                                                    final unread = unreadStatus ==
+                                                                            "no" ||
+                                                                        unreadStatus ==
+                                                                            null ||
+                                                                        (unreadStatus
+                                                                                ?.isEmpty ??
+                                                                            true);
+                                                                    if (unread) {
                                                                       if (controller
                                                                               .bookReadPer
                                                                               .value ==
@@ -6036,12 +6190,17 @@ class _HomeScreenState extends State<HomeScreen>
                                                                               0;
                                                                           i < controller.selectedBookContent.length;
                                                                           i++) {
-                                                                        await DBHelper()
-                                                                            .updateVersesData(
-                                                                                int.parse(controller.selectedBookContent[i].id.toString()),
-                                                                                "is_read",
-                                                                                "yes")
-                                                                            .then((value) {});
+                                                                        final verseId =
+                                                                            controller.selectedBookContent[i].id;
+                                                                        if (verseId !=
+                                                                            null) {
+                                                                          await DBHelper()
+                                                                              .updateVersesData(
+                                                                                  verseId,
+                                                                                  "is_read",
+                                                                                  "yes")
+                                                                              .then((value) {});
+                                                                        }
                                                                         var data = VerseBookContentModel(
                                                                             id: controller.selectedBookContent[i].id,
                                                                             bookNum: controller.selectedBookContent[i].bookNum,
@@ -6056,6 +6215,10 @@ class _HomeScreenState extends State<HomeScreen>
                                                                         controller.selectedBookContent[i] =
                                                                             data;
                                                                       }
+                                                                      // Additive: mark by book/chapter ref too.
+                                                                      await controller
+                                                                          .markCurrentChapterReadInDb(
+                                                                              "yes");
 
                                                                       Future
                                                                           .delayed(

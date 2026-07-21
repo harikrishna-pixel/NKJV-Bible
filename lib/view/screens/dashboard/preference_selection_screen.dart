@@ -112,7 +112,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
 
       if (categoryIcons.isEmpty) {
         final jsonString =
-            await rootBundle.loadString('assets/jsonFile/dailyVerse.json');
+            await rootBundle.loadString('asseFts/jsonFile/dailyVerse.json');
         categoryIcons = await compute(
             preferenceSelectionCategoryMapFromJsonString, jsonString);
       }

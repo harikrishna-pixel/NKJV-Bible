@@ -150,7 +150,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                         ),
                         Padding(
                           padding: const EdgeInsets.only(right: 20.0),
-                          child: Text("Chapter",
+                          child: Text(BibleInfo.chapterWord,
                               style: CommanStyle.appBarStyle(context)),
                         ),
                         const SizedBox()
