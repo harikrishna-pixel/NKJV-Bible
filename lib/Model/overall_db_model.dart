@@ -48,44 +48,45 @@ class OverallDbModel {
   }
 
   Future<void> updateLocalDB() async {
-    bookmark?.forEach((e) async {
+    // Additive: await each row (forEach+async was fire-and-forget).
+    for (final e in bookmark ?? const <BookMarkModel>[]) {
       await DBHelper().insertBookmark(e);
       await DBHelper().updateVersesDataByContent(
           e.content.toString(), 'is_bookmarked', 'yes');
 //! plaincontent is versse id
       await DBHelper().updateVersesData(
           int.parse(e.plaincontent.toString()), 'is_bookmarked', 'yes');
-    });
-    highlight?.forEach((e) async {
+    }
+    for (final e in highlight ?? const <HighLightContentModal>[]) {
       await DBHelper().insertIntoHighLight(e);
       await DBHelper().updateVersesDataByContent(
           e.content.toString(), 'is_highlighted', '${e.color}');
       //! plaincontent is versse id
       await DBHelper().updateVersesData(
           int.parse(e.verseid ?? '0'), 'is_highlighted', '${e.color}');
-    });
-    underline?.forEach((e) async {
+    }
+    for (final e in underline ?? const <BookMarkModel>[]) {
       await DBHelper().insertUnderLine(e);
       await DBHelper().updateVersesDataByContent(
           e.content.toString(), 'is_underlined', 'yes');
       //! plaincontent is versse id
       await DBHelper().updateVersesData(
           int.parse(e.plaincontent.toString()), 'is_underlined', 'yes');
-    });
-    notes?.forEach((e) async {
+    }
+    for (final e in notes ?? const <SaveNotesModel>[]) {
       await DBHelper().insertNotes(e);
       await DBHelper().updateVersesDataByContent(
           e.content.toString(), 'is_noted', '${e.notes}');
 //! plaincontent is versse id
       await DBHelper().updateVersesData(
           int.parse(e.plaincontent.toString()), 'is_noted', '${e.notes}');
-    });
-    images?.forEach((e) async {
+    }
+    for (final e in images ?? const <SaveImageModel>[]) {
       await DBHelper().saveImage(e);
-    });
-    calendar?.forEach((e) async {
+    }
+    for (final e in calendar ?? const <CalendarModel>[]) {
       await DBHelper().saveCalendarData(e);
-    });
+    }
 
     // for (var e in versecontent!) {
     //   if (e.id != null) {
@@ -120,29 +121,30 @@ class OverallDbModel {
   }
 
   Future<void> updateLocalDBsync() async {
-    bookmark?.forEach((e) async {
+    // Additive: await each row so verse flags finish before Home opens.
+    for (final e in bookmark ?? const <BookMarkModel>[]) {
       //  await DBHelper().insertBookmark(e);
       await DBHelper().updateVersesDataByContentnew(
           e.content.toString(), 'is_bookmarked', 'yes');
-    });
-    highlight?.forEach((e) async {
+    }
+    for (final e in highlight ?? const <HighLightContentModal>[]) {
       //  await DBHelper().insertIntoHighLight(e);
       await DBHelper().updateVersesDataByContentnew(
           e.content.toString(), 'is_highlighted', '${e.color}');
-    });
-    underline?.forEach((e) async {
+    }
+    for (final e in underline ?? const <BookMarkModel>[]) {
       //await DBHelper().insertUnderLine(e);
       await DBHelper().updateVersesDataByContentnew(
           e.content.toString(), 'is_underlined', 'yes');
-    });
-    notes?.forEach((e) async {
+    }
+    for (final e in notes ?? const <SaveNotesModel>[]) {
       await DBHelper().updateVersesDataByContentnew(
           e.content.toString(), 'is_noted', '${e.notes}');
-    });
+    }
 
-    calendar?.forEach((e) async {
+    for (final e in calendar ?? const <CalendarModel>[]) {
       await DBHelper().saveCalendarData(e);
-    });
+    }
   }
 
   factory OverallDbModel.fromJson(Map<String, dynamic> data) {

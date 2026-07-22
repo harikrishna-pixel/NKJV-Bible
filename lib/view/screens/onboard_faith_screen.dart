@@ -5,21 +5,24 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
+import 'package:biblebookapp/view/constants/images.dart';
+import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/bible_select_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/preference_selection_screen.dart';
 import 'package:biblebookapp/view/screens/onboarding_guidance_screen.dart';
+import 'package:biblebookapp/view/screens/welcome_screen.dart';
 import 'package:biblebookapp/view/widget/notification_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:biblebookapp/view/screens/welcome_screen.dart';
+import 'package:html/parser.dart' show parse;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-import 'package:biblebookapp/view/constants/images.dart';
 
 /// Keys for persistence
 class _PrefsKeys {
@@ -686,12 +689,124 @@ class _OnboardingThemeSelectionScreenState
   late AppCustomTheme _selectedTheme;
   String? _selectedThemeName;
 
+  // Additive: Bible preview from current installed bible language (not hardcoded EN).
+  static const String _kFallbackPreviewRef = 'Genesis 1:1–2';
+  static const String _kFallbackPreviewBody =
+      '1. In the beginning God created the heaven and the earth.\n\n'
+      '2. And the earth was without form, and void; and darkness was upon the face of the deep. '
+      'And the Spirit of God moved upon the face of the waters.';
+  String _previewRef = _kFallbackPreviewRef;
+  String _previewBody = _kFallbackPreviewBody;
+
   @override
   void initState() {
     super.initState();
     final provider = Provider.of<ThemeProvider>(context, listen: false);
     _selectedTheme = provider.currentCustomTheme;
     _selectedThemeName = _selectedTheme.name;
+    _loadBibleLanguagePreview();
+  }
+
+  String _plainVerseText(dynamic raw) {
+    final html = raw?.toString() ?? '';
+    if (html.isEmpty) return '';
+    return parse(html).body?.text?.trim() ?? html.trim();
+  }
+
+  /// Additive: load first-book ch.1 vv.1–2 from the active bible DB so preview
+  /// matches the installed language. Falls back to English if DB not ready.
+  Future<void> _loadBibleLanguagePreview() async {
+    try {
+      String? bookTitle;
+      String? previewBody;
+
+      final db = await DBHelper().db;
+      if (db != null) {
+        final books = await db.rawQuery(
+          'SELECT book_num, title FROM book ORDER BY book_num ASC LIMIT 1',
+        );
+        if (books.isNotEmpty) {
+          final bookNum = books.first['book_num'];
+          bookTitle = books.first['title']?.toString().trim();
+
+          List<Map<String, dynamic>> verses = [];
+          for (final chapterNum in const [0, 1]) {
+            final rows = await db.rawQuery(
+              'SELECT verse_num, content FROM verse '
+              'WHERE book_num = ? AND chapter_num = ? '
+              'ORDER BY verse_num ASC LIMIT 5',
+              [bookNum, chapterNum],
+            );
+            if (rows.isNotEmpty) {
+              verses = List<Map<String, dynamic>>.from(rows);
+              break;
+            }
+          }
+
+          if (verses.isNotEmpty) {
+            final firstTwo = verses.take(2).toList();
+            final parts = <String>[];
+            for (var i = 0; i < firstTwo.length; i++) {
+              final plain = _plainVerseText(firstTwo[i]['content']);
+              if (plain.isEmpty) continue;
+              parts.add('${i + 1}. $plain');
+            }
+            if (parts.isNotEmpty) {
+              previewBody = parts.join('\n\n');
+            }
+          }
+        }
+      }
+
+      // Additive: when DB not ready yet, still resolve book title from the
+      // app's current bible asset (language/version) so ref isn't stuck on EN.
+      if (bookTitle == null || bookTitle.isEmpty) {
+        final saved =
+            await SharPreferences.getString(SharPreferences.selectedBook);
+        if (saved != null && saved.trim().isNotEmpty) {
+          bookTitle = saved.trim();
+        }
+      }
+      if (bookTitle == null || bookTitle.isEmpty) {
+        final folder =
+            BibleInfo.folders.isNotEmpty ? BibleInfo.folders.first : null;
+        if (folder != null) {
+          try {
+            final raw = await rootBundle
+                .loadString('assets/zipped/$folder/book.json');
+            final decoded = jsonDecode(raw);
+            if (decoded is List && decoded.isNotEmpty) {
+              final first = decoded.first;
+              if (first is Map && first['title'] != null) {
+                bookTitle = first['title'].toString().trim();
+              }
+            }
+          } catch (e) {
+            debugPrint('Theme preview asset book.json skipped: $e');
+          }
+        }
+      }
+
+      if (!mounted) return;
+      if ((bookTitle == null || bookTitle.isEmpty) && previewBody == null) {
+        return;
+      }
+
+      setState(() {
+        if (bookTitle != null && bookTitle.isNotEmpty) {
+          final endVerse = previewBody != null && previewBody.contains('\n\n')
+              ? 2
+              : (previewBody != null ? 1 : 2);
+          _previewRef =
+              endVerse > 1 ? '$bookTitle 1:1–$endVerse' : '$bookTitle 1:1';
+        }
+        if (previewBody != null && previewBody.isNotEmpty) {
+          _previewBody = previewBody;
+        }
+      });
+    } catch (e) {
+      debugPrint('Theme preview bible load skipped: $e');
+    }
   }
 
   Color getColor(AppCustomTheme theme) {
@@ -823,11 +938,9 @@ class _OnboardingThemeSelectionScreenState
   }
 
   Widget _buildThemePreviewCard(BuildContext context, {required bool compact}) {
-    const previewText = Text(
-      '1. In the beginning God created the heaven and the earth.\n\n'
-      '2. And the earth was without form, and void; and darkness was upon the face of the deep. '
-      'And the Spirit of God moved upon the face of the waters.',
-      style: TextStyle(
+    final previewText = Text(
+      _previewBody,
+      style: const TextStyle(
         height: 1.4,
         fontSize: 15.5,
         color: Color(0xFF2E2C2B),
@@ -878,12 +991,14 @@ class _OnboardingThemeSelectionScreenState
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Text(
-                      'Genesis 1:1–2',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF2E2C2B),
+                    Flexible(
+                      child: Text(
+                        _previewRef,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF2E2C2B),
+                        ),
                       ),
                     ),
                   ],
@@ -892,7 +1007,7 @@ class _OnboardingThemeSelectionScreenState
                 if (compact)
                   previewText
                 else
-                  const Expanded(
+                  Expanded(
                     child: SingleChildScrollView(
                       child: previewText,
                     ),

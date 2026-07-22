@@ -1,4 +1,5 @@
 // ignore_for_file: use_full_hex_values_for_flutter_colors
+import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/core/export_db.dart';
 import 'package:biblebookapp/core/library_backup_upload_service.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
@@ -26,6 +27,23 @@ import 'bookMarkScreen.dart';
 import 'highlight_screen.dart';
 import 'image_screen.dart';
 import 'notes_screen.dart';
+
+/// Additive: after library restore/import, drop stale Reading-screen verses and
+/// reload the current chapter from DB so is_highlighted / bookmarks show on
+/// Home immediately (From "splash" otherwise reuses pre-import cache).
+Future<void> _invalidateReadingCacheAfterLibraryImport() async {
+  if (!Get.isRegistered<DashBoardController>()) return;
+  final c = Get.find<DashBoardController>();
+  c.selectedBookContent.clear();
+  c.selectedVersesContent.clear();
+  c.isFetchContent.value = true;
+  try {
+    // Existing reload helper — pulls verse flags fresh from SQLite.
+    await c.forceReloadSelectedChapter();
+  } catch (e) {
+    debugPrint('Post-import reading reload skipped: $e');
+  }
+}
 
 void showImportExportInfo(BuildContext context, Function() onTap) {
   showDialog(
@@ -1277,6 +1295,7 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
     final ok = await LibraryBackupUploadService.downloadAndImportFromCloud();
     await SharPreferences.setString('OpenAd', '1');
     if (ok) {
+      await _invalidateReadingCacheAfterLibraryImport();
       Get.offAll(() => HomeScreen(
             From: "splash",
             selectedVerseNumForRead: "",
@@ -1322,6 +1341,7 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
             return;
           }
           await SharPreferences.setString('OpenAd', '1');
+          await _invalidateReadingCacheAfterLibraryImport();
           Get.offAll(() => HomeScreen(
                 From: "splash",
                 selectedVerseNumForRead: "",

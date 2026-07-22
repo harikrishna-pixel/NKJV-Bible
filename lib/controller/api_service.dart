@@ -19,6 +19,7 @@ import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/more_apps/model/app_model.dart';
 import 'package:biblebookapp/view/screens/profile/model/user_model.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
+import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -581,6 +582,26 @@ Future<bool> updateReferralRewardClaimed({required int value}) async {
   }
 }
 
+/// Grant local wallet credits to the referrer when API [referral_count] increases.
+/// Wallet credits are device-local; without this, User 1 never sees referral rewards.
+Future<void> syncReferrerCreditsFromProfile(UserModel user) async {
+  final count = user.referralCount ?? 0;
+  if (count <= 0) return;
+
+  const rewardPerReferral = 100;
+  final prefs = await SharedPreferences.getInstance();
+  final key = 'local_referral_count_credited_${user.uid}';
+  final alreadyCredited = prefs.getInt(key) ?? 0;
+  if (count <= alreadyCredited) return;
+
+  final delta = count - alreadyCredited;
+  await WalletService.addCredits(delta * rewardPerReferral);
+  await prefs.setInt(key, count);
+  debugPrint(
+      'syncReferrerCreditsFromProfile: credited ${delta * rewardPerReferral} '
+      'for $delta new referral(s) (count=$count)');
+}
+
 String? _referralCodeFromAuthResponse(dynamic response) {
   if (response is! Map) return null;
   final map = Map<String, dynamic>.from(response);
@@ -656,9 +677,19 @@ String _referralApplyFailureMessage(String? profileResult) {
     return 'Invalid Referral code';
   }
   final lower = profileError.toLowerCase();
+  if (lower.contains('referral') ||
+      lower.contains('already applied') ||
+      lower.contains('already used') ||
+      lower.contains('does not exist') ||
+      lower.contains('expired')) {
+    return profileError;
+  }
+  // Profile payload noise — not an invalid invite code.
+  if (lower.contains('email already exists')) {
+    return 'Unable to apply referral code. Please try again.';
+  }
   // Ignore non-referral noise (404 endpoints, password/email field validation).
-  if (lower.contains('email already exists') ||
-      lower.contains('validation failed') ||
+  if (lower.contains('validation failed') ||
       lower.contains('page not found') ||
       lower.contains('password') ||
       lower.contains('the email field') ||
@@ -725,13 +756,13 @@ Map<String, String> _referralApplyLoginBody({
   required String referralCode,
 }) {
   final code = referralCode.trim();
-  // Send both keys — some API builds apply via referral_code, others via referred_by.
+  // Only referred_by — referral_code is the user's OWN invite code field.
+  // Sending the friend's code as referral_code confuses apply / is ignored.
   return {
     'email': email,
     'password': password,
     'app_id': BibleInfo.appID.toString(),
     'device_type': Platform.isIOS ? 'iOS' : 'Android',
-    'referral_code': code,
     'referred_by': code,
   };
 }
@@ -935,9 +966,8 @@ Future<UserModel> loginUser(
       "device_type": Platform.isIOS ? "iOS" : "Android",
     };
     if (referralCode != null && referralCode.trim().isNotEmpty) {
-      final trimmed = referralCode.trim();
-      body['referred_by'] = trimmed;
-      body['referral_code'] = trimmed;
+      // Apply invite via referred_by only (referral_code is own invite id).
+      body['referred_by'] = referralCode.trim();
     }
     final resp =
         await http.post(Uri.parse(Api.login), headers: <String, String>{
@@ -989,6 +1019,8 @@ Future<UserModel> loginUser(
       debugPrint('  referral_count           → ${user.referralCount}');
       debugPrint(
           '  referral_reward_claimed  → ${user.referralRewardClaimed}');
+      // Additive: credit referrer locally when backend referral_count grew.
+      await syncReferrerCreditsFromProfile(user);
       return user;
     } else {
       throw data['message'] ?? 'Failed to login';
@@ -1095,11 +1127,13 @@ Future<void> applyReferralViaLogin({
         message.contains('referral code not found') ||
         message.contains('referral not found');
 
-    if (resp.statusCode != 200 ||
-        statusFalse ||
-        !statusTrue ||
-        _hasReferralErrorInResponse(data) ||
-        messageSaysInvalid) {
+    // Only hard-fail when login itself fails or the API explicitly says the
+    // code is invalid. Soft referral errors in a successful login payload must
+    // not block the existing profile / apply-referral fallback below.
+    if (resp.statusCode != 200 || statusFalse || !statusTrue) {
+      throw 'Invalid Referral code';
+    }
+    if (messageSaysInvalid) {
       throw 'Invalid Referral code';
     }
 

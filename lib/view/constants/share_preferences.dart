@@ -48,6 +48,10 @@ class SharPreferences {
   static const lastScheduledCloudBackupDate = 'lastScheduledCloudBackupDate';
   static const lastCloudBackupFailed = 'lastCloudBackupFailed';
   static const lastCloudBackupFailureReason = 'lastCloudBackupFailureReason';
+  /// Additive: last launched app version (for Welcome logo old vs new).
+  static const lastKnownAppVersion = 'last_known_app_version';
+  /// Additive: true → Welcome shows Old→New logo comparison (upgraders only).
+  static const showWelcomeLogoComparison = 'show_welcome_logo_comparison';
   static const userLocalData = 'userLocalData';
   static const calendarLocal = 'calendarLocal';
   static const bookadscatid = 'bookadscatid';

@@ -269,62 +269,61 @@ class ProfileUpdateApi {
               ? email!.trim()
               : cachedEmail?.toString().trim()) ??
           '';
-      final resolvedPassword = password?.trim() ?? '';
       final code = referralCode.trim();
       final userId = userid.toString();
       final appId = BibleInfo.appID.toString();
 
       String? lastBody;
 
-      // Backend profile-update requires name+email for action 1 (see 422 logs).
-      // Action 2 requires password + old_password when provided.
+      // Same pattern as referral_reward_claimed: prime with email+name, then
+      // set the key WITHOUT email. Sending email on key updates returns
+      // 400 "Email already exists" and incorrectly surfaces as invalid referral.
+      if (resolvedEmail.isNotEmpty && resolvedName.isNotEmpty) {
+        await _postProfileUpdate(
+          uri: uri,
+          authtoken: authtoken,
+          logLabel: 'referred_by prime',
+          payload: {
+            'action': '1',
+            'email': resolvedEmail,
+            'name': resolvedName,
+            'user_id': userId,
+            'app_id': appId,
+          },
+        );
+      }
+
+      // Do NOT send email / do NOT write key=referral_code (that is the user's
+      // own code). Only set referred_by to the invite code.
       final profileAttempts = <Map<String, String>>[
-        if (resolvedName.isNotEmpty && resolvedEmail.isNotEmpty)
-          {
-            'action': '1',
-            'key': 'referred_by',
-            'value': code,
-            'user_id': userId,
-            'app_id': appId,
-            'name': resolvedName,
-            'email': resolvedEmail,
-          },
-        if (resolvedEmail.isNotEmpty)
-          {
-            'action': '1',
-            'key': 'referred_by',
-            'value': code,
-            'user_id': userId,
-            'app_id': appId,
-            'email': resolvedEmail,
-            if (resolvedName.isNotEmpty) 'name': resolvedName,
-          },
-        if (resolvedPassword.isNotEmpty &&
-            resolvedName.isNotEmpty &&
-            resolvedEmail.isNotEmpty)
-          {
-            'action': '2',
-            'key': 'referred_by',
-            'value': code,
-            'user_id': userId,
-            'app_id': appId,
-            'name': resolvedName,
-            'email': resolvedEmail,
-            'password': resolvedPassword,
-            'old_password': resolvedPassword,
-          },
-        // Also try sending the invite code as referral_code (same action 1 shape).
-        if (resolvedName.isNotEmpty && resolvedEmail.isNotEmpty)
-          {
-            'action': '1',
-            'key': 'referral_code',
-            'value': code,
-            'user_id': userId,
-            'app_id': appId,
-            'name': resolvedName,
-            'email': resolvedEmail,
-            'referred_by': code,
-          },
+        {
+          'action': '1',
+          'key': 'referred_by',
+          'value': code,
+          'user_id': userId,
+          'app_id': appId,
+          if (resolvedName.isNotEmpty) 'name': resolvedName,
+        },
+        {
+          'action': '1',
+          'key': 'referred_by',
+          'value': code,
+          'user_id': userId,
+          'app_id': appId,
+        },
+        {
+          'action': '1',
+          'user_id': userId,
+          'app_id': appId,
+          'referred_by': code,
+          if (resolvedName.isNotEmpty) 'name': resolvedName,
+        },
+        {
+          'action': '1',
+          'user_id': userId,
+          'app_id': appId,
+          'referred_by': code,
+        },
       ];
 
       for (var i = 0; i < profileAttempts.length; i++) {
@@ -340,6 +339,8 @@ class ProfileUpdateApi {
         }
       }
 
+      // apply-referral-code routes currently 404 on this backend; keep as
+      // last-resort only so future API availability does not require a release.
       Uri applyQueryUri(String baseUrl, String referralCode, String uid) {
         return Uri.parse('${baseUrl}api/apply-referral-code').replace(
           queryParameters: {

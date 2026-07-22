@@ -126,6 +126,9 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
       );
       const rewardCredits = 100;
       await WalletService.addCredits(rewardCredits);
+      // Notify backend that the referee reward was claimed (also credits referrer).
+      // Restored — accidentally removed in a UI-only change.
+      await updateReferralRewardClaimed(value: rewardCredits);
       if (!mounted) return;
       _dismissKeyboard();
       Navigator.of(context).pop();

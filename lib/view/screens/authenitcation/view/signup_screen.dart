@@ -14,6 +14,7 @@ import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/authenitcation/bloc/signup_bloc.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
+import 'package:biblebookapp/view/screens/authenitcation/view/widget/referral_code_bottom_sheet.dart';
 import 'package:biblebookapp/utils/email_validator.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/login_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
@@ -296,6 +297,22 @@ class SignupScreen extends HookConsumerWidget {
                                                 await OwnReferralCodeDialog.show(
                                                   context: context,
                                                   referralCode: referralCode,
+                                                );
+                                              }
+                                              // Same sheet as login — signup
+                                              // already caches auth tokens, so
+                                              // the invitee can apply a shared
+                                              // code without signing in again.
+                                              if (context.mounted) {
+                                                await ReferralCodeBottomSheet.show(
+                                                  context: context,
+                                                  email: signupState
+                                                      .emailCon.text
+                                                      .trim(),
+                                                  password:
+                                                      signupState.passCon.text,
+                                                  ownReferralCode: referralCode,
+                                                  initialReferredBy: null,
                                                 );
                                               }
                                               if (!context.mounted) return;

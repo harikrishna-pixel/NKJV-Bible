@@ -4640,152 +4640,152 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
           _lightRaysOverlay(true),
           _celebrationBurstOverlay(true),
           SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      AnimatedOpacity(
-                        opacity: _showStreakCompletedToast ? 1 : 0,
-                        duration: const Duration(milliseconds: 250),
-                        child: IgnorePointer(
-                          ignoring: !_showStreakCompletedToast,
-                          child: Text(
-                            'Streak Completed!',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: screenWidth > 450 ? 18 : 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white.withOpacity(0.95),
-                              fontFamily: 'Georgia',
-                              shadows: _kStreakPhotoSoftTextShadows,
-                            ),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+              child: FutureBuilder<int?>(
+                future: SharPreferences.getInt(
+                    SharPreferences.pendingStreakCompleteCelebration),
+                builder: (context, snap) {
+                  final streakDays = (snap.data ?? 0).clamp(0, 9999);
+                  final creditsEarned = streakDays * 20;
+
+                  return FadeTransition(
+                    opacity: _fade,
+                    child: Column(
+                      children: [
+                        ScaleTransition(
+                          scale: _scale,
+                          child: _StreakCompleteFlameBadge(
+                            twinkleCtrl: _twinkleCtrl,
                           ),
                         ),
-                      ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: IconButton(
-                          icon: const Icon(
-                            Icons.share_outlined,
-                            color: Colors.white,
-                            size: 22,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black87,
-                                blurRadius: 6,
-                                offset: Offset(0, 1),
+                        const SizedBox(height: 18),
+                        RichText(
+                          textAlign: TextAlign.center,
+                          text: TextSpan(
+                            style: TextStyle(
+                              fontSize: screenWidth > 450 ? 34 : 28,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              fontFamily: 'Georgia',
+                              height: 1.15,
+                              shadows: _kStreakPhotoTextShadows,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: streakDays > 0
+                                    ? 'Day $streakDays '
+                                    : '',
+                              ),
+                              const TextSpan(
+                                text: 'Streak!',
+                                style: TextStyle(
+                                  color: _kStreakPhotoGold,
+                                ),
                               ),
                             ],
                           ),
-                          onPressed: _shareStreakCompleted,
-                          tooltip: 'Share',
                         ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'You\'re building a beautiful habit of seeking God daily.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: screenWidth > 450 ? 15 : 14,
+                            height: 1.45,
+                            color: Colors.white.withOpacity(0.92),
+                            fontFamily: 'Georgia',
+                            shadows: _kStreakPhotoSoftTextShadows,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _streakGoldDivider(center: _streakDividerHeart()),
+                        const SizedBox(height: 18),
+                        SlideTransition(
+                          position: _cardSlide,
+                          child: _StreakCompleteRewardCard(
+                            creditsLabel: '+20 Faith Credits',
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        SlideTransition(
+                          position: _cardSlide,
+                          child: _StreakCompleteMotivationCard(),
+                        ),
+                        const SizedBox(height: 14),
+                        SlideTransition(
+                          position: _cardSlide,
+                          child: _StreakCompleteStatsBar(
+                            daysStreak: streakDays,
+                            versesRead: streakDays,
+                            prayersOffered: streakDays,
+                            faithCreditsEarned: creditsEarned,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        _streakPhotoPrimaryButton(
+                          context: context,
+                          label: 'Continue My Journey',
+                          onPressed: () => _onContinuePressed(context),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          // UI only: share floats on the photo — no top bar/toolbar row.
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 4, top: 2),
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.share_outlined,
+                    color: Colors.white,
+                    size: 22,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black87,
+                        blurRadius: 6,
+                        offset: Offset(0, 1),
                       ),
                     ],
                   ),
+                  onPressed: _shareStreakCompleted,
+                  tooltip: 'Share',
                 ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
-                    child: FutureBuilder<int?>(
-                      future: SharPreferences.getInt(
-                          SharPreferences.pendingStreakCompleteCelebration),
-                      builder: (context, snap) {
-                        final streakDays = (snap.data ?? 0).clamp(0, 9999);
-                        final creditsEarned = streakDays * 20;
-
-                        return FadeTransition(
-                          opacity: _fade,
-                          child: Column(
-                            children: [
-                              ScaleTransition(
-                                scale: _scale,
-                                child: _StreakCompleteFlameBadge(
-                                  twinkleCtrl: _twinkleCtrl,
-                                ),
-                              ),
-                              const SizedBox(height: 18),
-                              RichText(
-                                textAlign: TextAlign.center,
-                                text: TextSpan(
-                                  style: TextStyle(
-                                    fontSize: screenWidth > 450 ? 34 : 28,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                    fontFamily: 'Georgia',
-                                    height: 1.15,
-                                    shadows: _kStreakPhotoTextShadows,
-                                  ),
-                                  children: [
-                                    TextSpan(
-                                      text: streakDays > 0
-                                          ? 'Day $streakDays '
-                                          : '',
-                                    ),
-                                    const TextSpan(
-                                      text: 'Streak!',
-                                      style: TextStyle(
-                                        color: _kStreakPhotoGold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                'You\'re building a beautiful habit of seeking God daily.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: screenWidth > 450 ? 15 : 14,
-                                  height: 1.45,
-                                  color: Colors.white.withOpacity(0.92),
-                                  fontFamily: 'Georgia',
-                                  shadows: _kStreakPhotoSoftTextShadows,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              _streakGoldDivider(center: _streakDividerHeart()),
-                              const SizedBox(height: 18),
-                              SlideTransition(
-                                position: _cardSlide,
-                                child: _StreakCompleteRewardCard(
-                                  creditsLabel: '+20 Faith Credits',
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              SlideTransition(
-                                position: _cardSlide,
-                                child: _StreakCompleteMotivationCard(),
-                              ),
-                              const SizedBox(height: 14),
-                              SlideTransition(
-                                position: _cardSlide,
-                                child: _StreakCompleteStatsBar(
-                                  daysStreak: streakDays,
-                                  versesRead: streakDays,
-                                  prayersOffered: streakDays,
-                                  faithCreditsEarned: creditsEarned,
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              _streakPhotoPrimaryButton(
-                                context: context,
-                                label: 'Continue My Journey',
-                                onPressed: () => _onContinuePressed(context),
-                              ),
-                              const SizedBox(height: 24),
-                            ],
-                          ),
-                        );
-                      },
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 10, left: 56, right: 56),
+                child: AnimatedOpacity(
+                  opacity: _showStreakCompletedToast ? 1 : 0,
+                  duration: const Duration(milliseconds: 250),
+                  child: IgnorePointer(
+                    ignoring: !_showStreakCompletedToast,
+                    child: Text(
+                      'Streak Completed!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: screenWidth > 450 ? 18 : 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withOpacity(0.95),
+                        fontFamily: 'Georgia',
+                        shadows: _kStreakPhotoSoftTextShadows,
+                      ),
                     ),
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ],

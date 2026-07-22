@@ -19,6 +19,7 @@ import 'package:get/get.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
@@ -506,8 +507,75 @@ class _SplashScreenState extends State<SplashScreen>
     }
   }
 
+  /// Additive: decide Welcome Old→New logos vs single new logo.
+  /// New install → false. In-place upgrade from older build → true.
+  /// Does not change navigation or onboarding completion.
+  Future<void> _updateWelcomeLogoComparisonFlag() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final current = info.version.trim();
+      final last =
+          (await SharPreferences.getString(SharPreferences.lastKnownAppVersion))
+              ?.trim();
+
+      var showComparison = false;
+      if (last != null && last.isNotEmpty) {
+        showComparison = _isAppVersionOlder(last, current);
+      } else {
+        // First time we track version: treat as upgrader if this install
+        // already had prior use (update from a build before this flag existed).
+        final prefs = await SharedPreferences.getInstance();
+        final launchCount = prefs.getInt('launchCount') ?? 0;
+        final selectedBook =
+            await SharPreferences.getString(SharPreferences.selectedBook);
+        final loadedList = await SharPreferences.getBoolean(
+                SharPreferences.isLoadBookList) ??
+            false;
+        showComparison = launchCount > 1 ||
+            (selectedBook != null && selectedBook.isNotEmpty) ||
+            loadedList;
+      }
+
+      await SharPreferences.setBoolean(
+          SharPreferences.showWelcomeLogoComparison, showComparison);
+      if (current.isNotEmpty) {
+        await SharPreferences.setString(
+            SharPreferences.lastKnownAppVersion, current);
+      }
+      debugPrint(
+        'Welcome logo comparison=$showComparison '
+        '(last=$last current=$current)',
+      );
+    } catch (e) {
+      debugPrint('_updateWelcomeLogoComparisonFlag error: $e');
+      // Safe default for Welcome: new-user single logo.
+      await SharPreferences.setBoolean(
+          SharPreferences.showWelcomeLogoComparison, false);
+    }
+  }
+
+  /// Returns true when [a] is strictly older than [b] (e.g. 1.0.101 < 1.0.115).
+  bool _isAppVersionOlder(String a, String b) {
+    List<int> parts(String v) => v
+        .split(RegExp(r'[^0-9]+'))
+        .where((s) => s.isNotEmpty)
+        .map((s) => int.tryParse(s) ?? 0)
+        .toList();
+    final pa = parts(a);
+    final pb = parts(b);
+    final len = pa.length > pb.length ? pa.length : pb.length;
+    for (var i = 0; i < len; i++) {
+      final ai = i < pa.length ? pa[i] : 0;
+      final bi = i < pb.length ? pb[i] : 0;
+      if (ai < bi) return true;
+      if (ai > bi) return false;
+    }
+    return false;
+  }
+
   handleNavigation() async {
     await NotificationsServices.storeLaunchPayloadIfFromNotification();
+    await _updateWelcomeLogoComparisonFlag();
 
     final isOnboardingCompleted =
         await SharPreferences.getBoolean(SharPreferences.onboarding);

@@ -1,11 +1,17 @@
+import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/onboard_faith_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-class WelcomeScreen extends StatelessWidget {
+class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
 
+  @override
+  State<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends State<WelcomeScreen> {
   static const String _kWelcomeBg = 'assets/welcome-screen-bg.png';
   static const Color _kWelcomeInk = Color(0xFF3D2914);
   static const Color _kWelcomeGold = Color(0xFFC59434);
@@ -30,6 +36,23 @@ class WelcomeScreen extends StatelessWidget {
     ),
   ];
 
+  /// null while loading flag; false = new user (single logo); true = upgrader.
+  bool? _showLogoComparison;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLogoMode();
+  }
+
+  Future<void> _loadLogoMode() async {
+    final show = await SharPreferences.getBoolean(
+            SharPreferences.showWelcomeLogoComparison) ??
+        false;
+    if (!mounted) return;
+    setState(() => _showLogoComparison = show);
+  }
+
   void _continueToOnboarding() {
     Get.offAll(() => const FaithOnboardingScreen());
   }
@@ -38,6 +61,7 @@ class WelcomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
+    final showComparison = _showLogoComparison ?? false;
 
     return Scaffold(
       body: Stack(
@@ -64,7 +88,10 @@ class WelcomeScreen extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _welcomeLogoComparison(isTablet: isTablet),
+                    if (showComparison)
+                      _welcomeLogoComparison(isTablet: isTablet)
+                    else
+                      _welcomeSingleNewLogo(isTablet: isTablet),
                     SizedBox(height: isTablet ? 18 : 14),
                     Text(
                       'Welcome to the',
@@ -174,6 +201,24 @@ class WelcomeScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  /// Additive: new users — only the in-app new logo (no Old→New row).
+  Widget _welcomeSingleNewLogo({required bool isTablet}) {
+    final iconSize = isTablet ? 128.0 : 110.0;
+    return Column(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Image.asset(
+            'assets/new_logos.jpg',
+            height: iconSize,
+            width: iconSize,
+            fit: BoxFit.contain,
+          ),
+        ),
+      ],
     );
   }
 
@@ -348,7 +393,7 @@ class _WelcomeFeatureCard extends StatelessWidget {
             style: TextStyle(
               fontSize: isTablet ? 11.5 : 10,
               fontWeight: FontWeight.w500,
-              color: WelcomeScreen._kWelcomeInk.withOpacity(0.88),
+              color: _WelcomeScreenState._kWelcomeInk.withOpacity(0.88),
               height: 1.2,
             ),
           ),

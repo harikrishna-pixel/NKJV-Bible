@@ -580,7 +580,7 @@ class floatingButtonState extends State<floatingButton>
           await flutterTts.setVoice(selectedVoice);
         }
       }
-      await flutterTts.speak("This is a preview of the selected voice.");
+      await flutterTts.speak("Your preview voice is changed.");
     } catch (e) {
       debugPrint("Error previewing voice: $e");
     }
@@ -1238,10 +1238,19 @@ class floatingButtonState extends State<floatingButton>
                       'TTS state updated - isSpeech: false, ttsState: stopped, isManuallyPaused: true');
                 }
               } else if (isAudioPlaying) {
-                await audioPlayer.stop();
+                // Additive: pause (not stop) so Play resumes from current position.
+                await audioPlayer.pause();
                 setState(() {
                   isAudioPlaying = false;
                 });
+              } else if (audioPlayer.state == PlayerState.paused) {
+                // Additive: resume from paused position — do not reload/seek zero.
+                await audioPlayer.resume();
+                if (mounted) {
+                  setState(() {
+                    isAudioPlaying = true;
+                  });
+                }
               } else if (!hasConnection &&
                   (isMp3Enabled || isTTSEnabled || isPrevTTSEnabled)) {
                 await _showAudioTtsPopover();
@@ -2715,7 +2724,7 @@ class floatingButtonState extends State<floatingButton>
                                 ),
                               );
                             }).toList(),
-                            onChanged: (dynamic newValue) {
+                            onChanged: (dynamic newValue) async {
                               setModalState(() {
                                 selectedVoice = newValue;
                               });
@@ -2726,10 +2735,12 @@ class floatingButtonState extends State<floatingButton>
                                   newValue.forEach((key, value) {
                                     voiceMap[key.toString()] = value.toString();
                                   });
-                                  flutterTts.setVoice(voiceMap);
+                                  await flutterTts.setVoice(voiceMap);
                                 } else {
-                                  flutterTts.setVoice(newValue);
+                                  await flutterTts.setVoice(newValue);
                                 }
+                                // Additive: play preview when voice changes (button removed).
+                                await _previewVoice();
                               }
                               setState(() {});
                             },
@@ -2836,42 +2847,6 @@ class floatingButtonState extends State<floatingButton>
                         );
                       }
                     },
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Preview Voice Button
-                  InkWell(
-                    onTap: () async {
-                      await _previewVoice();
-                    },
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(
-                        color: CommanColor.lightDarkPrimary(context),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.play_arrow,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            "Preview Voice",
-                            style: TextStyle(
-                              color: Colors.white,
-                              letterSpacing: BibleInfo.letterSpacing,
-                              fontSize: BibleInfo.fontSizeScale * 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
                   const SizedBox(height: 30),
 

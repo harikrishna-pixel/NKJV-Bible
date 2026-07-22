@@ -49,6 +49,8 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
     // TODO: implement initState
     super.initState();
     getFont();
+    // Assign before first build; loadData() reloads after legacy restore.
+    underListData = DBHelper().getUnderLine();
     loadData();
   }
 

@@ -159,7 +159,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   bool _shouldShowRestoreDialog =
       false; // Track if restore dialog should be shown
   String? _pendingRestoreProductId; // Store product ID for pending restore
-  Timer? _loadingTimeoutTimer; // Timer for 10-second loading timeout
+  Timer? _loadingTimeoutTimer; // Timer for 6-second loading timeout
   bool _autoPurchaseTriggered = false;
   Set<String> _lastQueriedProductIds = {};
   Set<String> _lastStoreNotFoundIds = {};
@@ -1014,11 +1014,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         }
         EasyLoading.show();
 
-        // Start 10-second timeout timer for loading
+        // Start 6-second timeout timer for loading
         _loadingTimeoutTimer?.cancel(); // Cancel any existing timer
-        _loadingTimeoutTimer = Timer(const Duration(seconds: 10), () {
+        _loadingTimeoutTimer = Timer(const Duration(seconds: 6), () {
           if (mounted) {
-            debugPrint('IAP Loading timeout - dismissing after 10 seconds');
+            debugPrint('IAP Loading timeout - dismissing after 6 seconds');
             EasyLoading.dismiss();
             setState(() {
               userTap = false;
