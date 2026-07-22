@@ -114,11 +114,17 @@ int _subscriptionDaysRemaining(DateTime expiryDate, [DateTime? now]) {
   return expiryOnly.difference(nowOnly).inDays;
 }
 
-String _subscriptionRenewalDisplayText(int diffDy) {
+String _subscriptionRenewalDisplayText(int diffDy, [String? plan]) {
   if (diffDy < 0) {
     return 'Your subscription has expired';
   }
-  if (_isLifetimeSubscriptionDisplay(diffDy)) {
+  final planKey = plan?.toLowerCase() ?? '';
+  // Additive: silver/gold copy must not become "never expire" just because
+  // remaining days are huge (e.g. bad lifetime expiry overwrite).
+  if (planKey == 'silver' || planKey == 'gold') {
+    return '$diffDy day(s) left for the renewal of the subscription.';
+  }
+  if (_isLifetimeSubscriptionDisplay(diffDy) || planKey == 'platinum') {
     return 'Your subscription will never expire';
   }
   return '$diffDy day(s) left for the renewal of the subscription.';
@@ -130,17 +136,22 @@ String _subscriptionPeriodDisplayText(
   DateTime expiryDate,
 ) {
   final planKey = plan?.toLowerCase() ?? '';
-  if (_isLifetimeSubscriptionDisplay(diffDy) || planKey == 'platinum') {
-    return 'Your subscription period is lifetime';
-  }
+  // Additive: trust stored plan key first so Restore info matches the plan
+  // that was applied (silver/gold), not a lifetime day-threshold fallback.
   if (planKey == 'silver') {
     return 'Your subscription period is 6 months';
   }
+  if (planKey == 'gold') {
+    if (_isTwoYearSubscriptionDisplay(diffDy)) {
+      return 'Your subscription period is 2 years';
+    }
+    return 'Your subscription period is 1 year';
+  }
+  if (_isLifetimeSubscriptionDisplay(diffDy) || planKey == 'platinum') {
+    return 'Your subscription period is lifetime';
+  }
   if (_isTwoYearSubscriptionDisplay(diffDy)) {
     return 'Your subscription period is 2 years';
-  }
-  if (planKey == 'gold') {
-    return 'Your subscription period is 1 year';
   }
   return 'Your subscription expires on ${DateFormat('dd-MM-yyyy').format(expiryDate)}';
 }
@@ -169,7 +180,7 @@ Widget _buildSubscriptionInfoDetails({
       return Column(
         children: [
           Text(
-            _subscriptionRenewalDisplayText(diffDy),
+            _subscriptionRenewalDisplayText(diffDy, plan),
             style: textStyle,
           ),
           const SizedBox(height: 5),

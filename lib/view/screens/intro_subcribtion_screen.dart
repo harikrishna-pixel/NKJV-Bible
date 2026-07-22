@@ -21,6 +21,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:get/get.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
@@ -165,6 +166,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   /// Additive: highest restore tier applied in the current Restore session
   /// (3=lifetime, 2=1Y/2Y, 1=6M). Prevents last-write-wins downgrades.
   int _highestRestoredTierApplied = 0;
+  /// Additive: most recent restore transaction chosen in this Restore session.
+  DateTime? _bestRestoreTransactionAt;
+  String? _bestRestoreProductId;
+  /// Additive: while true, StoreKit restored products are collected and applied once.
+  bool _restoreCollecting = false;
+  final List<Map<String, String>> _restoreCollectedProducts = [];
+  /// Additive: when applying the one chosen Restore product, ignore prior stored
+  /// plan tier (e.g. stale platinum) so the collected best can overwrite it.
+  bool _forceApplyCollectedRestoreBest = false;
 
   /// Bundle prefix shared by 6M/1Y plans (e.g. com.balaklrapps.bibliasagradacatolica).
   String get _planBundlePrefix {
@@ -261,13 +271,76 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     }
   }
 
+  /// Additive: StoreKit `transactionDate` is often epoch ms/seconds, not ISO-8601.
+  /// Without this, all dates look "missing" and Lifetime wins by tier alone.
+  DateTime? _parseRestoreTransactionDate(String? raw) {
+    if (raw == null) return null;
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+
+    final iso = DateTime.tryParse(trimmed);
+    if (iso != null) return iso;
+
+    final numeric = int.tryParse(trimmed);
+    if (numeric == null) return null;
+    // Milliseconds since epoch (typical StoreKit / IAP plugin value).
+    if (numeric > 1000000000000) {
+      return DateTime.fromMillisecondsSinceEpoch(numeric);
+    }
+    // Seconds since epoch.
+    if (numeric > 1000000000) {
+      return DateTime.fromMillisecondsSinceEpoch(numeric * 1000);
+    }
+    return null;
+  }
+
   /// Additive: true when applying [productId] would downgrade an already-restored higher plan.
+  /// Also prefers a newer transaction over an older higher-tier one (e.g. old Lifetime
+  /// must not replace a newer 6M/1Y purchase after reinstall Restore).
   Future<bool> _shouldSkipRestoreDowngrade(
     String productId,
-    DownloadProvider? downloadProvider,
-  ) async {
+    DownloadProvider? downloadProvider, {
+    String? transactionDate,
+  }) async {
+    // Additive: single best product from Restore collection must apply even if
+    // prefs still hold a stale higher plan from a previous bad restore.
+    if (_forceApplyCollectedRestoreBest) return false;
+
     final incomingTier = _restoreProductTier(productId);
     if (incomingTier <= 0) return false;
+
+    final incomingDate = _parseRestoreTransactionDate(transactionDate);
+    // Additive: a dated restore always beats an undated prior claim (epoch dates
+    // used to fail ISO parse, so Lifetime claimed with null date first).
+    if (incomingDate != null && _bestRestoreTransactionAt == null) {
+      return false;
+    }
+    if (incomingDate != null && _bestRestoreTransactionAt != null) {
+      if (incomingDate.isBefore(_bestRestoreTransactionAt!)) {
+        debugPrint(
+          'Restore: skip older transaction $productId '
+          '($incomingDate < $_bestRestoreTransactionAt)',
+        );
+        return true;
+      }
+      if (incomingDate.isAfter(_bestRestoreTransactionAt!)) {
+        // Newer purchase/restore wins even if tier is lower.
+        return false;
+      }
+    }
+
+    // Additive: undated Lifetime/exit-offer must not overwrite a dated 6M/1Y.
+    if (incomingDate == null &&
+        _bestRestoreTransactionAt != null &&
+        incomingTier >= 3 &&
+        _highestRestoredTierApplied > 0 &&
+        _highestRestoredTierApplied < 3) {
+      debugPrint(
+        'Restore: skip undated lifetime/exit over dated lower plan $productId',
+      );
+      return true;
+    }
+
     int currentTier = _highestRestoredTierApplied;
     if (downloadProvider != null) {
       final currentPlan = await downloadProvider.getSubscriptionPlan();
@@ -284,9 +357,226 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     return false;
   }
 
-  void _claimRestoreTier(int incomingTier) {
-    if (incomingTier > _highestRestoredTierApplied) {
-      _highestRestoredTierApplied = incomingTier;
+  void _claimRestoreCandidate(String productId, {String? transactionDate}) {
+    final tier = _restoreProductTier(productId);
+    if (tier <= 0) return;
+    final incomingDate = _parseRestoreTransactionDate(transactionDate);
+
+    if (_bestRestoreProductId == null) {
+      _bestRestoreProductId = productId;
+      _highestRestoredTierApplied = tier;
+      _bestRestoreTransactionAt = incomingDate;
+      return;
+    }
+
+    // Dated candidate replaces an undated prior claim.
+    if (incomingDate != null && _bestRestoreTransactionAt == null) {
+      _bestRestoreProductId = productId;
+      _highestRestoredTierApplied = tier;
+      _bestRestoreTransactionAt = incomingDate;
+      return;
+    }
+
+    if (incomingDate != null && _bestRestoreTransactionAt != null) {
+      if (incomingDate.isAfter(_bestRestoreTransactionAt!)) {
+        _bestRestoreProductId = productId;
+        _highestRestoredTierApplied = tier;
+        _bestRestoreTransactionAt = incomingDate;
+        return;
+      }
+      if (incomingDate.isBefore(_bestRestoreTransactionAt!)) {
+        return;
+      }
+    }
+
+    // Do not let undated higher tier replace a dated lower-tier claim.
+    if (incomingDate == null &&
+        _bestRestoreTransactionAt != null &&
+        tier > _highestRestoredTierApplied) {
+      return;
+    }
+
+    if (tier > _highestRestoredTierApplied) {
+      _bestRestoreProductId = productId;
+      _highestRestoredTierApplied = tier;
+      _bestRestoreTransactionAt = incomingDate ?? _bestRestoreTransactionAt;
+    }
+  }
+
+  void _resetRestoreSessionSelection() {
+    _highestRestoredTierApplied = 0;
+    _bestRestoreTransactionAt = null;
+    _bestRestoreProductId = null;
+  }
+
+  void _beginRestoreCollection() {
+    _resetRestoreSessionSelection();
+    _restoreCollectedProducts.clear();
+    _restoreCollecting = true;
+  }
+
+  void _queueRestoreProduct(String productId, String date) {
+    if (_restoreProductTier(productId) <= 0) return;
+    _restoreCollectedProducts.add({
+      'id': productId,
+      'date': date,
+    });
+    debugPrint(
+      'Restore collect: $productId date=$date '
+      'parsed=${_parseRestoreTransactionDate(date)}',
+    );
+  }
+
+  static const MethodChannel _iapMemoryChannel =
+      MethodChannel('com.biblebookapp/iap_memory');
+  static const String _lastIapProductPrefKey = 'last_iap_product_id';
+
+  /// Additive: remember the plan the user last bought/applied. Keychain keeps
+  /// it across delete+reinstall so Restore matches that plan (not highest tier).
+  Future<void> _rememberLastIapProduct(String productId) async {
+    if (productId.isEmpty || _restoreProductTier(productId) <= 0) return;
+    await SharPreferences.setString(_lastIapProductPrefKey, productId);
+    if (!Platform.isIOS) return;
+    try {
+      await _iapMemoryChannel.invokeMethod('setLastIapProduct', {
+        'productId': productId,
+      });
+    } catch (e) {
+      debugPrint('iap_memory set failed: $e');
+    }
+  }
+
+  Future<String?> _readLastIapProduct() async {
+    final local = await SharPreferences.getString(_lastIapProductPrefKey);
+    if (local != null && local.trim().isNotEmpty) return local.trim();
+    if (!Platform.isIOS) return null;
+    try {
+      final remote =
+          await _iapMemoryChannel.invokeMethod<String>('getLastIapProduct');
+      if (remote != null && remote.trim().isNotEmpty) {
+        await SharPreferences.setString(_lastIapProductPrefKey, remote.trim());
+        return remote.trim();
+      }
+    } catch (e) {
+      debugPrint('iap_memory get failed: $e');
+    }
+    return null;
+  }
+
+  /// Additive: among a pool, newest transaction wins; same date → higher tier.
+  Map<String, String>? _pickNewestThenHighestTier(
+    List<Map<String, String>> items,
+  ) {
+    Map<String, String>? best;
+    DateTime? bestDate;
+    var bestTier = -1;
+
+    for (final item in items) {
+      final productId = item['id'] ?? '';
+      final dateRaw = item['date'] ?? '';
+      final tier = _restoreProductTier(productId);
+      if (tier <= 0) continue;
+      final date = _parseRestoreTransactionDate(dateRaw);
+
+      if (best == null) {
+        best = item;
+        bestDate = date;
+        bestTier = tier;
+        continue;
+      }
+
+      if (date != null && bestDate == null) {
+        best = item;
+        bestDate = date;
+        bestTier = tier;
+        continue;
+      }
+      if (date == null && bestDate != null) continue;
+      if (date != null && bestDate != null) {
+        if (date.isAfter(bestDate)) {
+          best = item;
+          bestDate = date;
+          bestTier = tier;
+          continue;
+        }
+        if (date.isBefore(bestDate)) continue;
+      }
+
+      if (tier > bestTier) {
+        best = item;
+        bestDate = date ?? bestDate;
+        bestTier = tier;
+      }
+    }
+    return best;
+  }
+
+  /// Additive: prefer last bought product (Keychain/prefs); else newest timed;
+  /// Lifetime only when no timed plan was restored. Purchase apply unchanged.
+  Future<Map<String, String>?> _pickBestCollectedRestoreProduct() async {
+    final timed = <Map<String, String>>[];
+    final lifetimeOnly = <Map<String, String>>[];
+    final byId = <String, Map<String, String>>{};
+
+    for (final item in _restoreCollectedProducts) {
+      final productId = item['id'] ?? '';
+      final tier = _restoreProductTier(productId);
+      if (tier <= 0) continue;
+      byId[productId] = item;
+      if (tier >= 3) {
+        lifetimeOnly.add(item);
+      } else {
+        timed.add(item);
+      }
+    }
+
+    final remembered = await _readLastIapProduct();
+    if (remembered != null && byId.containsKey(remembered)) {
+      debugPrint(
+        'Restore pick: prefer last purchased $remembered '
+        '(ignored tier/date among ${byId.length} StoreKit product(s))',
+      );
+      return byId[remembered];
+    }
+
+    if (timed.isNotEmpty) {
+      final picked = _pickNewestThenHighestTier(timed);
+      debugPrint(
+        'Restore pick: prefer newest timed ${picked?['id']} '
+        '(ignored ${lifetimeOnly.length} lifetime candidate(s); '
+        'no remembered product match)',
+      );
+      return picked;
+    }
+    return _pickNewestThenHighestTier(lifetimeOnly);
+  }
+
+  Future<void> _applyBestCollectedRestore(
+    DashBoardController controller,
+  ) async {
+    final best = await _pickBestCollectedRestoreProduct();
+    _restoreCollecting = false;
+    if (best == null) {
+      EasyLoading.dismiss();
+      Constants.showToast('No active subscription available');
+      return;
+    }
+    debugPrint(
+      'Restore apply best: ${best['id']} date=${best['date']} '
+      'parsed=${_parseRestoreTransactionDate(best['date'])}',
+    );
+    _resetRestoreSessionSelection();
+    _forceApplyCollectedRestoreBest = true;
+    try {
+      await restorePurchaseHandle(
+        best['id'] ?? '',
+        best['date'] ?? '',
+        controller,
+        context: context,
+      );
+    } finally {
+      _forceApplyCollectedRestoreBest = false;
+      EasyLoading.dismiss();
     }
   }
 
@@ -1566,17 +1856,21 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       }
     }
 
-    // Additive: claim/skip before the existing delay so parallel 6M restores
-    // cannot race past a Lifetime/1Y restore.
+    // Additive: claim/skip before the existing delay so parallel restores
+    // keep the newest transaction (and tier only as a same-date tiebreaker).
     if (dataEarly == true || startFlagEarly == true) {
-      if (await _shouldSkipRestoreDowngrade(productId, downloadProviderEarly)) {
+      if (await _shouldSkipRestoreDowngrade(
+        productId,
+        downloadProviderEarly,
+        transactionDate: date,
+      )) {
         EasyLoading.dismiss();
         return;
       }
-      _claimRestoreTier(_restoreProductTier(productId));
+      _claimRestoreCandidate(productId, transactionDate: date);
     }
 
-    final dateTime = DateTime.tryParse(date) ?? DateTime.now();
+    final dateTime = _parseRestoreTransactionDate(date) ?? DateTime.now();
     await Future.delayed(Duration(seconds: 2));
     final data = await SharPreferences.getBoolean('restorepurches');
     final startFlag = await SharPreferences.getBoolean('startpurches');
@@ -1607,16 +1901,30 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         }
       }
 
-      // Additive: re-check after delay (higher tier may have claimed meanwhile).
-      if (await _shouldSkipRestoreDowngrade(productId, downloadProvider)) {
+      // Additive: re-check after delay (newer/higher candidate may have claimed).
+      if (await _shouldSkipRestoreDowngrade(
+        productId,
+        downloadProvider,
+        transactionDate: date,
+      )) {
         EasyLoading.dismiss();
         return;
       }
-      _claimRestoreTier(_restoreProductTier(productId));
+      _claimRestoreCandidate(productId, transactionDate: date);
+
+      // Additive: stamp last Buy product (Keychain) so reinstall Restore
+      // prefers that plan — not highest-tier among all StoreKit history.
+      if (startFlag == true) {
+        await _rememberLastIapProduct(productId);
+      }
 
       // Additive: match Lifetime the same way as 1Y/6M helpers (not exact ID only).
       if (_isLifetimeProductId(productId) || isExitOfferLifetime) {
-        if (await _shouldSkipRestoreDowngrade(productId, downloadProvider)) {
+        if (await _shouldSkipRestoreDowngrade(
+          productId,
+          downloadProvider,
+          transactionDate: date,
+        )) {
           EasyLoading.dismiss();
           return;
         }
@@ -1642,7 +1950,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         return;
       } else if (_isOneYearProductId(productId)) {
         // Additive: final guard before mutating expiry/plan.
-        if (await _shouldSkipRestoreDowngrade(productId, downloadProvider)) {
+        if (await _shouldSkipRestoreDowngrade(
+          productId,
+          downloadProvider,
+          transactionDate: date,
+        )) {
           EasyLoading.dismiss();
           return;
         }
@@ -1665,7 +1977,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         );
         return;
       } else if (_isTwoYearProductId(productId)) {
-        if (await _shouldSkipRestoreDowngrade(productId, downloadProvider)) {
+        if (await _shouldSkipRestoreDowngrade(
+          productId,
+          downloadProvider,
+          transactionDate: date,
+        )) {
           EasyLoading.dismiss();
           return;
         }
@@ -1685,7 +2001,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         );
         return;
       } else if (_isSixMonthProductId(productId)) {
-        if (await _shouldSkipRestoreDowngrade(productId, downloadProvider)) {
+        if (await _shouldSkipRestoreDowngrade(
+          productId,
+          downloadProvider,
+          transactionDate: date,
+        )) {
           EasyLoading.dismiss();
           return;
         }
@@ -1781,6 +2101,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     receiptData:
                         '${purchaseDetails.purchaseID}-productId:${purchaseDetails.productID}-date:${DateTime.now()}');
                 await SharPreferences.setBoolean("downloadreward", true);
+                // Additive: remember Buy product across reinstall Restore.
+                await _rememberLastIapProduct(purchaseDetails.productID);
                 await Future.delayed(Duration(seconds: 1));
                 if (_isSixMonthProductId(purchaseDetails.productID)) {
                   await _applySixMonthPremium(controller);
@@ -1956,7 +2278,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               }
             }
           } else if (purchaseDetails.status == PurchaseStatus.restored) {
-            EasyLoading.dismiss();
+            // Additive: keep Restoring… loader while collecting StoreKit products.
+            if (!_restoreCollecting) {
+              EasyLoading.dismiss();
+            }
             final restoreFlag =
                 await SharPreferences.getBoolean('restorepurches');
             final startFlag = await SharPreferences.getBoolean('startpurches');
@@ -2683,13 +3008,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     DashBoardController controller,
   ) async {
     if (!mounted) return;
-    //EasyLoading.dismiss();
     debugPrint("Restored Purchase: ${purchaseDetails.productID}");
 
-    //  await SharPreferences.setBoolean('restorepurches', true);
-    // setState(() {
-    //   isRestoreLoading = false;
-    // });
+    // Additive: during Restore-button collection, only queue — apply once later.
+    if (_restoreCollecting) {
+      _queueRestoreProduct(
+        purchaseDetails.productID,
+        purchaseDetails.transactionDate ?? '',
+      );
+      return;
+    }
+
     await restorePurchaseHandle(
       purchaseDetails.productID,
       purchaseDetails.transactionDate ?? '',
@@ -2703,59 +3032,46 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     // Check connectivity FIRST before showing loader
     final hasInternet = await InternetConnection().hasInternetAccess;
     if (!hasInternet) {
+      _restoreCollecting = false;
       Constants.showToast("No Internet Connection");
       return; // Return early - don't show loader or proceed
     }
 
-    // if (!Platform.isIOS) {
-    //   Constants.showToast("Restore is only available on iOS");
-    //   return;
-    // }
-
-    // setState(() {
-    //   isRestoreLoading = true;
-    // });
     EasyLoading.show(status: "Restoring...");
+    _beginRestoreCollection();
 
-    // try {
-    //   // This triggers restored purchases to come via purchaseStream
-    //   await InAppPurchase.instance.restorePurchases();
-    //   Constants.showToast("Restore request sent");
-    // } catch (e) {
-    //   Constants.showToast("Restore failed: $e");
-    // }
-
-    // EasyLoading.dismiss();
-    // setState(() => isRestoreLoading = false);
-//    await SharPreferences.setBoolean('restorepurches', true);
-    await _inAppPurchase.restorePurchases();
-    // setState(() {
-    //   isRestoreLoading = true;
-    // });
-    await Future.delayed(Duration(seconds: 9));
     try {
-      final res = await restorePurchase();
-      if (res['status'] == 'success') {
-        final rawData = res['data'].toString().split('-productId:');
-        if (rawData.length == 2) {
-          final data = rawData[1].split('-date:');
-          final productId = data[0].toString();
-          final date = data[1].toString();
-          await restorePurchaseHandle(productId, date, controller,
-              context: context);
-          Constants.showToast('Restore Successful');
-        }
-      } else {
-        Constants.showToast('No active subscription available');
-      }
-    } catch (e) {
-      //  Constants.showToast(' error No active subscription available');
+      await _inAppPurchase.restorePurchases();
+      await Future.delayed(Duration(seconds: 9));
 
+      // Additive: include API candidate when available (often fails with empty receipt).
+      try {
+        final res = await restorePurchase();
+        if (res != null && res['status'] == 'success') {
+          final rawData = res['data'].toString().split('-productId:');
+          if (rawData.length == 2) {
+            final data = rawData[1].split('-date:');
+            final productId = data[0].toString();
+            final date = data.length > 1 ? data[1].toString() : '';
+            _queueRestoreProduct(productId, date);
+          }
+        } else {
+          debugPrint(
+            'Restore API status not success: ${res?['status']} '
+            '(using StoreKit collected products)',
+          );
+        }
+      } catch (e) {
+        DebugConsole.log("restore API error - $e");
+      }
+
+      await _applyBestCollectedRestore(controller);
+    } catch (e) {
+      _restoreCollecting = false;
+      EasyLoading.dismiss();
       DebugConsole.log("restore No active subscription available error - $e");
+      Constants.showToast('No active subscription available');
     }
-    // setState(() {
-    //   isRestoreLoading = false;
-    // });
   }
 
   @override
@@ -2981,8 +3297,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         onPressed: () async {
                           await SharPreferences.setBoolean(
                               'restorepurches', true);
-                          // Additive: new Restore tap — allow fresh highest-tier selection.
-                          _highestRestoredTierApplied = 0;
                           await _restorePurchases(controller);
                         },
                         child: const Text(

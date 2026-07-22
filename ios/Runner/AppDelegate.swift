@@ -70,6 +70,60 @@ import flutter_local_notifications
       }
     }
 
+    // Additive: last IAP product id in Keychain (survives delete/reinstall).
+    let iapMemoryMessenger: FlutterBinaryMessenger? = {
+      if let controller = self.window?.rootViewController as? FlutterViewController {
+        return controller.binaryMessenger
+      }
+      return self.registrar(forPlugin: "com.biblebookapp.iap_memory")?.messenger()
+    }()
+    if let messenger = iapMemoryMessenger {
+      let channel = FlutterMethodChannel(
+        name: "com.biblebookapp/iap_memory",
+        binaryMessenger: messenger
+      )
+      channel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
+        let key = "last_iap_product_id"
+        if call.method == "setLastIapProduct" {
+          let productId = (call.arguments as? [String: Any])?["productId"] as? String ?? ""
+          guard !productId.isEmpty else {
+            result(false)
+            return
+          }
+          let data = Data(productId.utf8)
+          let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key,
+            kSecAttrService as String: "com.biblebookapp.iap_memory",
+          ]
+          SecItemDelete(query as CFDictionary)
+          var add = query
+          add[kSecValueData as String] = data
+          add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+          let status = SecItemAdd(add as CFDictionary, nil)
+          result(status == errSecSuccess)
+        } else if call.method == "getLastIapProduct" {
+          let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key,
+            kSecAttrService as String: "com.biblebookapp.iap_memory",
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+          ]
+          var item: CFTypeRef?
+          let status = SecItemCopyMatching(query as CFDictionary, &item)
+          guard status == errSecSuccess, let data = item as? Data,
+                let productId = String(data: data, encoding: .utf8), !productId.isEmpty else {
+            result(nil)
+            return
+          }
+          result(productId)
+        } else {
+          result(FlutterMethodNotImplemented)
+        }
+      }
+    }
+
     return result
   }
 }
