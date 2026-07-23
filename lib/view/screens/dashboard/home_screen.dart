@@ -30,6 +30,7 @@ import 'package:biblebookapp/view/screens/dashboard/ios_style_app_drawer.dart';
 import 'package:biblebookapp/view/screens/dashboard/social_link_screen.dart';
 import 'package:biblebookapp/view/screens/verse_topics/verse_topics_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
+import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/eproducts_screen.dart';
 
@@ -1207,6 +1208,10 @@ class _HomeScreenState extends State<HomeScreen>
   bool _readerAppBarScrollUpIntent = false;
   double _readerAppBarDragDelta = 0;
   static const double _kReaderAppBarToggleThreshold = 20.0;
+  /// Re-show top bar after scrolling up about this many verses.
+  static const double _kReaderAppBarShowVerseCount = 5.5;
+  /// Scroll offset when the bar was hidden / deepest point while hidden.
+  double _readerAppBarHiddenAnchorOffset = 0;
   List<VerseBookContentModel>? _lastContentSource;
   BuildContext? _bottomSheetContext; // Track bottom sheet context to dismiss it
   bool _exitOfferCooldownActive = false; // Red dot indicator (show after 3 days)
@@ -1334,6 +1339,7 @@ class _HomeScreenState extends State<HomeScreen>
     // First-streak Apple rating is shown on LeaveRatingScreen after Continue
     // on StreakCompletedScreen. Home only clears a leftover pending flag (e.g.
     // if the user left before the rating flow finished).
+    // Day-2+: Home shows a short loader + interstitial (not App Open).
     final count = await SharPreferences.getInt(
         SharPreferences.pendingStreakCompleteCelebration);
     if (count == null || count < 1 || !mounted) return;
@@ -1381,9 +1387,64 @@ class _HomeScreenState extends State<HomeScreen>
       } else {
         await _clearDeferUpgradeAfterStreakRating();
       }
+    } else if (count > 1) {
+      // Day-2+ Continue → Home: loader + interstitial only (no App Open).
+      await _showPostStreakInterstitialIfNeeded();
     }
     await SharPreferences.setInt(
         SharPreferences.pendingStreakCompleteCelebration, 0);
+  }
+
+  /// Additive: after Day-2+ streak Continue, show interstitial once on Home.
+  /// Does not change Mark-as-Read / Amen / swipe interstitial call sites.
+  Future<void> _showPostStreakInterstitialIfNeeded() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('showopenad', 'false');
+      await SharPreferences.setString('OpenAd', '1');
+
+      final shouldLoad = await SharPreferences.shouldLoadAd();
+      if (!shouldLoad || !mounted) return;
+
+      EasyLoading.showInfo('Please wait...');
+
+      // Interstitial is kicked off in checkUserLoggedIn; wait briefly if needed.
+      for (var i = 0; i < 15; i++) {
+        if (_adService.interstitialAd != null) break;
+        await Future.delayed(const Duration(milliseconds: 200));
+        if (!mounted) {
+          await EasyLoading.dismiss();
+          return;
+        }
+      }
+
+      if (!mounted) {
+        await EasyLoading.dismiss();
+        return;
+      }
+
+      try {
+        await _showInterstitialAdAndWait();
+      } catch (e) {
+        debugPrint('Post-streak interstitial error: $e');
+      } finally {
+        await EasyLoading.dismiss();
+        // Reload for later in-session uses (swipe / Amen, etc.).
+        if (mounted) {
+          final shouldReload = await SharPreferences.shouldLoadAd();
+          if (shouldReload) {
+            _adService.loadInterstitialAd(() {
+              if (mounted) setState(() {});
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Post-streak interstitial setup error: $e');
+      try {
+        await EasyLoading.dismiss();
+      } catch (_) {}
+    }
   }
 
   Future<void> _clearDeferUpgradeAfterStreakRating() async {
@@ -1433,6 +1494,9 @@ class _HomeScreenState extends State<HomeScreen>
       case 'open_streak':
         Get.to(() => const StreakConnectionScreen());
         break;
+      case 'open_faith_journey':
+        Get.to(() => const DailyJourneyScreen());
+        break;
       case 'open_reading':
         // Already on Home
         break;
@@ -1464,6 +1528,12 @@ class _HomeScreenState extends State<HomeScreen>
       Get.to(() => const PrayerGuidanceScreen());
     } else if (route == BibleWidgetRoute.chat) {
       Get.to(() => const ChatScreen());
+    } else if (route == BibleWidgetRoute.streak) {
+      // Live Activity / streak widget tap → Faith Journey (same as drawer).
+      // Clear native queued action so cold-start does not open this twice.
+      unawaited(SharPreferences.setString(
+          SharPreferences.pendingNotificationAction, ''));
+      Get.to(() => const DailyJourneyScreen());
     }
   }
 
@@ -2562,6 +2632,7 @@ class _HomeScreenState extends State<HomeScreen>
     _readerAppBarScrollUpIntent = false;
     _readerAppBarDragDelta = 0;
     _readerAppBarUserScrollingDown = false;
+    _readerAppBarHiddenAnchorOffset = 0;
     if (!_showUI.value) {
       _showUI.value = true;
     }
@@ -2649,6 +2720,8 @@ class _HomeScreenState extends State<HomeScreen>
       if (ModalRoute.of(context)?.isCurrent == true) {
         _onVisible();
         _maybeShowPendingFeedbackAfterReadingResume();
+        // Live Activity tap may land while Home is already open.
+        unawaited(_handlePendingNotificationAction());
       }
     }
   }
@@ -3690,7 +3763,8 @@ class _HomeScreenState extends State<HomeScreen>
                                             controller.selectedChapter.value,
                                       ),
                                   transition: Transition.cupertino,
-                                  duration: const Duration(milliseconds: 350));
+                                  duration: const Duration(milliseconds: 350),
+                                  opaque: true);
                             },
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -4004,6 +4078,16 @@ class _HomeScreenState extends State<HomeScreen>
                             Loader(),
                           ],
                         ))
+                      // UI-only: while chapter header advanced but verses still
+                      // belong to the previous chapter, cover with loader so
+                      // the old chapter does not flash/flicker.
+                      : (controller.selectedChapter.value.isNotEmpty &&
+                              readerVerses.isNotEmpty &&
+                              !controller.displayedContentMatchesSelection())
+                          ? ColoredBox(
+                              color: scaffoldBg,
+                              child: const Center(child: Loader()),
+                            )
                       : controller.selectedBookContent.isEmpty &&
                               !_hasDisplayedChapterContent
                           ? _buildEmptyContentWithChapters(controller)
@@ -5516,13 +5600,19 @@ class _HomeScreenState extends State<HomeScreen>
               height: 40,
               width: 120,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: colour),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: value == 0 ? Colors.grey[500] : colour,
+                  disabledBackgroundColor: Colors.grey[500],
+                ),
                 child: Text(
                   showButton ? 'Rate Us' : 'Feedback',
                   style: const TextStyle(color: Colors.white),
                 ),
-                onPressed: () =>
-                    _handleRatingButtonPress(state, showButton, currentTime),
+                // Keep tappable after stars are selected (value > 0).
+                onPressed: value == 0
+                    ? null
+                    : () => _handleRatingButtonPress(
+                        state, showButton, currentTime),
               ),
             );
           },
@@ -5837,6 +5927,16 @@ class _HomeScreenState extends State<HomeScreen>
             message =
                 "Hey, I've been using this Bible app that has transformed my daily Bible study experience. Try it now at : https://itunes.apple.com/app/id$appid";
           }
+          // Include referrer ID when available so invitees can enter it on Sign Up.
+          try {
+            final cached = await CacheNotifier()
+                .readCache(key: OwnReferralCodeDialog.referralCacheKey);
+            final referralCode = cached?.toString().trim() ?? '';
+            if (referralCode.isNotEmpty && message.isNotEmpty) {
+              message =
+                  "$message\n\nUse my referral code when you sign up: $referralCode";
+            }
+          } catch (_) {}
           if (message.isNotEmpty) {
             Share.share(
               message,
@@ -5881,7 +5981,8 @@ class _HomeScreenState extends State<HomeScreen>
         onSettingsTap: () {
           SharPreferences.getBoolean(SharPreferences.isNotificationOn)
               .then((value) {
-            final natificationValue = value ?? true;
+            // Default OFF when unset so denied permission never opens as ON.
+            final natificationValue = value ?? false;
             Future.microtask(() {
               Get.to(
                 () => SettingScreen(
@@ -6011,6 +6112,31 @@ class _HomeScreenState extends State<HomeScreen>
     Get.to(const FeedbackWebView());
   }
 
+  /// Approximate average verse row height from current chapter scroll metrics.
+  double _estimateReaderVerseExtent(ScrollMetrics metrics) {
+    try {
+      final controller = Get.find<DashBoardController>();
+      final count = controller.selectedBookContent.length;
+      if (count <= 0) return 100;
+      final total = metrics.maxScrollExtent + metrics.viewportDimension;
+      if (total <= 0) return 100;
+      return (total / count).clamp(70.0, 200.0);
+    } catch (_) {
+      return 100;
+    }
+  }
+
+  void _showReaderAppBarFromScroll() {
+    _readerAppBarPinnedVisible = true;
+    _readerAppBarPendingHide = false;
+    _readerAppBarScrollUpIntent = false;
+    _readerAppBarDragDelta = 0;
+    _readerAppBarHiddenAnchorOffset = 0;
+    if (!_showUI.value && mounted) {
+      _showUI.value = true;
+    }
+  }
+
   void _handleReaderScrollForAppBar(
     ScrollNotification notification,
     double currentOffset,
@@ -6028,29 +6154,21 @@ class _HomeScreenState extends State<HomeScreen>
         _readerAppBarDragDelta = 0;
         _readerAppBarPendingHide = false;
         _readerAppBarUserScrollingDown = false;
-        // Stay hidden after scroll-down stops until user scrolls up again.
-        if (!_readerAppBarPinnedVisible) {
-          _readerAppBarScrollUpIntent = false;
-        }
+        // Keep hide-anchor so upward distance still counts across pauses.
         if (notification.metrics.pixels <= 0 && !_showUI.value && mounted) {
-          _readerAppBarPinnedVisible = true;
-          _readerAppBarPendingHide = false;
-          _readerAppBarScrollUpIntent = false;
-          _showUI.value = true;
+          _showReaderAppBarFromScroll();
         }
         return;
       }
 
       if (notification.direction == ScrollDirection.reverse) {
         _readerAppBarPendingHide = false;
-        _readerAppBarDragDelta = 0;
+        _readerAppBarUserScrollingDown = false;
         if (_readerAppBarPinnedVisible) {
+          _readerAppBarDragDelta = 0;
           return;
         }
-        // Arm show only for a fresh upward gesture, not fling settle after scroll down.
-        if (!_readerAppBarUserScrollingDown) {
-          _readerAppBarScrollUpIntent = true;
-        }
+        _readerAppBarScrollUpIntent = true;
         return;
       }
 
@@ -6073,7 +6191,7 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     if (_readerAppBarPinnedVisible) {
-      // Reading down — hide after threshold (drag or fling).
+      // Reading down — hide after small threshold (unchanged).
       if (delta > 0) {
         _readerAppBarDragDelta += delta;
         if (_readerAppBarDragDelta >= _kReaderAppBarToggleThreshold) {
@@ -6081,6 +6199,7 @@ class _HomeScreenState extends State<HomeScreen>
           _readerAppBarPendingHide = false;
           _readerAppBarScrollUpIntent = false;
           _readerAppBarDragDelta = 0;
+          _readerAppBarHiddenAnchorOffset = currentOffset;
           if (_showUI.value && mounted) {
             _showUI.value = false;
           }
@@ -6092,21 +6211,20 @@ class _HomeScreenState extends State<HomeScreen>
       return;
     }
 
-    // Hidden — show only after deliberate scroll up, not when momentum settles.
-    if (delta < 0 && _readerAppBarScrollUpIntent) {
-      _readerAppBarDragDelta += delta;
-      if (_readerAppBarDragDelta <= -_kReaderAppBarToggleThreshold) {
-        _readerAppBarPinnedVisible = true;
-        _readerAppBarPendingHide = false;
-        _readerAppBarScrollUpIntent = false;
-        _readerAppBarDragDelta = 0;
-        if (!_showUI.value && mounted) {
-          _showUI.value = true;
-        }
-      }
-    } else if (delta > 0) {
-      _readerAppBarDragDelta = 0;
-      _readerAppBarScrollUpIntent = false;
+    // Hidden — track deepest point, show after ~5–6 verses scrolled upward.
+    if (currentOffset > _readerAppBarHiddenAnchorOffset) {
+      _readerAppBarHiddenAnchorOffset = currentOffset;
+    }
+
+    final verseExtent = _estimateReaderVerseExtent(notification.metrics);
+    final showAfterPixels = verseExtent * _kReaderAppBarShowVerseCount;
+    final scrolledUp = _readerAppBarHiddenAnchorOffset - currentOffset;
+
+    if (delta < 0 && scrolledUp >= showAfterPixels) {
+      _showReaderAppBarFromScroll();
+    } else if (notification.metrics.pixels <= 0) {
+      // Fewer than 5–6 verses left above — show at chapter top.
+      _showReaderAppBarFromScroll();
     }
   }
 

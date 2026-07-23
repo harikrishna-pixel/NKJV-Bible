@@ -115,6 +115,9 @@ class _SettingScreenState extends State<SettingScreen>
             notificationButtonValue2 = nt2 ?? false;
           });
           // Proceed with your logic
+        } else {
+          // Keep toggles aligned with OS permission (denied → OFF).
+          await _syncTogglesForDeniedPermission();
         }
         // final status2 = await Permission.notification.status;
         // debugPrint(
@@ -312,11 +315,8 @@ class _SettingScreenState extends State<SettingScreen>
         }
         // Proceed with your logic
       } else {
-        setState(() {
-          notificationButtonValue = false;
-          notificationButtonValue1 = false;
-          notificationButtonValue2 = false;
-        });
+        // Denied / restricted: toggles must stay OFF (prefs + UI).
+        await _syncTogglesForDeniedPermission();
       }
       // Update state at once
       setState(() {
@@ -507,7 +507,9 @@ class _SettingScreenState extends State<SettingScreen>
           break;
       }
     } else {
-      checkNotificationPermission();
+      // Permission denied — keep toggle OFF; existing prompt to open Settings.
+      await _syncTogglesForDeniedPermission();
+      await checkNotificationPermission();
     }
   }
 
@@ -847,6 +849,19 @@ class _SettingScreenState extends State<SettingScreen>
     });
   }
 
+  /// When OS notification permission is not allowed, Settings toggles must be OFF.
+  Future<void> _syncTogglesForDeniedPermission() async {
+    await SharPreferences.setBoolean(SharPreferences.isNotificationOn, false);
+    await SharPreferences.setBoolean(SharPreferences.isNotificationOn1, false);
+    await SharPreferences.setBoolean(SharPreferences.isNotificationOn2, false);
+    if (!mounted) return;
+    setState(() {
+      notificationButtonValue = false;
+      notificationButtonValue1 = false;
+      notificationButtonValue2 = false;
+    });
+  }
+
   Future<void> _persistNotificationTime(
       NotificationTime notificationTime) async {
     switch (notificationTime) {
@@ -870,15 +885,16 @@ class _SettingScreenState extends State<SettingScreen>
         break;
     }
 
-    await _setNotificationSlotEnabled(notificationTime, true);
-    _syncNotificationToggleUi(notificationTime, true);
-
-    Constants.showToast('Notification time updated successfully.');
-
     final status = await Permission.notification.status;
     if (status.isGranted || status.isLimited || status.isProvisional) {
+      await _setNotificationSlotEnabled(notificationTime, true);
+      _syncNotificationToggleUi(notificationTime, true);
+      Constants.showToast('Notification time updated successfully.');
       setNotification(notificationTime);
     } else {
+      // Time is saved, but toggle stays OFF until OS permission is granted.
+      await _syncTogglesForDeniedPermission();
+      Constants.showToast('Notification time updated successfully.');
       await checkNotificationPermission();
     }
   }
@@ -1078,16 +1094,27 @@ class _SettingScreenState extends State<SettingScreen>
     //     connectivityResult.first == ConnectivityResult.wifi ||
     //     connectivityResult.first == ConnectivityResult.mobile) {
 
+    // Keep open-ad / upgrade overlays from interrupting the system review
+    // sheet (that interruption greys out Submit after stars are tapped).
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('showopenad', 'false');
+      await SharPreferences.setString('OpenAd', '1');
+      await SharPreferences.setBoolean(
+          SharPreferences.deferUpgradeAlert, true);
+    } catch (_) {}
+
     final InAppReview inAppReview = InAppReview.instance;
 
     final isAvailable = await inAppReview.isAvailable();
     debugPrint('Is Available: $isAvailable. ');
     if (isAvailable) {
       try {
+        // Let the Settings tap gesture finish before presenting the sheet.
+        await Future.delayed(const Duration(milliseconds: 300));
         await inAppReview.requestReview();
-        await Future.delayed(Duration(seconds: 3));
-        // Don't check connectivity after review - it's not needed
-        // The review dialog doesn't require internet, and checking after can show false errors
+        // Do not delay/await here — work after requestReview() races the
+        // system sheet and can leave Submit disabled after selecting stars.
       } catch (e, st) {
         Constants.showToast("review request failed");
         debugPrint('Error: $e,$st');
@@ -1095,6 +1122,11 @@ class _SettingScreenState extends State<SettingScreen>
     } else {
       Constants.showToast("review request not available, try again later");
     }
+
+    // Clear defer after the user has had time with the sheet.
+    Future.delayed(const Duration(seconds: 5), () {
+      SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, false);
+    });
 
     // } else {
     //   Constants.showToast('Please connect to the internet');

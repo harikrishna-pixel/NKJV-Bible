@@ -339,48 +339,8 @@ class ProfileUpdateApi {
         }
       }
 
-      // apply-referral-code routes currently 404 on this backend; keep as
-      // last-resort only so future API availability does not require a release.
-      Uri applyQueryUri(String baseUrl, String referralCode, String uid) {
-        return Uri.parse('${baseUrl}api/apply-referral-code').replace(
-          queryParameters: {
-            'referral_code': referralCode,
-            'user_id': uid,
-            'app_id': appId,
-          },
-        );
-      }
-
-      Uri applyPathUri(String baseUrl, String referralCode, String uid) {
-        return Uri.parse('${baseUrl}api/apply-referral-code/$referralCode')
-            .replace(queryParameters: {
-          'user_id': uid,
-          'app_id': appId,
-        });
-      }
-
-      final tempToken = await _resolveTempAccessToken();
-      final applyGetAttempts = <({String suffix, String? token, Uri Function(String, String, String) buildUri})>[
-        (suffix: ' query auth', token: authtoken, buildUri: applyQueryUri),
-        (suffix: ' path auth', token: authtoken, buildUri: applyPathUri),
-        if (tempToken != null && tempToken.isNotEmpty)
-          (suffix: ' query temp', token: tempToken, buildUri: applyQueryUri),
-      ];
-
-      for (final attempt in applyGetAttempts) {
-        final body = await _tryApplyReferralCodeGet(
-          code: code,
-          userId: userId,
-          authtoken: attempt.token,
-          logSuffix: attempt.suffix,
-          buildUri: attempt.buildUri,
-        );
-        lastBody = body;
-        if (_profileResponseSucceeded(body)) {
-          return body;
-        }
-      }
-
+      // apply-referral-code is not deployed on this backend (always 404) —
+      // do not call it; it only overwrote the real profile-update error.
       return lastBody;
     } catch (e) {
       devtools.log('profile update referred_by error: $e');

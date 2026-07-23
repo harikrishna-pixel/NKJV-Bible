@@ -8,7 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
 
 /// Route to open when user taps a home widget. App should navigate to the matching screen.
-enum BibleWidgetRoute { verse, prayer, chat, none }
+enum BibleWidgetRoute { verse, prayer, chat, streak, none }
 
 /// Parses a widget launch URI (e.g. biblebookapp://prayer?homeWidget) and returns the route.
 BibleWidgetRoute getBibleWidgetRouteFromUri(Uri? uri) {
@@ -17,6 +17,7 @@ BibleWidgetRoute getBibleWidgetRouteFromUri(Uri? uri) {
   if (host == kWidgetRouteVerse) return BibleWidgetRoute.verse;
   if (host == kWidgetRoutePrayer) return BibleWidgetRoute.prayer;
   if (host == kWidgetRouteChat) return BibleWidgetRoute.chat;
+  if (host == kWidgetRouteStreak) return BibleWidgetRoute.streak;
   return BibleWidgetRoute.none;
 }
 
@@ -46,6 +47,7 @@ const String _kBibleChatTitleKey = 'widget_bible_chat_title';
 const String kWidgetRouteVerse = 'verse';
 const String kWidgetRoutePrayer = 'prayer';
 const String kWidgetRouteChat = 'chat';
+const String kWidgetRouteStreak = 'streak';
 
 /// Returns the verse text and reference currently shown on the Verse of the Day widget.
 /// Use when opening Daily Verse from widget tap so the same verse is displayed.

@@ -674,7 +674,8 @@ bool _isMisleadingLoginSuccessMessage(String? message) {
 String _referralApplyFailureMessage(String? profileResult) {
   final profileError = _profileUpdateErrorMessage(profileResult);
   if (profileError == null || profileError.isEmpty) {
-    return 'Invalid Referral code';
+    // Backend only wires referred_by during register — not login/profile.
+    return 'Enter this referral ID on the Sign Up screen';
   }
   final lower = profileError.toLowerCase();
   if (lower.contains('referral') ||
@@ -684,17 +685,13 @@ String _referralApplyFailureMessage(String? profileResult) {
       lower.contains('expired')) {
     return profileError;
   }
-  // Profile payload noise — not an invalid invite code.
-  if (lower.contains('email already exists')) {
-    return 'Unable to apply referral code. Please try again.';
-  }
-  // Ignore non-referral noise (404 endpoints, password/email field validation).
-  if (lower.contains('validation failed') ||
+  if (lower.contains('email already exists') ||
+      lower.contains('validation failed') ||
       lower.contains('page not found') ||
       lower.contains('password') ||
       lower.contains('the email field') ||
       lower.contains('the name field')) {
-    return 'Invalid Referral code';
+    return 'Enter this referral ID on the Sign Up screen';
   }
   return profileError;
 }
@@ -872,18 +869,16 @@ bool _referralWasAcceptedByApi(
 Future<String?> registerUser(
     {required String email,
     required String name,
-    required String password}) async {
+    required String password,
+    String? referredBy}) async {
   // final CacheNotifier cacheNotifier = CacheNotifier();
   try {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     List<String> selectedCategories =
         prefs.getStringList('selected_categories') ?? [];
     final token = await getTempToken();
-    final resp =
-        await http.post(Uri.parse(Api.register), headers: <String, String>{
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': 'Bearer $token'
-    }, body: {
+    final inviteCode = referredBy?.trim() ?? '';
+    final body = <String, String>{
       'name': name,
       'email': email,
       'password': password,
@@ -891,7 +886,16 @@ Future<String?> registerUser(
       'password_confirmation': password,
       'app_id': BibleInfo.appID,
       'interested_vc_tags': selectedCategories.toString()
-    });
+    };
+    // Backend accepts invite only at register (profile-update cannot set it).
+    if (inviteCode.isNotEmpty) {
+      body['referred_by'] = inviteCode;
+    }
+    final resp =
+        await http.post(Uri.parse(Api.register), headers: <String, String>{
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': 'Bearer $token'
+    }, body: body);
     final data = jsonDecode(resp.body);
 
     logAuthApiReferralFields('REGISTER API', data);
@@ -914,6 +918,19 @@ Future<String?> registerUser(
         await cacheNotifier.writeCache(
             key: OwnReferralCodeDialog.referralCacheKey,
             value: registeredReferralCode.trim());
+      }
+      if (inviteCode.isNotEmpty) {
+        final userMap = data['data'] is Map
+            ? data['data']['user']
+            : null;
+        final fromApi = userMap is Map
+            ? (userMap['referred_by'] ?? userMap['referredBy'] ?? '')
+                .toString()
+                .trim()
+            : '';
+        final stored =
+            fromApi.isNotEmpty ? fromApi : inviteCode;
+        await cacheNotifier.writeCache(key: 'referred_by', value: stored);
       }
       Constants.showToast("Account Created Successfully");
       return registeredReferralCode;
@@ -1058,6 +1075,52 @@ Future<UserModel> loginUser(
   }
 }
 
+/// Apply a friend's referral code while the user is already signed in
+/// (Account → Enter Referral Code). Uses the existing profile `referred_by`
+/// update path — does not alter login/signup apply flows.
+Future<void> applyReferralWhileLoggedIn({
+  required String referralCode,
+  String? ownReferralCode,
+  String? initialReferredBy,
+  int? initialReferralRewardClaimed,
+}) async {
+  final code = referralCode.trim();
+  if (code.isEmpty) {
+    throw 'Please enter a referral ID';
+  }
+  if (ownReferralCode != null &&
+      ownReferralCode.trim().isNotEmpty &&
+      code.toUpperCase() == ownReferralCode.trim().toUpperCase()) {
+    throw 'You cannot use your own referral code';
+  }
+
+  final alreadyApplied =
+      (initialReferredBy != null && initialReferredBy.trim().isNotEmpty) ||
+          ((initialReferralRewardClaimed ?? 0) > 0);
+  if (alreadyApplied) {
+    throw 'Referral code already applied';
+  }
+
+  final cachedReferredBy =
+      await cacheNotifier.readCache(key: 'referred_by');
+  if (cachedReferredBy != null &&
+      cachedReferredBy.toString().trim().isNotEmpty) {
+    throw 'Referral code already applied';
+  }
+
+  final email = await cacheNotifier.readCache(key: 'user');
+  final name = await cacheNotifier.readCache(key: 'name');
+  final profileResult = await ProfileUpdateApi().updateReferredBy(
+    referralCode: code,
+    email: email?.toString(),
+    name: name?.toString(),
+  );
+  if (!_profileUpdateSucceeded(profileResult)) {
+    throw _referralApplyFailureMessage(profileResult);
+  }
+  await cacheNotifier.writeCache(key: 'referred_by', value: code);
+}
+
 Future<void> applyReferralViaLogin({
   required String email,
   required String password,
@@ -1149,6 +1212,11 @@ Future<void> applyReferralViaLogin({
         (userMap['referred_by'] ?? userMap['referredBy'] ?? '')
             .toString()
             .trim();
+    final rewardClaimedRaw =
+        userMap['referral_reward_claimed'] ?? userMap['referralRewardClaimed'];
+    final rewardClaimed = rewardClaimedRaw is int
+        ? rewardClaimedRaw
+        : int.tryParse(rewardClaimedRaw?.toString() ?? '');
 
     await cacheNotifier.writeCache(
         key: 'user', value: '${userMap['email']}');
@@ -1159,30 +1227,39 @@ Future<void> applyReferralViaLogin({
     await cacheNotifier.writeCache(
         key: 'authtoken', value: '${responseData['token']}');
 
+    // Account-level guards (survive reinstall): if this user already entered a
+    // referral code or already claimed joining credit, do not apply again.
+    if (rewardClaimed != null && rewardClaimed > 0) {
+      if (referredByFromApi.isNotEmpty) {
+        await cacheNotifier.writeCache(
+            key: 'referred_by', value: referredByFromApi);
+      }
+      throw 'Referral code already applied';
+    }
+    if (referredByFromApi.isNotEmpty) {
+      await cacheNotifier.writeCache(
+          key: 'referred_by', value: referredByFromApi);
+      throw 'Referral code already applied';
+    }
+
     // Login often returns 200/true with empty referred_by even for a valid
     // code (it only authenticates). Confirm apply via profile / apply-referral.
-    var referralApplied = referredByFromApi.isNotEmpty &&
-        referredByFromApi.toUpperCase() == code.toUpperCase();
-
-    if (!referralApplied) {
+    debugPrint(
+        'applyReferralViaLogin: Login left referred_by empty; '
+        'confirming via profile apply-referral');
+    final profileResult = await ProfileUpdateApi().updateReferredBy(
+      referralCode: code,
+      email: email,
+      name: userMap['name']?.toString(),
+      password: password,
+    );
+    if (_profileUpdateSucceeded(profileResult)) {
+      debugPrint('applyReferralViaLogin: referral accepted by profile API');
+    } else {
       debugPrint(
-          'applyReferralViaLogin: Login left referred_by empty/mismatched '
-          '("$referredByFromApi"); confirming via profile apply-referral');
-      final profileResult = await ProfileUpdateApi().updateReferredBy(
-        referralCode: code,
-        email: email,
-        name: userMap['name']?.toString(),
-        password: password,
-      );
-      if (_profileUpdateSucceeded(profileResult)) {
-        referralApplied = true;
-        debugPrint('applyReferralViaLogin: referral accepted by profile API');
-      } else {
-        debugPrint(
-            'applyReferralViaLogin: profile apply failed '
-            '(${_profileUpdateErrorMessage(profileResult) ?? 'unknown'})');
-        throw _referralApplyFailureMessage(profileResult);
-      }
+          'applyReferralViaLogin: profile apply failed '
+          '(${_profileUpdateErrorMessage(profileResult) ?? 'unknown'})');
+      throw _referralApplyFailureMessage(profileResult);
     }
 
     await cacheNotifier.writeCache(key: 'referred_by', value: code);

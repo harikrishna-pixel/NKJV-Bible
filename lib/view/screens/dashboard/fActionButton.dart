@@ -922,14 +922,27 @@ class floatingButtonState extends State<floatingButton>
       // Update the reading screen via controller
       try {
         final controller = Get.find<DashBoardController>();
-        // Drive the reload via prefs + "ForRead" values, so the controller doesn't
-        // early-return thinking the already-visible content matches the new chapter.
+        // Sync in-memory chapter BEFORE reload. Leaving the old value made
+        // getSelectedChapterAndBook() prefer memory over prefs and skip-reload,
+        // so Next Chapter kept showing the previous chapter on the reader.
+        controller.selectedChapter.value = chapterNum.toString();
         controller.selectedChapterForRead.value = chapterNum.toString();
         controller.selectChapterChange.value = chapterNum;
+        // Keep book ForRead fields aligned so getBookContentForRead does not
+        // wipe the current book when those fields are still empty.
+        if (controller.selectedBookNumForRead.value.trim().isEmpty &&
+            controller.selectedBookNum.value.trim().isNotEmpty) {
+          controller.selectedBookNumForRead.value =
+              controller.selectedBookNum.value;
+        }
+        if (controller.selectedBookNameForRead.value.trim().isEmpty &&
+            controller.selectedBook.value.trim().isNotEmpty) {
+          controller.selectedBookNameForRead.value =
+              controller.selectedBook.value;
+        }
 
-        // Await chapter loads sequentially so ListView/AutoScrollTag does not
-        // rebuild from overlapping content updates (avoids LateInitializationError).
-        await controller.getSelectedChapterAndBook();
+        // Force a fresh chapter load (clears skip/early-return cache).
+        await controller.forceReloadSelectedChapter();
         await controller.getBookContentForRead();
 
         // Ensure the in-memory selected chapter matches what we just loaded.

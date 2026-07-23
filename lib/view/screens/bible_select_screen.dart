@@ -1210,13 +1210,19 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
               height: 40,
               width: 120,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: colour),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: value == 0 ? Colors.grey[500] : colour,
+                  disabledBackgroundColor: Colors.grey[500],
+                ),
                 child: Text(
                   showButton ? 'Rate Us' : 'Feedback',
                   style: const TextStyle(color: Colors.white),
                 ),
-                onPressed: () =>
-                    _handleRatingButtonPress(state, showButton, currentTime),
+                // Keep tappable after stars are selected (value > 0).
+                onPressed: value == 0
+                    ? null
+                    : () => _handleRatingButtonPress(
+                        state, showButton, currentTime),
               ),
             );
           },

@@ -1,4 +1,5 @@
 import 'package:biblebookapp/controller/api_service.dart';
+import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -14,7 +15,6 @@ import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/authenitcation/bloc/signup_bloc.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
-import 'package:biblebookapp/view/screens/authenitcation/view/widget/referral_code_bottom_sheet.dart';
 import 'package:biblebookapp/utils/email_validator.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/login_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
@@ -37,6 +37,7 @@ class SignupScreen extends HookConsumerWidget {
       bloc.emailCon.clear();
       bloc.passCon.clear();
       bloc.confirmPassCon.clear();
+      bloc.referralCon.clear();
       agree.value = false;
       return null;
     }, const []);
@@ -163,6 +164,11 @@ class SignupScreen extends HookConsumerWidget {
                                       return null;
                                     },
                                   ),
+                                  const SizedBox(height: 20),
+                                  CustomTextFormField(
+                                    controller: signupState.referralCon,
+                                    hintText: 'Referral ID (optional)',
+                                  ),
                                   SizedBox(height: screenWidth > 450 ? 19 : 15),
                                   Row(
                                     children: [
@@ -268,6 +274,9 @@ class SignupScreen extends HookConsumerWidget {
                                           FocusScope.of(context).unfocus();
                                           try {
                                             if (!signupState.isLoading) {
+                                              final inviteCode = signupState
+                                                  .referralCon.text
+                                                  .trim();
                                               var referralCode =
                                                   await signupState
                                                       .createAccount();
@@ -299,21 +308,17 @@ class SignupScreen extends HookConsumerWidget {
                                                   referralCode: referralCode,
                                                 );
                                               }
-                                              // Same sheet as login — signup
-                                              // already caches auth tokens, so
-                                              // the invitee can apply a shared
-                                              // code without signing in again.
-                                              if (context.mounted) {
-                                                await ReferralCodeBottomSheet.show(
-                                                  context: context,
-                                                  email: signupState
-                                                      .emailCon.text
-                                                      .trim(),
-                                                  password:
-                                                      signupState.passCon.text,
-                                                  ownReferralCode: referralCode,
-                                                  initialReferredBy: null,
-                                                );
+                                              // Credits only when invite was
+                                              // sent at register (API cannot
+                                              // apply referred_by afterward).
+                                              if (inviteCode.isNotEmpty) {
+                                                const rewardCredits = 100;
+                                                await WalletService.addCredits(
+                                                    rewardCredits);
+                                                await updateReferralRewardClaimed(
+                                                    value: rewardCredits);
+                                                Constants.showToast(
+                                                    'You received 100 free coins!');
                                               }
                                               if (!context.mounted) return;
                                               Get.offAll(() => HomeScreen(

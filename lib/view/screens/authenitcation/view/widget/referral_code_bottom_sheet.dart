@@ -12,16 +12,21 @@ import 'package:provider/provider.dart';
 class ReferralCodeBottomSheet extends StatefulWidget {
   const ReferralCodeBottomSheet({
     super.key,
-    required this.email,
-    required this.password,
+    this.email = '',
+    this.password = '',
     this.ownReferralCode,
     this.initialReferredBy,
+    this.initialReferralRewardClaimed,
+    this.useLoggedInSession = false,
   });
 
   final String email;
   final String password;
   final String? ownReferralCode;
   final String? initialReferredBy;
+  final int? initialReferralRewardClaimed;
+  /// When true, apply via profile API (Account section) — no password needed.
+  final bool useLoggedInSession;
 
   static Future<void> show({
     required BuildContext context,
@@ -29,7 +34,16 @@ class ReferralCodeBottomSheet extends StatefulWidget {
     required String password,
     String? ownReferralCode,
     String? initialReferredBy,
+    int? initialReferralRewardClaimed,
   }) {
+    // Do not open the sheet when this account already used a referral.
+    final alreadyReferred =
+        (initialReferredBy != null && initialReferredBy.trim().isNotEmpty) ||
+            ((initialReferralRewardClaimed ?? 0) > 0);
+    if (alreadyReferred) {
+      return Future.value();
+    }
+
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -54,6 +68,55 @@ class ReferralCodeBottomSheet extends StatefulWidget {
               password: password,
               ownReferralCode: ownReferralCode,
               initialReferredBy: initialReferredBy,
+              initialReferralRewardClaimed: initialReferralRewardClaimed,
+            ),
+          ),
+        );
+      },
+    ).whenComplete(() {
+      FocusManager.instance.primaryFocus?.unfocus();
+    });
+  }
+
+  /// Account section: enter a referral code while already signed in.
+  static Future<void> showForLoggedInUser({
+    required BuildContext context,
+    String? ownReferralCode,
+    String? initialReferredBy,
+    int? initialReferralRewardClaimed,
+  }) {
+    final alreadyReferred =
+        (initialReferredBy != null && initialReferredBy.trim().isNotEmpty) ||
+            ((initialReferralRewardClaimed ?? 0) > 0);
+    if (alreadyReferred) {
+      Constants.showToast('Referral code already applied');
+      return Future.value();
+    }
+
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final mediaQuery = MediaQuery.of(context);
+        final keyboardHeight = mediaQuery.viewInsets.bottom;
+        final availableHeight =
+            mediaQuery.size.height - mediaQuery.padding.top - 8;
+
+        return AnimatedPadding(
+          padding: EdgeInsets.only(bottom: keyboardHeight),
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: availableHeight - keyboardHeight,
+            ),
+            child: ReferralCodeBottomSheet(
+              ownReferralCode: ownReferralCode,
+              initialReferredBy: initialReferredBy,
+              initialReferralRewardClaimed: initialReferralRewardClaimed,
+              useLoggedInSession: true,
             ),
           ),
         );
@@ -117,13 +180,22 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
 
     setState(() => _isSubmitting = true);
     try {
-      await applyReferralViaLogin(
-        email: widget.email,
-        password: widget.password,
-        referralCode: _referralController.text.trim(),
-        ownReferralCode: widget.ownReferralCode,
-        initialReferredBy: widget.initialReferredBy,
-      );
+      if (widget.useLoggedInSession) {
+        await applyReferralWhileLoggedIn(
+          referralCode: _referralController.text.trim(),
+          ownReferralCode: widget.ownReferralCode,
+          initialReferredBy: widget.initialReferredBy,
+          initialReferralRewardClaimed: widget.initialReferralRewardClaimed,
+        );
+      } else {
+        await applyReferralViaLogin(
+          email: widget.email,
+          password: widget.password,
+          referralCode: _referralController.text.trim(),
+          ownReferralCode: widget.ownReferralCode,
+          initialReferredBy: widget.initialReferredBy,
+        );
+      }
       const rewardCredits = 100;
       await WalletService.addCredits(rewardCredits);
       // Notify backend that the referee reward was claimed (also credits referrer).
@@ -141,11 +213,12 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
           lower.contains('own referral') ||
           lower.contains('already applied') ||
           lower.contains('please enter') ||
+          lower.contains('sign up') ||
           lower.contains('no internet') ||
           lower.contains('something went wrong')) {
         Constants.showToast(message);
       } else {
-        Constants.showToast('Invalid Referral code');
+        Constants.showToast('Enter this referral ID on the Sign Up screen');
       }
     } finally {
       if (mounted) {
@@ -266,6 +339,19 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
                               ? BibleInfo.fontSizeScale * 16
                               : BibleInfo.fontSizeScale * 14,
                           height: 1.35,
+                          letterSpacing: BibleInfo.letterSpacing,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'New accounts: enter the ID on Sign Up for best results.',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: screenWidth > 450
+                              ? BibleInfo.fontSizeScale * 14
+                              : BibleInfo.fontSizeScale * 12,
+                          height: 1.3,
                           letterSpacing: BibleInfo.letterSpacing,
                         ),
                         textAlign: TextAlign.center,

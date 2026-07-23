@@ -375,10 +375,9 @@ class _HomeFrontPageState extends State<HomeFrontPage> {
                               SharPreferences.getBoolean(
                                       SharPreferences.isNotificationOn)
                                   .then((value) {
-                                bool natificationValue;
-                                value != null
-                                    ? natificationValue = value
-                                    : natificationValue = true;
+                                // Default OFF when unset so denied permission
+                                // never opens Settings toggles as ON.
+                                final natificationValue = value ?? false;
                                 Get.to(() => SettingScreen(
                                       notificationValue: natificationValue,
                                     ));

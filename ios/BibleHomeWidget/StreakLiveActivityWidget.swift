@@ -2,12 +2,16 @@ import ActivityKit
 import SwiftUI
 import WidgetKit
 
+/// Deep link when user taps the streak Live Activity (matches Flutter home widget routing).
+private let kStreakLiveActivityURL = URL(string: "biblebookapp://streak?homeWidget")
+
 /// Lock Screen + Dynamic Island UI for the Daily Streak Live Activity.
 @available(iOS 16.1, *)
 struct StreakLiveActivityWidget: Widget {
   var body: some WidgetConfiguration {
     ActivityConfiguration(for: StreakLiveActivityAttributes.self) { context in
       StreakLiveActivityLockScreenView(context: context)
+        .widgetURL(kStreakLiveActivityURL)
     } dynamicIsland: { context in
       DynamicIsland {
         DynamicIslandExpandedRegion(.leading) {
@@ -18,28 +22,34 @@ struct StreakLiveActivityWidget: Widget {
             Image(systemName: "flame.fill")
           }
           .foregroundColor(.orange)
+          .widgetURL(kStreakLiveActivityURL)
         }
         DynamicIslandExpandedRegion(.trailing) {
           Text("\(context.state.stepsCompleted)/\(context.state.stepsTotal)")
             .font(.headline)
             .monospacedDigit()
+            .widgetURL(kStreakLiveActivityURL)
         }
         DynamicIslandExpandedRegion(.bottom) {
           Text(context.state.statusText)
             .font(.caption)
             .foregroundColor(.secondary)
             .lineLimit(2)
+            .widgetURL(kStreakLiveActivityURL)
         }
       } compactLeading: {
         Image(systemName: "flame.fill")
           .foregroundColor(.orange)
+          .widgetURL(kStreakLiveActivityURL)
       } compactTrailing: {
         Text("\(context.state.streakCount)")
           .font(.caption2.weight(.bold))
           .monospacedDigit()
+          .widgetURL(kStreakLiveActivityURL)
       } minimal: {
         Image(systemName: "flame.fill")
           .foregroundColor(.orange)
+          .widgetURL(kStreakLiveActivityURL)
       }
     }
   }

@@ -983,9 +983,8 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
                               CachedNetworkImage(
                             imageUrl: photos[i].imageUrl ?? '',
                             fit: BoxFit.fill,
-                            placeholder: (context, url) => const Center(
-                              child: CircularProgressIndicator.adaptive(),
-                            ),
+                            // octo_image allows only one of placeholder /
+                            // progressIndicatorBuilder — keep progress.
                             progressIndicatorBuilder:
                                 (context, url, downloadProgress) => Center(
                               child: CircularProgressIndicator.adaptive(

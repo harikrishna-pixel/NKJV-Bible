@@ -201,7 +201,7 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer> {
     final aiChildren = <_DrawerSubItem>[
       if (widget.showAskAnything)
         _DrawerSubItem(
-          label: 'Ask Anything (AI)',
+          label: 'Ask Anything',
           icon: Icons.chat_bubble_outline_rounded,
           asset: 'assets/Chat icon.png',
           onTap: widget.onAskAnythingTap,

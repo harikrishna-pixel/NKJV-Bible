@@ -12,6 +12,7 @@ import 'package:biblebookapp/view/screens/profile/bloc/user_bloc.dart';
 import 'package:biblebookapp/view/screens/profile/model/library_status_model.dart';
 import 'package:biblebookapp/view/screens/profile/view/edit_profile_screen.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
+import 'package:biblebookapp/view/screens/authenitcation/view/widget/referral_code_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:provider/provider.dart' as P;
@@ -140,6 +141,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   String? message;
   String? user = '';
   String? _referralCode = '';
+  String? _referredBy = '';
+  int? _referralRewardClaimed;
   loadDB() async {
     final db = DBHelper();
     if (mounted) {
@@ -177,6 +180,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     final dataname = await cacheprovider.readCache(key: 'name');
     final referralCode = await cacheprovider.readCache(
         key: OwnReferralCodeDialog.referralCacheKey);
+    final referredBy = await cacheprovider.readCache(key: 'referred_by');
 
     debugPrint(' name is $dataname');
 
@@ -184,11 +188,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       setState(() {
         user = dataname;
         _referralCode = referralCode?.trim() ?? '';
+        _referredBy = referredBy?.toString().trim() ?? '';
       });
     } else {
       setState(() {
         user = '';
         _referralCode = '';
+        _referredBy = '';
+        _referralRewardClaimed = null;
       });
     }
   }
@@ -526,6 +533,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                 SizedBox(height: mheight * 0.03),
                                 ReferralCodeProfileSection(
                                   referralCode: _referralCode ?? '',
+                                  referredBy: _referredBy,
+                                  referralRewardClaimed: _referralRewardClaimed,
+                                  onEnterReferralTap: () async {
+                                    await ReferralCodeBottomSheet
+                                        .showForLoggedInUser(
+                                      context: context,
+                                      ownReferralCode:
+                                          (_referralCode ?? '').trim().isEmpty
+                                              ? null
+                                              : _referralCode,
+                                      initialReferredBy: _referredBy,
+                                      initialReferralRewardClaimed:
+                                          _referralRewardClaimed,
+                                    );
+                                    if (mounted) {
+                                      await checkuserloggedin();
+                                    }
+                                  },
                                 ),
                                 Text(
                                   'My Library Status'.toUpperCase(),

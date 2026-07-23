@@ -98,72 +98,141 @@ class ReferralCodeProfileSection extends StatelessWidget {
   const ReferralCodeProfileSection({
     super.key,
     required this.referralCode,
+    this.referredBy,
+    this.referralRewardClaimed,
+    this.onEnterReferralTap,
   });
 
   final String referralCode;
+  final String? referredBy;
+  final int? referralRewardClaimed;
+  final VoidCallback? onEnterReferralTap;
+
+  bool get _canEnterReferral {
+    final hasReferrer =
+        referredBy != null && referredBy!.trim().isNotEmpty;
+    final claimed = (referralRewardClaimed ?? 0) > 0;
+    return !hasReferrer && !claimed;
+  }
 
   @override
   Widget build(BuildContext context) {
     final code = referralCode.trim();
-    if (code.isEmpty) return const SizedBox.shrink();
-
     final screenWidth = MediaQuery.of(context).size.width;
     final primary = CommanColor.lightDarkPrimary(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Your Referral Code'.toUpperCase(),
-          style: const TextStyle(
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 18,
-            fontWeight: FontWeight.bold,
+        if (_canEnterReferral && onEnterReferralTap != null) ...[
+          Text(
+            'Enter Referral Code'.toUpperCase(),
+            style: const TextStyle(
+              letterSpacing: BibleInfo.letterSpacing,
+              fontSize: BibleInfo.fontSizeScale * 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-        const SizedBox(height: 10),
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.all(screenWidth > 450 ? 16 : 14),
-          decoration: BoxDecoration(
-            color: primary.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: primary.withOpacity(0.22)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                code,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: CommanColor.whiteBlack(context),
-                  fontSize: screenWidth > 450
-                      ? BibleInfo.fontSizeScale * 22
-                      : BibleInfo.fontSizeScale * 20,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 2,
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(screenWidth > 450 ? 16 : 14),
+            decoration: BoxDecoration(
+              color: primary.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: primary.withOpacity(0.22)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Missed entering a referral code at sign up? Add it here to claim your welcome reward.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: CommanColor.whiteBlack(context).withOpacity(0.75),
+                    fontSize: BibleInfo.fontSizeScale * 13,
+                    height: 1.35,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Share this code with friends or copy it anytime.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: CommanColor.whiteBlack(context).withOpacity(0.7),
-                  fontSize: BibleInfo.fontSizeScale * 13,
-                  height: 1.35,
+                const SizedBox(height: 14),
+                GestureDetector(
+                  onTap: onEnterReferralTap,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: primary,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      'Enter Referral Code',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: BibleInfo.fontSizeScale * 15,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: BibleInfo.letterSpacing,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              ReferralCodeShareActions(
-                referralCode: code,
-                includeAppLink: true,
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 20),
+          const SizedBox(height: 20),
+        ],
+        if (code.isNotEmpty) ...[
+          Text(
+            'Your Referral Code'.toUpperCase(),
+            style: const TextStyle(
+              letterSpacing: BibleInfo.letterSpacing,
+              fontSize: BibleInfo.fontSizeScale * 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(screenWidth > 450 ? 16 : 14),
+            decoration: BoxDecoration(
+              color: primary.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: primary.withOpacity(0.22)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  code,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: CommanColor.whiteBlack(context),
+                    fontSize: screenWidth > 450
+                        ? BibleInfo.fontSizeScale * 22
+                        : BibleInfo.fontSizeScale * 20,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Share this code with friends or copy it anytime.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: CommanColor.whiteBlack(context).withOpacity(0.7),
+                    fontSize: BibleInfo.fontSizeScale * 13,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                ReferralCodeShareActions(
+                  referralCode: code,
+                  includeAppLink: true,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
       ],
     );
   }

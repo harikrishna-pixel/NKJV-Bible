@@ -102,18 +102,29 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
   Widget build(BuildContext context) {
     final chapterCount =
         math.max(0, int.tryParse(widget.chapterCount.toString()) ?? 0);
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isVintage =
+        themeProvider.currentCustomTheme == AppCustomTheme.vintage;
+    final isDark = themeProvider.themeMode == ThemeMode.dark;
+    final scaffoldBg = isVintage
+        ? (isDark ? CommanColor.black : const Color(0xFFF5F0E6))
+        : (isDark
+            ? CommanColor.darkPrimaryColor
+            : themeProvider.backgroundColor);
 
     return Scaffold(
+      // Opaque so the Reading screen cannot show through during transitions.
+      backgroundColor: scaffoldBg,
       body: Container(
           height: MediaQuery.of(context).size.height,
           width: MediaQuery.of(context).size.width,
-          decoration: Provider.of<ThemeProvider>(context).currentCustomTheme ==
-                  AppCustomTheme.vintage
+          decoration: isVintage
               ? BoxDecoration(
+                  color: scaffoldBg,
                   image: DecorationImage(
                       image: AssetImage(Images.bgImage(context)),
                       fit: BoxFit.fill))
-              : null,
+              : BoxDecoration(color: scaffoldBg),
           child: loader == false
               ? const Center(
                   child: Loader(),
@@ -212,6 +223,9 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                             setState(() {
                               selectedChapter = index;
                               selectedChangeChapter = index;
+                              // Hide chapter grid before route fade so Reading
+                              // UI cannot composite over the grid (flicker).
+                              loader = false;
                             });
                             Get.offAll(
                                   () => HomeScreen(
@@ -222,7 +236,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                                       selectedBookNameForRead: "",
                                       selectedVerseForRead: ""),
                                   transition: Transition.fadeIn,
-                                  duration: Duration(milliseconds: 300));
+                                  duration: Duration(milliseconds: 300),
+                                  opaque: true);
                           },
                           child: Container(
                             height: 20,

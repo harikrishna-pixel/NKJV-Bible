@@ -13,6 +13,7 @@ class SignupBloc extends ChangeNotifier {
   TextEditingController nameCon = TextEditingController();
   TextEditingController passCon = TextEditingController();
   TextEditingController confirmPassCon = TextEditingController();
+  TextEditingController referralCon = TextEditingController();
   bool isLoading = false;
   UserModel? user;
   Future<String?> createAccount() async {
@@ -20,7 +21,11 @@ class SignupBloc extends ChangeNotifier {
     notifyListeners();
     try {
       final referralCode = await registerUser(
-          email: emailCon.text, name: nameCon.text, password: passCon.text);
+        email: emailCon.text,
+        name: nameCon.text,
+        password: passCon.text,
+        referredBy: referralCon.text.trim(),
+      );
       isLoading = false;
       notifyListeners();
       return referralCode;

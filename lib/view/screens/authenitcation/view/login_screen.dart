@@ -160,13 +160,23 @@ class LoginScreen extends HookConsumerWidget {
                                   Constants.showToast(
                                       "Hi ${user.displayName}, Welcome to ${BibleInfo.bible_shortName}");
                                   if (context.mounted) {
-                                    await ReferralCodeBottomSheet.show(
-                                      context: context,
-                                      email: loginState.emailCon.text.trim(),
-                                      password: loginState.passCon.text,
-                                      ownReferralCode: user.referralCode,
-                                      initialReferredBy: user.referredBy,
-                                    );
+                                    // One referral join per account — skip if
+                                    // this user already entered a code / claimed.
+                                    final alreadyReferred = (user.referredBy !=
+                                                null &&
+                                            user.referredBy!.trim().isNotEmpty) ||
+                                        ((user.referralRewardClaimed ?? 0) > 0);
+                                    if (!alreadyReferred) {
+                                      await ReferralCodeBottomSheet.show(
+                                        context: context,
+                                        email: loginState.emailCon.text.trim(),
+                                        password: loginState.passCon.text,
+                                        ownReferralCode: user.referralCode,
+                                        initialReferredBy: user.referredBy,
+                                        initialReferralRewardClaimed:
+                                            user.referralRewardClaimed,
+                                      );
+                                    }
                                   }
                                   if (!context.mounted) return;
                                   if (popOnSuccess) {

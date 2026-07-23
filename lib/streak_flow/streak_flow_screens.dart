@@ -4118,8 +4118,8 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                                 await prefs.setString("showopenad", "false");
                                 await SharPreferences.setString('OpenAd', '1');
                               } else {
-                                // Later streak days: allow open ad on next cold start only.
-                                await prefs.setString("showopenad", "true");
+                                // Day-2+: Home shows interstitial (not App Open) after Continue.
+                                await prefs.setString("showopenad", "false");
                                 await SharPreferences.setString('OpenAd', '1');
                               }
                             } catch (_) {}

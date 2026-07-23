@@ -1065,9 +1065,8 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
   static const double _kActionIconSize = 44;
   static const double _kShieldIconSize = 58;
   static const double _kImportIconSize = 56;
-  static const double _kCloudImageWidth = 176;
-  static const double _kCloudImageHeight = 154;
-  static const double _kCloudSlotHeight = 98;
+  static const double _kCloudImageWidth = 120;
+  static const double _kCloudImageHeight = 104;
 
   Widget _backupIcon(String asset, {double size = 28}) {
     return Image.asset(
@@ -1437,8 +1436,9 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
                             color: _brownMuted.withValues(alpha: 0.9),
                           ),
                         ),
+                        const SizedBox(height: 12),
                         _cloudIllustration(signedIn: _isSignedIn),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 8),
                         if (_isSignedIn)
                           (_backupFailed
                               ? _signedInFailedStatusBox()
@@ -1501,21 +1501,12 @@ class _MainBackupDialogState extends State<MainBackupDialog> {
   }
 
   Widget _cloudIllustration({required bool signedIn}) {
-    return SizedBox(
-      height: _kCloudSlotHeight,
-      width: double.infinity,
-      child: OverflowBox(
-        alignment: Alignment.center,
-        minWidth: _kCloudImageWidth,
-        maxWidth: _kCloudImageWidth,
-        minHeight: _kCloudImageHeight,
-        maxHeight: _kCloudImageHeight,
-        child: Image.asset(
-          signedIn ? _assetRefresh : _assetLockCloud,
-          width: _kCloudImageWidth,
-          height: _kCloudImageHeight,
-          fit: BoxFit.contain,
-        ),
+    return Center(
+      child: Image.asset(
+        signedIn ? _assetRefresh : _assetLockCloud,
+        width: _kCloudImageWidth,
+        height: _kCloudImageHeight,
+        fit: BoxFit.contain,
       ),
     );
   }

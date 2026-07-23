@@ -1921,8 +1921,8 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
       final pendingStreakRating = await SharPreferences.getInt(
               SharPreferences.pendingStreakCompleteCelebration) ??
           0;
-      // Never stack open ad with Apple rating (streak day-1 review).
-      if (deferForRating || pendingStreakRating == 1) {
+      // Never stack open ad with streak day-1 rating OR day-2+ post-streak interstitial.
+      if (deferForRating || pendingStreakRating >= 1) {
         await prefs.setString("showopenad", "false");
         await SharPreferences.setString('OpenAd', '1');
         await _markOpenAdFlowComplete();

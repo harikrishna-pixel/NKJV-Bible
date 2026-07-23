@@ -2637,14 +2637,17 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     required double imageHeightFactor,
     double imageTop = 0,
     Alignment imageAlignment = Alignment.topCenter,
+    bool isDark = false,
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final imageHeight = constraints.maxHeight * imageHeightFactor;
+        final baseColor =
+            isDark ? CommanColor.darkPrimaryColor : _kPrayerGuidanceCream;
         return Stack(
           fit: StackFit.expand,
           children: [
-            const ColoredBox(color: _kPrayerGuidanceCream),
+            ColoredBox(color: baseColor),
             Positioned(
               top: imageTop,
               left: 0,
@@ -2665,13 +2668,21 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.white.withOpacity(0.62),
-                          Colors.white.withOpacity(0.22),
-                          Colors.transparent,
-                          _kPrayerGuidanceCream.withOpacity(0.45),
-                          _kPrayerGuidanceCream,
-                        ],
+                        colors: isDark
+                            ? [
+                                Colors.black.withOpacity(0.55),
+                                Colors.black.withOpacity(0.28),
+                                Colors.transparent,
+                                baseColor.withOpacity(0.55),
+                                baseColor,
+                              ]
+                            : [
+                                Colors.white.withOpacity(0.62),
+                                Colors.white.withOpacity(0.22),
+                                Colors.transparent,
+                                _kPrayerGuidanceCream.withOpacity(0.45),
+                                _kPrayerGuidanceCream,
+                              ],
                         stops: const [0.0, 0.22, 0.42, 0.72, 1.0],
                       ),
                     ),
@@ -2690,12 +2701,19 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.white.withOpacity(0.9),
-                        Colors.white.withOpacity(0.62),
-                        Colors.white.withOpacity(0.18),
-                        Colors.transparent,
-                      ],
+                      colors: isDark
+                          ? [
+                              Colors.black.withOpacity(0.72),
+                              Colors.black.withOpacity(0.42),
+                              Colors.black.withOpacity(0.12),
+                              Colors.transparent,
+                            ]
+                          : [
+                              Colors.white.withOpacity(0.9),
+                              Colors.white.withOpacity(0.62),
+                              Colors.white.withOpacity(0.18),
+                              Colors.transparent,
+                            ],
                       stops: const [0.0, 0.38, 0.72, 1.0],
                     ),
                   ),
@@ -3087,11 +3105,18 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
         ),
       );
     }
+    final systemIsDark =
+        Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark;
+    // Main category screen stays light scenic; response view uses dark scrim
+    // so white title/subtitle remain readable in dark mode.
+    final useDarkScrim =
+        !_prayerGuidanceIsMainScreen() && systemIsDark;
     return Positioned.fill(
       child: _prayerGuidanceSceneBackground(
         imageHeightFactor: 0.45,
         imageTop: -1,
         imageAlignment: const Alignment(0, -0.65),
+        isDark: useDarkScrim,
       ),
     );
   }
@@ -3561,6 +3586,15 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                   color: headerColor,
                   fontFamily: 'Georgia',
                   height: 1.1,
+                  shadows: isDark
+                      ? const [
+                          Shadow(
+                            color: Color(0xCC000000),
+                            blurRadius: 10,
+                            offset: Offset(0, 1),
+                          ),
+                        ]
+                      : null,
                 ),
               ),
             ),
@@ -3579,13 +3613,21 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                   height: 1.35,
                   color: isDark ? Colors.white : _kPrayerGuidanceInk,
                   fontWeight: FontWeight.w700,
-                  shadows: const [
-                    Shadow(
-                      color: Color(0x66FFFFFF),
-                      blurRadius: 6,
-                      offset: Offset(0, 1),
-                    ),
-                  ],
+                  shadows: isDark
+                      ? const [
+                          Shadow(
+                            color: Color(0xCC000000),
+                            blurRadius: 8,
+                            offset: Offset(0, 1),
+                          ),
+                        ]
+                      : const [
+                          Shadow(
+                            color: Color(0x66FFFFFF),
+                            blurRadius: 6,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
                 ),
               ),
             ),

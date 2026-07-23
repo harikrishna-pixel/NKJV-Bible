@@ -22,6 +22,11 @@ import flutter_local_notifications
 
     let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
 
+    // If launched from streak Live Activity deep link, queue Faith Journey open.
+    if let url = launchOptions?[.url] as? URL {
+      Self.queueFaithJourneyIfStreakLiveActivity(url: url)
+    }
+
     // ✅ Correct: use registrar ONLY
     if let registrar = self.registrar(forPlugin: "com.biblebookapp.move_to_back") {
       let channel = FlutterMethodChannel(
@@ -125,5 +130,25 @@ import flutter_local_notifications
     }
 
     return result
+  }
+
+  override func application(
+    _ app: UIApplication,
+    open url: URL,
+    options: [UIApplication.OpenURLOptionsKey: Any] = [:]
+  ) -> Bool {
+    Self.queueFaithJourneyIfStreakLiveActivity(url: url)
+    return super.application(app, open: url, options: options)
+  }
+
+  /// Live Activity tap uses biblebookapp://streak — queue Faith Journey for Home to open.
+  private static func queueFaithJourneyIfStreakLiveActivity(url: URL) {
+    guard url.scheme?.lowercased() == "biblebookapp",
+          url.host?.lowercased() == "streak" else { return }
+    // Flutter SharedPreferences on iOS stores keys with the "flutter." prefix.
+    UserDefaults.standard.set(
+      "open_faith_journey",
+      forKey: "flutter.pending_notification_action"
+    )
   }
 }

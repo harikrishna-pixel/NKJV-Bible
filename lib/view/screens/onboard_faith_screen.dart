@@ -114,12 +114,24 @@ class _FaithOnboardingScreenState extends State<FaithOnboardingScreen> {
     await NotificationsServices().initialiseNotifications();
 
     // Then request permission explicitly if needed
+    PermissionStatus status;
     if (Platform.isAndroid) {
-      final status = await Permission.notification.request();
+      status = await Permission.notification.request();
       debugPrint('Android Notification Permission: $status');
     } else if (Platform.isIOS) {
-      final status = await Permission.notification.request();
+      status = await Permission.notification.request();
       debugPrint('iOS Notification Permission: $status');
+    } else {
+      return;
+    }
+
+    // If user denied (e.g. Don't Allow), keep Settings toggles OFF.
+    final permitted =
+        status.isGranted || status.isLimited || status.isProvisional;
+    if (!permitted) {
+      await SharPreferences.setBoolean(SharPreferences.isNotificationOn, false);
+      await SharPreferences.setBoolean(SharPreferences.isNotificationOn1, false);
+      await SharPreferences.setBoolean(SharPreferences.isNotificationOn2, false);
     }
   }
 
