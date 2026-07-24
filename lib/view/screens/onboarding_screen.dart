@@ -1,4 +1,5 @@
 import 'package:biblebookapp/view/constants/colors.dart';
+import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/preference_selection_screen.dart';
 import 'package:flutter/material.dart';
@@ -94,7 +95,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: Image.asset(
-                    'assets/Icon-1024.png',
+                    Images.appIcon1024,
                     width: isTablet ? 120 : 88,
                     height: isTablet ? 120 : 88,
                     fit: BoxFit.contain,

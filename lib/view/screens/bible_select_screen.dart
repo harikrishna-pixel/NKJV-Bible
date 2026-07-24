@@ -542,7 +542,7 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                   decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       image: DecorationImage(
-                          image: AssetImage("assets/Icon-1024.png"))),
+                          image: AssetImage(Images.appIcon1024))),
                 ),
                 // const Icon(Icons.menu_book, size: 48, color: Colors.brown),
                 const SizedBox(height: 10),
@@ -1649,7 +1649,7 @@ class CustomAlertBox {
               children: [
                 // Bible Image/Icon
                 Image.asset(
-                  "assets/Icon-1024.png", // replace with your Bible icon
+                  Images.appIcon1024, // replace with your Bible icon
                   height: isTablet ? 100 : 70,
                   fit: BoxFit.contain,
                 ),

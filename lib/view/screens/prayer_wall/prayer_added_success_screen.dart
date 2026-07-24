@@ -44,7 +44,7 @@ class PrayerAddedSuccessScreen extends StatelessWidget {
                   image: AssetImage(Images.bgImage(context)),
                   fit: BoxFit.cover,
                 ),
-              )
+         )
             : BoxDecoration(color: cream),
         child: Scaffold(
           backgroundColor: Colors.transparent,

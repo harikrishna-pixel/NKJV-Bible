@@ -31,6 +31,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
+import 'package:biblebookapp/view/constants/images.dart';
 
 
 // Color constants for streak completion screen
@@ -1242,7 +1243,7 @@ Widget _streakShareCardForCapture(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Image.asset(
-                      'assets/Icon-1024.png',
+                      Images.appIcon1024,
                       height: 22,
                       width: 22,
                     ),

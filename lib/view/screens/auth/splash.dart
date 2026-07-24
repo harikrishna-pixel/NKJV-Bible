@@ -10,6 +10,7 @@ import 'package:biblebookapp/view/screens/onboard_faith_screen.dart';
 import 'package:biblebookapp/view/screens/welcome_screen.dart';
 import 'package:biblebookapp/view/screens/notification_info_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/preference_selection_screen.dart';
+import 'package:biblebookapp/view/constants/images.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -1504,7 +1505,7 @@ class _SplashScreenState extends State<SplashScreen>
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(22),
                     child: Image.asset(
-                      'assets/Icon-1024.png',
+                      Images.appIcon1024,
                       width: iconSize,
                       height: iconSize,
                       fit: BoxFit.cover,

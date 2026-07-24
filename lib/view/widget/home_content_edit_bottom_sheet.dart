@@ -7102,7 +7102,7 @@ class VerseShareImageCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Image.asset(
-                      'assets/Icon-1024.png',
+                      Images.appIcon1024,
                       height: 22,
                       width: 22,
                     ),
@@ -7229,7 +7229,7 @@ class VerseShareImageCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Image.asset(
-                    'assets/Icon-1024.png',
+                    Images.appIcon1024,
                     height: 22,
                     width: 22,
                   ),

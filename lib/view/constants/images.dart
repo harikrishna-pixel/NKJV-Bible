@@ -84,6 +84,9 @@ class Images {
         : 'assets/lightMode/icons/logo.png';
   }
 
+  /// App icon (1024). Use this instead of hardcoding the asset path.
+  static const String appIcon1024 = 'assets/Icon-1024.png';
+
   static String adFree(BuildContext context) {
     return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
         ? 'assets/icons/crown.png'

@@ -1,4 +1,5 @@
 import 'package:biblebookapp/view/constants/colors.dart';
+import 'package:biblebookapp/view/constants/images.dart';
 import 'package:flutter/material.dart';
 
 /// Accordion iOS-style cream drawer (collapsed rows + expanded sub-items).
@@ -37,7 +38,7 @@ class IosStyleAppDrawer extends StatefulWidget {
     this.showEProducts = false,
     this.footer,
     this.tagline = 'Grow in Faith. Walk in Truth.',
-    this.appIconAsset = 'assets/Icon-1024.png',
+    this.appIconAsset = Images.appIcon1024,
     this.crownAsset = 'assets/gold-premium-icons/top_crown.png',
   });
 

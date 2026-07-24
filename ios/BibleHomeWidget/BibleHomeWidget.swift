@@ -91,6 +91,8 @@ private struct WidgetImageSurface<Content: View>: View {
             Image(imageName)
               .resizable()
               .scaledToFill()
+              .frame(maxWidth: .infinity, maxHeight: .infinity)
+              .clipped()
             RadialGradient(
               colors: [Color.clear, Color.black.opacity(0.18)],
               center: .center,
@@ -105,6 +107,8 @@ private struct WidgetImageSurface<Content: View>: View {
         Image(imageName)
           .resizable()
           .scaledToFill()
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .clipped()
         content()
       }
     }
@@ -130,20 +134,25 @@ private struct LeatherSurface<Content: View>: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .containerBackground(for: .widget) {
           ZStack {
-            Image("widget_parchment_bg")
+            leatherBackground
+            Image("widget_leather_bg")
               .resizable()
               .scaledToFill()
-            Color(red: 0.28, green: 0.16, blue: 0.10).opacity(0.84)
+              .frame(maxWidth: .infinity, maxHeight: .infinity)
+              .clipped()
+            Color(red: 0.28, green: 0.16, blue: 0.10).opacity(0.72)
           }
         }
     } else {
       ZStack {
         leatherBackground
-        Image("widget_parchment_bg")
+        Image("widget_leather_bg")
           .resizable()
           .scaledToFill()
-          .opacity(0.35)
-        Color(red: 0.28, green: 0.16, blue: 0.10).opacity(0.75)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .clipped()
+          .opacity(0.55)
+        Color(red: 0.28, green: 0.16, blue: 0.10).opacity(0.7)
         content()
       }
     }
@@ -354,15 +363,6 @@ struct BiblePrayerView: View {
     // with the same gradient to ensure edge-to-edge rendering inside widget bounds.
     if family == .systemLarge || family == .systemMedium {
       ZStack {
-        LinearGradient(
-          colors: [
-            Color(red: 0.99, green: 0.86, blue: 0.76),
-            Color(red: 0.98, green: 0.92, blue: 0.82)
-          ],
-          startPoint: .top,
-          endPoint: .bottom
-        )
-
         VStack(spacing: 0) {
             HStack {
               Spacer()
@@ -411,7 +411,7 @@ struct BiblePrayerView: View {
             .padding(.horizontal, 18)
             .padding(.vertical, 16)
             .frame(maxWidth: .infinity)
-            .background(Color(red: 0.99, green: 0.96, blue: 0.90))
+            .background(Color(red: 0.99, green: 0.96, blue: 0.90).opacity(0.92))
             .overlay(
               RoundedRectangle(cornerRadius: 18)
                 .stroke(Color(red: 0.88, green: 0.82, blue: 0.73), lineWidth: 1)
@@ -437,7 +437,7 @@ struct BiblePrayerView: View {
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .padding(0)
       .widgetURL(URL(string: "biblebookapp://prayer?homeWidget"))
-      .modifier(_PrayerWidgetGradientBackground())
+      .modifier(_PrayerWidgetImageBackground())
     } else {
       OldPaperSurface {
         VStack(alignment: .leading, spacing: 6) {
@@ -463,33 +463,30 @@ struct BiblePrayerView: View {
   }
 }
 
-/// Applies prayer widget gradient as containerBackground on iOS 17+.
-private struct _PrayerWidgetGradientBackground: ViewModifier {
+/// Full-bleed prayer background image (dashboard ads / IAP logic untouched).
+private struct _PrayerWidgetImageBackground: ViewModifier {
   func body(content: Content) -> some View {
     if #available(iOS 17.0, *) {
       content
         .containerBackground(for: .widget) {
-          LinearGradient(
-            colors: [
-              Color(red: 0.99, green: 0.86, blue: 0.76),
-              Color(red: 0.98, green: 0.92, blue: 0.82)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-          )
+          ZStack {
+            Color(red: 0.99, green: 0.86, blue: 0.76)
+            Image("widget_prayer_guidance_bg")
+              .resizable()
+              .scaledToFill()
+              .frame(maxWidth: .infinity, maxHeight: .infinity)
+              .clipped()
+          }
         }
     } else {
-      content
-        .background(
-          LinearGradient(
-            colors: [
-              Color(red: 0.99, green: 0.86, blue: 0.76),
-              Color(red: 0.98, green: 0.92, blue: 0.82)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-          )
-        )
+      ZStack {
+        Image("widget_prayer_guidance_bg")
+          .resizable()
+          .scaledToFill()
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .clipped()
+        content
+      }
     }
   }
 }
@@ -498,15 +495,22 @@ private struct _VerseImageBackground: ViewModifier {
   func body(content: Content) -> some View {
     if #available(iOS 17.0, *) {
       content.containerBackground(for: .widget) {
-        Image("widget_path_bg")
-          .resizable()
-          .scaledToFill()
+        ZStack {
+          oldPaperBackground
+          Image("widget_verse_image_bg")
+            .resizable()
+            .scaledToFill()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
+        }
       }
     } else {
       ZStack {
-        Image("widget_path_bg")
+        Image("widget_verse_image_bg")
           .resizable()
           .scaledToFill()
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .clipped()
         content
       }
     }

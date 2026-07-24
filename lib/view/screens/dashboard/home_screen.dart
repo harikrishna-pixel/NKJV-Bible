@@ -2173,7 +2173,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Image.asset(
-                                    "assets/Icon-1024.png",
+                                    Images.appIcon1024,
                                       height: 22,
                                       width: 22,
                                   ),
@@ -5102,7 +5102,7 @@ class _HomeScreenState extends State<HomeScreen>
                   decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       image: DecorationImage(
-                          image: AssetImage("assets/Icon-1024.png"))),
+                          image: AssetImage(Images.appIcon1024))),
                 ),
                 // const Icon(Icons.menu_book, size: 48, color: Colors.brown),
                 const SizedBox(height: 10),
