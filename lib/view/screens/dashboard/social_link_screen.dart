@@ -394,83 +394,53 @@ class _CommunityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      color: isDark
-          ? Colors.white.withOpacity(0.08)
-          : const Color(0xFFF7EFE4),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: isDark
-              ? Colors.white.withOpacity(0.14)
-              : const Color(0xFFE6D8C8),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: isDark
-                      ? [
-                    titleColor.withOpacity(0.55),
-                    titleColor.withOpacity(0.85),
-                  ]
-                      : const [
-                    Color(0xFF8D6E63),
-                    Color(0xFF5C4033),
-                  ],
+    // Plain informational row — no card fill/border so it doesn't look tappable.
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 72,
+            height: 72,
+            child: Image.asset(
+              'assets/community.png',
+              width: 72,
+              height: 72,
+              fit: BoxFit.contain,
+              color: titleColor.withOpacity(isDark ? 0.92 : 0.85),
+              colorBlendMode: BlendMode.srcIn,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Be part of our growing community',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: titleColor,
+                    height: 1.3,
+                    fontFamily: 'Georgia',
+                  ),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: titleColor.withOpacity(0.22),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
+                const SizedBox(height: 4),
+                Text(
+                  'Connect, share and grow together in faith.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.35,
+                    color: mutedColor,
+                    fontWeight: FontWeight.w400,
                   ),
-                ],
-              ),
-              child: const Icon(
-                Icons.groups_rounded,
-                color: Colors.white,
-                size: 26,
-              ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Be part of our growing community',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: titleColor,
-                      height: 1.25,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Connect, share and grow together in faith.',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      height: 1.3,
-                      color: mutedColor,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

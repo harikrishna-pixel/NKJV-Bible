@@ -314,15 +314,29 @@ class MyApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           themeMode: themeProvider.themeMode,
           theme: MyThemes.lightTheme(context, themeProvider.backgroundColor),
-          darkTheme: MyThemes.darkTheme(context),
+          darkTheme: MyThemes.darkTheme(
+            context,
+            themeProvider.backgroundColor,
+            themeProvider.currentCustomTheme,
+          ),
           defaultTransition: Transition.cupertino,
           transitionDuration: const Duration(milliseconds: 350),
           home: SplashScreen(),
           builder: (context, child) {
+            // Bridge color behind route transitions. A fixed cream color caused a
+            // bright white flash/line in dark mode (e.g. Read → Home).
+            final usesLightCustom =
+                themeProvider.currentCustomTheme == AppCustomTheme.white ||
+                    themeProvider.currentCustomTheme ==
+                        AppCustomTheme.lightbrown;
+            final isDarkBridge = themeProvider.themeMode == ThemeMode.dark &&
+                !usesLightCustom;
+            final bridgeColor =
+                isDarkBridge ? Colors.black : const Color(0xFFF2E6D4);
             return EasyLoading.init()(
               context,
               ColoredBox(
-                color: const Color(0xFFF2E6D4),
+                color: bridgeColor,
                 child: child ?? const SizedBox.shrink(),
               ),
             );

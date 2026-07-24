@@ -23,6 +23,25 @@ class MarkAsReadScreen extends StatefulWidget {
       required this.RededBookName,
       required this.SelectedBookChapterCount});
 
+  /// Presentation-only: always push as an opaque route so the reader never
+  /// shows through during Mark as Read / Next Chapter transitions (real devices).
+  static Future<T?>? open<T>({
+    required String ReadedChapter,
+    required String RededBookName,
+    required String SelectedBookChapterCount,
+  }) {
+    return Get.to<T>(
+      () => MarkAsReadScreen(
+        ReadedChapter: ReadedChapter,
+        RededBookName: RededBookName,
+        SelectedBookChapterCount: SelectedBookChapterCount,
+      ),
+      opaque: true,
+      transition: Transition.cupertino,
+      duration: const Duration(milliseconds: 350),
+    );
+  }
+
   @override
   State<MarkAsReadScreen> createState() => _MarkAsReadScreenState();
 }
@@ -255,6 +274,8 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
         debugPrint('open reader forceReload: $e');
       }
     }
+    // Opaque cupertino (not fadeIn): fadeIn stacked this screen over the new
+    // reader on real devices when switching OT→NT / Next Book.
     Get.offAll(
       () => HomeScreen(
         From: "Chapter",
@@ -264,7 +285,7 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
         selectedBookNameForRead: bookNameHint,
         selectedVerseForRead: "",
       ),
-      transition: Transition.fadeIn,
+      transition: Transition.cupertino,
       duration: const Duration(milliseconds: 280),
       opaque: true,
     );

@@ -158,8 +158,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       setState(() {});
     });
 
-    // Load interstitial for back-button ad (one ad when leaving Chat for unsubscribed)
-    _chatBackAdService.loadInterstitialAd(() {});
+    // Load interstitial for back-button ad (one ad when leaving Chat for unsubscribed).
+    // Respect dashboard ads-disabled (same shouldLoadAd gate as Home).
+    SharPreferences.shouldLoadAd().then((shouldLoad) {
+      if (!shouldLoad || !mounted) return;
+      _chatBackAdService.loadInterstitialAd(() {});
+    });
   }
 
   @override
@@ -1208,6 +1212,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           ['platinum', 'gold', 'silver'].contains(plan.toLowerCase());
       if (!isSubscribed) {
         try {
+          // Dashboard ads off → never show chat-back interstitial.
+          final shouldLoadAd = await SharPreferences.shouldLoadAd();
+          if (!shouldLoadAd) {
+            // fall through to Get.back below
+          } else {
           // Show back interstitial at most once every 3 minutes (shared with Prayer)
           final lastStr = await SharPreferences.getString(
               SharPreferences.lastBackInterstitialTime);
@@ -1230,6 +1239,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     now.toIso8601String());
               }
             }
+          }
           }
         } catch (_) {}
       }

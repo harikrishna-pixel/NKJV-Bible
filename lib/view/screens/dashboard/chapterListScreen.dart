@@ -106,11 +106,10 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     final isVintage =
         themeProvider.currentCustomTheme == AppCustomTheme.vintage;
     final isDark = themeProvider.themeMode == ThemeMode.dark;
+    // White/yellow themes always use their light surface (even in Dark Mode).
     final scaffoldBg = isVintage
         ? (isDark ? CommanColor.black : const Color(0xFFF5F0E6))
-        : (isDark
-            ? CommanColor.darkPrimaryColor
-            : themeProvider.backgroundColor);
+        : themeProvider.backgroundColor;
 
     return Scaffold(
       // Opaque so the Reading screen cannot show through during transitions.

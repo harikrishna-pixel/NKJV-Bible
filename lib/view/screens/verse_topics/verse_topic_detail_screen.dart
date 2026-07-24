@@ -180,7 +180,8 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
             selectedVerseForRead: verseText,
             fromSearch: true,
           ),
-          transition: Transition.fadeIn,
+          // Avoid fadeIn — it briefly reveals the light app bridge color.
+          transition: Transition.cupertino,
           duration: const Duration(milliseconds: 280),
           opaque: true,
         );
@@ -207,7 +208,8 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
           selectedVerseForRead: verseText,
           fromSearch: true,
         ),
-        transition: Transition.fadeIn,
+        // Avoid fadeIn — it briefly reveals the light app bridge color.
+        transition: Transition.cupertino,
         duration: const Duration(milliseconds: 280),
         opaque: true,
       );

@@ -469,17 +469,26 @@ class floatingButtonState extends State<floatingButton>
               selectedChapterContent.length == curretNo + 1) {
             // End of current chapter, move to next chapter
             if (mounted) {
+              // Remember we were in an active TTS session before stop-for-reload.
+              final wasSpeaking = isSpeech || ttsState == TtsState.playing;
               await _stop();
               // Clear old voice text to prevent speaking old verse
               _newVoiceText = null;
               setState(() {
                 selectedChapter++;
                 curretNo = 0; // Reset to first verse of new chapter
+                // _stop() clears isSpeech; restore so the intended auto-continue runs.
+                if (wasSpeaking && !isManuallyPaused) {
+                  isSpeech = true;
+                  shouldAutoAdvance = true;
+                }
               });
               // Wait for setState to complete
               await Future.delayed(const Duration(milliseconds: 50));
               // Load chapter content and wait for it to complete
               await setChapterContent();
+              // Keep reading screen chapter aligned with TTS (same helper as audio).
+              await updateReadingScreenChapter(selectedChapter);
               if (mounted &&
                   selectedChapterContent.isNotEmpty &&
                   curretNo >= 0 &&
@@ -492,10 +501,13 @@ class floatingButtonState extends State<floatingButton>
                 // Don't auto-speak if manually paused
                 if (mounted &&
                     !isManuallyPaused &&
-                    isSpeech &&
+                    shouldAutoAdvance &&
                     _newVoiceText != null &&
                     _newVoiceText!.isNotEmpty) {
-                  _speak();
+                  if (!isSpeech) {
+                    setState(() => isSpeech = true);
+                  }
+                  await _speak();
                 }
               }
             }
@@ -513,9 +525,13 @@ class floatingButtonState extends State<floatingButton>
               // Don't auto-speak if manually paused
               if (mounted &&
                   !isManuallyPaused &&
+                  shouldAutoAdvance &&
                   _newVoiceText != null &&
                   _newVoiceText!.isNotEmpty) {
-                _speak();
+                if (!isSpeech) {
+                  setState(() => isSpeech = true);
+                }
+                await _speak();
               }
             }
           }
@@ -834,43 +850,91 @@ class floatingButtonState extends State<floatingButton>
     closeaudio();
   }
 
-  /// Additive: pause chapter audio while a fullscreen ad is showing.
+  /// Additive: pause chapter audio / TTS while a fullscreen ad is showing.
   /// Does not stop/seek; only pause so we can resume after the ad.
+  /// MP3 and TTS are handled independently — neither early-return blocks the other.
   bool _audioPausedForAd = false;
+  bool _ttsPausedForAd = false;
 
   Future<void> pausePlaybackForAd() async {
     _audioPausedForAd = false;
+    _ttsPausedForAd = false;
     if (!mounted) return;
+
+    // MP3 path (unchanged behavior)
     try {
-      final playing = isAudioPlaying ||
-          audioPlayer.state == PlayerState.playing;
-      if (!playing) return;
-      await audioPlayer.pause();
-      _audioPausedForAd = true;
-      if (mounted) {
-        setState(() {
-          isAudioPlaying = false;
-        });
+      final playing =
+          isAudioPlaying || audioPlayer.state == PlayerState.playing;
+      if (playing) {
+        await audioPlayer.pause();
+        _audioPausedForAd = true;
+        if (mounted) {
+          setState(() {
+            isAudioPlaying = false;
+          });
+        }
       }
     } catch (e) {
-      debugPrint('pausePlaybackForAd: $e');
+      debugPrint('pausePlaybackForAd audio: $e');
+    }
+
+    // TTS path (additive only — Mark as Read ad overlap fix)
+    try {
+      final ttsPlaying = isSpeech || ttsState == TtsState.playing;
+      if (ttsPlaying && _isTtsInitialized) {
+        await flutterTts.pause();
+        _ttsPausedForAd = true;
+        if (mounted) {
+          setState(() {
+            ttsState = TtsState.paused;
+            isSpeech = false;
+            // Prevent completion handler from advancing while the ad is up.
+            isManuallyPaused = true;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('pausePlaybackForAd tts: $e');
     }
   }
 
-  /// Additive: resume only if we paused for an ad (no-op otherwise).
+  /// Additive: resume only what we paused for an ad (no-op otherwise).
   Future<void> resumePlaybackAfterAd() async {
-    if (!_audioPausedForAd) return;
-    _audioPausedForAd = false;
-    if (!mounted) return;
-    try {
-      await audioPlayer.resume();
-      if (mounted) {
-        setState(() {
-          isAudioPlaying = true;
-        });
+    if (!mounted) {
+      _audioPausedForAd = false;
+      _ttsPausedForAd = false;
+      return;
+    }
+
+    // MP3 resume (unchanged behavior)
+    if (_audioPausedForAd) {
+      _audioPausedForAd = false;
+      try {
+        await audioPlayer.resume();
+        if (mounted) {
+          setState(() {
+            isAudioPlaying = true;
+          });
+        }
+      } catch (e) {
+        debugPrint('resumePlaybackAfterAd audio: $e');
       }
-    } catch (e) {
-      debugPrint('resumePlaybackAfterAd: $e');
+    }
+
+    // TTS resume (additive only)
+    if (_ttsPausedForAd) {
+      _ttsPausedForAd = false;
+      try {
+        if (mounted) {
+          setState(() {
+            isManuallyPaused = false;
+            isSpeech = true;
+          });
+        }
+        await _speak();
+      } catch (e) {
+        debugPrint('resumePlaybackAfterAd tts: $e');
+      }
     }
   }
 
@@ -916,38 +980,60 @@ class floatingButtonState extends State<floatingButton>
       if (mounted) {
         setState(() {
           selectedChapter = chapterNum;
+          audioChapterNum = chapterNum;
         });
       }
 
       // Update the reading screen via controller
       try {
         final controller = Get.find<DashBoardController>();
+        // Capture live book BEFORE touching ForRead — getBookContentForRead()
+        // assigns selectedBook/Num FROM ForRead and can wipe a valid book when
+        // ForRead is still empty/"null" from HomeScreen init.
+        final liveBookNum = controller.selectedBookNum.value.trim();
+        final liveBookName = controller.selectedBook.value.trim();
+        final liveChapterCount =
+            controller.selectedBookChapterCount.value.trim();
+
         // Sync in-memory chapter BEFORE reload. Leaving the old value made
         // getSelectedChapterAndBook() prefer memory over prefs and skip-reload,
         // so Next Chapter kept showing the previous chapter on the reader.
         controller.selectedChapter.value = chapterNum.toString();
         controller.selectedChapterForRead.value = chapterNum.toString();
         controller.selectChapterChange.value = chapterNum;
-        // Keep book ForRead fields aligned so getBookContentForRead does not
-        // wipe the current book when those fields are still empty.
-        if (controller.selectedBookNumForRead.value.trim().isEmpty &&
-            controller.selectedBookNum.value.trim().isNotEmpty) {
-          controller.selectedBookNumForRead.value =
-              controller.selectedBookNum.value;
+
+        if (liveBookNum.isNotEmpty && liveBookNum.toLowerCase() != 'null') {
+          controller.selectedBookNum.value = liveBookNum;
+          controller.selectedBookNumForRead.value = liveBookNum;
         }
-        if (controller.selectedBookNameForRead.value.trim().isEmpty &&
-            controller.selectedBook.value.trim().isNotEmpty) {
-          controller.selectedBookNameForRead.value =
-              controller.selectedBook.value;
+        if (liveBookName.isNotEmpty && liveBookName.toLowerCase() != 'null') {
+          controller.selectedBook.value = liveBookName;
+          controller.selectedBookNameForRead.value = liveBookName;
+        }
+        if (liveChapterCount.isNotEmpty) {
+          currentBookChapterCount =
+              int.tryParse(liveChapterCount) ?? currentBookChapterCount;
         }
 
         // Force a fresh chapter load (clears skip/early-return cache).
         await controller.forceReloadSelectedChapter();
-        await controller.getBookContentForRead();
+
+        // Only call getBookContentForRead when the reader still doesn't match —
+        // calling it always can re-apply stale ForRead and undo the reload.
+        if (!controller.displayedContentMatchesSelection()) {
+          await controller.getBookContentForRead();
+        }
 
         // Ensure the in-memory selected chapter matches what we just loaded.
         controller.selectedChapter.value = chapterNum.toString();
+        controller.selectedChapterForRead.value = chapterNum.toString();
         controller.selectChapterChange.value = chapterNum;
+
+        // New list instance so GetX/Home ListView cannot keep a stale identity.
+        if (controller.selectedBookContent.isNotEmpty) {
+          controller.selectedBookContent.value =
+              List.from(controller.selectedBookContent);
+        }
 
         final scrollCtrl = controller.autoScrollController.value;
         if (scrollCtrl.hasClients) {
@@ -1093,46 +1179,134 @@ class floatingButtonState extends State<floatingButton>
     }
   }
 
-  Future<void> setChapterContent() async {
-    await Future.delayed(Duration(milliseconds: 2000));
+  /// Candidate verse lists for TTS. Full-book lists first so next/prev chapter
+  /// can resolve; on-screen chapter last for instant open.
+  /// Do not gate on book_num equality — selectedBookNum and verse.bookNum can
+  /// differ by ±1 for some books after candidate loading.
+  List<List<VerseBookContentModel>> _ttsVerseSources() {
+    final sources = <List<VerseBookContentModel>>[];
+
+    if (widget.contentList.isNotEmpty) {
+      sources.add(widget.contentList);
+    }
+
+    if (Get.isRegistered<DashBoardController>()) {
+      final c = Get.find<DashBoardController>();
+      if (c.selectedVersesContent.isNotEmpty) {
+        sources.add(c.selectedVersesContent);
+      }
+      if (c.selectedBookContent.isNotEmpty) {
+        sources.add(c.selectedBookContent);
+      }
+    }
+
+    return sources;
+  }
+
+  /// Detect 0-based chapters from the full book when possible (chapter-only
+  /// lists often lack chapter 0, which wrongly looks 1-based).
+  bool _ttsChaptersAreZeroBased(List<VerseBookContentModel> verses) {
+    if (Get.isRegistered<DashBoardController>()) {
+      final full = Get.find<DashBoardController>().selectedVersesContent;
+      if (full.isNotEmpty) {
+        return full.any((v) => (v.chapterNum ?? -1) == 0);
+      }
+    }
+    return verses.any((v) => (v.chapterNum ?? -1) == 0);
+  }
+
+  /// Same 0-/1-based chapter matching as the reader controller.
+  List<VerseBookContentModel> _filterTtsChapter(
+    List<VerseBookContentModel> verses,
+    int uiChapter,
+  ) {
+    if (verses.isEmpty) return [];
+    final safe = uiChapter <= 0 ? 1 : uiChapter;
+    final zeroBased = _ttsChaptersAreZeroBased(verses);
+    final stored = zeroBased ? safe - 1 : safe;
+
+    var matched =
+        verses.where((v) => v.chapterNum?.toInt() == stored).toList();
+    if (matched.isNotEmpty) return matched;
+
+    // Mixed/legacy DBs: try the alternate basis once (same as controller).
+    final alt = zeroBased ? safe : safe - 1;
+    if (alt >= 0 && alt != stored) {
+      matched = verses.where((v) => v.chapterNum?.toInt() == alt).toList();
+      if (matched.isNotEmpty) return matched;
+    }
+
+    // Already chapter-scoped list: accept only if it is that UI chapter.
+    final chapters = verses
+        .map((v) => v.chapterNum?.toInt())
+        .whereType<int>()
+        .toSet();
+    if (chapters.length == 1 &&
+        (chapters.first == stored ||
+            chapters.first == safe ||
+            chapters.first + 1 == safe)) {
+      return List<VerseBookContentModel>.from(verses);
+    }
+    return [];
+  }
+
+  List<VerseBookContentModel> _resolveTtsChapterVerses({
+    bool preferReaderChapter = false,
+  }) {
+    final uiChapter = selectedChapter <= 0 ? 1 : selectedChapter;
+
+    // When opening the TTS sheet, always prefer verses already on screen.
+    // Fixes Loading/1/0 when selectedChapter or full-book cache is stale.
+    // Next/prev chapter calls omit this flag so existing advance logic is unchanged.
+    if (preferReaderChapter && Get.isRegistered<DashBoardController>()) {
+      final onScreen = Get.find<DashBoardController>().selectedBookContent;
+      if (onScreen.isNotEmpty) {
+        return List<VerseBookContentModel>.from(onScreen);
+      }
+    }
+
+    for (final source in _ttsVerseSources()) {
+      final matched = _filterTtsChapter(source, uiChapter);
+      if (matched.isNotEmpty) return matched;
+    }
+    return const <VerseBookContentModel>[];
+  }
+
+  /// Applies matched verses to TTS state. Synchronous so the sheet can open
+  /// with content already filled when data is ready.
+  void _applyTtsChapterContent(List<VerseBookContentModel> matched) {
+    selectedChapterContent
+      ..clear()
+      ..addAll(matched);
+    start = 0;
+    end = isInitialTime ? 0 : (_newVoiceText?.length ?? 0);
+    curretNo = 0;
+    if (selectedChapterContent.isNotEmpty) {
+      _newVoiceText = selectedChapterContent[0].content;
+    }
+  }
+
+  Future<void> setChapterContent({bool preferReaderChapter = false}) async {
+    // Instant when verses for selectedChapter are already in memory.
+    var matched =
+        _resolveTtsChapterVerses(preferReaderChapter: preferReaderChapter);
+    if (matched.isNotEmpty) {
+      if (!mounted) return;
+      setState(() => _applyTtsChapterContent(matched));
+      return;
+    }
+
+    // Slow path only when content is not ready yet (rare / first load).
+    for (var attempt = 0; attempt < 10; attempt++) {
+      await Future.delayed(const Duration(milliseconds: 200));
+      if (!mounted) return;
+      matched =
+          _resolveTtsChapterVerses(preferReaderChapter: preferReaderChapter);
+      if (matched.isNotEmpty) break;
+    }
 
     if (!mounted) return;
-    selectedChapterContent.clear();
-    start = 0;
-    end = 0;
-    if (mounted) {
-      setState(() {
-        curretNo = 0;
-      });
-    }
-    // Use Completer to ensure we wait for content to be loaded
-    final completer = Completer<void>();
-    Future.delayed(Duration.zero, () {
-      if (!mounted) {
-        completer.complete();
-        return;
-      }
-      for (var i = 0; i < (widget.contentList.length ?? 0); i++) {
-        if (selectedChapter ==
-            int.parse((widget.contentList[i].chapterNum).toString()) + 1) {
-          if (mounted) {
-            setState(() {
-              start = 0;
-              end = isInitialTime ? 0 : (_newVoiceText?.length ?? 0);
-              selectedChapterContent.add(widget.contentList[i]);
-              // Only set _newVoiceText if list is not empty and curretNo is valid
-              if (selectedChapterContent.isNotEmpty &&
-                  curretNo >= 0 &&
-                  curretNo < selectedChapterContent.length) {
-                _newVoiceText = selectedChapterContent[curretNo].content;
-              }
-            });
-          }
-        }
-      }
-      completer.complete();
-    });
-    await completer.future;
+    setState(() => _applyTtsChapterContent(matched));
   }
 
   @override
@@ -1493,8 +1667,25 @@ class floatingButtonState extends State<floatingButton>
               // If not repeating, auto-advance to next chapter (if available)
               // and avoid re-entrant calls using isNext flag.
               if (!repeat && !isNext) {
-                final lastChapter = currentBookChapterCount;
-                if (audioChapterNum < lastChapter) {
+                // Prefer widget/controller chapter count (same as Next button) so
+                // auto-advance does not stall when currentBookChapterCount is stale.
+                final lastChapter = int.tryParse(widget.chapterCount) ??
+                    currentBookChapterCount;
+                if (Get.isRegistered<DashBoardController>()) {
+                  final countStr = Get.find<DashBoardController>()
+                      .selectedBookChapterCount
+                      .value
+                      .trim();
+                  final fromController = int.tryParse(countStr);
+                  if (fromController != null && fromController > 0) {
+                    currentBookChapterCount = fromController;
+                  }
+                }
+                final effectiveLastChapter =
+                    currentBookChapterCount > lastChapter
+                        ? currentBookChapterCount
+                        : lastChapter;
+                if (audioChapterNum < effectiveLastChapter) {
                   setState(() {
                     isNext = true; // prevent duplicate triggers
                     audioChapterNum++;
@@ -3095,7 +3286,16 @@ class floatingButtonState extends State<floatingButton>
     // Sync audio position with current reading position before opening bottom sheet
     try {
       final currentBookNum = int.parse(widget.bookNum.toString());
-      final currentChapterNum = int.parse(widget.chapterNum);
+      // Prefer controller chapter (what the reader shows) over possibly stale
+      // local TTS selectedChapter / widget props.
+      int currentChapterNum = int.tryParse(widget.chapterNum) ?? selectedChapter;
+      if (Get.isRegistered<DashBoardController>()) {
+        final fromController = int.tryParse(
+            Get.find<DashBoardController>().selectedChapter.value);
+        if (fromController != null && fromController > 0) {
+          currentChapterNum = fromController;
+        }
+      }
       String? currentBookName;
 
       // Get current book name from controller, widget, or SharedPreferences
@@ -3120,6 +3320,8 @@ class floatingButtonState extends State<floatingButton>
         setState(() {
           audioBookNum = currentBookNum + 1;
           audioChapterNum = currentChapterNum;
+          // Keep TTS selectedChapter on the chapter the user is reading
+          selectedChapter = currentChapterNum;
           currentBookChapterCount =
             int.tryParse(widget.chapterCount.toString()) ??
                 currentBookChapterCount;
@@ -3130,6 +3332,14 @@ class floatingButtonState extends State<floatingButton>
       }
     } catch (e) {
       debugPrint("Error syncing audio position: $e");
+    }
+
+    // Ensure chapter verses are ready before the sheet paints (avoids 1/0 Loading
+    // on books that use a different chapter_num basis or load slightly later).
+    try {
+      await setChapterContent(preferReaderChapter: true);
+    } catch (e) {
+      debugPrint("Error preparing TTS chapter content: $e");
     }
 
     // Additional refresh of _storedBookName from widget.bookName first, then controller, then SharedPreferences
@@ -3161,8 +3371,6 @@ class floatingButtonState extends State<floatingButton>
         setState(() {
           _storedBookName = finalBookName;
         });
-        // Small delay to ensure setState completes before showing modal
-        await Future.delayed(const Duration(milliseconds: 50));
       }
     } catch (e) {
       debugPrint("Error refreshing book name: $e");
@@ -3633,6 +3841,8 @@ class floatingButtonState extends State<floatingButton>
                                     int.parse(widget.chapterCount.toString())) {
                                   // Move to next chapter
                                   if (context.mounted) {
+                                    final wasSpeaking =
+                                        isSpeech || ttsState == TtsState.playing;
                                     await _stop();
                                     // Clear old voice text to prevent speaking old verse
                                     _newVoiceText = null;
@@ -3643,12 +3853,19 @@ class floatingButtonState extends State<floatingButton>
                                           true; // Mark as manual navigation to prevent double increment
                                       shouldAutoAdvance =
                                           true; // Re-enable auto-advance after manual navigation
+                                      // _stop() clears isSpeech; restore when we intend to continue.
+                                      if (wasSpeaking) {
+                                        isSpeech = true;
+                                        isManuallyPaused = false;
+                                      }
                                     });
                                     // Wait for setState to complete
                                     await Future.delayed(
                                         const Duration(milliseconds: 50));
                                     // Load chapter content and wait for it to complete
                                     await setChapterContent();
+                                    await updateReadingScreenChapter(
+                                        selectedChapter);
                                     if (mounted &&
                                         selectedChapterContent.isNotEmpty &&
                                         curretNo >= 0 &&
@@ -3663,10 +3880,14 @@ class floatingButtonState extends State<floatingButton>
                                       await Future.delayed(
                                           const Duration(milliseconds: 50));
                                       if (mounted &&
-                                          isSpeech &&
+                                          wasSpeaking &&
+                                          !isManuallyPaused &&
                                           _newVoiceText != null &&
                                           _newVoiceText!.isNotEmpty) {
-                                        _speak();
+                                        if (!isSpeech) {
+                                          setState(() => isSpeech = true);
+                                        }
+                                        await _speak();
                                       }
                                     }
                                   }

@@ -16,6 +16,7 @@ import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
+import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/services/daily_slot_notification_helper.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
@@ -1755,6 +1756,9 @@ void _goToHome(BuildContext context) {
   } catch (e) {
     debugPrint('warmDataBeforeHomeScreen error: $e');
   }
+  // Additive: start interstitial load before Home so post-streak / Mark as Read
+  // can show instantly. Open-ad flow unchanged.
+  unawaited(AdService.preloadInterstitialAdIfNeeded());
   Get.offAll(
     () => HomeScreen(
       From: "splash",
@@ -4338,6 +4342,7 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
     } catch (e) {
       debugPrint('warmDataBeforeHomeScreen error: $e');
     }
+    unawaited(AdService.preloadInterstitialAdIfNeeded());
     Get.offAll(
       () => HomeScreen(
         From: "splash",
@@ -4385,6 +4390,9 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
   @override
   void initState() {
     super.initState();
+    // Warm interstitial while user is on celebration so Home can show it
+    // immediately (day-2+). Does not show the ad or change open-ad logic.
+    unawaited(AdService.preloadInterstitialAdIfNeeded());
     SharPreferences.getInt(SharPreferences.pendingStreakCompleteCelebration)
         .then((value) {
       if (!mounted) return;

@@ -39,11 +39,19 @@ import 'package:provider/provider.dart' as p;
 class AdService {
   RewardedInterstitialAd? _rewardedInterstitialAd;
   BannerAd? _bannerAd;
-  InterstitialAd? _interstitialAd;
   NativeAd? _fullScreenAd;
   bool _isFullScreenAdLoaded = false;
   bool _isBannerAdLoaded = false;
-  bool _isInterstitialAdLoaded = false;
+
+  /// Shared across screens so a preload on Streak is usable on Home.
+  /// Open-ad flow is unchanged (still local to its own loaders).
+  static InterstitialAd? _sharedInterstitialAd;
+  static bool _sharedInterstitialLoaded = false;
+  static bool _sharedInterstitialLoading = false;
+
+  /// Same-library callers historically used instance fields; keep aliases.
+  InterstitialAd? get _interstitialAd => _sharedInterstitialAd;
+  bool get _isInterstitialAdLoaded => _sharedInterstitialLoaded;
 
   void loadRewardedInterstitialAds(VoidCallback onAdLoaded) async {
     String? adUnitId =
@@ -79,12 +87,12 @@ class AdService {
 
   void showInterstitialAd() async {
     await Future.delayed(Duration(milliseconds: 600));
-    if (_interstitialAd != null) {
+    if (_sharedInterstitialAd != null) {
       EasyLoading.dismiss();
-      _interstitialAd!.show();
+      _sharedInterstitialAd!.show();
       DebugConsole.log(" interstitialAd 3 is running ");
-      _interstitialAd = null; // Dispose after showing
-      _isInterstitialAdLoaded = false;
+      _sharedInterstitialAd = null; // Dispose after showing
+      _sharedInterstitialLoaded = false;
       loadInterstitialAd(() {}); // Reload for the next time
     } else {
       EasyLoading.dismiss();
@@ -92,7 +100,32 @@ class AdService {
     }
   }
 
+  /// Additive: start interstitial load early (e.g. on Streak before Home).
+  /// Does not show ads or change eligibility — only warms the shared cache.
+  static Future<void> preloadInterstitialAdIfNeeded() async {
+    try {
+      final shouldLoad = await SharPreferences.shouldLoadAd();
+      if (!shouldLoad) return;
+      if (_sharedInterstitialLoaded && _sharedInterstitialAd != null) return;
+      if (_sharedInterstitialLoading) return;
+      AdService().loadInterstitialAd(() {
+        debugPrint('Interstitial ad preloaded (shared cache)');
+      });
+    } catch (e) {
+      debugPrint('preloadInterstitialAdIfNeeded: $e');
+    }
+  }
+
   void loadInterstitialAd(VoidCallback onAdLoaded) async {
+    // Already ready — notify caller immediately (Home / Mark as Read).
+    if (_sharedInterstitialLoaded && _sharedInterstitialAd != null) {
+      onAdLoaded();
+      return;
+    }
+    // In flight from a prior screen — avoid duplicate requests.
+    if (_sharedInterstitialLoading) return;
+
+    _sharedInterstitialLoading = true;
     final trackingAllowed = await isTrackingAllowed();
 
     String? adUnitId =
@@ -116,11 +149,13 @@ class AdService {
               ad.dispose();
             },
           );
-          _interstitialAd = ad;
-          _isInterstitialAdLoaded = true;
+          _sharedInterstitialAd = ad;
+          _sharedInterstitialLoaded = true;
+          _sharedInterstitialLoading = false;
           onAdLoaded();
         },
         onAdFailedToLoad: (LoadAdError error) async {
+          _sharedInterstitialLoading = false;
           await SharPreferences.setString('OpenAd', '1');
           log('InterstitialAd failed to load: $error');
         },
@@ -178,7 +213,7 @@ class AdService {
   }
 
   InterstitialAd? get interstitialAd =>
-      _isInterstitialAdLoaded ? _interstitialAd : null;
+      _sharedInterstitialLoaded ? _sharedInterstitialAd : null;
   RewardedInterstitialAd? get rewardedInterstitialAd => _rewardedInterstitialAd;
   BannerAd? get bannerAd => _isBannerAdLoaded ? _bannerAd : null;
   NativeAd? get fullScreenAd => _isFullScreenAdLoaded ? _fullScreenAd : null;

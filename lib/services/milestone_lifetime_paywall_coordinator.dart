@@ -1,4 +1,5 @@
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
+import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 import 'package:biblebookapp/view/screens/milestone/milestone_journey_dialog.dart';
 import 'package:biblebookapp/view/screens/milestone/milestone_lifetime_iap_screen.dart';
 import 'package:flutter/material.dart';
@@ -29,6 +30,8 @@ class MilestoneLifetimePaywallCoordinator {
   /// Call after a successful scripture chat AI response (not errors).
   static Future<void> onChatAiResponseSuccess(BuildContext context) async {
     if (!context.mounted) return;
+    // Same dashboard IAP gate as Home paywall — skip milestone when IAP is off.
+    if (!await SubscriptionScreen.isDashboardIapEnabled()) return;
     if (await _isSubscribed(context)) return;
 
     final prefs = await SharedPreferences.getInstance();
@@ -40,6 +43,7 @@ class MilestoneLifetimePaywallCoordinator {
     if (next != chatThreshold) return;
 
     if (!context.mounted) return;
+    if (!await SubscriptionScreen.isDashboardIapEnabled()) return;
     if (await _isSubscribed(context)) {
       await prefs.setBool(_kChatFlowDone, true);
       return;
@@ -47,6 +51,7 @@ class MilestoneLifetimePaywallCoordinator {
 
     await Future<void>.delayed(const Duration(milliseconds: 400));
     if (!context.mounted) return;
+    if (!await SubscriptionScreen.isDashboardIapEnabled()) return;
     if (await _isSubscribed(context)) {
       await prefs.setBool(_kChatFlowDone, true);
       return;
@@ -70,6 +75,8 @@ class MilestoneLifetimePaywallCoordinator {
   /// Call after a successful prayer guidance AI response (not errors).
   static Future<void> onPrayerGuidanceAiResponseSuccess(BuildContext context) async {
     if (!context.mounted) return;
+    // Same dashboard IAP gate as Home paywall — skip milestone when IAP is off.
+    if (!await SubscriptionScreen.isDashboardIapEnabled()) return;
     if (await _isSubscribed(context)) return;
 
     final prefs = await SharedPreferences.getInstance();
@@ -81,6 +88,7 @@ class MilestoneLifetimePaywallCoordinator {
     if (next != prayerThreshold) return;
 
     if (!context.mounted) return;
+    if (!await SubscriptionScreen.isDashboardIapEnabled()) return;
     if (await _isSubscribed(context)) {
       await prefs.setBool(_kPrayerFlowDone, true);
       return;
@@ -88,6 +96,7 @@ class MilestoneLifetimePaywallCoordinator {
 
     await Future<void>.delayed(const Duration(milliseconds: 400));
     if (!context.mounted) return;
+    if (!await SubscriptionScreen.isDashboardIapEnabled()) return;
     if (await _isSubscribed(context)) {
       await prefs.setBool(_kPrayerFlowDone, true);
       return;

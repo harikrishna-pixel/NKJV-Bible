@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
@@ -87,10 +88,20 @@ class PrayerShareScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    final isDark = themeProvider.themeMode == ThemeMode.dark;
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isVintage =
+        themeProvider.currentCustomTheme == AppCustomTheme.vintage;
+    final usesLightCustom = themeProvider.currentCustomTheme ==
+            AppCustomTheme.white ||
+        themeProvider.currentCustomTheme == AppCustomTheme.lightbrown;
+    final isDark =
+        themeProvider.themeMode == ThemeMode.dark && !usesLightCustom;
     final brown = const Color(0xFF5C4033);
-    // Background is painted by the image; keep theme colors for widgets only.
+    final cream = isDark
+        ? CommanColor.darkPrimaryColor
+        : (isVintage
+            ? const Color(0xFFF5F0E6)
+            : themeProvider.backgroundColor);
 
     final cardBg = isDark ? Colors.white.withValues(alpha: 0.07) : Colors.white;
     final tileBg = isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white;
@@ -99,12 +110,14 @@ class PrayerShareScreen extends StatelessWidget {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage(Images.bgImage(context)),
-            fit: BoxFit.cover,
-          ),
-        ),
+        decoration: isVintage
+            ? BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage(Images.bgImage(context)),
+                  fit: BoxFit.cover,
+                ),
+              )
+            : BoxDecoration(color: cream),
         child: Scaffold(
           backgroundColor: Colors.transparent,
       appBar: AppBar(

@@ -3558,94 +3558,121 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
 
     final horizontalPad = size.width > 450 ? 20.0 : 16.0;
 
-    return SingleChildScrollView(
-      controller: _scrollController,
-      padding: EdgeInsets.fromLTRB(
-        horizontalPad,
-        12,
-        horizontalPad,
-        8,
-      ),
-      child: _guidanceResponseContentBox(
-        context,
-        isDark,
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: 6),
-                Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: size.width > 450 ? 40 : 28,
-              ),
-              child: Text(
-                title,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: size.width > 450 ? 28 : 26,
-                  fontWeight: FontWeight.w700,
-                  color: headerColor,
-                  fontFamily: 'Georgia',
-                  height: 1.1,
-                  shadows: isDark
-                      ? const [
-                          Shadow(
-                            color: Color(0xCC000000),
-                            blurRadius: 10,
-                            offset: Offset(0, 1),
-                          ),
-                        ]
-                      : null,
+    // Title / subtitle stay fixed; only the prayer card scrolls.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(horizontalPad, 12, horizontalPad, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 6),
+              Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: size.width > 450 ? 40 : 28,
+                ),
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: size.width > 450 ? 28 : 26,
+                    fontWeight: FontWeight.w700,
+                    color: headerColor,
+                    fontFamily: 'Georgia',
+                    height: 1.1,
+                    shadows: isDark
+                        ? const [
+                            Shadow(
+                              color: Color(0xCC000000),
+                              blurRadius: 10,
+                              offset: Offset(0, 1),
+                            ),
+                          ]
+                        : null,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            _prayerGuidanceGoldDivider(),
-            const SizedBox(height: 10),
-            Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: size.width > 450 ? 46 : 34,
-              ),
-              child: Text(
-                instructional,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: size.width > 450 ? 15 : 14,
-                  height: 1.35,
-                  color: isDark ? Colors.white : _kPrayerGuidanceInk,
-                  fontWeight: FontWeight.w700,
-                  shadows: isDark
-                      ? const [
-                          Shadow(
-                            color: Color(0xCC000000),
-                            blurRadius: 8,
-                            offset: Offset(0, 1),
-                          ),
-                        ]
-                      : const [
-                          Shadow(
-                            color: Color(0x66FFFFFF),
-                            blurRadius: 6,
-                            offset: Offset(0, 1),
-                          ),
-                        ],
+              const SizedBox(height: 8),
+              _prayerGuidanceGoldDivider(),
+              const SizedBox(height: 10),
+              Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: size.width > 450 ? 46 : 34,
+                ),
+                child: Text(
+                  instructional,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: size.width > 450 ? 15 : 14,
+                    height: 1.35,
+                    color: isDark ? Colors.white : _kPrayerGuidanceInk,
+                    fontWeight: FontWeight.w700,
+                    shadows: isDark
+                        ? const [
+                            Shadow(
+                              color: Color(0xCC000000),
+                              blurRadius: 8,
+                              offset: Offset(0, 1),
+                            ),
+                          ]
+                        : const [
+                            Shadow(
+                              color: Color(0x66FFFFFF),
+                              blurRadius: 6,
+                              offset: Offset(0, 1),
+                            ),
+                          ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 26),
-            if (aiText != null) ...[
-              _buildPrayerResponseCard(aiText, size, isDark),
-              if (!_isPrayerGenerationError(aiText)) ...[
-                const SizedBox(height: 12),
-                _buildPrayerResponseCopyShareRow(aiText, size),
-              ],
+              const SizedBox(height: 26),
             ],
-          ],
+          ),
         ),
-      ),
+        Expanded(
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            padding: EdgeInsets.fromLTRB(
+              horizontalPad,
+              0,
+              horizontalPad,
+              8,
+            ),
+            child: _guidanceResponseContentBox(
+              context,
+              isDark,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (aiText != null) ...[
+                    _buildPrayerResponseCard(aiText, size, isDark),
+                    if (!_isPrayerGenerationError(aiText)) ...[
+                      const SizedBox(height: 12),
+                      _buildPrayerResponseCopyShareRow(aiText, size),
+                    ],
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
+  bool _isAmenHeartFilled() {
+    for (int idx = _messages.length - 1; idx >= 0; idx--) {
+      if (!_messages[idx].isUser) {
+        return _amenShownForResponseHashes
+            .contains(_messages[idx].text.hashCode);
+      }
+    }
+    return false;
+  }
+
   Widget _buildPrayerAmenButton(Size size, {required VoidCallback onPressed}) {
+    final heartFilled = _isAmenHeartFilled();
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -3680,7 +3707,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                Icons.favorite_border,
+                heartFilled ? Icons.favorite : Icons.favorite_border,
                 color: Colors.white,
                 size: size.width > 450 ? 24 : 22,
               ),
@@ -4557,6 +4584,8 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                               _amenShownForResponseHashes.add(hash);
                             }
                           }
+                          // Visual-only: fill Amen heart after tap.
+                          if (mounted) setState(() {});
                         },
                     ),
                   ),

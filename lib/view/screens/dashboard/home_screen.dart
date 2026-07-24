@@ -1406,23 +1406,21 @@ class _HomeScreenState extends State<HomeScreen>
       final shouldLoad = await SharPreferences.shouldLoadAd();
       if (!shouldLoad || !mounted) return;
 
-      EasyLoading.showInfo('Please wait...');
-
-      // Interstitial is kicked off in checkUserLoggedIn; wait briefly if needed.
+      // Wait for a preloaded/in-flight interstitial silently.
+      // Do not show "Please wait..." unless an ad is actually ready to show.
       for (var i = 0; i < 15; i++) {
         if (_adService.interstitialAd != null) break;
         await Future.delayed(const Duration(milliseconds: 200));
-        if (!mounted) {
-          await EasyLoading.dismiss();
-          return;
-        }
+        if (!mounted) return;
       }
 
-      if (!mounted) {
-        await EasyLoading.dismiss();
+      if (!mounted) return;
+      if (_adService.interstitialAd == null) {
+        // No ad available — skip loader and proceed with no interstitial.
         return;
       }
 
+      EasyLoading.showInfo('Please wait...');
       try {
         await _showInterstitialAdAndWait();
       } catch (e) {
@@ -3457,11 +3455,10 @@ class _HomeScreenState extends State<HomeScreen>
           final isVintage =
               themeProvider.currentCustomTheme == AppCustomTheme.vintage;
           final isDark = themeProvider.themeMode == ThemeMode.dark;
+          // White/yellow themes always use their light surface (even in Dark Mode).
           final scaffoldBg = isVintage
               ? (isDark ? CommanColor.black : const Color(0xFFF5F0E6))
-              : (isDark
-                  ? CommanColor.darkPrimaryColor
-                  : themeProvider.backgroundColor);
+              : themeProvider.backgroundColor;
 
           final readerToolbarHeight = screenWidth > 450 ? 70.0 : 55.0;
           final readerChapterBarHeight = screenWidth > 450 ? 45.0 : 30.0;
@@ -3492,15 +3489,8 @@ class _HomeScreenState extends State<HomeScreen>
                                   .currentCustomTheme ==
                               AppCustomTheme.vintage
                           ? null
-                          : Provider.of<ThemeProvider>(context).themeMode ==
-                                  ThemeMode.dark
-                              ? CommanColor.darkPrimaryColor
-                              : p.Provider.of<ThemeProvider>(context)
-                                          .currentCustomTheme ==
-                                      AppCustomTheme.vintage
-                                  ? CommanColor.darkPrimaryColor
-                                  : p.Provider.of<ThemeProvider>(context)
-                                      .backgroundColor,
+                          : p.Provider.of<ThemeProvider>(context)
+                              .backgroundColor,
                       decoration: p.Provider.of<ThemeProvider>(context)
                                   .currentCustomTheme ==
                               AppCustomTheme.vintage
@@ -3554,70 +3544,70 @@ class _HomeScreenState extends State<HomeScreen>
                                 ),
                               ),
                         SizedBox(width: 12),
-                        controller.isAdsCompletlyDisabled.value
-                            ? const SizedBox.shrink()
-                            : controller.adFree.value
-                                ? DateTime.tryParse(controller
-                                            .RewardAdExpireDate.value) !=
-                                        null
-                                    // UI only: subscription info icon removed from
-                                    // reading bar (same sheet remains in the drawer).
-                                    ? const SizedBox.shrink()
-                                    : Visibility(
-                                        visible:
-                                            controller.isSubscriptionEnabled ??
-                                                true,
-                                        child: GestureDetector(
-                                          onTap: () async {
-                                            // Navigate directly to the paywall from Home
-                                            // instead of showing the Home exit-offer bottom sheet.
-                                            // This keeps purchase logic unchanged and avoids
-                                            // displaying the in-place exit-offer sheet on Home.
-                                            if (controller.connectionStatus
-                                                        .first ==
-                                                    ConnectivityResult.wifi ||
-                                                controller.connectionStatus
-                                                        .first ==
-                                                    ConnectivityResult.mobile) {
-                                              adsIcon = false;
-                                              debugPrint(
-                                                  "all plans - ${controller.sixMonthPlan} ${controller.oneYearPlan}  ${controller.lifeTimePlan}");
-                                              await SubscriptionScreen
-                                                  .navigateToPaywallFromHome(
-                                                      context);
-                                            } else {
-                                              Constants.showToast(
-                                                  "Check your Internet Connection");
-                                            }
-                                          },
-                                          child: Image.asset(
-                                            'assets/no-ad.png',
-                                            height:
-                                                screenWidth > 450 ? 40 : 24,
-                                            width:
-                                                screenWidth > 450 ? 40 : 24,
-                                            color: CommanColor.whiteBlack(
-                                                context),
-                                          ),
-                                        ))
+                        // IAP icon is independent of ads being completely disabled
+                        // (ads_Type == "0"). Ads stay off; only visibility is uncoupled.
+                        controller.adFree.value
+                            ? DateTime.tryParse(controller
+                                        .RewardAdExpireDate.value) !=
+                                    null
+                                // UI only: subscription info icon removed from
+                                // reading bar (same sheet remains in the drawer).
+                                ? const SizedBox.shrink()
                                 : Visibility(
-                                    visible: controller.isSubscriptionEnabled ??
-                                        false,
+                                    visible:
+                                        controller.isSubscriptionEnabled ??
+                                            true,
                                     child: GestureDetector(
                                       onTap: () async {
-                                        adsIcon = false;
-                                        await SubscriptionScreen
-                                            .navigateToPaywallFromHome(context);
+                                        // Navigate directly to the paywall from Home
+                                        // instead of showing the Home exit-offer bottom sheet.
+                                        // This keeps purchase logic unchanged and avoids
+                                        // displaying the in-place exit-offer sheet on Home.
+                                        if (controller.connectionStatus
+                                                    .first ==
+                                                ConnectivityResult.wifi ||
+                                            controller.connectionStatus
+                                                    .first ==
+                                                ConnectivityResult.mobile) {
+                                          adsIcon = false;
+                                          debugPrint(
+                                              "all plans - ${controller.sixMonthPlan} ${controller.oneYearPlan}  ${controller.lifeTimePlan}");
+                                          await SubscriptionScreen
+                                              .navigateToPaywallFromHome(
+                                                  context);
+                                        } else {
+                                          Constants.showToast(
+                                              "Check your Internet Connection");
+                                        }
                                       },
                                       child: Image.asset(
                                         'assets/no-ad.png',
-                                        height: screenWidth > 450 ? 35 : 24,
-                                        width: screenWidth > 450 ? 35 : 24,
-                                        color:
-                                            CommanColor.whiteBlack(context),
+                                        height:
+                                            screenWidth > 450 ? 40 : 24,
+                                        width:
+                                            screenWidth > 450 ? 40 : 24,
+                                        color: CommanColor.whiteBlack(
+                                            context),
                                       ),
-                                    ),
+                                    ))
+                            : Visibility(
+                                visible: controller.isSubscriptionEnabled ??
+                                    false,
+                                child: GestureDetector(
+                                  onTap: () async {
+                                    adsIcon = false;
+                                    await SubscriptionScreen
+                                        .navigateToPaywallFromHome(context);
+                                  },
+                                  child: Image.asset(
+                                    'assets/no-ad.png',
+                                    height: screenWidth > 450 ? 35 : 24,
+                                    width: screenWidth > 450 ? 35 : 24,
+                                    color:
+                                        CommanColor.whiteBlack(context),
                                   ),
+                                ),
+                              ),
                       ],
                     ),
                     actions: [
@@ -3715,10 +3705,8 @@ class _HomeScreenState extends State<HomeScreen>
                             final isVintage = themeProvider
                                               .currentCustomTheme ==
                                 AppCustomTheme.vintage;
-                            if (isDark) {
-                              final base = isVintage
-                                      ? CommanColor.darkPrimaryColor
-                                  : CommanColor.darkPrimaryColor200;
+                            if (isDark && isVintage) {
+                              final base = CommanColor.darkPrimaryColor;
                               return BoxDecoration(
                                 color: Color.lerp(
                                   base,
@@ -3922,7 +3910,11 @@ class _HomeScreenState extends State<HomeScreen>
                         key: _readerAudioFabKey,
                         chapterNum: controller.selectedChapter.value,
                         bookName: controller.selectedBook.value,
-                        contentList: controller.selectedVersesContent,
+                        // Prefer full-book verses for TTS next/prev; fall back to
+                        // the on-screen chapter so newly opened books are not empty.
+                        contentList: controller.selectedVersesContent.isNotEmpty
+                            ? controller.selectedVersesContent
+                            : controller.selectedBookContent,
                         chapterCount: controller.selectedBookChapterCount.value,
                         audioData: controller.audioData.value,
                         bookNum: controller.selectedBookNum.value,
@@ -4408,18 +4400,11 @@ class _HomeScreenState extends State<HomeScreen>
 
                                                                 // If should skip ad (offline/low internet), navigate directly
                                                                 if (shouldSkipAd) {
-                                                                  Get.to(() =>
-                                                                      MarkAsReadScreen(
-                                                                        ReadedChapter: controller
-                                                                            .selectedChapter
-                                                                            .value,
-                                                                        RededBookName: controller
-                                                                            .selectedBook
-                                                                            .value,
-                                                                        SelectedBookChapterCount: controller
-                                                                            .selectedBookChapterCount
-                                                                            .value,
-                                                                      ));
+                                                                  MarkAsReadScreen.open(
+                                                                                  ReadedChapter: controller.selectedChapter.value,
+                                                                                  RededBookName: controller.selectedBook.value,
+                                                                                  SelectedBookChapterCount: controller.selectedBookChapterCount.value,
+                                                                                );
                                                                   return;
                                                                 }
 
@@ -4447,48 +4432,27 @@ class _HomeScreenState extends State<HomeScreen>
                                                                       // If ad fails, proceed anyway
                                                                     }
                                                                     // Navigate AFTER ad is dismissed
-                                                                    Get.to(() =>
-                                                                        MarkAsReadScreen(
-                                                                          ReadedChapter: controller
-                                                                              .selectedChapter
-                                                                              .value,
-                                                                          RededBookName: controller
-                                                                              .selectedBook
-                                                                              .value,
-                                                                          SelectedBookChapterCount: controller
-                                                                              .selectedBookChapterCount
-                                                                              .value,
-                                                                        ));
+                                                                    MarkAsReadScreen.open(
+                                                                                  ReadedChapter: controller.selectedChapter.value,
+                                                                                  RededBookName: controller.selectedBook.value,
+                                                                                  SelectedBookChapterCount: controller.selectedBookChapterCount.value,
+                                                                                );
                                                                   } else {
                                                                     // Ad shown recently, skip ad but still navigate
-                                                                    Get.to(() =>
-                                                                        MarkAsReadScreen(
-                                                                          ReadedChapter: controller
-                                                                              .selectedChapter
-                                                                              .value,
-                                                                          RededBookName: controller
-                                                                              .selectedBook
-                                                                              .value,
-                                                                          SelectedBookChapterCount: controller
-                                                                              .selectedBookChapterCount
-                                                                              .value,
-                                                                        ));
+                                                                    MarkAsReadScreen.open(
+                                                                                  ReadedChapter: controller.selectedChapter.value,
+                                                                                  RededBookName: controller.selectedBook.value,
+                                                                                  SelectedBookChapterCount: controller.selectedBookChapterCount.value,
+                                                                                );
                                                                   }
                                                                 } else {
                                                                   print(
                                                                       'Not Load Interstitial Ad');
-                                                                  Get.to(() =>
-                                                                              MarkAsReadScreen(
-                                                                        ReadedChapter: controller
-                                                                            .selectedChapter
-                                                                            .value,
-                                                                        RededBookName: controller
-                                                                            .selectedBook
-                                                                            .value,
-                                                                        SelectedBookChapterCount: controller
-                                                                            .selectedBookChapterCount
-                                                                            .value,
-                                                                      ));
+                                                                  MarkAsReadScreen.open(
+                                                                                  ReadedChapter: controller.selectedChapter.value,
+                                                                                  RededBookName: controller.selectedBook.value,
+                                                                                  SelectedBookChapterCount: controller.selectedBookChapterCount.value,
+                                                                                );
 
                                                                   // Get.to(() =>
                                                                   //     MarkAsReadScreen(
@@ -4828,12 +4792,11 @@ class _HomeScreenState extends State<HomeScreen>
 
                                                                           // If should skip ad (offline/low internet), navigate directly
                                                                           if (shouldSkipAd) {
-                                                                            Get.to(() =>
-                                                                                MarkAsReadScreen(
+                                                                            MarkAsReadScreen.open(
                                                                                   ReadedChapter: controller.selectedChapter.value,
                                                                                   RededBookName: controller.selectedBook.value,
                                                                                   SelectedBookChapterCount: controller.selectedBookChapterCount.value,
-                                                                                ));
+                                                                                );
                                                                             return;
                                                                           }
 
@@ -4854,26 +4817,26 @@ class _HomeScreenState extends State<HomeScreen>
                                                                                 // If ad fails, proceed anyway
                                                                               }
                                                                               // Navigate AFTER ad is dismissed
-                                                                              Get.to(() => MarkAsReadScreen(
-                                                                                    ReadedChapter: controller.selectedChapter.value,
-                                                                                    RededBookName: controller.selectedBook.value,
-                                                                                    SelectedBookChapterCount: controller.selectedBookChapterCount.value,
-                                                                                  ));
+                                                                              MarkAsReadScreen.open(
+                                                                                  ReadedChapter: controller.selectedChapter.value,
+                                                                                  RededBookName: controller.selectedBook.value,
+                                                                                  SelectedBookChapterCount: controller.selectedBookChapterCount.value,
+                                                                                );
                                                                             } else {
                                                                               // Ad shown recently, skip ad but still navigate
-                                                                              Get.to(() => MarkAsReadScreen(
-                                                                                    ReadedChapter: controller.selectedChapter.value,
-                                                                                    RededBookName: controller.selectedBook.value,
-                                                                                    SelectedBookChapterCount: controller.selectedBookChapterCount.value,
-                                                                                  ));
+                                                                              MarkAsReadScreen.open(
+                                                                                  ReadedChapter: controller.selectedChapter.value,
+                                                                                  RededBookName: controller.selectedBook.value,
+                                                                                  SelectedBookChapterCount: controller.selectedBookChapterCount.value,
+                                                                                );
                                                                             }
                                                                           } else {
                                                                             print('Not Load Interstitial Ad');
-                                                                            Get.to(() => MarkAsReadScreen(
-                                                                                    ReadedChapter: controller.selectedChapter.value,
-                                                                                    RededBookName: controller.selectedBook.value,
-                                                                                    SelectedBookChapterCount: controller.selectedBookChapterCount.value,
-                                                                                  ));
+                                                                            MarkAsReadScreen.open(
+                                                                                  ReadedChapter: controller.selectedChapter.value,
+                                                                                  RededBookName: controller.selectedBook.value,
+                                                                                  SelectedBookChapterCount: controller.selectedBookChapterCount.value,
+                                                                                );
                                                                           }
                                                                         },
                                                                       );

@@ -418,29 +418,36 @@ class _StreakSavedListScreenState extends State<StreakSavedListScreen>
   @override
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width > 450;
-    Color bgColor;
-    try {
-      final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-      bgColor = themeProvider.themeMode == ThemeMode.dark
-          ? CommanColor.darkPrimaryColor
-          : themeProvider.backgroundColor;
-    } catch (_) {
-      bgColor = const Color(0xFFF5F0E6);
-    }
-    final isDark = bgColor == CommanColor.darkPrimaryColor;
-    final Color textColor = isDark ? Colors.white : _brown;
-    final Color panelColor = isDark ? Colors.white.withOpacity(0.12) : _panel;
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isVintage =
+        themeProvider.currentCustomTheme == AppCustomTheme.vintage;
+    final usesLightCustom = themeProvider.currentCustomTheme ==
+            AppCustomTheme.white ||
+        themeProvider.currentCustomTheme == AppCustomTheme.lightbrown;
+    final isDark =
+        themeProvider.themeMode == ThemeMode.dark && !usesLightCustom;
+    final bgColor =
+        isDark ? CommanColor.darkPrimaryColor : themeProvider.backgroundColor;
+    final isWhiteLight =
+        !isDark && themeProvider.currentCustomTheme == AppCustomTheme.white;
+    final Color accentBrown = isWhiteLight ? const Color(0xFF424242) : _brown;
+    final Color textColor = isDark ? Colors.white : accentBrown;
+    final Color panelColor = isDark
+        ? Colors.white.withOpacity(0.12)
+        : (isWhiteLight ? const Color(0xFFF0F0F0) : _panel);
 
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage(Images.bgImage(context)),
-            fit: BoxFit.cover,
-          ),
-        ),
+        decoration: isVintage
+            ? BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage(Images.bgImage(context)),
+                  fit: BoxFit.cover,
+                ),
+              )
+            : BoxDecoration(color: bgColor),
         child: SafeArea(
           child: Column(
             children: [

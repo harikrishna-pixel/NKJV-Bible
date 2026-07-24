@@ -332,18 +332,16 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width > 450;
 
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final themeProvider = Provider.of<ThemeProvider>(context);
     final isVintage =
         themeProvider.currentCustomTheme == AppCustomTheme.vintage;
-    Color bgColor;
-    try {
-      bgColor = themeProvider.themeMode == ThemeMode.dark
-          ? CommanColor.darkPrimaryColor
-          : themeProvider.backgroundColor;
-    } catch (_) {
-      bgColor = const Color(0xFFF5F0E6);
-    }
-    final isDark = bgColor == CommanColor.darkPrimaryColor;
+    final usesLightCustom = themeProvider.currentCustomTheme ==
+            AppCustomTheme.white ||
+        themeProvider.currentCustomTheme == AppCustomTheme.lightbrown;
+    final isDark =
+        themeProvider.themeMode == ThemeMode.dark && !usesLightCustom;
+    final bgColor =
+        isDark ? CommanColor.darkPrimaryColor : themeProvider.backgroundColor;
     final isWhiteLight = !isDark &&
         themeProvider.currentCustomTheme == AppCustomTheme.white;
     final Color accentBrown = isWhiteLight ? const Color(0xFF424242) : _brown;
@@ -1131,16 +1129,29 @@ class _DayJourneyCardsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isVintage =
+        themeProvider.currentCustomTheme == AppCustomTheme.vintage;
+    final usesLightCustom = themeProvider.currentCustomTheme ==
+            AppCustomTheme.white ||
+        themeProvider.currentCustomTheme == AppCustomTheme.lightbrown;
+    final bgColor = (themeProvider.themeMode == ThemeMode.dark &&
+            !usesLightCustom)
+        ? CommanColor.darkPrimaryColor
+        : themeProvider.backgroundColor;
+
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage(Images.bgImage(context)),
-            fit: BoxFit.cover,
-          ),
-        ),
+        decoration: isVintage
+            ? BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage(Images.bgImage(context)),
+                  fit: BoxFit.cover,
+                ),
+              )
+            : BoxDecoration(color: bgColor),
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),

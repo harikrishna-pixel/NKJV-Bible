@@ -77,17 +77,29 @@ class MyThemes {
         iconTheme: const IconThemeData(color: Colors.red, opacity: 0.8),
       );
 
-  static ThemeData darkTheme(BuildContext context) => ThemeData(
-        scaffoldBackgroundColor: CommanColor.darkPrimaryColor,
-        primaryColor: Colors.black,
-        colorScheme: const ColorScheme.dark(),
-        bottomSheetTheme: BottomSheetThemeData(
-          constraints: BoxConstraints(
-            minWidth: MediaQuery.sizeOf(context).width,
-          ),
+  static ThemeData darkTheme(
+    BuildContext context, [
+    Color? customBackgroundColor,
+    AppCustomTheme? customTheme,
+  ]) {
+    // White/yellow custom themes keep a light surface even when Dark Mode is on.
+    if (customTheme != null &&
+        customTheme != AppCustomTheme.vintage &&
+        customBackgroundColor != null) {
+      return lightTheme(context, customBackgroundColor);
+    }
+    return ThemeData(
+      scaffoldBackgroundColor: CommanColor.darkPrimaryColor,
+      primaryColor: Colors.black,
+      colorScheme: const ColorScheme.dark(),
+      bottomSheetTheme: BottomSheetThemeData(
+        constraints: BoxConstraints(
+          minWidth: MediaQuery.sizeOf(context).width,
         ),
-        iconTheme: IconThemeData(color: Colors.purple.shade200, opacity: 0.8),
-      );
+      ),
+      iconTheme: IconThemeData(color: Colors.purple.shade200, opacity: 0.8),
+    );
+  }
 }
 
 enum AppCustomTheme {

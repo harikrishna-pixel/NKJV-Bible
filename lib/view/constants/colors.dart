@@ -18,6 +18,14 @@ class CommanColor {
   static bool isDarkTheme(BuildContext context) =>
       Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark;
 
+  /// White / yellow themes always use a light surface, even when Dark Mode is on.
+  static bool usesLightCustomSurface(BuildContext context) {
+    final theme =
+        Provider.of<ThemeProvider>(context, listen: false).currentCustomTheme;
+    return theme == AppCustomTheme.white ||
+        theme == AppCustomTheme.lightbrown;
+  }
+
   static Color lightDarkPrimary(BuildContext context) {
     return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
         ? darkPrimaryColor
@@ -43,24 +51,28 @@ class CommanColor {
   }
 
   static Color whiteBlack45(BuildContext context) {
+    if (usesLightCustomSurface(context)) return Colors.black45;
     return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
         ? Colors.white
         : Colors.black45;
   }
 
   static Color Blackwhite(BuildContext context) {
+    if (usesLightCustomSurface(context)) return Colors.white;
     return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
         ? Colors.black
         : Colors.white;
   }
 
   static Color Blackwhite100(BuildContext context) {
+    if (usesLightCustomSurface(context)) return Colors.grey.shade300;
     return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
         ? Colors.white12
         : Colors.grey.shade300;
   }
 
   static Color whiteBlack(BuildContext context) {
+    if (usesLightCustomSurface(context)) return Colors.black;
     return Provider.of<ThemeProvider>(context, listen: false).themeMode ==
             ThemeMode.dark
         ? Colors.white
@@ -119,12 +131,14 @@ class CommanColor {
   }
 
   static Color whiteLightModePrimary(BuildContext context) {
+    if (usesLightCustomSurface(context)) return CommanColor.lightModePrimary;
     return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
         ? CommanColor.white
         : CommanColor.lightModePrimary;
   }
 
   static Color darkModePrimaryWhite(BuildContext context) {
+    if (usesLightCustomSurface(context)) return CommanColor.white;
     return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
         ? CommanColor.darkPrimaryColor
         : CommanColor.white;
@@ -137,6 +151,7 @@ class CommanColor {
   }
 
   static Color inDarkWhiteAndInLightPrimary(BuildContext context) {
+    if (usesLightCustomSurface(context)) return CommanColor.lightModePrimary;
     return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
         ? Colors.white
         : CommanColor.lightModePrimary;
@@ -154,19 +169,13 @@ class CommanColor {
 
 class CommanStyle {
   static TextStyle appBarStyle(BuildContext context) {
-    return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? const TextStyle(
-            color: Colors.white,
-            letterSpacing: BibleInfo.letterSpacing,
-            overflow: TextOverflow.ellipsis,
-            fontSize: BibleInfo.fontSizeScale * 18,
-            fontWeight: FontWeight.w600)
-        : const TextStyle(
-            color: Colors.black,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 18,
-            overflow: TextOverflow.ellipsis,
-            fontWeight: FontWeight.w600);
+    return TextStyle(
+      color: CommanColor.whiteBlack(context),
+      letterSpacing: BibleInfo.letterSpacing,
+      overflow: TextOverflow.ellipsis,
+      fontSize: BibleInfo.fontSizeScale * 18,
+      fontWeight: FontWeight.w600,
+    );
   }
 
   static TextStyle themedAppBarStyle(BuildContext context) {
@@ -180,185 +189,120 @@ class CommanStyle {
   }
 
   static TextStyle bw14400(BuildContext context) {
-    return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? const TextStyle(
-            color: Colors.white,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 14,
-            fontWeight: FontWeight.w400)
-        : const TextStyle(
-            color: Colors.black,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 14,
-            fontWeight: FontWeight.w400);
+    return TextStyle(
+      color: CommanColor.whiteBlack(context),
+      letterSpacing: BibleInfo.letterSpacing,
+      fontSize: BibleInfo.fontSizeScale * 14,
+      fontWeight: FontWeight.w400,
+    );
   }
 
   static TextStyle bw14500(BuildContext context) {
-    return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? const TextStyle(
-            color: Colors.white,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 14,
-            fontWeight: FontWeight.w500)
-        : const TextStyle(
-            color: Colors.black,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 14,
-            fontWeight: FontWeight.w500);
+    return TextStyle(
+      color: CommanColor.whiteBlack(context),
+      letterSpacing: BibleInfo.letterSpacing,
+      fontSize: BibleInfo.fontSizeScale * 14,
+      fontWeight: FontWeight.w500,
+    );
   }
 
   // static TextStyle bw14500WithUnderline(BuildContext context) {
   //   return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark ? TextStyle(color: Colors.white,letterSpacing: BibleInfo.letterSpacing ,  fontSize: BibleInfo.fontSizeScale * 14,fontWeight: FontWeight.w500,decoration: TextDecoration.underline) :TextStyle(color: Colors.black,letterSpacing: BibleInfo.letterSpacing ,  fontSize: BibleInfo.fontSizeScale * 14,fontWeight: FontWeight.w500,decoration: TextDecoration.underline);
   // }
   static TextStyle bw16500(BuildContext context) {
-    return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? const TextStyle(
-            color: Colors.white,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 16,
-            fontWeight: FontWeight.w500)
-        : const TextStyle(
-            color: Colors.black,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 16,
-            fontWeight: FontWeight.w500);
+    return TextStyle(
+      color: CommanColor.whiteBlack(context),
+      letterSpacing: BibleInfo.letterSpacing,
+      fontSize: BibleInfo.fontSizeScale * 16,
+      fontWeight: FontWeight.w500,
+    );
   }
 
   static TextStyle bw17500(BuildContext context) {
-    return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? const TextStyle(
-            color: Colors.white,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 17,
-            fontWeight: FontWeight.w500)
-        : const TextStyle(
-            color: Colors.black,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 17,
-            fontWeight: FontWeight.w500);
+    return TextStyle(
+      color: CommanColor.whiteBlack(context),
+      letterSpacing: BibleInfo.letterSpacing,
+      fontSize: BibleInfo.fontSizeScale * 17,
+      fontWeight: FontWeight.w500,
+    );
   }
 
   static TextStyle bw15400(BuildContext context) {
-    return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? const TextStyle(
-            color: Colors.white,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 16,
-            fontWeight: FontWeight.w400)
-        : const TextStyle(
-            color: Colors.black,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 16,
-            fontWeight: FontWeight.w400);
+    return TextStyle(
+      color: CommanColor.whiteBlack(context),
+      letterSpacing: BibleInfo.letterSpacing,
+      fontSize: BibleInfo.fontSizeScale * 16,
+      fontWeight: FontWeight.w400,
+    );
   }
 
   static TextStyle bw18400(BuildContext context) {
-    return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? const TextStyle(
-            color: Colors.white,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 18,
-            fontWeight: FontWeight.w400)
-        : const TextStyle(
-            color: Colors.black,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 20,
-            fontWeight: FontWeight.w400);
+    final isDark =
+        Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark &&
+            !CommanColor.usesLightCustomSurface(context);
+    return TextStyle(
+      color: CommanColor.whiteBlack(context),
+      letterSpacing: BibleInfo.letterSpacing,
+      fontSize: BibleInfo.fontSizeScale * (isDark ? 18 : 20),
+      fontWeight: FontWeight.w400,
+    );
   }
 
   static TextStyle bw22500(BuildContext context) {
-    return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? const TextStyle(
-            color: Colors.white,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 22,
-            fontWeight: FontWeight.w400,
-          )
-        : const TextStyle(
-            color: Colors.black,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 22,
-            fontWeight: FontWeight.w400);
+    return TextStyle(
+      color: CommanColor.whiteBlack(context),
+      letterSpacing: BibleInfo.letterSpacing,
+      fontSize: BibleInfo.fontSizeScale * 22,
+      fontWeight: FontWeight.w400,
+    );
   }
 
   static TextStyle bw20500(BuildContext context) {
-    return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? const TextStyle(
-            color: Colors.white,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 20,
-            fontWeight: FontWeight.w500,
-          )
-        : const TextStyle(
-            color: Colors.black,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 20,
-            fontWeight: FontWeight.w500);
+    return TextStyle(
+      color: CommanColor.whiteBlack(context),
+      letterSpacing: BibleInfo.letterSpacing,
+      fontSize: BibleInfo.fontSizeScale * 20,
+      fontWeight: FontWeight.w500,
+    );
   }
 
   static TextStyle bw15500(BuildContext context) {
-    return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? const TextStyle(
-            color: Colors.white,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 15,
-            fontWeight: FontWeight.w500,
-            decoration: TextDecoration.underline)
-        : const TextStyle(
-            color: Colors.black,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 15,
-            fontWeight: FontWeight.w500,
-            decoration: TextDecoration.underline);
+    return TextStyle(
+      color: CommanColor.whiteBlack(context),
+      letterSpacing: BibleInfo.letterSpacing,
+      fontSize: BibleInfo.fontSizeScale * 15,
+      fontWeight: FontWeight.w500,
+      decoration: TextDecoration.underline,
+    );
   }
 
   static TextStyle bw15500wU(BuildContext context) {
-    return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? const TextStyle(
-            color: Colors.white,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 15,
-            fontWeight: FontWeight.w500,
-          )
-        : const TextStyle(
-            color: Colors.black,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 15,
-            fontWeight: FontWeight.w500,
-          );
+    return TextStyle(
+      color: CommanColor.whiteBlack(context),
+      letterSpacing: BibleInfo.letterSpacing,
+      fontSize: BibleInfo.fontSizeScale * 15,
+      fontWeight: FontWeight.w500,
+    );
   }
 
   static TextStyle bw12400(BuildContext context) {
-    return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? const TextStyle(
-            color: Colors.white,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 12,
-            fontWeight: FontWeight.w500)
-        : const TextStyle(
-            color: Colors.black,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 12,
-            fontWeight: FontWeight.w500);
+    return TextStyle(
+      color: CommanColor.whiteBlack(context),
+      letterSpacing: BibleInfo.letterSpacing,
+      fontSize: BibleInfo.fontSizeScale * 12,
+      fontWeight: FontWeight.w500,
+    );
   }
 
   static TextStyle bw14500WithBgColor(BuildContext context, Color? bgColor) {
-    return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? TextStyle(
-            color: Colors.white,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 14,
-            fontWeight: FontWeight.w500,
-            backgroundColor: bgColor,
-            height: 1.5)
-        : TextStyle(
-            color: Colors.black,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 14,
-            fontWeight: FontWeight.w500,
-            backgroundColor: bgColor,
-            height: 1.5,
-          );
+    return TextStyle(
+      color: CommanColor.whiteBlack(context),
+      letterSpacing: BibleInfo.letterSpacing,
+      fontSize: BibleInfo.fontSizeScale * 14,
+      fontWeight: FontWeight.w500,
+      backgroundColor: bgColor,
+      height: 1.5,
+    );
   }
 
   static TextStyle pw14500(BuildContext context) {
@@ -499,97 +443,66 @@ class CommanStyle {
 
   static TextStyle bw14500withBgColor(BuildContext context, int index,
       selectedIndex, double? fontSize, String? fontFamily) {
-    return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w500,
-            height: 1.2,
-            backgroundColor:
-                index == selectedIndex ? Colors.black54 : Colors.transparent,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * (fontSize ?? 14),
-            fontFamily: fontFamily)
-        : TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.w500,
-            height: 1.2,
-            backgroundColor: index == selectedIndex
-                ? const Color(0x80605749)
-                : Colors.transparent,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * (fontSize ?? 14),
-            fontFamily: fontFamily);
+    final isDark =
+        Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark &&
+            !CommanColor.usesLightCustomSurface(context);
+    return TextStyle(
+      color: CommanColor.whiteBlack(context),
+      fontWeight: FontWeight.w500,
+      height: 1.2,
+      backgroundColor: index == selectedIndex
+          ? (isDark ? Colors.black54 : const Color(0x80605749))
+          : Colors.transparent,
+      letterSpacing: BibleInfo.letterSpacing,
+      fontSize: BibleInfo.fontSizeScale * (fontSize ?? 14),
+      fontFamily: fontFamily,
+    );
   }
 
   static TextStyle bw14500withBgColorAndUnderLine(BuildContext context,
       int index, selectedIndex, double? fontSize, String? fontFamily) {
-    return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? TextStyle(
-            color: Colors.white,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * (fontSize ?? 14),
-            fontFamily: fontFamily,
-            fontWeight: FontWeight.w500,
-            height: 1.2,
-            backgroundColor:
-                index == selectedIndex ? Colors.black54 : Colors.transparent,
-            decoration: TextDecoration.underline)
-        : TextStyle(
-            color: Colors.black,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * (fontSize ?? 14),
-            fontFamily: fontFamily,
-            fontWeight: FontWeight.w500,
-            height: 1.2,
-            backgroundColor: index == selectedIndex
-                ? const Color(0x80605749)
-                : Colors.transparent,
-            decoration: TextDecoration.underline);
+    final isDark =
+        Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark &&
+            !CommanColor.usesLightCustomSurface(context);
+    return TextStyle(
+      color: CommanColor.whiteBlack(context),
+      letterSpacing: BibleInfo.letterSpacing,
+      fontSize: BibleInfo.fontSizeScale * (fontSize ?? 14),
+      fontFamily: fontFamily,
+      fontWeight: FontWeight.w500,
+      height: 1.2,
+      backgroundColor: index == selectedIndex
+          ? (isDark ? Colors.black54 : const Color(0x80605749))
+          : Colors.transparent,
+      decoration: TextDecoration.underline,
+    );
   }
 
   static TextStyle bw14500withColor(
       BuildContext context, int? color, double? fontSize, String? fontFamily) {
-    return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? TextStyle(
-            color: Colors.white,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * (fontSize ?? 14),
-            fontFamily: fontFamily,
-            fontWeight: FontWeight.w500,
-            height: 1.2,
-            backgroundColor: color != null ? Color(color) : null)
-        : TextStyle(
-            color: Colors.black,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * (fontSize ?? 14),
-            fontFamily: fontFamily,
-            fontWeight: FontWeight.w500,
-            height: 1.2,
-            backgroundColor: color != null ? Color(color) : null,
-          );
+    return TextStyle(
+      color: CommanColor.whiteBlack(context),
+      letterSpacing: BibleInfo.letterSpacing,
+      fontSize: BibleInfo.fontSizeScale * (fontSize ?? 14),
+      fontFamily: fontFamily,
+      fontWeight: FontWeight.w500,
+      height: 1.2,
+      backgroundColor: color != null ? Color(color) : null,
+    );
   }
 
   static TextStyle bw14500withColorWithUnderLine(
       BuildContext context, int color, double? fontSize, String? fontFamily) {
-    return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? TextStyle(
-            color: Colors.white,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * (fontSize ?? 14),
-            fontFamily: fontFamily,
-            fontWeight: FontWeight.w500,
-            height: 1.2,
-            backgroundColor: Color(color),
-            decoration: TextDecoration.underline)
-        : TextStyle(
-            color: Colors.black,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * (fontSize ?? 14),
-            fontFamily: fontFamily,
-            fontWeight: FontWeight.w500,
-            height: 1.2,
-            backgroundColor: Color(color),
-            decoration: TextDecoration.underline);
+    return TextStyle(
+      color: CommanColor.whiteBlack(context),
+      letterSpacing: BibleInfo.letterSpacing,
+      fontSize: BibleInfo.fontSizeScale * (fontSize ?? 14),
+      fontFamily: fontFamily,
+      fontWeight: FontWeight.w500,
+      height: 1.2,
+      backgroundColor: Color(color),
+      decoration: TextDecoration.underline,
+    );
   }
 
   static TextStyle searchTextStyle(BuildContext context) {
@@ -634,34 +547,30 @@ class CommanStyle {
 
   static TextStyle bwWithChangeFont(
       BuildContext context, double? fontSize, String? fontFamily) {
-    return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? TextStyle(
-            color: Colors.white,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * (fontSize ?? 14),
-            fontWeight: FontWeight.w500,
-            fontFamily: fontFamily)
-        : TextStyle(
-            color: Colors.black,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * (fontSize ?? 14),
-            fontWeight: FontWeight.w500,
-            fontFamily: fontFamily);
+    return TextStyle(
+      color: CommanColor.whiteBlack(context),
+      letterSpacing: BibleInfo.letterSpacing,
+      fontSize: BibleInfo.fontSizeScale * (fontSize ?? 14),
+      fontWeight: FontWeight.w500,
+      fontFamily: fontFamily,
+    );
   }
 
   static TextStyle placeholderText(BuildContext context) {
-    return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
-        ? const TextStyle(
-            color: Colors.white,
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 16,
-            fontWeight: FontWeight.w400,
-          )
-        : const TextStyle(
-            color: Color(0xFF51493D),
-            letterSpacing: BibleInfo.letterSpacing,
-            fontSize: BibleInfo.fontSizeScale * 16,
-            fontWeight: FontWeight.w400,
-          );
+    if (CommanColor.usesLightCustomSurface(context) ||
+        Provider.of<ThemeProvider>(context).themeMode != ThemeMode.dark) {
+      return const TextStyle(
+        color: Color(0xFF51493D),
+        letterSpacing: BibleInfo.letterSpacing,
+        fontSize: BibleInfo.fontSizeScale * 16,
+        fontWeight: FontWeight.w400,
+      );
+    }
+    return const TextStyle(
+      color: Colors.white,
+      letterSpacing: BibleInfo.letterSpacing,
+      fontSize: BibleInfo.fontSizeScale * 16,
+      fontWeight: FontWeight.w400,
+    );
   }
 }

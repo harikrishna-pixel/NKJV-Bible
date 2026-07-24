@@ -278,9 +278,20 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    final isDark = themeProvider.themeMode == ThemeMode.dark;
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isVintage =
+        themeProvider.currentCustomTheme == AppCustomTheme.vintage;
+    final usesLightCustom = themeProvider.currentCustomTheme ==
+            AppCustomTheme.white ||
+        themeProvider.currentCustomTheme == AppCustomTheme.lightbrown;
+    final isDark =
+        themeProvider.themeMode == ThemeMode.dark && !usesLightCustom;
     final brown = const Color(0xFF5C4033);
+    final cream = isDark
+        ? CommanColor.darkPrimaryColor
+        : (isVintage
+            ? const Color(0xFFF8F3EA)
+            : themeProvider.backgroundColor);
     final iconTileBg = isDark
         ? Colors.white.withValues(alpha: 0.14)
         : brown.withValues(alpha: 0.12);
@@ -302,10 +313,13 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
             child: Container(
               margin: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage(Images.bgImage(context)),
-                  fit: BoxFit.cover,
-                ),
+                color: isVintage ? null : cream,
+                image: isVintage
+                    ? DecorationImage(
+                        image: AssetImage(Images.bgImage(context)),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(

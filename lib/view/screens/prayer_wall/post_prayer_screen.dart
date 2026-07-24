@@ -1,3 +1,4 @@
+import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
@@ -211,9 +212,20 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    final isDark = themeProvider.themeMode == ThemeMode.dark;
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isVintage =
+        themeProvider.currentCustomTheme == AppCustomTheme.vintage;
+    final usesLightCustom = themeProvider.currentCustomTheme ==
+            AppCustomTheme.white ||
+        themeProvider.currentCustomTheme == AppCustomTheme.lightbrown;
+    final isDark =
+        themeProvider.themeMode == ThemeMode.dark && !usesLightCustom;
     final brown = const Color(0xFF5C4033);
+    final cream = isDark
+        ? CommanColor.darkPrimaryColor
+        : (isVintage
+            ? const Color(0xFFF5F0E6)
+            : themeProvider.backgroundColor);
     final dateFmt = DateFormat('MMMM d, yyyy');
 
     return GestureDetector(
@@ -224,12 +236,14 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         body: Container(
           width: double.infinity,
           height: double.infinity,
-          decoration: BoxDecoration(
-            image: DecorationImage(
-              image: AssetImage(Images.bgImage(context)),
-              fit: BoxFit.cover,
-            ),
-          ),
+          decoration: isVintage
+              ? BoxDecoration(
+                  image: DecorationImage(
+                    image: AssetImage(Images.bgImage(context)),
+                    fit: BoxFit.cover,
+                  ),
+                )
+              : BoxDecoration(color: cream),
           child: Scaffold(
             resizeToAvoidBottomInset: false,
             backgroundColor: Colors.transparent,

@@ -1151,14 +1151,26 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         loadTextToSpeech.value = true;
       }
 
-      selectedChapter.value = selectedChapterForRead.value;
-      selectedBook.value = selectedBookNameForRead.value;
-      selectedBookNum.value = selectedBookNumForRead.value;
-      selectedBook.value = selectedBookNameForRead.value;
-      await SharPreferences.setString(
-        SharPreferences.selectedBook,
-        selectedBook.value,
-      );
+      // Do not overwrite live book/chapter with empty/"null" ForRead values
+      // (Home init can leave ForRead blank; audio next-chapter sync relies on this).
+      final forReadChapter = selectedChapterForRead.value.trim();
+      final forReadBook = selectedBookNameForRead.value.trim();
+      final forReadBookNum = selectedBookNumForRead.value.trim();
+      if (forReadChapter.isNotEmpty && forReadChapter.toLowerCase() != 'null') {
+        selectedChapter.value = forReadChapter;
+      }
+      if (forReadBook.isNotEmpty && forReadBook.toLowerCase() != 'null') {
+        selectedBook.value = forReadBook;
+      }
+      if (forReadBookNum.isNotEmpty && forReadBookNum.toLowerCase() != 'null') {
+        selectedBookNum.value = forReadBookNum;
+      }
+      if (selectedBook.value.isNotEmpty) {
+        await SharPreferences.setString(
+          SharPreferences.selectedBook,
+          selectedBook.value,
+        );
+      }
 
       final chapterValue =
           selectedChapter.value.isNotEmpty ? selectedChapter.value : "1";

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
+import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -60,6 +61,8 @@ class _LeaveRatingScreenState extends State<LeaveRatingScreen> {
     } catch (e) {
       debugPrint('warmDataBeforeHomeScreen error: $e');
     }
+    // Additive preload only — open ad / rating flow unchanged.
+    AdService.preloadInterstitialAdIfNeeded();
     Get.offAll(
           () => HomeScreen(
         From: "splash",

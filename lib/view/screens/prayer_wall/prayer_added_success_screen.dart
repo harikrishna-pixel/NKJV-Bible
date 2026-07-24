@@ -15,12 +15,18 @@ class PrayerAddedSuccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    final isDark = themeProvider.themeMode == ThemeMode.dark;
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isVintage =
+        themeProvider.currentCustomTheme == AppCustomTheme.vintage;
+    final usesLightCustom = themeProvider.currentCustomTheme ==
+            AppCustomTheme.white ||
+        themeProvider.currentCustomTheme == AppCustomTheme.lightbrown;
+    final isDark =
+        themeProvider.themeMode == ThemeMode.dark && !usesLightCustom;
     final brown = const Color(0xFF5C4033);
     final cream = isDark
         ? CommanColor.darkPrimaryColor
-        : (themeProvider.currentCustomTheme == AppCustomTheme.vintage
+        : (isVintage
             ? const Color(0xFFF5F0E6)
             : themeProvider.backgroundColor);
 
@@ -32,12 +38,14 @@ class PrayerAddedSuccessScreen extends StatelessWidget {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage(Images.bgImage(context)),
-            fit: BoxFit.cover,
-          ),
-        ),
+        decoration: isVintage
+            ? BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage(Images.bgImage(context)),
+                  fit: BoxFit.cover,
+                ),
+              )
+            : BoxDecoration(color: cream),
         child: Scaffold(
           backgroundColor: Colors.transparent,
       body: SafeArea(

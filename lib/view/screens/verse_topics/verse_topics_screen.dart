@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/verse_topics/verse_topic_detail_screen.dart';
 import 'package:biblebookapp/view/screens/verse_topics/verse_topics_data.dart';
@@ -44,19 +45,32 @@ class _VerseTopicsScreenState extends State<VerseTopicsScreen> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isWide = screenWidth > 450;
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final usesLightCustom =
+        themeProvider.currentCustomTheme == AppCustomTheme.white ||
+            themeProvider.currentCustomTheme == AppCustomTheme.lightbrown;
+    final isDark =
+        themeProvider.themeMode == ThemeMode.dark && !usesLightCustom;
+    // Match dark theme during Read→Home pops so cream scaffold never flashes.
+    final scaffoldBg =
+        isDark ? CommanColor.darkPrimaryColor : const Color(0xFFF5F0E6);
+    final titleColor = isDark ? Colors.white : _ink;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F0E6),
+      backgroundColor: scaffoldBg,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(
-            VerseTopicsData.backgroundAsset,
-            fit: BoxFit.cover,
-            width: double.infinity,
-            height: double.infinity,
-            gaplessPlayback: true,
-          ),
+          if (!isDark)
+            Image.asset(
+              VerseTopicsData.backgroundAsset,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              gaplessPlayback: true,
+            )
+          else
+            ColoredBox(color: scaffoldBg),
           SafeArea(
             child: Column(
               children: [
@@ -66,7 +80,7 @@ class _VerseTopicsScreenState extends State<VerseTopicsScreen> {
                     children: [
                       IconButton(
                         onPressed: () => Get.back(),
-                        icon: const Icon(Icons.arrow_back_ios, color: _ink),
+                        icon: Icon(Icons.arrow_back_ios, color: titleColor),
                       ),
                       Expanded(
                         child: Text(
@@ -76,7 +90,7 @@ class _VerseTopicsScreenState extends State<VerseTopicsScreen> {
                             fontFamily: 'Georgia',
                             fontSize: isWide ? 24 : 20,
                             fontWeight: FontWeight.w700,
-                            color: _ink,
+                            color: titleColor,
                           ),
                         ),
                       ),
@@ -89,7 +103,7 @@ class _VerseTopicsScreenState extends State<VerseTopicsScreen> {
                   child: _loading
                       ? Center(
                           child: CircularProgressIndicator(
-                            color: _ink,
+                            color: titleColor,
                           ),
                         )
                       : _categories.isEmpty
@@ -99,7 +113,7 @@ class _VerseTopicsScreenState extends State<VerseTopicsScreen> {
                                 style: TextStyle(
                                   fontFamily: 'Georgia',
                                   fontSize: isWide ? 18 : 16,
-                                  color: _ink.withValues(alpha: 0.8),
+                                  color: titleColor.withValues(alpha: 0.8),
                                 ),
                               ),
                             )
