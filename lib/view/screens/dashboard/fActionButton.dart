@@ -1312,10 +1312,18 @@ class floatingButtonState extends State<floatingButton>
         controller.selectChapterChange.value = chapterNum;
 
         if (liveBookNum.isNotEmpty && liveBookNum.toLowerCase() != 'null') {
+          // Keep SharedPreferences consistent with the book currently playing.
+          // forceReloadSelectedChapter() reads selectedBookNum from prefs.
+          await SharPreferences.setString(
+              SharPreferences.selectedBookNum, liveBookNum);
           controller.selectedBookNum.value = liveBookNum;
           controller.selectedBookNumForRead.value = liveBookNum;
         }
         if (liveBookName.isNotEmpty && liveBookName.toLowerCase() != 'null') {
+          // Keep SharedPreferences consistent with the book currently playing.
+          // forceReloadSelectedChapter() reads selectedBook from prefs.
+          await SharPreferences.setString(
+              SharPreferences.selectedBook, liveBookName);
           controller.selectedBook.value = liveBookName;
           controller.selectedBookNameForRead.value = liveBookName;
         }

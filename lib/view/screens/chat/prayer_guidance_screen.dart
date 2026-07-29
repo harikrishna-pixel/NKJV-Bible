@@ -2123,6 +2123,8 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
 
   // Load interstitial ad
   Future<void> _loadInterstitialAd() async {
+    final shouldLoad = await SharPreferences.shouldLoadAd();
+    if (!shouldLoad) return;
     debugPrint('🔍 PRAYER AD: Loading interstitial ad...');
     _adService.loadInterstitialAd(() {
       debugPrint('✅ PRAYER AD: Interstitial ad loaded successfully');
@@ -2257,6 +2259,12 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
       return;
     }
     _isClosingWithAd = true;
+
+    // Dashboard ads off → never show back interstitial (same gate as Chat).
+    if (!await SharPreferences.shouldLoadAd()) {
+      if (mounted) Get.back();
+      return;
+    }
 
     // Prefer a smooth back animation: only wait for an interstitial if it is
     // already loaded. Never block on network/subscription checks.

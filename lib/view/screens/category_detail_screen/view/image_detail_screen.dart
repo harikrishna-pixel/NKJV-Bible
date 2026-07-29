@@ -1102,6 +1102,7 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
                         }
                         if (val > 0 &&
                             val % adcountview == 0 &&
+                            shouldLoadAd &&
                             _adService._interstitialAd != null) {
                           if (_adService._isInterstitialAdLoaded) {
                             EasyLoading.showInfo('Please wait...');

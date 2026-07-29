@@ -2098,7 +2098,7 @@ class ContinueTodayJourneySheet extends StatelessWidget {
                 child: OutlinedButton(
                   onPressed: () async {
                     final today =
-                        DateTime.now().toIso8601String().split('T')[0];
+                    DateTime.now().toIso8601String().split('T')[0];
                     await SharPreferences.setString(
                       SharPreferences.streakFlowDismissedDate,
                       today,
@@ -2142,9 +2142,9 @@ class StreakFlowNavigation {
     final dismissed = await SharPreferences.getString(
         SharPreferences.streakFlowDismissedDate);
     final started =
-        await SharPreferences.getString(SharPreferences.streakFlowStartedDate);
+    await SharPreferences.getString(SharPreferences.streakFlowStartedDate);
     final steps = await SharPreferences.getInt(
-            SharPreferences.streakFlowStepsCompletedToday) ??
+        SharPreferences.streakFlowStepsCompletedToday) ??
         0;
 
     if (last == today || dismissed == today) return false;
@@ -2152,7 +2152,7 @@ class StreakFlowNavigation {
     final stepsByDay = await _readStreakFlowStepsByDay();
     final stepsTodayFromMap = stepsByDay[today] ?? 0;
     final effectiveSteps =
-        stepsTodayFromMap > steps ? stepsTodayFromMap : steps;
+    stepsTodayFromMap > steps ? stepsTodayFromMap : steps;
     if (started == today && effectiveSteps > 0) return false;
 
     return true;
@@ -2167,7 +2167,7 @@ class StreakFlowNavigation {
 
   static void openStreakConnectionFlow() {
     Get.to(
-      () => const UpgradeCheckWrapper(
+          () => const UpgradeCheckWrapper(
         showUpgradeAlert: true,
         child: StreakConnectionScreen(),
       ),
@@ -2183,9 +2183,9 @@ class StreakFlowNavigation {
     final yesterdayDate = todayDate.subtract(const Duration(days: 1));
     final dayBeforeYesterdayDate = todayDate.subtract(const Duration(days: 2));
     final yesterday =
-        DateTime(yesterdayDate.year, yesterdayDate.month, yesterdayDate.day)
-            .toIso8601String()
-            .split('T')[0];
+    DateTime(yesterdayDate.year, yesterdayDate.month, yesterdayDate.day)
+        .toIso8601String()
+        .split('T')[0];
     final dayBeforeYesterday = DateTime(
       dayBeforeYesterdayDate.year,
       dayBeforeYesterdayDate.month,
@@ -2194,9 +2194,9 @@ class StreakFlowNavigation {
     final last = await SharPreferences.getString(
         SharPreferences.streakFlowLastShownDate);
     final started =
-        await SharPreferences.getString(SharPreferences.streakFlowStartedDate);
+    await SharPreferences.getString(SharPreferences.streakFlowStartedDate);
     final steps = await SharPreferences.getInt(
-            SharPreferences.streakFlowStepsCompletedToday) ??
+        SharPreferences.streakFlowStepsCompletedToday) ??
         0;
 
     final isIncompleteYesterday = started != null &&
@@ -2213,7 +2213,7 @@ class StreakFlowNavigation {
         isIncompleteYesterday ? started : yesterday,
       );
       final pausedAt =
-          await SharPreferences.getString(SharPreferences.streakFlowPausedAt);
+      await SharPreferences.getString(SharPreferences.streakFlowPausedAt);
       if (pausedAt == null || pausedAt.isEmpty) {
         await SharPreferences.setString(
           SharPreferences.streakFlowPausedAt,
@@ -2222,7 +2222,7 @@ class StreakFlowNavigation {
       }
       if (!context.mounted) return;
       Get.offAll(
-        () => const StreakPausedScreen(),
+            () => const StreakPausedScreen(),
         transition: Transition.cupertino,
         duration: const Duration(milliseconds: 350),
       );
