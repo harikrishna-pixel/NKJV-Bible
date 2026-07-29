@@ -1233,6 +1233,7 @@ class _HomeScreenState extends State<HomeScreen>
   bool _feedbackPendingAtSessionStart = false;
   bool _deferUpgradeAfterStreakRating = false;
   bool _streakRatingSawLifecyclePause = false;
+  bool _continueJourneySheetShown = false;
   Timer? _deferUpgradeAfterStreakRatingFallbackTimer;
   int _ratingUiDialogDepth = 0;
   static const Duration _kUpgradeAfterStreakRatingDelay =
@@ -1326,6 +1327,9 @@ class _HomeScreenState extends State<HomeScreen>
     ]);
     if (!mounted) return;
 
+    await _maybeShowContinueJourneySheet();
+    if (!mounted) return;
+
       SmartNotificationHelper.recordAppOpen();
       SmartNotificationHelper.scheduleSmartNotificationIfNeeded();
       if (mounted) {
@@ -1345,6 +1349,16 @@ class _HomeScreenState extends State<HomeScreen>
         if (!mounted) return;
         _navigateForWidgetRoute(getBibleWidgetRouteFromUri(uri));
       });
+  }
+
+  Future<void> _maybeShowContinueJourneySheet() async {
+    if (_continueJourneySheetShown || !mounted) return;
+    if (!await StreakFlowNavigation.shouldShowContinueJourneyPrompt()) return;
+    if (!mounted) return;
+    _continueJourneySheetShown = true;
+    await Future.delayed(const Duration(milliseconds: 350));
+    if (!mounted) return;
+    await StreakFlowNavigation.showContinueJourneyBottomSheet(context);
   }
 
   Future<void> _showStreakCompleteCelebrationIfNeeded() async {

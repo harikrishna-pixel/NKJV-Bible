@@ -5,9 +5,41 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
+import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/streak/streak_service.dart';
 import 'package:biblebookapp/streak_flow/daily_journey_screen.dart';
+
+class _StreakIconVisualState {
+  const _StreakIconVisualState({
+    required this.streak,
+    required this.showCountBadge,
+    required this.showNotificationDot,
+  });
+
+  final int streak;
+  final bool showCountBadge;
+  final bool showNotificationDot;
+
+  static Future<_StreakIconVisualState> load() async {
+    final today = DateTime.now().toIso8601String().split('T')[0];
+    final lastShown = await SharPreferences.getString(
+        SharPreferences.streakFlowLastShownDate);
+    final steps = await SharPreferences.getInt(
+            SharPreferences.streakFlowStepsCompletedToday) ??
+        0;
+    final streak = await StreakService.getCurrentStreak();
+    final todayComplete = lastShown == today || steps >= 4;
+    final showCountBadge = streak > 0 && todayComplete;
+    final showNotificationDot = !todayComplete && steps < 1;
+
+    return _StreakIconVisualState(
+      streak: streak,
+      showCountBadge: showCountBadge,
+      showNotificationDot: showNotificationDot,
+    );
+  }
+}
 
 /// Streak icon button for Home app bar. Tapping opens Daily Journey screen.
 class StreakIconButton extends StatelessWidget {
@@ -20,31 +52,64 @@ class StreakIconButton extends StatelessWidget {
     this.iconColor,
   });
 
+  Widget _inactiveFlame({required Color color, required bool showDot}) {
+    final badgeSize = iconSize * 1.55;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: badgeSize,
+          height: badgeSize,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: color.withOpacity(0.12),
+            border: Border.all(color: color.withOpacity(0.28)),
+          ),
+          child: Icon(
+            Icons.local_fire_department_rounded,
+            size: iconSize * 0.82,
+            color: color.withOpacity(0.42),
+          ),
+        ),
+        if (showDot)
+          Positioned(
+            top: -1,
+            right: -1,
+            child: Container(
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE53935),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final color = iconColor ?? CommanColor.whiteBlack(context);
-    // Use a lightweight periodic refresh so streak stays consistent across screens
-    // even when preferences change without triggering a rebuild (e.g. after restore flow).
-    return StreamBuilder<int>(
-      // Fetch once immediately (avoid initial "blank"), then refresh periodically.
-      // Provide a computation so this never emits null (required for non-nullable int).
+    return StreamBuilder<_StreakIconVisualState>(
       stream: (() async* {
-        // Show current consecutive streak (resets after a missed day without restore),
-        // not lifetime completed-day total.
-        yield await StreakService.getCurrentStreak();
-        yield* Stream<int>.periodic(const Duration(seconds: 2), (_) => 0)
-            .asyncMap((_) => StreakService.getCurrentStreak());
+        yield await _StreakIconVisualState.load();
+        yield* Stream<void>.periodic(const Duration(seconds: 2))
+            .asyncMap((_) => _StreakIconVisualState.load());
       })(),
-      initialData: 0,
       builder: (context, snapshot) {
-        final streak = snapshot.data ?? 0;
-        final hasStreak = streak > 0;
+        final state = snapshot.data;
+        final streak = state?.streak ?? 0;
+        final showCountBadge = state?.showCountBadge ?? false;
+        final showNotificationDot = state?.showNotificationDot ?? false;
+
         return InkWell(
           onTap: () => Get.to(() => const DailyJourneyScreen()),
           borderRadius: BorderRadius.circular(20),
           child: Padding(
             padding: const EdgeInsets.all(4),
-            child: hasStreak
+            child: showCountBadge
                 ? Container(
                     padding: EdgeInsets.symmetric(
                       horizontal: iconSize * 0.45,
@@ -82,10 +147,9 @@ class StreakIconButton extends StatelessWidget {
                       ],
                     ),
                   )
-                : Icon(
-                    Icons.local_fire_department_rounded,
-                    size: iconSize,
+                : _inactiveFlame(
                     color: color,
+                    showDot: showNotificationDot,
                   ),
           ),
         );
@@ -121,7 +185,6 @@ class StreakUI {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Flame icon with gradient
               Container(
                 width: isTablet ? 88 : 72,
                 height: isTablet ? 88 : 72,
@@ -165,16 +228,6 @@ class StreakUI {
                   color: isDark ? Colors.white70 : Colors.black87,
                 ),
               ),
-              // SizedBox(height: isTablet ? 24 : 20),
-              // Text(
-              //   'Use at least one every day to build your streak.',
-              //   textAlign: TextAlign.center,
-              //   style: TextStyle(
-              //     fontSize: isTablet ? 14 : 13,
-              //     fontStyle: FontStyle.italic,
-              //     color: isDark ? Colors.white60 : Colors.black54,
-              //   ),
-              // ),
               SizedBox(height: isTablet ? 24 : 20),
               SizedBox(
                 width: double.infinity,

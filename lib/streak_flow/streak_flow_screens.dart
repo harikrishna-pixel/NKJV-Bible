@@ -1965,18 +1965,227 @@ class _FaithJourneyStepPagerState extends State<FaithJourneyStepPager> {
   }
 }
 
-/// Entry point for streak flow. Call when navigating to Home; shows flow once per day first.
+/// Bottom sheet shown on Home when today's journey has not started yet.
+class ContinueTodayJourneySheet extends StatelessWidget {
+  const ContinueTodayJourneySheet({super.key});
+
+  static Future<void> show(BuildContext context) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withOpacity(0.35),
+      builder: (ctx) => const ContinueTodayJourneySheet(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 0, 16, 12 + bottomInset),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8F4EB),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: const Color(0xFFD4B89E).withOpacity(0.65)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.18),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFFFFE0B2).withOpacity(0.55),
+                      border: Border.all(
+                        color: const Color(0xFFE65100).withOpacity(0.35),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.local_fire_department_rounded,
+                      color: Color(0xFFE65100),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Continue Today's Journey",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF3D2914),
+                            fontFamily: 'Georgia',
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Build your connection with God and complete your daily streak.',
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.35,
+                            color: Color(0xFF6B4C34),
+                            fontFamily: 'Georgia',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xFF763201),
+                        Color(0xFFD5821F),
+                        Color(0xFF763201),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      StreakFlowNavigation.openStreakConnectionFlow();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      'Continue',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        fontFamily: 'Georgia',
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: OutlinedButton(
+                  onPressed: () async {
+                    final today =
+                        DateTime.now().toIso8601String().split('T')[0];
+                    await SharPreferences.setString(
+                      SharPreferences.streakFlowDismissedDate,
+                      today,
+                    );
+                    if (context.mounted) Navigator.of(context).pop();
+                  },
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(
+                      color: const Color(0xFF7A5435).withOpacity(0.45),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'Not now',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF3D2914),
+                      fontFamily: 'Georgia',
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Entry point for streak flow. Call when navigating to Home; Home shows prompt when needed.
 class StreakFlowNavigation {
-  /// Show streak flow if not yet shown today, else go to Home.
+  /// Whether Home should show the "Continue Today's Journey" bottom sheet.
+  static Future<bool> shouldShowContinueJourneyPrompt() async {
+    final today = DateTime.now().toIso8601String().split('T')[0];
+    final last = await SharPreferences.getString(
+        SharPreferences.streakFlowLastShownDate);
+    final dismissed = await SharPreferences.getString(
+        SharPreferences.streakFlowDismissedDate);
+    final started =
+        await SharPreferences.getString(SharPreferences.streakFlowStartedDate);
+    final steps = await SharPreferences.getInt(
+            SharPreferences.streakFlowStepsCompletedToday) ??
+        0;
+
+    if (last == today || dismissed == today) return false;
+
+    final stepsByDay = await _readStreakFlowStepsByDay();
+    final stepsTodayFromMap = stepsByDay[today] ?? 0;
+    final effectiveSteps =
+        stepsTodayFromMap > steps ? stepsTodayFromMap : steps;
+    if (started == today && effectiveSteps > 0) return false;
+
+    return true;
+  }
+
+  static Future<void> showContinueJourneyBottomSheet(BuildContext context) async {
+    if (!context.mounted) return;
+    if (!await shouldShowContinueJourneyPrompt()) return;
+    if (!context.mounted) return;
+    await ContinueTodayJourneySheet.show(context);
+  }
+
+  static void openStreakConnectionFlow() {
+    Get.to(
+      () => const UpgradeCheckWrapper(
+        showUpgradeAlert: true,
+        child: StreakConnectionScreen(),
+      ),
+      transition: Transition.cupertino,
+      duration: const Duration(milliseconds: 350),
+    );
+  }
+
+  /// Open Home directly; streak prompt is shown on Home when applicable.
   static Future<void> navigateToStreakFlowOrHome(BuildContext context) async {
     final today = DateTime.now().toIso8601String().split('T')[0];
     final todayDate = DateTime.now();
     final yesterdayDate = todayDate.subtract(const Duration(days: 1));
     final dayBeforeYesterdayDate = todayDate.subtract(const Duration(days: 2));
     final yesterday =
-    DateTime(yesterdayDate.year, yesterdayDate.month, yesterdayDate.day)
-        .toIso8601String()
-        .split('T')[0];
+        DateTime(yesterdayDate.year, yesterdayDate.month, yesterdayDate.day)
+            .toIso8601String()
+            .split('T')[0];
     final dayBeforeYesterday = DateTime(
       dayBeforeYesterdayDate.year,
       dayBeforeYesterdayDate.month,
@@ -1984,12 +2193,10 @@ class StreakFlowNavigation {
     ).toIso8601String().split('T')[0];
     final last = await SharPreferences.getString(
         SharPreferences.streakFlowLastShownDate);
-    final dismissed = await SharPreferences.getString(
-        SharPreferences.streakFlowDismissedDate);
     final started =
-    await SharPreferences.getString(SharPreferences.streakFlowStartedDate);
+        await SharPreferences.getString(SharPreferences.streakFlowStartedDate);
     final steps = await SharPreferences.getInt(
-        SharPreferences.streakFlowStepsCompletedToday) ??
+            SharPreferences.streakFlowStepsCompletedToday) ??
         0;
 
     final isIncompleteYesterday = started != null &&
@@ -2006,7 +2213,7 @@ class StreakFlowNavigation {
         isIncompleteYesterday ? started : yesterday,
       );
       final pausedAt =
-      await SharPreferences.getString(SharPreferences.streakFlowPausedAt);
+          await SharPreferences.getString(SharPreferences.streakFlowPausedAt);
       if (pausedAt == null || pausedAt.isEmpty) {
         await SharPreferences.setString(
           SharPreferences.streakFlowPausedAt,
@@ -2015,39 +2222,15 @@ class StreakFlowNavigation {
       }
       if (!context.mounted) return;
       Get.offAll(
-            () => const StreakPausedScreen(),
+        () => const StreakPausedScreen(),
         transition: Transition.cupertino,
         duration: const Duration(milliseconds: 350),
       );
       return;
     }
 
-    if (last == today || dismissed == today) {
-      _goToHome(context);
-      return;
-    }
-
-// Already completed Connection (and maybe more) today — do not restart at
-// Connection on reopen. Open Reading screen; user can resume pending steps
-// from Faith Journey.
-    final stepsByDay = await _readStreakFlowStepsByDay();
-    final stepsTodayFromMap = stepsByDay[today] ?? 0;
-    final effectiveSteps =
-    stepsTodayFromMap > steps ? stepsTodayFromMap : steps;
-    if (started == today && effectiveSteps > 0) {
-      _goToHome(context);
-      return;
-    }
-
     if (!context.mounted) return;
-    Get.offAll(
-          () => const UpgradeCheckWrapper(
-        showUpgradeAlert: true,
-        child: StreakConnectionScreen(),
-      ),
-      transition: Transition.cupertino,
-      duration: const Duration(milliseconds: 350),
-    );
+    _goToHome(context);
   }
 }
 
