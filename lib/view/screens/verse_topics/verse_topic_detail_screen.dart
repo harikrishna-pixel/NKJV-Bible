@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:biblebookapp/view/constants/colors.dart';
@@ -7,6 +8,8 @@ import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/utils/custom_share.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
+import 'package:biblebookapp/view/screens/auth/splash.dart';
+import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
 import 'package:biblebookapp/view/screens/chat/chat_screen.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
@@ -15,6 +18,7 @@ import 'package:biblebookapp/view/screens/verse_topics/verse_topics_data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -37,20 +41,44 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
   static const Color _card = Color(0xFFF8F4EB);
   static const Color _gold = Color(0xFF8B6914);
 
+  final ScrollController _scrollController = ScrollController();
+  bool _showCategoryTitleInTopBar = false;
+
   List<VerseTopicVerse> _allVerses = [];
   bool _loading = true;
+
+  /// Display-only monetization (does not change verse/action logic).
+  final AdService _adService = AdService();
+  bool _adsEnabled = false;
+  int _actionTapCount = 0;
+  final Map<int, BannerAd> _bannerAds = {};
+  final Set<int> _bannerSlotsLoading = {};
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _scrollController.addListener(_handleScroll);
     _loadVerses();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _scrollController.removeListener(_handleScroll);
+    _scrollController.dispose();
+    for (final ad in _bannerAds.values) {
+      ad.dispose();
+    }
+    _bannerAds.clear();
     super.dispose();
+  }
+
+  void _handleScroll() {
+    if (!_scrollController.hasClients) return;
+    final shouldShow = _scrollController.offset > 140;
+    if (shouldShow == _showCategoryTitleInTopBar) return;
+    setState(() => _showCategoryTitleInTopBar = shouldShow);
   }
 
   @override
@@ -69,6 +97,137 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
       _allVerses = verses;
       _loading = false;
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initAdsIfNeeded();
+    });
+  }
+
+  Future<void> _initAdsIfNeeded() async {
+    if (!mounted || _allVerses.isEmpty) return;
+    final shouldLoad = await SharPreferences.shouldLoadAd();
+    if (!mounted || !shouldLoad) return;
+
+    setState(() => _adsEnabled = true);
+    _adService.loadInterstitialAd(() {
+      if (mounted) setState(() {});
+    });
+
+    final slotCount = _allVerses.length ~/ 4;
+    for (var slot = 0; slot < slotCount; slot++) {
+      unawaited(_loadAdaptiveBanner(slot));
+    }
+  }
+
+  Future<void> _loadAdaptiveBanner(int slotIndex) async {
+    if (!_adsEnabled || !mounted) return;
+    if (_bannerAds.containsKey(slotIndex) ||
+        _bannerSlotsLoading.contains(slotIndex)) {
+      return;
+    }
+    _bannerSlotsLoading.add(slotIndex);
+
+    try {
+      final width = MediaQuery.sizeOf(context).width.truncate();
+      final size =
+          await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(
+        width,
+      );
+      if (size == null || !mounted) {
+        _bannerSlotsLoading.remove(slotIndex);
+        return;
+      }
+
+      final adUnitId =
+          await SharPreferences.getString(SharPreferences.googleBannerId);
+      if (adUnitId == null || adUnitId.isEmpty || !mounted) {
+        _bannerSlotsLoading.remove(slotIndex);
+        return;
+      }
+
+      final banner = BannerAd(
+        size: size,
+        adUnitId: adUnitId,
+        listener: BannerAdListener(
+          onAdLoaded: (ad) {
+            _bannerSlotsLoading.remove(slotIndex);
+            if (!mounted) {
+              ad.dispose();
+              return;
+            }
+            setState(() {
+              _bannerAds[slotIndex] = ad as BannerAd;
+            });
+          },
+          onAdFailedToLoad: (ad, error) {
+            _bannerSlotsLoading.remove(slotIndex);
+            ad.dispose();
+          },
+        ),
+        request: await AdConsentManager.getAdRequest(),
+      );
+      await banner.load();
+    } catch (_) {
+      _bannerSlotsLoading.remove(slotIndex);
+    }
+  }
+
+  /// Counts Read/Copy/Share/Ask taps; every 10th shows interstitial, then runs
+  /// the existing action unchanged.
+  Future<void> _onVerseAction(FutureOr<void> Function() action) async {
+    _actionTapCount++;
+    if (_actionTapCount % 10 == 0) {
+      final shouldLoad = await SharPreferences.shouldLoadAd();
+      if (shouldLoad && mounted) {
+        await _adService.showInterstitialAdAndWait();
+      }
+    }
+    if (!mounted) return;
+    await action();
+  }
+
+  Widget _buildInlineBanner(int slotIndex) {
+    final ad = _bannerAds[slotIndex];
+    if (ad == null) {
+      return const SizedBox(height: 12);
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Center(
+        child: SizedBox(
+          width: ad.size.width.toDouble(),
+          height: ad.size.height.toDouble(),
+          child: AdWidget(key: ValueKey('topic-banner-$slotIndex'), ad: ad),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildVerseListChildren({
+    required bool isWide,
+    required bool isDark,
+    required Color cardBorder,
+  }) {
+    final children = <Widget>[];
+    for (var i = 0; i < _allVerses.length; i++) {
+      final verse = _allVerses[i];
+      children.add(
+        _VerseCard(
+          verse: verse,
+          isWide: isWide,
+          isDark: isDark,
+          cardBorder: cardBorder,
+          onRead: () => _onVerseAction(() => _readVerse(verse)),
+          onCopy: () => _onVerseAction(() => _copyVerse(verse)),
+          onShare: () => _onVerseAction(() => _shareVerse(verse)),
+          onAsk: () => _onVerseAction(() => _askAboutVerse(verse)),
+        ),
+      );
+      final oneBased = i + 1;
+      if (_adsEnabled && oneBased % 4 == 0) {
+        children.add(_buildInlineBanner((oneBased ~/ 4) - 1));
+      }
+    }
+    return children;
   }
 
   Future<void> _shareVerse(VerseTopicVerse verse) async {
@@ -251,16 +410,37 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
-              child: Row(
+              child: Stack(
+                alignment: Alignment.center,
                 children: [
-                  IconButton(
-                    onPressed: () => Get.back(),
-                    icon: Icon(
-                      Icons.arrow_back_ios,
-                      color: isDark ? Colors.white : _ink,
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      onPressed: () => Get.back(),
+                      icon: Icon(
+                        Icons.arrow_back_ios,
+                        color: isDark ? Colors.white : _ink,
+                      ),
                     ),
                   ),
-                  const Spacer(),
+                  IgnorePointer(
+                    child: AnimatedOpacity(
+                      opacity: _showCategoryTitleInTopBar ? 1 : 0,
+                      duration: const Duration(milliseconds: 180),
+                      child: Text(
+                        widget.categoryName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Georgia',
+                          fontSize: isWide ? 18 : 16,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white : _ink,
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -272,6 +452,7 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
                       ),
                     )
                   : ListView(
+                          controller: _scrollController,
                           padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                           children: [
                             Center(
@@ -355,17 +536,10 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
                                 ),
                               )
                             else
-                              ..._allVerses.map(
-                                (verse) => _VerseCard(
-                                  verse: verse,
-                                  isWide: isWide,
-                                  isDark: isDark,
-                                  cardBorder: cardBorder,
-                                  onRead: () => _readVerse(verse),
-                                  onCopy: () => _copyVerse(verse),
-                                  onShare: () => _shareVerse(verse),
-                                  onAsk: () => _askAboutVerse(verse),
-                                ),
+                              ..._buildVerseListChildren(
+                                isWide: isWide,
+                                isDark: isDark,
+                                cardBorder: cardBorder,
                               ),
                           ],
                         ),

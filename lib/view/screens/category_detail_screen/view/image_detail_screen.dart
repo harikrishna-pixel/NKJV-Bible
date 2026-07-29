@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer';
 import 'dart:io';
 import 'package:biblebookapp/Model/category_model.dart';
@@ -98,6 +99,45 @@ class AdService {
       EasyLoading.dismiss();
       log('InterstitialAd is not ready yet');
     }
+  }
+
+  /// Additive wait helper — does not change [showInterstitialAd] behavior.
+  /// Completes when the ad is dismissed / fails / times out.
+  Future<void> showInterstitialAdAndWait({
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    final ad = _sharedInterstitialAd;
+    if (ad == null || !_sharedInterstitialLoaded) {
+      loadInterstitialAd(() {});
+      return;
+    }
+
+    final completer = Completer<void>();
+    _sharedInterstitialAd = null;
+    _sharedInterstitialLoaded = false;
+
+    ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdShowedFullScreenContent: (ad) async {
+        await SharPreferences.setString('OpenAd', '1');
+      },
+      onAdDismissedFullScreenContent: (ad) async {
+        await SharPreferences.setString('OpenAd', '1');
+        ad.dispose();
+        if (!completer.isCompleted) completer.complete();
+        loadInterstitialAd(() {});
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        ad.dispose();
+        if (!completer.isCompleted) completer.complete();
+        loadInterstitialAd(() {});
+      },
+    );
+
+    await ad.show();
+    await completer.future.timeout(
+      timeout,
+      onTimeout: () {},
+    );
   }
 
   /// Additive: start interstitial load early (e.g. on Streak before Home).

@@ -287,7 +287,12 @@ class _SettingScreenState extends State<SettingScreen>
         debugPrint("✅ Notification permission is granted");
         // If user came from the "Enable Daily Reminder" CTA (streak completion),
         // turn on all three schedules the first time (without altering core logic).
-        final shouldAutoEnableAll = widget.notificationValue == true &&
+        // Additive: also one-time sync when OS permission is already granted but
+        // Settings slots were never synced (e.g. Allow during onboarding).
+        final slotsSynced = await SharPreferences.getBoolean(
+            SharPreferences.notificationSlotsSyncedFromPermission);
+        final shouldAutoEnableAll = ((widget.notificationValue == true) ||
+                (slotsSynced != true)) &&
             (nt ?? false) == false &&
             (nt1 ?? false) == false &&
             (nt2 ?? false) == false;
@@ -309,6 +314,8 @@ class _SettingScreenState extends State<SettingScreen>
               SharPreferences.isNotificationOn1, nextAfternoon);
           SharPreferences.setBoolean(
               SharPreferences.isNotificationOn2, nextEvening);
+          SharPreferences.setBoolean(
+              SharPreferences.notificationSlotsSyncedFromPermission, true);
           setNotification(NotificationTime.morning);
           setNotification(NotificationTime.afternoon);
           setNotification(NotificationTime.evening);
@@ -478,6 +485,8 @@ class _SettingScreenState extends State<SettingScreen>
         case NotificationTime.morning:
           await SharPreferences.setBoolean(
               SharPreferences.isNotificationOn, notificationButtonValue);
+          await SharPreferences.setBoolean(
+              SharPreferences.notificationSlotsSyncedFromPermission, true);
           if (notificationButtonValue) {
             setNotification(NotificationTime.morning);
           } else {
@@ -488,6 +497,8 @@ class _SettingScreenState extends State<SettingScreen>
         case NotificationTime.afternoon:
           await SharPreferences.setBoolean(
               SharPreferences.isNotificationOn1, notificationButtonValue1);
+          await SharPreferences.setBoolean(
+              SharPreferences.notificationSlotsSyncedFromPermission, true);
           if (notificationButtonValue1) {
             setNotification(NotificationTime.afternoon);
           } else {
@@ -498,6 +509,8 @@ class _SettingScreenState extends State<SettingScreen>
         case NotificationTime.evening:
           await SharPreferences.setBoolean(
               SharPreferences.isNotificationOn2, notificationButtonValue2);
+          await SharPreferences.setBoolean(
+              SharPreferences.notificationSlotsSyncedFromPermission, true);
           if (notificationButtonValue2) {
             setNotification(NotificationTime.evening);
           } else {
@@ -854,6 +867,8 @@ class _SettingScreenState extends State<SettingScreen>
     await SharPreferences.setBoolean(SharPreferences.isNotificationOn, false);
     await SharPreferences.setBoolean(SharPreferences.isNotificationOn1, false);
     await SharPreferences.setBoolean(SharPreferences.isNotificationOn2, false);
+    await SharPreferences.setBoolean(
+        SharPreferences.notificationSlotsSyncedFromPermission, true);
     if (!mounted) return;
     setState(() {
       notificationButtonValue = false;

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:biblebookapp/controller/api_service.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
@@ -297,6 +298,7 @@ class _WalletScreenState extends State<WalletScreen> {
     });
     // Initialize max ads check
     _checkMaxAdsWatched();
+    syncReferrerCreditsFromSession();
 
   }
 

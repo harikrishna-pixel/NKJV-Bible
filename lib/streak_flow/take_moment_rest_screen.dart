@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:biblebookapp/streak_flow/take_moment_released_screen.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 
@@ -201,6 +202,7 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
                   child: Listener(
                     onPointerDown: (_) {
                       if (!_isHolding && mounted) {
+                        HapticFeedback.heavyImpact();
                         setState(() => _isHolding = true);
                         _startCountdown();
                       }
@@ -234,7 +236,7 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
                           animation: _breathingAnimation,
                           builder: (context, _) {
                             final scale =
-                                _isHolding ? 0.98 : _breathingAnimation.value;
+                            _isHolding ? 0.98 : _breathingAnimation.value;
                             return Transform.scale(
                               scale: scale,
                               child: _buildMainCircle(
@@ -311,8 +313,8 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
         shape: BoxShape.circle,
         color: _isHolding
             ? (isDark
-                ? Colors.white.withOpacity(0.08)
-                : _softGold.withOpacity(0.12))
+            ? Colors.white.withOpacity(0.08)
+            : _softGold.withOpacity(0.12))
             : Colors.transparent,
         border: Border.all(
           color: _isHolding ? accentColor : accentColor.withOpacity(0.65),

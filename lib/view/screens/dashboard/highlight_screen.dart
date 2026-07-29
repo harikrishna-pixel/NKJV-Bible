@@ -21,6 +21,7 @@ import '../../../controller/dpProvider.dart';
 import '../../constants/colors.dart';
 import '../../constants/constant.dart';
 import '../../constants/share_preferences.dart';
+import 'package:biblebookapp/view/widget/library_list_ads_helper.dart';
 
 class HighLightScreen extends StatefulWidget {
   const HighLightScreen({super.key});
@@ -36,6 +37,13 @@ class _HighLightScreenState extends State<HighLightScreen> {
   double fontSize = Sizecf.scrnWidth! > 450 ? 25.0 : 15.0;
   var fontSizeS = "";
   var selectedFontFamily = "";
+
+  /// Display-only ads (same pattern as Explore Topics detail).
+  late final LibraryListAdsHelper _libraryAds =
+      LibraryListAdsHelper(onChanged: () {
+        if (mounted) setState(() {});
+      });
+
   Future<void> getFont() async {
     fontSizeS =
         await SharPreferences.getString(SharPreferences.selectedFontSize) ??
@@ -75,6 +83,12 @@ class _HighLightScreenState extends State<HighLightScreen> {
     setState(() {
       highlightContent = _loadData();
     });
+  }
+
+  @override
+  void dispose() {
+    _libraryAds.dispose();
+    super.dispose();
   }
 
   @override
@@ -123,6 +137,14 @@ class _HighLightScreenState extends State<HighLightScreen> {
             }
             final items = snapshot.data;
             if (items != null && items.isNotEmpty) {
+              // Display-only: adaptive banners between items + interstitial every 10 actions.
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                _libraryAds.initIfNeeded(
+                  itemCount: items.length,
+                  context: context,
+                );
+              });
               return ListView.builder(
                 shrinkWrap: true,
                 itemCount: items.length,
@@ -149,7 +171,7 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                     height: 10,
                                   ),
                                   GestureDetector(
-                                      onTap: () {
+                                      onTap: () async {
                                         showModalBottomSheet(
                                           enableDrag: true,
                                           shape: const RoundedRectangleBorder(
@@ -238,6 +260,7 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                         children: [
                                                           InkWell(
                                                               onTap: () async {
+                                                                await _libraryAds.runCountedAction(() async {
                                                                 await Clipboard.setData(
                                                                     ClipboardData(
                                                                         text:
@@ -245,6 +268,7 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                                 Constants
                                                                     .showToast(
                                                                         "Copied");
+                                                                });
                                                               },
                                                               child: Container(
                                                                   padding:
@@ -289,6 +313,7 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                       ),
                                                       InkWell(
                                                         onTap: () async {
+                                                          await _libraryAds.runCountedAction(() async {
                                                           await SharPreferences
                                                               .setString(
                                                                   SharPreferences
@@ -335,6 +360,7 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                             },
                                                           );
                                                           // Navigator.push(context, MaterialPageRoute(builder: (context) => );
+                                                          });
                                                         },
                                                         child: Column(
                                                           children: [
@@ -378,8 +404,9 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                       Column(
                                                         children: [
                                                           InkWell(
-                                                              onTap: () async {
-                                                                // final appPackageName =
+                                                                onTap: () async {
+                                                                await _libraryAds.runCountedAction(() async {
+                                                              // final appPackageName =
                                                                 //     (await PackageInfo
                                                                 //             .fromPlatform())
                                                                 //         .packageName;
@@ -494,6 +521,7 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                                     },
                                                                   ),
                                                                 );
+                                                                });
                                                               },
                                                               child: Image.asset(
                                                                   "assets/share.png",
@@ -514,7 +542,8 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                         width: 25,
                                                       ),
                                                       InkWell(
-                                                        onTap: () {
+                                                        onTap: () async {
+                                                          await _libraryAds.runCountedAction(() async {
                                                           Get.back();
                                                           Get.to(
                                                             () => ChatScreen(
@@ -541,6 +570,7 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                                     milliseconds:
                                                                         300),
                                                           );
+                                                          });
                                                         },
                                                         child: Column(
                                                           children: [
@@ -788,7 +818,7 @@ class _HighLightScreenState extends State<HighLightScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               InkWell(
-                                onTap: () {
+                                onTap: () async {
                                   showModalBottomSheet(
                                     enableDrag: true,
                                     shape: const RoundedRectangleBorder(
@@ -864,12 +894,14 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                   children: [
                                                     InkWell(
                                                         onTap: () async {
+                                                          await _libraryAds.runCountedAction(() async {
                                                           await Clipboard.setData(
                                                               ClipboardData(
                                                                   text:
                                                                       "${parse(data.content).body?.text}\n${data.bookName} ${data.chapterNum}:${data.verseNum}"));
                                                           Constants.showToast(
                                                               "Copied");
+                                                          });
                                                         },
                                                         child: Container(
                                                             padding:
@@ -910,7 +942,8 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                   width: 30,
                                                 ),
                                                 InkWell(
-                                                  onTap: () {
+                                                  onTap: () async {
+                                                    await _libraryAds.runCountedAction(() async {
                                                     Future.delayed(
                                                       Duration.zero,
                                                       () async {
@@ -957,6 +990,7 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                       },
                                                     );
                                                     // Navigator.push(context, MaterialPageRoute(builder: (context) => );
+                                                    });
                                                   },
                                                   child: Column(
                                                     children: [
@@ -1001,6 +1035,7 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                   children: [
                                                     InkWell(
                                                         onTap: () async {
+                                                          await _libraryAds.runCountedAction(() async {
                                                           // final appPackageName =
                                                           //     (await PackageInfo
                                                           //             .fromPlatform())
@@ -1122,6 +1157,7 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                               },
                                                             ),
                                                           );
+                                                          });
                                                         },
                                                         child: Image.asset(
                                                             "assets/share.png",
@@ -1140,7 +1176,8 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                 ),
                                                 const SizedBox(width: 25),
                                                 InkWell(
-                                                  onTap: () {
+                                                  onTap: () async {
+                                                    await _libraryAds.runCountedAction(() async {
                                                     Get.back();
                                                     Get.to(
                                                       () => ChatScreen(
@@ -1163,6 +1200,7 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                       duration: const Duration(
                                                           milliseconds: 300),
                                                     );
+                                                    });
                                                   },
                                                   child: Column(
                                                     children: [
@@ -1423,7 +1461,9 @@ class _HighLightScreenState extends State<HighLightScreen> {
                           child: Divider(
                             thickness: 0.5,
                             color: CommanColor.whiteBlack(context),
-                          ))
+                          )),
+                      if (_libraryAds.shouldShowBannerAfter(index))
+                        _libraryAds.buildInlineBanner(index, keyPrefix: 'highlight'),
                     ],
                   );
                 },

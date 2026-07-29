@@ -14,7 +14,6 @@ import '../../../constant/size_config.dart';
 import '../../../view/constants/colors.dart';
 import '../../../view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/core/library_backup_upload_service.dart';
-import 'package:biblebookapp/utils/referral_api_logger.dart';
 import '../../api/auth/profile_update.api.dart';
 import '../../api/auth/register.api.dart';
 
@@ -205,8 +204,6 @@ class AuthNotifier extends ChangeNotifier {
       var appdata = await registerApi.login(email: email, password: password);
 
       final datafn = jsonDecode(appdata);
-
-      logAuthApiReferralFields('LOGIN API (auth notifier)', datafn);
 
       // final statuscode = datafn['status_code'];
 
@@ -591,7 +588,6 @@ class AuthNotifier extends ChangeNotifier {
           await profileUpdateApi.updateprofile(email: email, name: name);
 
       final datafn = jsonDecode(appdata);
-      logAuthApiReferralFields('PROFILE UPDATE API (auth notifier)', datafn);
 
       // final statuscode = datafn['status_code'];
 

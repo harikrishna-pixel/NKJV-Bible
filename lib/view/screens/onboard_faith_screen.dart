@@ -16,6 +16,7 @@ import 'package:biblebookapp/view/screens/dashboard/preference_selection_screen.
 import 'package:biblebookapp/view/screens/onboarding_guidance_screen.dart';
 import 'package:biblebookapp/view/screens/welcome_screen.dart';
 import 'package:biblebookapp/view/widget/notification_service.dart';
+import 'package:biblebookapp/services/daily_slot_notification_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -132,7 +133,29 @@ class _FaithOnboardingScreenState extends State<FaithOnboardingScreen> {
       await SharPreferences.setBoolean(SharPreferences.isNotificationOn, false);
       await SharPreferences.setBoolean(SharPreferences.isNotificationOn1, false);
       await SharPreferences.setBoolean(SharPreferences.isNotificationOn2, false);
+      await SharPreferences.setBoolean(
+          SharPreferences.notificationSlotsSyncedFromPermission, true);
+      return;
     }
+
+    // Additive: Allow → mirror Settings Morning/Afternoon/Evening ON
+    // (OS permission alone did not flip these prefs, so Settings looked Off).
+    final nt =
+        await SharPreferences.getBoolean(SharPreferences.isNotificationOn);
+    final nt1 =
+        await SharPreferences.getBoolean(SharPreferences.isNotificationOn1);
+    final nt2 =
+        await SharPreferences.getBoolean(SharPreferences.isNotificationOn2);
+    final allOff =
+        (nt ?? false) == false && (nt1 ?? false) == false && (nt2 ?? false) == false;
+    if (allOff) {
+      await SharPreferences.setBoolean(SharPreferences.isNotificationOn, true);
+      await SharPreferences.setBoolean(SharPreferences.isNotificationOn1, true);
+      await SharPreferences.setBoolean(SharPreferences.isNotificationOn2, true);
+      await DailySlotNotificationHelper.rescheduleEnabledSlots();
+    }
+    await SharPreferences.setBoolean(
+        SharPreferences.notificationSlotsSyncedFromPermission, true);
   }
 
   @override
@@ -835,7 +858,7 @@ class _OnboardingThemeSelectionScreenState
   String _themeDisplayName(AppCustomTheme theme) {
     switch (theme) {
       case AppCustomTheme.vintage:
-        return 'Classic Parchment';
+        return 'Classic';
       case AppCustomTheme.white:
         return 'Pure Light';
       case AppCustomTheme.lightbrown:
@@ -997,7 +1020,7 @@ class _OnboardingThemeSelectionScreenState
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: const Icon(
-                        Icons.bookmark,
+                        Icons.menu_book_rounded,
                         color: Colors.white,
                         size: 16,
                       ),
@@ -1142,7 +1165,7 @@ class _OnboardingThemeSelectionScreenState
                     SliverToBoxAdapter(
                       child: SizedBox(
                         height: (isTablet ? 64 : 56) +
-                            (isTablet ? 32 : 20),
+                            (isTablet ? 14 : 8),
                       ),
                     ),
                   ],

@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:developer' as devtools show log;
-import 'package:biblebookapp/utils/referral_api_logger.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 
@@ -119,9 +118,6 @@ class RegisterApi {
           print("login msg is $statuscode - $body");
 
           if (body.isNotEmpty) {
-            try {
-              logAuthApiReferralFields('LOGIN API (register.api)', jsonDecode(body));
-            } catch (_) {}
             return body;
           } else {
             print("login api  is not found");

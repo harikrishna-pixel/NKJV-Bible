@@ -10,6 +10,8 @@ import 'package:in_app_review/in_app_review.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../view/constants/images.dart' show Images;
+
 class LeaveRatingScreen extends StatefulWidget {
   const LeaveRatingScreen({super.key});
 
@@ -61,6 +63,9 @@ class _LeaveRatingScreenState extends State<LeaveRatingScreen> {
     } catch (e) {
       debugPrint('warmDataBeforeHomeScreen error: $e');
     }
+    // Clear rating defer so the next app open can show open ad (same as Day 2).
+    unawaited(
+        SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, false));
     // Additive preload only — open ad / rating flow unchanged.
     AdService.preloadInterstitialAdIfNeeded();
     Get.offAll(
@@ -160,10 +165,17 @@ class _LeaveRatingScreenState extends State<LeaveRatingScreen> {
   }
 
   Widget _topEmblem() {
-    return Image.asset(
-      'assets/new_ico.png',
+    return Container(
       height: 84,
       width: 84,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        image: DecorationImage(
+          image: AssetImage(Images.appIcon1024),
+          fit: BoxFit.cover,
+        ),
+      ),
+
     );
   }
 

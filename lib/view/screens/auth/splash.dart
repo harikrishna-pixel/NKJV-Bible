@@ -10,7 +10,6 @@ import 'package:biblebookapp/view/screens/onboard_faith_screen.dart';
 import 'package:biblebookapp/view/screens/welcome_screen.dart';
 import 'package:biblebookapp/view/screens/notification_info_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/preference_selection_screen.dart';
-import 'package:biblebookapp/view/constants/images.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -64,7 +63,7 @@ Future<List<VerseBookContentModel>> _parseVerseContent(
   return List.from(data)
       .map<VerseBookContentModel>(
         (item) => VerseBookContentModel.fromJson(item),
-      )
+  )
       .toList();
 }
 
@@ -169,10 +168,10 @@ class _SplashScreenState extends State<SplashScreen>
     final trackingAllowed = await isTrackingAllowed();
     debugPrint('ad pop loadOpenAd -  ${!trackingAllowed}');
     bool? isAdEnabledFromApi =
-        await SharPreferences.getBoolean(SharPreferences.isAdsEnabledApi);
+    await SharPreferences.getBoolean(SharPreferences.isAdsEnabledApi);
     if (isAdEnabledFromApi ?? true) {
       String? openAdUnitId =
-          await SharPreferences.getString(SharPreferences.openAppId);
+      await SharPreferences.getString(SharPreferences.openAppId);
       AppOpenAd.load(
         adUnitId: openAdUnitId ?? '',
         request: await AdConsentManager.getAdRequest(),
@@ -226,7 +225,7 @@ class _SplashScreenState extends State<SplashScreen>
               // final data2 = await SharPreferences.getString('bottom') ?? '0';
 
               final data = await SharPreferences.getBoolean(
-                      SharPreferences.isAdsEnabled) ??
+                  SharPreferences.isAdsEnabled) ??
                   true;
               // debugPrint("Open ad tigger and $checkad and && $dta");
               if (data) {
@@ -243,7 +242,7 @@ class _SplashScreenState extends State<SplashScreen>
             // final data2 = await SharPreferences.getString('bottom') ?? '0';
 
             final data = await SharPreferences.getBoolean(
-                    SharPreferences.isAdsEnabled) ??
+                SharPreferences.isAdsEnabled) ??
                 true;
             // debugPrint("Open ad tigger and $checkad and && $dta");
             if (data) {
@@ -266,7 +265,7 @@ class _SplashScreenState extends State<SplashScreen>
       try {
         // Only do essential initialization that's required before navigation
         // APIs are already loading in background via BackgroundApiService
-        
+
         // Drop any stale DB handle (hot restart / odd overwrite cases); always
         // align with current file on disk before migration + seed.
         await DBHelper.resetStaticDatabaseConnection();
@@ -281,21 +280,21 @@ class _SplashScreenState extends State<SplashScreen>
         ]);
         print('SPLASH after migrateToEncryptedDatabase');
         debugPrint('SPLASH after migrateToEncryptedDatabase');
-        
+
         if (kDebugMode) {
           await DBHelper.debugPrintDatabaseFiles();
         }
-        
+
         // Essential: Reset purchase flags
         await SharPreferences.setBoolean('restorepurches', false);
         await SharPreferences.setBoolean('startpurches', false);
-        
+
         // Preload Paywall Screen data in background (non-blocking)
         PaywallPreloadService.preloadPaywallData();
-        
+
         // Essential: Check app count and load daily verses
         await checkappcount();
-        
+
         // Essential: Load local data (books, verses from DB)
         await Future.wait<void>([
           loadBookList(),
@@ -306,7 +305,7 @@ class _SplashScreenState extends State<SplashScreen>
         await reconcilePersistedBibleStateWithDatabase();
         await loadDailyVerseData();
         await loadLocal();
-        
+
         // Essential: Set default book if not set + preserve legacy user data
         await Future.wait<void>([
           DBHelper().db.then((db) async {
@@ -319,8 +318,8 @@ class _SplashScreenState extends State<SplashScreen>
               if (result.isNotEmpty && result[0]["title"] != null) {
                 final title = result[0]["title"].toString();
                 final data = await SharPreferences.getString(
-                      SharPreferences.selectedBook,
-                    ) ??
+                  SharPreferences.selectedBook,
+                ) ??
                     "";
                 if (data.isEmpty) {
                   await SharPreferences.setString(
@@ -337,7 +336,7 @@ class _SplashScreenState extends State<SplashScreen>
           }),
           DBMigrationHelper.copyUserDataFromLegacyIfNeeded(password),
         ]);
-        
+
         // Essential: Update local DB (sync verse flags with bookmarks/highlights)
         await Future.wait<void>([
           updateLocalDB(),
@@ -368,12 +367,12 @@ class _SplashScreenState extends State<SplashScreen>
       if (db == null) return;
 
       final verseCount = Sqflite.firstIntValue(
-            await db.rawQuery('SELECT COUNT(*) AS c FROM verse'),
-          ) ??
+        await db.rawQuery('SELECT COUNT(*) AS c FROM verse'),
+      ) ??
           0;
       final bookCount = Sqflite.firstIntValue(
-            await db.rawQuery('SELECT COUNT(*) AS c FROM book'),
-          ) ??
+        await db.rawQuery('SELECT COUNT(*) AS c FROM book'),
+      ) ??
           0;
 
       if (verseCount > 0 && bookCount > 0) return;
@@ -404,7 +403,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future loadLocal() async {
     final downloadProvider =
-        Provider.of<DownloadProvider>(context, listen: false);
+    Provider.of<DownloadProvider>(context, listen: false);
 
     try {
       // downloadProvider.setIsLoading(true); // Start loading
@@ -471,7 +470,7 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _requestTrackingPermission() async {
     // Wait a few seconds after splash screen appears before showing ATT
     await Future.delayed(const Duration(seconds: 4));
-    
+
     if (Platform.isIOS) {
       try {
         final status = await AppTrackingTransparency.requestTrackingAuthorization();
@@ -516,8 +515,8 @@ class _SplashScreenState extends State<SplashScreen>
       final info = await PackageInfo.fromPlatform();
       final current = info.version.trim();
       final last =
-          (await SharPreferences.getString(SharPreferences.lastKnownAppVersion))
-              ?.trim();
+      (await SharPreferences.getString(SharPreferences.lastKnownAppVersion))
+          ?.trim();
 
       var showComparison = false;
       if (last != null && last.isNotEmpty) {
@@ -528,9 +527,9 @@ class _SplashScreenState extends State<SplashScreen>
         final prefs = await SharedPreferences.getInstance();
         final launchCount = prefs.getInt('launchCount') ?? 0;
         final selectedBook =
-            await SharPreferences.getString(SharPreferences.selectedBook);
+        await SharPreferences.getString(SharPreferences.selectedBook);
         final loadedList = await SharPreferences.getBoolean(
-                SharPreferences.isLoadBookList) ??
+            SharPreferences.isLoadBookList) ??
             false;
         showComparison = launchCount > 1 ||
             (selectedBook != null && selectedBook.isNotEmpty) ||
@@ -545,7 +544,7 @@ class _SplashScreenState extends State<SplashScreen>
       }
       debugPrint(
         'Welcome logo comparison=$showComparison '
-        '(last=$last current=$current)',
+            '(last=$last current=$current)',
       );
     } catch (e) {
       debugPrint('_updateWelcomeLogoComparisonFlag error: $e');
@@ -574,12 +573,38 @@ class _SplashScreenState extends State<SplashScreen>
     return false;
   }
 
+  Future<({int verseCount, int bookCount})?> _readCoreBibleCountsWithRetry() async {
+    Future<({int verseCount, int bookCount})?> readCounts() async {
+      final db = await DBHelper().db;
+      if (db == null) return null;
+      final verseCountRows = await db.rawQuery("SELECT COUNT(*) as c FROM verse");
+      final bookCountRows = await db.rawQuery("SELECT COUNT(*) as c FROM book");
+      final verseCount =
+          verseCountRows.isNotEmpty ? (verseCountRows.first["c"] as int?) ?? 0 : 0;
+      final bookCount =
+          bookCountRows.isNotEmpty ? (bookCountRows.first["c"] as int?) ?? 0 : 0;
+      return (verseCount: verseCount, bookCount: bookCount);
+    }
+
+    try {
+      return await readCounts();
+    } catch (e) {
+      final err = e.toString().toLowerCase();
+      final isClosed = e is DatabaseException && err.contains('database_closed');
+      if (!isClosed) rethrow;
+
+      debugPrint('Core bible count read hit closed DB, retrying once...');
+      await DBHelper.resetStaticDatabaseConnection();
+      return readCounts();
+    }
+  }
+
   handleNavigation() async {
     await NotificationsServices.storeLaunchPayloadIfFromNotification();
     await _updateWelcomeLogoComparisonFlag();
 
     final isOnboardingCompleted =
-        await SharPreferences.getBoolean(SharPreferences.onboarding);
+    await SharPreferences.getBoolean(SharPreferences.onboarding);
 
     // First launch: show welcome -> onboarding questions
     if (isOnboardingCompleted == null || !isOnboardingCompleted) {
@@ -591,40 +616,34 @@ class _SplashScreenState extends State<SplashScreen>
     // Hard safety: if core bible data missing, route user to restore/select Bible.
     // If DB cannot be opened, do NOT fall through to Home (infinite loader / empty content).
     try {
-      final db = await DBHelper().db;
-      if (db == null) {
+      final counts = await _readCoreBibleCountsWithRetry();
+      if (counts == null) {
         debugPrint('testapp Core bible check: DB null → Bible restore flow');
         if (BibleInfo.folders.length <= 1) {
           _schedulePostSplashAtt();
           Get.offAll(() => PreferenceSelectionScreen(
-                isSetting: false,
-                selectedbible: BibleInfo.folders.isNotEmpty
-                    ? BibleInfo.folders.first
-                    : '',
-              ));
+            isSetting: false,
+            selectedbible: BibleInfo.folders.isNotEmpty
+                ? BibleInfo.folders.first
+                : '',
+          ));
         } else {
           _schedulePostSplashAtt();
           Get.offAll(() => const BibleVersionsScreen(from: 'onboard'));
         }
         return;
       }
-      final verseCountRows =
-          await db.rawQuery("SELECT COUNT(*) as c FROM verse");
-      final bookCountRows =
-          await db.rawQuery("SELECT COUNT(*) as c FROM book");
-      final verseCount =
-          verseCountRows.isNotEmpty ? (verseCountRows.first["c"] as int?) ?? 0 : 0;
-      final bookCount =
-          bookCountRows.isNotEmpty ? (bookCountRows.first["c"] as int?) ?? 0 : 0;
+      final verseCount = counts.verseCount;
+      final bookCount = counts.bookCount;
       if (verseCount == 0 || bookCount == 0) {
         if (BibleInfo.folders.length <= 1) {
           _schedulePostSplashAtt();
           Get.offAll(() => PreferenceSelectionScreen(
-                isSetting: false,
-                selectedbible: BibleInfo.folders.isNotEmpty
-                    ? BibleInfo.folders.first
-                    : '',
-              ));
+            isSetting: false,
+            selectedbible: BibleInfo.folders.isNotEmpty
+                ? BibleInfo.folders.first
+                : '',
+          ));
         } else {
           _schedulePostSplashAtt();
           Get.offAll(() => const BibleVersionsScreen(from: 'onboard'));
@@ -637,11 +656,11 @@ class _SplashScreenState extends State<SplashScreen>
         if (BibleInfo.folders.length <= 1) {
           _schedulePostSplashAtt();
           Get.offAll(() => PreferenceSelectionScreen(
-                isSetting: false,
-                selectedbible: BibleInfo.folders.isNotEmpty
-                    ? BibleInfo.folders.first
-                    : '',
-              ));
+            isSetting: false,
+            selectedbible: BibleInfo.folders.isNotEmpty
+                ? BibleInfo.folders.first
+                : '',
+          ));
         } else {
           _schedulePostSplashAtt();
           Get.offAll(() => const BibleVersionsScreen(from: 'onboard'));
@@ -654,7 +673,7 @@ class _SplashScreenState extends State<SplashScreen>
     await SharPreferences.setBoolean(SharPreferences.isLoadBookContent, true);
     try {
       final provider =
-          Provider.of<DownloadProvider>(context, listen: false);
+      Provider.of<DownloadProvider>(context, listen: false);
       unawaited(provider.warmDataBeforeHomeScreen());
     } catch (e) {
       debugPrint('warmDataBeforeHomeScreen error: $e');
@@ -725,13 +744,13 @@ class _SplashScreenState extends State<SplashScreen>
         final db = await DBHelper().db;
         if (db != null) {
           final verseCountRows =
-              await db.rawQuery("SELECT COUNT(*) as c FROM verse");
+          await db.rawQuery("SELECT COUNT(*) as c FROM verse");
           final bookCountRows =
-              await db.rawQuery("SELECT COUNT(*) as c FROM book");
+          await db.rawQuery("SELECT COUNT(*) as c FROM book");
           final bookmarkCountRows =
-              await db.rawQuery("SELECT COUNT(*) as c FROM bookmark");
+          await db.rawQuery("SELECT COUNT(*) as c FROM bookmark");
           final highlightCountRows =
-              await db.rawQuery("SELECT COUNT(*) as c FROM highlight");
+          await db.rawQuery("SELECT COUNT(*) as c FROM highlight");
           final verseCount =
               (verseCountRows.isNotEmpty ? (verseCountRows.first["c"] as int?) : 0) ?? 0;
           final bookCount =
@@ -1117,14 +1136,14 @@ class _SplashScreenState extends State<SplashScreen>
     final db = await DBHelper().db;
 
     final List<Map<String, dynamic>> dailyVersesMainList =
-        await db!.rawQuery("SELECT * FROM dailyVersesMainList");
+    await db!.rawQuery("SELECT * FROM dailyVersesMainList");
 
     if (dailyVersesMainList.isEmpty) {
       final String dailyVerseResponse =
-          await rootBundle.loadString('assets/jsonFile/dailyVerse.json');
+      await rootBundle.loadString('assets/jsonFile/dailyVerse.json');
       // Use compute for parsing
       final List<DailyVersesMainListModel> dataList =
-          await compute(parseDailyVerseJsond, dailyVerseResponse);
+      await compute(parseDailyVerseJsond, dailyVerseResponse);
 
       // Update your state only here
       setState(() {
@@ -1150,7 +1169,7 @@ class _SplashScreenState extends State<SplashScreen>
       // Insert daily verses for the first 20 items
       int saveDay = 0; // Make sure to manage this appropriately
       final newMainList =
-          await db.rawQuery("SELECT * FROM dailyVersesMainList");
+      await db.rawQuery("SELECT * FROM dailyVersesMainList");
       for (var i = 0; i < 20 && i < newMainList.length; i++) {
         final m = newMainList[i];
 
@@ -1160,8 +1179,8 @@ class _SplashScreenState extends State<SplashScreen>
 
         final selectedVerse = await db.rawQuery(
           "SELECT * FROM verse WHERE book_num ='${int.parse(m["Book_Id"].toString()) - 1}' AND "
-          "chapter_num ='${int.parse(m["Chapter"].toString()) - 1}' "
-          "AND verse_num ='$verseNum'",
+              "chapter_num ='${int.parse(m["Chapter"].toString()) - 1}' "
+              "AND verse_num ='$verseNum'",
         );
 
         if (selectedVerse.isNotEmpty) {
@@ -1192,21 +1211,21 @@ class _SplashScreenState extends State<SplashScreen>
     } else {
       // Already populated, check if new daily verse needs to be added
       final saveTime =
-          await SharPreferences.getString(SharPreferences.dailyVerseUpdateTime);
+      await SharPreferences.getString(SharPreferences.dailyVerseUpdateTime);
       final saveDateTime =
-          DateTime.parse(saveTime ?? DateTime.now().toString());
+      DateTime.parse(saveTime ?? DateTime.now().toString());
       final currentDateTime = DateTime.now();
       final difference = daysBetween(saveDateTime, currentDateTime);
 
       if (difference >= 1) {
         final isLoadBookContent =
-            await SharPreferences.getBoolean(SharPreferences.isLoadBookContent);
+        await SharPreferences.getBoolean(SharPreferences.isLoadBookContent);
 
         if (isLoadBookContent != null && isLoadBookContent == true) {
           final mainList =
-              await db.rawQuery("SELECT * FROM dailyVersesMainList");
+          await db.rawQuery("SELECT * FROM dailyVersesMainList");
           String selecteDailyVerses = await SharPreferences.getString(
-                  SharPreferences.selectedDailyVerse) ??
+              SharPreferences.selectedDailyVerse) ??
               "11";
           int idx = int.parse(selecteDailyVerses);
 
@@ -1218,8 +1237,8 @@ class _SplashScreenState extends State<SplashScreen>
 
           final selectedVerse = await db.rawQuery(
             "SELECT * FROM verse WHERE book_num ='${int.parse(m["Book_Id"].toString()) - 1}' AND "
-            "chapter_num ='${int.parse(m["Chapter"].toString()) - 1}' "
-            "AND verse_num ='$verseNum'",
+                "chapter_num ='${int.parse(m["Chapter"].toString()) - 1}' "
+                "AND verse_num ='$verseNum'",
           );
 
           if (selectedVerse.isNotEmpty) {
@@ -1272,7 +1291,7 @@ class _SplashScreenState extends State<SplashScreen>
     // 1. Load all data from local database
     final List<BookMarkModel> bookmarks = await dbHelper.getBookMark();
     final List<HighLightContentModal> highlights =
-        await dbHelper.getHighlight();
+    await dbHelper.getHighlight();
     final List<BookMarkModel> underlines = await dbHelper.getUnderLine();
     final List<SaveNotesModel> notesList = await dbHelper.getNotes();
     //final List<ImageModel> imageList = await dbHelper.getSavedImages();
@@ -1356,15 +1375,21 @@ class _SplashScreenState extends State<SplashScreen>
 
   Widget _splashLoadingBookIcon() {
     return SizedBox(
-      width: 34,
-      height: 34,
-      child: Image.asset(
-        'assets/paywall_icons/read_scripture.png',
-        fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => Icon(
-          Icons.auto_stories_rounded,
-          size: 30,
-          color: _splashGold.withValues(alpha: 0.95),
+      width: 52,
+      height: 52,
+      child: ColorFiltered(
+        colorFilter: ColorFilter.mode(
+          _splashGold.withValues(alpha: 0.95),
+          BlendMode.srcIn,
+        ),
+        child: Image.asset(
+          'assets/paywall_icons/read_scripture.png',
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => Icon(
+            Icons.auto_stories_rounded,
+            size: 38,
+            color: _splashGold.withValues(alpha: 0.95),
+          ),
         ),
       ),
     );
@@ -1376,56 +1401,61 @@ class _SplashScreenState extends State<SplashScreen>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        return Container(
-          height: barHeight,
-          width: constraints.maxWidth,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(barHeight / 2),
-            color: const Color(0xFFE8D9C4).withValues(alpha: 0.88),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: FractionallySizedBox(
-                  widthFactor: _progress.clamp(0.0, 1.0),
-                  heightFactor: 1,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(barHeight / 2),
-                      gradient: const LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                        colors: [
-                          Color(0xFFD4A04A),
-                          Color(0xFFC59434),
-                          Color(0xFF9A6B2F),
-                        ],
+        // 10% narrower than the available content width.
+        final barWidth = constraints.maxWidth * 0.9;
+        return Align(
+          alignment: Alignment.center,
+          child: Container(
+            height: barHeight,
+            width: barWidth,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(barHeight / 2),
+              color: const Color(0xFFE8D9C4).withValues(alpha: 0.88),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FractionallySizedBox(
+                    widthFactor: _progress.clamp(0.0, 1.0),
+                    heightFactor: 1,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(barHeight / 2),
+                        gradient: const LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [
+                            Color(0xFFD4A04A),
+                            Color(0xFFC59434),
+                            Color(0xFF9A6B2F),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              Text(
-                '$percent%',
-                style: TextStyle(
-                  fontFamily: 'Georgia',
-                  fontSize: isCompact ? 11.5 : 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                  height: 1,
-                  shadows: const [
-                    Shadow(
-                      color: Color(0x66000000),
-                      blurRadius: 2,
-                      offset: Offset(0, 1),
-                    ),
-                  ],
+                Text(
+                  '$percent%',
+                  style: TextStyle(
+                    fontFamily: 'Georgia',
+                    fontSize: isCompact ? 11.5 : 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    height: 1,
+                    shadows: const [
+                      Shadow(
+                        color: Color(0x66000000),
+                        blurRadius: 2,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -1452,18 +1482,6 @@ class _SplashScreenState extends State<SplashScreen>
           ),
           SizedBox(height: isCompact ? 14 : 16),
           _splashProgressBar(isCompact),
-          SizedBox(height: isCompact ? 10 : 12),
-          Text(
-            'Preparing your Bible experience',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: 'Georgia',
-              fontSize: isCompact ? 11.5 : 12.5,
-              fontWeight: FontWeight.w500,
-              color: _splashInk.withValues(alpha: 0.72),
-              height: 1.3,
-            ),
-          ),
         ],
       ),
     );
@@ -1505,7 +1523,7 @@ class _SplashScreenState extends State<SplashScreen>
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(22),
                     child: Image.asset(
-                      Images.appIcon1024,
+                      'assets/Icon-1024.png',
                       width: iconSize,
                       height: iconSize,
                       fit: BoxFit.cover,
@@ -1621,7 +1639,7 @@ class SupportDialogContent extends StatelessWidget {
                   borderRadius: BorderRadius.circular(30),
                 ),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 50, vertical: 9),
+                const EdgeInsets.symmetric(horizontal: 50, vertical: 9),
               ),
               child: Text(
                 'Continue',
@@ -1654,11 +1672,11 @@ class AdConsentManager {
 
     if (Platform.isIOS) {
       var status =
-          await AppTrackingTransparency.trackingAuthorizationStatus;
+      await AppTrackingTransparency.trackingAuthorizationStatus;
       if (status == TrackingStatus.notDetermined) {
         try {
           status =
-              await AppTrackingTransparency.requestTrackingAuthorization();
+          await AppTrackingTransparency.requestTrackingAuthorization();
           debugPrint('ATT Status: $status');
         } on PlatformException catch (e) {
           debugPrint('ATT Error: ${e.message}');
@@ -1740,7 +1758,7 @@ class AdConsentManager {
     final params = ConsentRequestParameters();
     ConsentInformation.instance.requestConsentInfoUpdate(
       params,
-      () async {
+          () async {
         _canRequestAds = await ConsentInformation.instance.canRequestAds();
         _privacyOptionsRequired = await _isPrivacyOptionsRequired();
         await Future.delayed(const Duration(seconds: 2));
@@ -1757,7 +1775,7 @@ class AdConsentManager {
 
         await _initializeAdNetworks();
       },
-      (FormError error) => throw Exception("Consent error: ${error.message}"),
+          (FormError error) => throw Exception("Consent error: ${error.message}"),
     );
   }
 
@@ -1785,7 +1803,7 @@ class AdConsentManager {
   /// Checks if privacy options required
   static Future<bool> _isPrivacyOptionsRequired() async {
     return await ConsentInformation.instance
-            .getPrivacyOptionsRequirementStatus() ==
+        .getPrivacyOptionsRequirementStatus() ==
         PrivacyOptionsRequirementStatus.required;
   }
 
@@ -1847,7 +1865,7 @@ class AdConsentManager {
     if (prefs.getBool(_prefsDontTrack) ?? false) return false;
 
     final status =
-        await AppTrackingTransparency.trackingAuthorizationStatus;
+    await AppTrackingTransparency.trackingAuthorizationStatus;
     if (status == TrackingStatus.denied) return false;
 
     final consentStatus = await ConsentInformation.instance.getConsentStatus();
@@ -1863,14 +1881,14 @@ class AdConsentManager {
   }
 
   static List<String> _getNonPersonalizedKeywords() => [
-        'bible',
-        'christian',
-        'faith',
-        'prayer',
-        'church',
-        'devotional',
-        'scripture'
-      ];
+    'bible',
+    'christian',
+    'faith',
+    'prayer',
+    'church',
+    'devotional',
+    'scripture'
+  ];
 }
 
 class UpgradeCheckWrapper extends StatefulWidget {
@@ -1916,14 +1934,12 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
       final prefs = await SharedPreferences.getInstance();
 
       final data = prefs.getString('showopenad');
-      final deferForRating =
-          await SharPreferences.getBoolean(SharPreferences.deferUpgradeAlert) ??
-              false;
       final pendingStreakRating = await SharPreferences.getInt(
-              SharPreferences.pendingStreakCompleteCelebration) ??
+          SharPreferences.pendingStreakCompleteCelebration) ??
           0;
-      // Never stack open ad with streak day-1 rating OR day-2+ post-streak interstitial.
-      if (deferForRating || pendingStreakRating >= 1) {
+      // Suppress open ad only while post-streak flow is still pending (Day 1 or Day 2+).
+      // deferUpgradeAlert is for upgrade/rating UI only — not a permanent open-ad block.
+      if (pendingStreakRating >= 1) {
         await prefs.setString("showopenad", "false");
         await SharPreferences.setString('OpenAd', '1');
         await _markOpenAdFlowComplete();
@@ -1954,14 +1970,14 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
     final trackingAllowed = await isTrackingAllowed();
     debugPrint('ad pop loadOpenAd -  ${!trackingAllowed}');
     bool? isAdEnabledFromApi =
-        await SharPreferences.getBoolean(SharPreferences.isAdsEnabledApi);
+    await SharPreferences.getBoolean(SharPreferences.isAdsEnabledApi);
     if (!(isAdEnabledFromApi ?? true)) {
       await _markOpenAdFlowComplete();
       return;
     }
     if (isAdEnabledFromApi ?? true) {
       String? openAdUnitId =
-          await SharPreferences.getString(SharPreferences.openAppId);
+      await SharPreferences.getString(SharPreferences.openAppId);
       AppOpenAd.load(
         adUnitId: openAdUnitId ?? '',
         request: await AdConsentManager.getAdRequest(),
@@ -2022,7 +2038,7 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
               // final data2 = await SharPreferences.getString('bottom') ?? '0';
 
               final data = await SharPreferences.getBoolean(
-                      SharPreferences.isAdsEnabled) ??
+                  SharPreferences.isAdsEnabled) ??
                   true;
               // debugPrint("Open ad tigger and $checkad and && $dta");
               if (data) {
@@ -2042,7 +2058,7 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
             // final data2 = await SharPreferences.getString('bottom') ?? '0';
 
             final data = await SharPreferences.getBoolean(
-                    SharPreferences.isAdsEnabled) ??
+                SharPreferences.isAdsEnabled) ??
                 true;
             // debugPrint("Open ad tigger and $checkad and && $dta");
             if (data) {

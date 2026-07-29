@@ -75,6 +75,30 @@ import flutter_local_notifications
       }
     }
 
+    // Memory Verse + Continue Reading Live Activities (UI mirrors only).
+    let contentLiveMessenger: FlutterBinaryMessenger? = {
+      if let controller = self.window?.rootViewController as? FlutterViewController {
+        return controller.binaryMessenger
+      }
+      return self.registrar(forPlugin: "com.biblebookapp.content_live_activity")?.messenger()
+    }()
+    if let messenger = contentLiveMessenger {
+      let channel = FlutterMethodChannel(
+        name: "com.biblebookapp/content_live_activity",
+        binaryMessenger: messenger
+      )
+      channel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
+        let args = call.arguments as? [String: Any]
+        if let value = ContentLiveActivityBridge.handle(call: call.method, args: args) {
+          result(value)
+        } else if call.method.hasPrefix("sync") || call.method.hasPrefix("end") {
+          result(true)
+        } else {
+          result(FlutterMethodNotImplemented)
+        }
+      }
+    }
+
     // Additive: last IAP product id in Keychain (survives delete/reinstall).
     let iapMemoryMessenger: FlutterBinaryMessenger? = {
       if let controller = self.window?.rootViewController as? FlutterViewController {

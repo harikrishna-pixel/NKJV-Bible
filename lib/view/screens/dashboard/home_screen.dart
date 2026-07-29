@@ -52,7 +52,8 @@ import 'package:biblebookapp/streak/streak_ui.dart';
 import 'package:biblebookapp/services/smart_notification_helper.dart';
 import 'package:biblebookapp/services/daily_slot_notification_helper.dart';
 import 'package:biblebookapp/streak_flow/daily_journey_screen.dart';
-import 'package:biblebookapp/streak_flow/streak_flow_screens.dart' hide SharPreferences;
+import 'package:biblebookapp/streak_flow/streak_flow_screens.dart'
+    hide SharPreferences;
 import '../../constants/share_preferences.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:home_widget/home_widget.dart';
@@ -120,15 +121,16 @@ String _subscriptionRenewalDisplayText(int diffDy, [String? plan]) {
     return 'Your subscription has expired';
   }
   final planKey = plan?.toLowerCase() ?? '';
+  final dayLabel = diffDy == 1 ? 'day' : 'days';
   // Additive: silver/gold copy must not become "never expire" just because
   // remaining days are huge (e.g. bad lifetime expiry overwrite).
   if (planKey == 'silver' || planKey == 'gold') {
-    return '$diffDy day(s) left for the renewal of the subscription.';
+    return '$diffDy $dayLabel left for the renewal of the subscription.';
   }
   if (_isLifetimeSubscriptionDisplay(diffDy) || planKey == 'platinum') {
     return 'Your subscription will never expire';
   }
-  return '$diffDy day(s) left for the renewal of the subscription.';
+  return '$diffDy $dayLabel left for the renewal of the subscription.';
 }
 
 String _subscriptionPeriodDisplayText(
@@ -143,9 +145,9 @@ String _subscriptionPeriodDisplayText(
     return 'Your subscription period is 6 months';
   }
   if (planKey == 'gold') {
-    if (_isTwoYearSubscriptionDisplay(diffDy)) {
-      return 'Your subscription period is 2 years';
-    }
+  if (_isTwoYearSubscriptionDisplay(diffDy)) {
+    return 'Your subscription period is 2 years';
+  }
     return 'Your subscription period is 1 year';
   }
   if (_isLifetimeSubscriptionDisplay(diffDy) || planKey == 'platinum') {
@@ -204,6 +206,7 @@ class HomeScreen extends StatefulWidget {
   var selectedVerseNumForRead;
   var selectedVerseForRead;
   var From;
+
   /// When true (e.g. opened from Search), verse is shown in default reading font, not user-selected font.
   final bool fromSearch;
 
@@ -1208,13 +1211,16 @@ class _HomeScreenState extends State<HomeScreen>
   bool _readerAppBarScrollUpIntent = false;
   double _readerAppBarDragDelta = 0;
   static const double _kReaderAppBarToggleThreshold = 20.0;
+
   /// Re-show top bar after scrolling up about this many verses.
   static const double _kReaderAppBarShowVerseCount = 5.5;
+
   /// Scroll offset when the bar was hidden / deepest point while hidden.
   double _readerAppBarHiddenAnchorOffset = 0;
   List<VerseBookContentModel>? _lastContentSource;
   BuildContext? _bottomSheetContext; // Track bottom sheet context to dismiss it
-  bool _exitOfferCooldownActive = false; // Red dot indicator (show after 3 days)
+  bool _exitOfferCooldownActive =
+      false; // Red dot indicator (show after 3 days)
   Timer?
       _exitOfferCooldownRefreshTimer; // Refresh so red dot dismisses after 10 mins
   // dailyverse
@@ -1300,7 +1306,8 @@ class _HomeScreenState extends State<HomeScreen>
     final startupPrefs = await SharedPreferences.getInstance();
     _feedbackPendingAtSessionStart =
         (startupPrefs.getBool(SharPreferences.mainFeedbackPending) ?? false) &&
-            (startupPrefs.getBool(SharPreferences.mainFeedbackFromVerseActions) ??
+            (startupPrefs
+                    .getBool(SharPreferences.mainFeedbackFromVerseActions) ??
                 false);
 
     await Future.wait([
@@ -1321,15 +1328,20 @@ class _HomeScreenState extends State<HomeScreen>
 
       SmartNotificationHelper.recordAppOpen();
       SmartNotificationHelper.scheduleSmartNotificationIfNeeded();
-      await updateAllLauncherWidgets();
+      if (mounted) {
+        final downloadProvider =
+            Provider.of<DownloadProvider>(context, listen: false);
+        await updateAllLauncherWidgets(
+          dailyVerses: downloadProvider.dailyVerseList,
+        );
+      }
     if (!mounted) return;
 
       final initialUri = await HomeWidget.initiallyLaunchedFromHomeWidget();
       if (!mounted) return;
       _navigateForWidgetRoute(getBibleWidgetRouteFromUri(initialUri));
       if (!mounted) return;
-      _widgetClickSubscription ??=
-          HomeWidget.widgetClicked.listen((uri) {
+    _widgetClickSubscription ??= HomeWidget.widgetClicked.listen((uri) {
         if (!mounted) return;
         _navigateForWidgetRoute(getBibleWidgetRouteFromUri(uri));
       });
@@ -1465,7 +1477,8 @@ class _HomeScreenState extends State<HomeScreen>
     if (_ratingUiDialogDepth <= 0) return;
     _ratingUiDialogDepth--;
     if (_ratingUiDialogDepth == 0 && !_deferUpgradeAfterStreakRating) {
-      await SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, false);
+      await SharPreferences.setBoolean(
+          SharPreferences.deferUpgradeAlert, false);
     }
   }
 
@@ -1483,10 +1496,11 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _handlePendingNotificationAction() async {
-    final action =
-        await SharPreferences.getString(SharPreferences.pendingNotificationAction);
+    final action = await SharPreferences.getString(
+        SharPreferences.pendingNotificationAction);
     if (action == null || action.isEmpty || !mounted) return;
-    await SharPreferences.setString(SharPreferences.pendingNotificationAction, '');
+    await SharPreferences.setString(
+        SharPreferences.pendingNotificationAction, '');
     if (!mounted) return;
     switch (action) {
       case 'open_streak':
@@ -2116,8 +2130,7 @@ class _HomeScreenState extends State<HomeScreen>
                                           : screenWidth > 450
                                               ? BibleInfo.fontSizeScale * 36
                                               : BibleInfo.fontSizeScale * 28,
-                                      minFontSize:
-                                          screenWidth < 380 ? 16 : 18,
+                                      minFontSize: screenWidth < 380 ? 16 : 18,
                                     ),
                                   ),
                                   Padding(
@@ -2173,7 +2186,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Image.asset(
-                                    Images.appIcon1024,
+                                      Images.appIcon1024,
                                       height: 22,
                                       width: 22,
                                   ),
@@ -2182,10 +2195,8 @@ class _HomeScreenState extends State<HomeScreen>
                                     BibleInfo.bible_shortName,
                                     style: TextStyle(
                                       color: const Color(0xFF3E2723),
-                                        letterSpacing:
-                                            BibleInfo.letterSpacing,
-                                        fontSize:
-                                            BibleInfo.fontSizeScale * 12,
+                                        letterSpacing: BibleInfo.letterSpacing,
+                                        fontSize: BibleInfo.fontSizeScale * 12,
                                         fontWeight: FontWeight.w600,
                                       height: 1.2,
                                     ),
@@ -2457,8 +2468,7 @@ class _HomeScreenState extends State<HomeScreen>
             From: "Daily",
             selectedBookForRead: dailyVerseBookNum(todayVerse.bookId),
             selectedChapterForRead: dailyVerseUiChapter(todayVerse.chapter),
-            selectedVerseNumForRead:
-                int.parse(todayVerse.verseNum.toString()),
+            selectedVerseNumForRead: int.parse(todayVerse.verseNum.toString()),
             selectedBookNameForRead: todayVerse.book.toString(),
             selectedVerseForRead:
                 parse(todayVerse.verse.toString()).body?.text.toString() ?? '',
@@ -3482,15 +3492,15 @@ class _HomeScreenState extends State<HomeScreen>
                     height: readerAppBarHeight,
                     child: AppBar(
                     toolbarHeight: readerToolbarHeight,
-                    iconTheme:
-                        IconThemeData(color: CommanColor.whiteBlack(context)),
+                          iconTheme: IconThemeData(
+                              color: CommanColor.whiteBlack(context)),
                     flexibleSpace: Container(
                       color: p.Provider.of<ThemeProvider>(context)
                                   .currentCustomTheme ==
                               AppCustomTheme.vintage
                           ? null
-                          : p.Provider.of<ThemeProvider>(context)
-                              .backgroundColor,
+                                  : p.Provider.of<ThemeProvider>(context)
+                                      .backgroundColor,
                       decoration: p.Provider.of<ThemeProvider>(context)
                                   .currentCustomTheme ==
                               AppCustomTheme.vintage
@@ -3503,10 +3513,12 @@ class _HomeScreenState extends State<HomeScreen>
                                               .currentCustomTheme ==
                                           AppCustomTheme.vintage
                                       ? CommanColor.darkPrimaryColor
-                                      : p.Provider.of<ThemeProvider>(context)
+                                            : p.Provider.of<ThemeProvider>(
+                                                    context)
                                           .backgroundColor,
                               image: DecorationImage(
-                                image: AssetImage(Images.bgImage((context))),
+                                      image:
+                                          AssetImage(Images.bgImage((context))),
                                 fit: BoxFit.cover,
                               ),
                             )
@@ -3544,80 +3556,84 @@ class _HomeScreenState extends State<HomeScreen>
                                 ),
                               ),
                         SizedBox(width: 12),
-                        // IAP icon is independent of ads being completely disabled
-                        // (ads_Type == "0"). Ads stay off; only visibility is uncoupled.
-                        controller.adFree.value
-                            ? DateTime.tryParse(controller
-                                        .RewardAdExpireDate.value) !=
-                                    null
-                                // UI only: subscription info icon removed from
-                                // reading bar (same sheet remains in the drawer).
-                                ? const SizedBox.shrink()
+                              // IAP icon is independent of ads being completely disabled
+                              // (ads_Type == "0"). Ads stay off; only visibility is uncoupled.
+                              controller.adFree.value
+                                ? DateTime.tryParse(controller
+                                            .RewardAdExpireDate.value) !=
+                                        null
+                                      // UI only: subscription info icon removed from
+                                      // reading bar (same sheet remains in the drawer).
+                                      ? const SizedBox.shrink()
+                                    : Visibility(
+                                          visible: controller
+                                                  .isSubscriptionEnabled ??
+                                                true,
+                                        child: GestureDetector(
+                                          onTap: () async {
+                                            // Navigate directly to the paywall from Home
+                                            // instead of showing the Home exit-offer bottom sheet.
+                                            // This keeps purchase logic unchanged and avoids
+                                            // displaying the in-place exit-offer sheet on Home.
+                                            if (controller.connectionStatus
+                                                        .first ==
+                                                    ConnectivityResult.wifi ||
+                                                controller.connectionStatus
+                                                        .first ==
+                                                      ConnectivityResult
+                                                          .mobile) {
+                                              adsIcon = false;
+                                              debugPrint(
+                                                  "all plans - ${controller.sixMonthPlan} ${controller.oneYearPlan}  ${controller.lifeTimePlan}");
+                                              await SubscriptionScreen
+                                                  .navigateToPaywallFromHome(
+                                                      context);
+                                            } else {
+                                              Constants.showToast(
+                                                  "Check your Internet Connection");
+                                            }
+                                          },
+                                          child: Image.asset(
+                                            'assets/no-ad.png',
+                                            height:
+                                                screenWidth > 450 ? 40 : 24,
+                                            width:
+                                                screenWidth > 450 ? 40 : 24,
+                                            color: CommanColor.whiteBlack(
+                                                context),
+                                          ),
+                                        ))
                                 : Visibility(
-                                    visible:
-                                        controller.isSubscriptionEnabled ??
-                                            true,
+                                      visible:
+                                          controller.isSubscriptionEnabled ??
+                                        false,
                                     child: GestureDetector(
                                       onTap: () async {
-                                        // Navigate directly to the paywall from Home
-                                        // instead of showing the Home exit-offer bottom sheet.
-                                        // This keeps purchase logic unchanged and avoids
-                                        // displaying the in-place exit-offer sheet on Home.
-                                        if (controller.connectionStatus
-                                                    .first ==
-                                                ConnectivityResult.wifi ||
-                                            controller.connectionStatus
-                                                    .first ==
-                                                ConnectivityResult.mobile) {
-                                          adsIcon = false;
-                                          debugPrint(
-                                              "all plans - ${controller.sixMonthPlan} ${controller.oneYearPlan}  ${controller.lifeTimePlan}");
-                                          await SubscriptionScreen
+                                        adsIcon = false;
+                                        await SubscriptionScreen
                                               .navigateToPaywallFromHome(
                                                   context);
-                                        } else {
-                                          Constants.showToast(
-                                              "Check your Internet Connection");
-                                        }
                                       },
                                       child: Image.asset(
                                         'assets/no-ad.png',
-                                        height:
-                                            screenWidth > 450 ? 40 : 24,
-                                        width:
-                                            screenWidth > 450 ? 40 : 24,
-                                        color: CommanColor.whiteBlack(
-                                            context),
+                                        height: screenWidth > 450 ? 35 : 24,
+                                        width: screenWidth > 450 ? 35 : 24,
+                                        color:
+                                            CommanColor.whiteBlack(context),
                                       ),
-                                    ))
-                            : Visibility(
-                                visible: controller.isSubscriptionEnabled ??
-                                    false,
-                                child: GestureDetector(
-                                  onTap: () async {
-                                    adsIcon = false;
-                                    await SubscriptionScreen
-                                        .navigateToPaywallFromHome(context);
-                                  },
-                                  child: Image.asset(
-                                    'assets/no-ad.png',
-                                    height: screenWidth > 450 ? 35 : 24,
-                                    width: screenWidth > 450 ? 35 : 24,
-                                    color:
-                                        CommanColor.whiteBlack(context),
+                                    ),
                                   ),
-                                ),
-                              ),
                       ],
                     ),
                     actions: [
                       BibleInfo.folders.length != 1
                           ? Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 4),
                               child: InkWell(
                                   onTap: () {
-                                    if (controller.adFree.value == false) {
+                                          if (controller.adFree.value ==
+                                              false) {
                                       controller.bannerAd?.dispose();
                                       controller.bannerAd?.load();
                                     }
@@ -3629,7 +3645,8 @@ class _HomeScreenState extends State<HomeScreen>
                                     "assets/biblebook.png",
                                     height: screenWidth > 450 ? 30 : 24,
                                     width: screenWidth > 450 ? 30 : 24,
-                                    color: CommanColor.whiteBlack(context),
+                                          color:
+                                              CommanColor.whiteBlack(context),
                                   )),
                             )
                           : SizedBox(),
@@ -3649,8 +3666,8 @@ class _HomeScreenState extends State<HomeScreen>
                                       controller: controller,
                                     ),
                                     transition: Transition.cupertino,
-                                    duration:
-                                        const Duration(milliseconds: 300));
+                                          duration: const Duration(
+                                              milliseconds: 300));
                           },
                               child: Padding(
                                 padding: const EdgeInsets.all(4),
@@ -3702,11 +3719,11 @@ class _HomeScreenState extends State<HomeScreen>
                                 p.Provider.of<ThemeProvider>(context);
                             final isDark =
                                 themeProvider.themeMode == ThemeMode.dark;
-                            final isVintage = themeProvider
-                                              .currentCustomTheme ==
+                                  final isVintage =
+                                      themeProvider.currentCustomTheme ==
                                 AppCustomTheme.vintage;
-                            if (isDark && isVintage) {
-                              final base = CommanColor.darkPrimaryColor;
+                                  if (isDark && isVintage) {
+                                    final base = CommanColor.darkPrimaryColor;
                               return BoxDecoration(
                                 color: Color.lerp(
                                   base,
@@ -3743,39 +3760,48 @@ class _HomeScreenState extends State<HomeScreen>
                               }
                               Get.to(
                                   () => ChapterListScreen(
-                                        book_num:
-                                            controller.selectedBookNum.value,
+                                              book_num: controller
+                                                  .selectedBookNum.value,
                                         chapterCount: controller
-                                            .selectedBookChapterCount.value,
-                                        selectedChapter:
-                                            controller.selectedChapter.value,
+                                                  .selectedBookChapterCount
+                                                  .value,
+                                              selectedChapter: controller
+                                                  .selectedChapter.value,
                                       ),
                                   transition: Transition.cupertino,
-                                  duration: const Duration(milliseconds: 350),
-                                  opaque: true);
+                                        duration:
+                                            const Duration(milliseconds: 350),
+                                        opaque: true);
                             },
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                               children: [
                                 controller.selectedChapter.value == ""
                                     ? const SizedBox()
                                     : Text(
                                         "Chapter - ${int.parse(controller.selectedChapter.value)}",
-                                        style: CommanStyle.bw14500(context)
+                                              style: CommanStyle.bw14500(
+                                                      context)
                                             .copyWith(
-                                                fontWeight: FontWeight.w400,
-                                                fontSize: screenWidth > 450
-                                                    ? BibleInfo.fontSizeScale *
-                                                        20
-                                                    : BibleInfo.fontSizeScale *
+                                                      fontWeight:
+                                                          FontWeight.w400,
+                                                      fontSize: screenWidth >
+                                                              450
+                                                          ? BibleInfo
+                                                                  .fontSizeScale *
+                                                              20
+                                                          : BibleInfo
+                                                                  .fontSizeScale *
                                                         14)),
                                 Padding(
-                                  padding:
-                                      const EdgeInsets.only(top: 2.0, left: 5),
+                                        padding: const EdgeInsets.only(
+                                            top: 2.0, left: 5),
                                   child: Icon(
                                     Icons.keyboard_arrow_down_rounded,
-                                    color: CommanColor.whiteBlack(context),
+                                          color:
+                                              CommanColor.whiteBlack(context),
                                     size: screenWidth > 450 ? 39 : 18,
                                   ),
                                 )
@@ -3805,23 +3831,28 @@ class _HomeScreenState extends State<HomeScreen>
                         clipBehavior: Clip.none,
                         children: [
                           Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Column(
                         mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
                         children: [
                           if (BibleInfo.chat == 1)
                             Builder(
-                              builder: (buttonContext) => GestureDetector(
+                                            builder: (buttonContext) =>
+                                                GestureDetector(
                                 onTap: () {
                                   if (isOpenChat) {
-                                    if (Navigator.of(buttonContext,
+                                                  if (Navigator.of(
+                                                          buttonContext,
                                             rootNavigator: false)
                                         .canPop()) {
                                       Navigator.of(buttonContext,
-                                              rootNavigator: false)
+                                                            rootNavigator:
+                                                                false)
                                           .pop();
                                     }
                                     setState(() {
@@ -3831,7 +3862,8 @@ class _HomeScreenState extends State<HomeScreen>
                                     setState(() {
                                       isOpenChat = true;
                                   });
-                                    _showChatEntryPopover(buttonContext);
+                                                  _showChatEntryPopover(
+                                                      buttonContext);
                                   }
                                 },
                                 child: Padding(
@@ -3854,15 +3886,20 @@ class _HomeScreenState extends State<HomeScreen>
                                               ? 50
                                               : 35,
                                       decoration: BoxDecoration(
-                                        color: CommanColor.whiteLightModePrimary(
+                                                      color: CommanColor
+                                                          .whiteLightModePrimary(
                                             context),
                                         shape: BoxShape.circle,
-                                        boxShadow: CommanColor.isDarkTheme(context)
+                                                      boxShadow: CommanColor
+                                                              .isDarkTheme(
+                                                                  context)
                                             ? const [
                                                 BoxShadow(
-                                                  color: Colors.black45,
+                                                                color: Colors
+                                                                    .black45,
                                                   blurRadius: 8,
-                                                  offset: Offset(0, 3),
+                                                                offset: Offset(
+                                                                    0, 3),
                                                 ),
                                               ]
                                             : null,
@@ -3872,25 +3909,37 @@ class _HomeScreenState extends State<HomeScreen>
                                             ? Icon(
                                                 Icons.close,
                                                 color: CommanColor
-                                                    .darkModePrimaryWhite(context),
-                                                size: screenWidth > 450 ? 22 : 18,
+                                                                  .darkModePrimaryWhite(
+                                                                      context),
+                                                              size:
+                                                                  screenWidth >
+                                                                          450
+                                                                      ? 22
+                                                                      : 18,
                                               )
                                             : Image.asset(
-                                                CommanColor.isDarkTheme(context)
+                                                              CommanColor
+                                                                      .isDarkTheme(
+                                                                          context)
                                                     ? "assets/dark_modes/new-dark_chat.png"
                                                     : "assets/Chat white.png",
-                                                width: screenWidth > 600
+                                                              width: screenWidth >
+                                                                      600
                                                     ? 26
-                                                    : screenWidth > 450
+                                                                  : screenWidth >
+                                                                          450
                                                         ? 24
                                                         : 22,
-                                                height: screenWidth > 600
+                                                              height: screenWidth >
+                                                                      600
                                                     ? 26
-                                                    : screenWidth > 450
+                                                                  : screenWidth >
+                                                                          450
                                                         ? 24
                                                         : 22,
                                                 color: CommanColor
-                                                    .darkModePrimaryWhite(context),
+                                                                  .darkModePrimaryWhite(
+                                                                      context),
                                               ),
                                       )),
                                 ),
@@ -3908,18 +3957,23 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                       floatingButton(
                         key: _readerAudioFabKey,
-                        chapterNum: controller.selectedChapter.value,
+                                      chapterNum:
+                                          controller.selectedChapter.value,
                         bookName: controller.selectedBook.value,
-                        // Prefer full-book verses for TTS next/prev; fall back to
-                        // the on-screen chapter so newly opened books are not empty.
-                        contentList: controller.selectedVersesContent.isNotEmpty
-                            ? controller.selectedVersesContent
-                            : controller.selectedBookContent,
-                        chapterCount: controller.selectedBookChapterCount.value,
+                                      // Prefer full-book verses for TTS next/prev; fall back to
+                                      // the on-screen chapter so newly opened books are not empty.
+                                      contentList: controller
+                                              .selectedVersesContent.isNotEmpty
+                                          ? controller.selectedVersesContent
+                                          : controller.selectedBookContent,
+                                      chapterCount: controller
+                                          .selectedBookChapterCount.value,
                         audioData: controller.audioData.value,
                         bookNum: controller.selectedBookNum.value,
-                        internetConnection: controller.connectionStatus,
-                        textToSpeechLoad: controller.loadTextToSpeech.value,
+                                      internetConnection:
+                                          controller.connectionStatus,
+                                      textToSpeechLoad:
+                                          controller.loadTextToSpeech.value,
                         audioPlayer: audioPlayer,
                       ),
                     ],
@@ -3933,11 +3987,11 @@ class _HomeScreenState extends State<HomeScreen>
                     controller.selectedBookContent.isEmpty &&
                     !_hasDisplayedChapterContent
                 ? const SizedBox()
-                : _buildIosHomeDrawer(
-                    context: context,
-                    controller: controller,
-                    bibleName: bibleName,
-                    screenWidth: screenWidth,
+                    : _buildIosHomeDrawer(
+                              context: context,
+                        controller: controller,
+                        bibleName: bibleName,
+                        screenWidth: screenWidth,
                   ),
             bottomNavigationBar: const SizedBox(
               height: 1,
@@ -4100,7 +4154,8 @@ class _HomeScreenState extends State<HomeScreen>
                               key: ValueKey(
                                   'reader_chapter_${controller.selectedChapter.value}'),
                               scrollDirection: controller.scrollDirection,
-                              controller: controller.autoScrollController.value,
+                                    controller:
+                                        controller.autoScrollController.value,
                               itemCount: readerVerses.length,
                               physics: const BouncingScrollPhysics(
                                 parent: AlwaysScrollableScrollPhysics(),
@@ -4122,25 +4177,26 @@ class _HomeScreenState extends State<HomeScreen>
                                 return AutoScrollTag(
                                   key: ValueKey(
                                       '${controller.selectedChapter.value}_$index'),
-                                  controller:
-                                      controller.autoScrollController.value,
+                                        controller: controller
+                                            .autoScrollController.value,
                                   index: index,
                                   child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.start,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.start,
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
                                       Padding(
-                                        padding:
-                                            const EdgeInsets.only(top: 10.0),
+                                              padding: const EdgeInsets.only(
+                                                  top: 10.0),
                                         child: GestureDetector(
                                           onTap: () async {
                                             setState(() {
-                                              controller.selectedIndex.value =
-                                                  -1;
+                                                    controller.selectedIndex
+                                                        .value = -1;
 
-                                              controller.selectedIndex.value =
-                                                  index;
+                                                    controller.selectedIndex
+                                                        .value = index;
 
                                               controller.selectedVerseView
                                                   .value = index;
@@ -4158,8 +4214,8 @@ class _HomeScreenState extends State<HomeScreen>
                                             }, callback: (v) {
                                               setState(() {
                                                 // selectedcolor = v;
-                                                controller.selectedIndex.value =
-                                                    index;
+                                                      controller.selectedIndex
+                                                          .value = index;
                                               });
                                               debugPrint(" step 1 ");
                                             },
@@ -4173,12 +4229,13 @@ class _HomeScreenState extends State<HomeScreen>
                                                         : int.parse(
                                                             selectedcolor ??
                                                                 '0x00000000'),
-                                                    controller: controller)
+                                                          controller:
+                                                              controller)
                                                 .then(
                                               (value) {
                                                 setState(() {
-                                                  controller
-                                                      .selectedIndex.value = -1;
+                                                        controller.selectedIndex
+                                                            .value = -1;
                                                 });
                                                 debugPrint(" step 2 ");
                                                 // controller.selectedIndex.value =
@@ -4188,8 +4245,8 @@ class _HomeScreenState extends State<HomeScreen>
                                           },
                                           child: VerseItemWidget(
                                             index: index,
-                                            currentindex:
-                                                controller.selectedIndex.value,
+                                                  currentindex: controller
+                                                      .selectedIndex.value,
                                             controller: controller,
                                             data: data,
                                             selectedVerseForRead: widget
@@ -4200,20 +4257,23 @@ class _HomeScreenState extends State<HomeScreen>
                                           ),
                                         ),
                                       ),
-                                      controller.selectedBookContent.length == 1
+                                            controller.selectedBookContent
+                                                        .length ==
+                                                    1
                                           ? Padding(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      vertical: 7),
+                                                    padding: const EdgeInsets
+                                                        .symmetric(vertical: 7),
                                               child: Row(
                                                 mainAxisAlignment:
-                                                    MainAxisAlignment.center,
+                                                          MainAxisAlignment
+                                                              .center,
                                                 children: [
                                                   GestureDetector(
                                                     onTap: () async {
                                                       await SharPreferences
                                                           .setString(
-                                                              'OpenAd', '1');
+                                                                    'OpenAd',
+                                                                    '1');
                                                       await DBHelper()
                                                           .db
                                                           .then((value) {
@@ -4222,72 +4282,57 @@ class _HomeScreenState extends State<HomeScreen>
                                                                 "SELECT * From book WHERE book_num = ${int.parse(controller.selectedBookNum.value)}")
                                                             .then(
                                                                 (value) async {
-                                                          controller.bookReadPer
-                                                              .value = value[0]
-                                                                  ["read_per"]
+                                                                controller
+                                                                    .bookReadPer
+                                                                    .value = value[
+                                                                            0][
+                                                                        "read_per"]
                                                               .toString();
                                                           if (controller
                                                                   .selectedBookContent[
                                                                       0]
                                                                   .isRead ==
                                                               "no") {
-                                                            if (int.tryParse(
-                                                                    controller
+                                                                  if (int.tryParse(controller
                                                                         .bookReadPer
                                                                         .value) ==
                                                                 0) {
                                                               double readPer = (100 *
                                                                       1) /
-                                                                  double.parse(
-                                                                      controller
+                                                                        double.parse(controller
                                                                           .selectedBookChapterCount
                                                                           .value
                                                                           .toString());
                                                               DBHelper()
                                                                   .updateBookData(
-                                                                      int.parse(controller
-                                                                          .selectedBookId
-                                                                          .value
-                                                                          .toString()),
+                                                                            int.parse(controller.selectedBookId.value.toString()),
                                                                       "read_per",
-                                                                      readPer
-                                                                          .toStringAsFixed(
-                                                                              1)
-                                                                          .toString())
-                                                                  .then(
-                                                                      (value) {});
+                                                                            readPer.toStringAsFixed(1).toString())
+                                                                        .then((value) {});
                                                             } else {
                                                               double readPer = (100 *
                                                                       1) /
-                                                                  double.parse(
-                                                                      controller
+                                                                        double.parse(controller
                                                                           .selectedBookChapterCount
                                                                           .value
                                                                           .toString());
-                                                              double finalRead =
-                                                                  double.parse(controller
+                                                                    double finalRead = double.parse(controller
                                                                           .bookReadPer
                                                                           .value
                                                                           .toString()) +
                                                                       readPer;
                                                               DBHelper()
                                                                   .updateBookData(
-                                                                      int.parse(controller
-                                                                          .selectedBookId
-                                                                          .value
-                                                                          .toString()),
+                                                                            int.parse(controller.selectedBookId.value.toString()),
                                                                       "read_per",
-                                                                      finalRead
-                                                                          .toStringAsFixed(
-                                                                              1)
-                                                                          .toString())
-                                                                  .then(
-                                                                      (value) {});
+                                                                            finalRead.toStringAsFixed(1).toString())
+                                                                        .then((value) {});
                                                             }
                                                             controller
                                                                 .isReadLoad
                                                                 .value = true;
-                                                            for (var i = 0;
+                                                                  for (var i =
+                                                                          0;
                                                                 i <
                                                                     controller
                                                                         .selectedBookContent
@@ -4296,11 +4341,7 @@ class _HomeScreenState extends State<HomeScreen>
                                                                 i++) {
                                                               DBHelper()
                                                                   .updateVersesData(
-                                                                      int.parse(controller
-                                                                          .selectedBookContent
-                                                                          .value[
-                                                                              i]
-                                                                          .id
+                                                                            int.parse(controller.selectedBookContent.value[i].id
                                                                           .toString()),
                                                                       "is_read",
                                                                       "yes")
@@ -4327,13 +4368,11 @@ class _HomeScreenState extends State<HomeScreen>
                                                                       .selectedBookContent[
                                                                           i]
                                                                       .content,
-                                                                  isBookmarked:
-                                                                      controller
+                                                                        isBookmarked: controller
                                                                           .selectedBookContent[
                                                                               i]
                                                                           .isBookmarked,
-                                                                  isHighlighted:
-                                                                      controller
+                                                                        isHighlighted: controller
                                                                           .selectedBookContent[
                                                                               i]
                                                                           .isHighlighted,
@@ -4341,19 +4380,19 @@ class _HomeScreenState extends State<HomeScreen>
                                                                       .selectedBookContent[
                                                                           i]
                                                                       .isNoted,
-                                                                  isUnderlined:
-                                                                      controller
+                                                                        isUnderlined: controller
                                                                           .selectedBookContent[
                                                                               i]
                                                                           .isUnderlined,
                                                                   isRead:
                                                                       "yes");
-                                                              controller
-                                                                      .selectedBookContent[
-                                                                  i] = data;
-                                                            }
+                                                                    controller.selectedBookContent[
+                                                                            i] =
+                                                                        data;
+                                                                  }
 
-                                                            Future.delayed(
+                                                                  Future
+                                                                      .delayed(
                                                               const Duration(
                                                                   milliseconds:
                                                                       200),
@@ -4368,8 +4407,7 @@ class _HomeScreenState extends State<HomeScreen>
                                                                     false;
                                                                 try {
                                                                   final hasInternet =
-                                                                      await InternetConnection()
-                                                                          .hasInternetAccess;
+                                                                            await InternetConnection().hasInternetAccess;
                                                                   if (!hasInternet) {
                                                                     // Offline - skip ad and navigate directly
                                                                     shouldSkipAd =
@@ -4377,13 +4415,10 @@ class _HomeScreenState extends State<HomeScreen>
                                                                   } else {
                                                                     // Check if mobile only connection (likely 2G/slow) - skip ad
                                                                     final connectivityResult =
-                                                                        await Connectivity()
-                                                                            .checkConnectivity();
+                                                                              await Connectivity().checkConnectivity();
                                                                     final isMobileOnly = connectivityResult.contains(ConnectivityResult.mobile) &&
-                                                                        !connectivityResult.contains(ConnectivityResult
-                                                                            .wifi) &&
-                                                                        !connectivityResult
-                                                                            .contains(ConnectivityResult.ethernet);
+                                                                              !connectivityResult.contains(ConnectivityResult.wifi) &&
+                                                                              !connectivityResult.contains(ConnectivityResult.ethernet);
                                                                     if (isMobileOnly) {
                                                                       // Low internet (2G/mobile only) - skip ad and navigate directly
                                                                       shouldSkipAd =
@@ -4400,21 +4435,25 @@ class _HomeScreenState extends State<HomeScreen>
 
                                                                 // If should skip ad (offline/low internet), navigate directly
                                                                 if (shouldSkipAd) {
-                                                                  MarkAsReadScreen.open(
-                                                                                  ReadedChapter: controller.selectedChapter.value,
-                                                                                  RededBookName: controller.selectedBook.value,
-                                                                                  SelectedBookChapterCount: controller.selectedBookChapterCount.value,
-                                                                                );
+                                                                        MarkAsReadScreen
+                                                                            .open(
+                                                                        ReadedChapter: controller
+                                                                            .selectedChapter
+                                                                            .value,
+                                                                        RededBookName: controller
+                                                                            .selectedBook
+                                                                            .value,
+                                                                        SelectedBookChapterCount: controller
+                                                                            .selectedBookChapterCount
+                                                                            .value,
+                                                                        );
                                                                   return;
                                                                 }
 
                                                                 // Only show ad if online with good connection
-                                                                if (_adService
-                                                                            .interstitialAd !=
+                                                                      if (_adService.interstitialAd !=
                                                                         null &&
-                                                                    controller
-                                                                            .adFree
-                                                                            .value ==
+                                                                          controller.adFree.value ==
                                                                         false) {
                                                                   // Check if 3 minutes have passed since last ad
                                                                   final canShowAd =
@@ -4425,34 +4464,48 @@ class _HomeScreenState extends State<HomeScreen>
                                                                     await _saveMarkAsReadAdTime();
                                                                     // Show ad FIRST, wait for dismissal, THEN navigate
                                                                     try {
-                                                                      await _showMarkAsReadAdPausingAudio();
+                                                                            await _showMarkAsReadAdPausingAudio();
                                                                     } catch (e) {
-                                                                      debugPrint(
-                                                                          'Error showing ad in Mark as Read: $e');
+                                                                            debugPrint('Error showing ad in Mark as Read: $e');
                                                                       // If ad fails, proceed anyway
                                                                     }
                                                                     // Navigate AFTER ad is dismissed
-                                                                    MarkAsReadScreen.open(
-                                                                                  ReadedChapter: controller.selectedChapter.value,
-                                                                                  RededBookName: controller.selectedBook.value,
-                                                                                  SelectedBookChapterCount: controller.selectedBookChapterCount.value,
-                                                                                );
+                                                                          MarkAsReadScreen
+                                                                              .open(
+                                                                            ReadedChapter:
+                                                                                controller.selectedChapter.value,
+                                                                            RededBookName:
+                                                                                controller.selectedBook.value,
+                                                                            SelectedBookChapterCount:
+                                                                                controller.selectedBookChapterCount.value,
+                                                                          );
                                                                   } else {
                                                                     // Ad shown recently, skip ad but still navigate
-                                                                    MarkAsReadScreen.open(
-                                                                                  ReadedChapter: controller.selectedChapter.value,
-                                                                                  RededBookName: controller.selectedBook.value,
-                                                                                  SelectedBookChapterCount: controller.selectedBookChapterCount.value,
-                                                                                );
+                                                                          MarkAsReadScreen
+                                                                              .open(
+                                                                            ReadedChapter:
+                                                                                controller.selectedChapter.value,
+                                                                            RededBookName:
+                                                                                controller.selectedBook.value,
+                                                                            SelectedBookChapterCount:
+                                                                                controller.selectedBookChapterCount.value,
+                                                                          );
                                                                   }
                                                                 } else {
                                                                   print(
                                                                       'Not Load Interstitial Ad');
-                                                                  MarkAsReadScreen.open(
-                                                                                  ReadedChapter: controller.selectedChapter.value,
-                                                                                  RededBookName: controller.selectedBook.value,
-                                                                                  SelectedBookChapterCount: controller.selectedBookChapterCount.value,
-                                                                                );
+                                                                        MarkAsReadScreen
+                                                                            .open(
+                                                                        ReadedChapter: controller
+                                                                            .selectedChapter
+                                                                            .value,
+                                                                        RededBookName: controller
+                                                                            .selectedBook
+                                                                            .value,
+                                                                        SelectedBookChapterCount: controller
+                                                                            .selectedBookChapterCount
+                                                                            .value,
+                                                                        );
 
                                                                   // Get.to(() =>
                                                                   //     MarkAsReadScreen(
@@ -4473,40 +4526,31 @@ class _HomeScreenState extends State<HomeScreen>
                                                             controller
                                                                 .isReadLoad
                                                                 .value = true;
-                                                            if (int.tryParse(
-                                                                    controller
+                                                                  if (int.tryParse(controller
                                                                         .bookReadPer
                                                                         .value) ==
                                                                 0) {
                                                             } else {
                                                               double readPer = (100 *
                                                                       1) /
-                                                                  double.parse(
-                                                                      controller
+                                                                        double.parse(controller
                                                                           .selectedBookChapterCount
                                                                           .value
                                                                           .toString());
-                                                              double finalRead =
-                                                                  double.parse(controller
+                                                                    double finalRead = double.parse(controller
                                                                           .bookReadPer
                                                                           .value
                                                                           .toString()) -
                                                                       readPer;
                                                               DBHelper()
                                                                   .updateBookData(
-                                                                      int.parse(controller
-                                                                          .selectedBookId
-                                                                          .value
-                                                                          .toString()),
+                                                                            int.parse(controller.selectedBookId.value.toString()),
                                                                       "read_per",
-                                                                      finalRead
-                                                                          .toStringAsFixed(
-                                                                              1)
-                                                                          .toString())
-                                                                  .then(
-                                                                      (value) {});
-                                                            }
-                                                            for (var i = 0;
+                                                                            finalRead.toStringAsFixed(1).toString())
+                                                                        .then((value) {});
+                                                                  }
+                                                                  for (var i =
+                                                                          0;
                                                                 i <
                                                                     controller
                                                                         .selectedBookContent
@@ -4514,10 +4558,7 @@ class _HomeScreenState extends State<HomeScreen>
                                                                 i++) {
                                                               await DBHelper()
                                                                   .updateVersesData(
-                                                                      int.parse(controller
-                                                                          .selectedBookContent[
-                                                                              i]
-                                                                          .id
+                                                                            int.parse(controller.selectedBookContent[i].id
                                                                           .toString()),
                                                                       "is_read",
                                                                       "no")
@@ -4544,13 +4585,11 @@ class _HomeScreenState extends State<HomeScreen>
                                                                       .selectedBookContent[
                                                                           i]
                                                                       .content,
-                                                                  isBookmarked:
-                                                                      controller
+                                                                        isBookmarked: controller
                                                                           .selectedBookContent[
                                                                               i]
                                                                           .isBookmarked,
-                                                                  isHighlighted:
-                                                                      controller
+                                                                        isHighlighted: controller
                                                                           .selectedBookContent[
                                                                               i]
                                                                           .isHighlighted,
@@ -4558,15 +4597,15 @@ class _HomeScreenState extends State<HomeScreen>
                                                                       .selectedBookContent[
                                                                           i]
                                                                       .isNoted,
-                                                                  isUnderlined:
-                                                                      controller
+                                                                        isUnderlined: controller
                                                                           .selectedBookContent[
                                                                               i]
                                                                           .isUnderlined,
-                                                                  isRead: "no");
-                                                              controller
-                                                                      .selectedBookContent[
-                                                                  i] = data;
+                                                                        isRead:
+                                                                            "no");
+                                                                    controller.selectedBookContent[
+                                                                            i] =
+                                                                        data;
                                                             }
                                                             Future.delayed(
                                                                 const Duration(
@@ -4584,13 +4623,15 @@ class _HomeScreenState extends State<HomeScreen>
                                                     child: Container(
                                                       width: 200,
                                                       height: 40,
-                                                      decoration: BoxDecoration(
+                                                            decoration:
+                                                                BoxDecoration(
                                                         color: controller
                                                                     .selectedBookContent[
                                                                         0]
                                                                     .isRead ==
                                                                 "no"
-                                                            ? Colors.black38
+                                                                  ? Colors
+                                                                      .black38
                                                             : CommanColor
                                                                 .whiteLightModePrimary(
                                                                     context),
@@ -4603,7 +4644,8 @@ class _HomeScreenState extends State<HomeScreen>
                                                           const BoxShadow(
                                                               color: Colors
                                                                   .black26,
-                                                              blurRadius: 2)
+                                                                    blurRadius:
+                                                                        2)
                                                         ],
                                                       ),
                                                       child: Center(
@@ -4612,37 +4654,28 @@ class _HomeScreenState extends State<HomeScreen>
                                                                       .value ==
                                                                   false
                                                               ? Text(
-                                                                  controller.selectedBookContent[0]
-                                                                              .isRead ==
+                                                                        controller.selectedBookContent[0].isRead ==
                                                                           "no"
                                                                       ? 'Mark as Read'
                                                                       : "Marked as Read",
                                                                   style: TextStyle(
-                                                                      letterSpacing:
-                                                                          BibleInfo
+                                                                            letterSpacing: BibleInfo
                                                                               .letterSpacing,
                                                                       fontSize: screenWidth > 450
-                                                                          ? BibleInfo.fontSizeScale *
-                                                                              20
-                                                                          : BibleInfo.fontSizeScale *
-                                                                              14,
-                                                                      fontWeight:
-                                                                          FontWeight
-                                                                              .w500,
-                                                                      color: controller.selectedBookContent[0].isRead ==
-                                                                              "no"
-                                                                          ? Colors
-                                                                              .white
-                                                                          : CommanColor.darkModePrimaryWhite(
-                                                                              context)),
+                                                                                ? BibleInfo.fontSizeScale * 20
+                                                                                : BibleInfo.fontSizeScale * 14,
+                                                                            fontWeight: FontWeight.w500,
+                                                                            color: controller.selectedBookContent[0].isRead == "no" ? Colors.white : CommanColor.darkModePrimaryWhite(context)),
                                                                 )
                                                               : const SizedBox(
-                                                                  height: 22,
-                                                                  width: 22,
+                                                                        height:
+                                                                            22,
+                                                                        width:
+                                                                            22,
                                                                   child:
                                                                       CircularProgressIndicator(
-                                                                    color: Colors
-                                                                        .white,
+                                                                          color:
+                                                                              Colors.white,
                                                                     strokeWidth:
                                                                         2.2,
                                                                   ))),
@@ -4652,29 +4685,33 @@ class _HomeScreenState extends State<HomeScreen>
                                               ),
                                             )
                                           : index ==
-                                                  controller.selectedBookContent
+                                                        controller
+                                                                .selectedBookContent
                                                           .length -
                                                       1
                                               ? Obx(() => Column(
                                                     children: [
                                                       Container(
-                                                        margin: const EdgeInsets
-                                                            .only(top: 15),
-                                                        width: MediaQuery.of(
+                                                              margin:
+                                                                  const EdgeInsets
+                                                                      .only(
+                                                                      top: 15),
+                                                              width:
+                                                                  MediaQuery.of(
                                                                 context)
                                                             .size
                                                             .width,
-                                                        color:
-                                                            Colors.transparent,
+                                                              color: Colors
+                                                                  .transparent,
                                                         child: Row(
                                                           mainAxisAlignment:
                                                               MainAxisAlignment
                                                                   .center,
                                                           children: [
                                                             GestureDetector(
-                                                              onTap: () async {
-                                                                await SharPreferences
-                                                                    .setString(
+                                                                    onTap:
+                                                                        () async {
+                                                                      await SharPreferences.setString(
                                                                         'OpenAd',
                                                                         '1');
                                                                 await DBHelper()
@@ -4682,95 +4719,41 @@ class _HomeScreenState extends State<HomeScreen>
                                                                     .then(
                                                                         (value) {
                                                                   value!
-                                                                      .rawQuery(
-                                                                          "SELECT * From book WHERE book_num = ${int.parse(controller.selectedBookNum.value)}")
-                                                                      .then(
-                                                                          (value) async {
+                                                                            .rawQuery("SELECT * From book WHERE book_num = ${int.parse(controller.selectedBookNum.value)}")
+                                                                            .then((value) async {
                                                                     controller
                                                                         .bookReadPer
-                                                                        .value = value[0]
-                                                                            [
-                                                                            "read_per"]
-                                                                        .toString();
-                                                                    if (controller
-                                                                            .selectedBookContent[1]
-                                                                            .isRead ==
+                                                                              .value = value[0]["read_per"].toString();
+                                                                          if (controller.selectedBookContent[1].isRead ==
                                                                         "no") {
-                                                                      if (controller
-                                                                              .bookReadPer
-                                                                              .value ==
+                                                                            if (controller.bookReadPer.value ==
                                                                           "0") {
-                                                                        double
-                                                                            readPer =
-                                                                            (100 * 1) /
-                                                                                double.parse(controller.selectedBookChapterCount.value.toString());
-                                                                        await DBHelper()
-                                                                            .updateBookData(
-                                                                                int.parse(controller.selectedBookId.value.toString()),
-                                                                                "read_per",
-                                                                                readPer.toStringAsFixed(1).toString())
-                                                                            .then((value) {});
+                                                                              double readPer = (100 * 1) / double.parse(controller.selectedBookChapterCount.value.toString());
+                                                                              await DBHelper().updateBookData(int.parse(controller.selectedBookId.value.toString()), "read_per", readPer.toStringAsFixed(1).toString()).then((value) {});
                                                                       } else {
-                                                                        double
-                                                                            readPer =
-                                                                            (100 * 1) /
-                                                                                double.parse(controller.selectedBookChapterCount.value.toString());
-                                                                        double
-                                                                            finalRead =
-                                                                            double.parse(controller.bookReadPer.value.toString()) +
-                                                                                readPer;
-                                                                        await DBHelper()
-                                                                            .updateBookData(
-                                                                                int.parse(controller.selectedBookId.value.toString()),
-                                                                                "read_per",
-                                                                                finalRead.toStringAsFixed(1).toString())
-                                                                            .then((value) {});
-                                                                      }
-                                                                      controller
-                                                                          .isReadLoad
-                                                                          .value = true;
-                                                                      for (var i =
-                                                                              0;
+                                                                              double readPer = (100 * 1) / double.parse(controller.selectedBookChapterCount.value.toString());
+                                                                              double finalRead = double.parse(controller.bookReadPer.value.toString()) + readPer;
+                                                                              await DBHelper().updateBookData(int.parse(controller.selectedBookId.value.toString()), "read_per", finalRead.toStringAsFixed(1).toString()).then((value) {});
+                                                                            }
+                                                                            controller.isReadLoad.value =
+                                                                                true;
+                                                                            for (var i = 0;
                                                                           i < controller.selectedBookContent.length;
                                                                           i++) {
-                                                                        await DBHelper()
-                                                                            .updateVersesData(
-                                                                                int.parse(controller.selectedBookContent[i].id.toString()),
-                                                                                "is_read",
-                                                                                "yes")
-                                                                            .then((value) {});
-                                                                        var data = VerseBookContentModel(
-                                                                            id: controller.selectedBookContent[i].id,
-                                                                            bookNum: controller.selectedBookContent[i].bookNum,
-                                                                            chapterNum: controller.selectedBookContent[i].chapterNum,
-                                                                            verseNum: controller.selectedBookContent[i].verseNum,
-                                                                            content: controller.selectedBookContent[i].content,
-                                                                            isBookmarked: controller.selectedBookContent[i].isBookmarked,
-                                                                            isHighlighted: controller.selectedBookContent[i].isHighlighted,
-                                                                            isNoted: controller.selectedBookContent[i].isNoted,
-                                                                            isUnderlined: controller.selectedBookContent[i].isUnderlined,
-                                                                            isRead: "yes");
-                                                                        controller.selectedBookContent[i] =
-                                                                            data;
-                                                                      }
+                                                                              await DBHelper().updateVersesData(int.parse(controller.selectedBookContent[i].id.toString()), "is_read", "yes").then((value) {});
+                                                                              var data = VerseBookContentModel(id: controller.selectedBookContent[i].id, bookNum: controller.selectedBookContent[i].bookNum, chapterNum: controller.selectedBookContent[i].chapterNum, verseNum: controller.selectedBookContent[i].verseNum, content: controller.selectedBookContent[i].content, isBookmarked: controller.selectedBookContent[i].isBookmarked, isHighlighted: controller.selectedBookContent[i].isHighlighted, isNoted: controller.selectedBookContent[i].isNoted, isUnderlined: controller.selectedBookContent[i].isUnderlined, isRead: "yes");
+                                                                              controller.selectedBookContent[i] = data;
+                                                                            }
 
-                                                                      Future
-                                                                          .delayed(
-                                                                        const Duration(
-                                                                            milliseconds:
-                                                                                200),
+                                                                            Future.delayed(
+                                                                              const Duration(milliseconds: 200),
                                                                         () async {
-                                                                          controller
-                                                                              .isReadLoad
-                                                                              .value = false;
+                                                                                controller.isReadLoad.value = false;
 
                                                                           // Check internet connectivity first - if offline/low internet, skip ad and navigate directly
-                                                                          bool
-                                                                              shouldSkipAd =
-                                                                              false;
+                                                                                bool shouldSkipAd = false;
                                                                           try {
-                                                                            final hasInternet =
-                                                                                await InternetConnection().hasInternetAccess;
+                                                                                  final hasInternet = await InternetConnection().hasInternetAccess;
                                                                             if (!hasInternet) {
                                                                               // Offline - skip ad and navigate directly
                                                                               shouldSkipAd = true;
@@ -4786,168 +4769,113 @@ class _HomeScreenState extends State<HomeScreen>
                                                                           } catch (e) {
                                                                             // If connectivity check fails, skip ad and proceed
                                                                             debugPrint('Connectivity check error in Mark as Read: $e');
-                                                                            shouldSkipAd =
-                                                                                true;
+                                                                                  shouldSkipAd = true;
                                                                           }
 
                                                                           // If should skip ad (offline/low internet), navigate directly
                                                                           if (shouldSkipAd) {
-                                                                            MarkAsReadScreen.open(
+                                                                                  MarkAsReadScreen.open(
                                                                                   ReadedChapter: controller.selectedChapter.value,
                                                                                   RededBookName: controller.selectedBook.value,
                                                                                   SelectedBookChapterCount: controller.selectedBookChapterCount.value,
-                                                                                );
+                                                                                  );
                                                                             return;
                                                                           }
 
                                                                           // Only show ad if online with good connection
-                                                                          if (_adService.interstitialAd != null &&
-                                                                              controller.adFree.value == false) {
+                                                                                if (_adService.interstitialAd != null && controller.adFree.value == false) {
                                                                             // Check if 3 minutes have passed since last ad
-                                                                            final canShowAd =
-                                                                                await _canShowMarkAsReadAd();
+                                                                                  final canShowAd = await _canShowMarkAsReadAd();
                                                                             if (canShowAd) {
                                                                               print('Load Interstitial Ad');
                                                                               await _saveMarkAsReadAdTime();
                                                                               // Show ad FIRST, wait for dismissal, THEN navigate
                                                                               try {
-                                                                                await _showMarkAsReadAdPausingAudio();
+                                                                                      await _showMarkAsReadAdPausingAudio();
                                                                               } catch (e) {
                                                                                 debugPrint('Error showing ad in Mark as Read: $e');
                                                                                 // If ad fails, proceed anyway
                                                                               }
                                                                               // Navigate AFTER ad is dismissed
-                                                                              MarkAsReadScreen.open(
-                                                                                  ReadedChapter: controller.selectedChapter.value,
-                                                                                  RededBookName: controller.selectedBook.value,
-                                                                                  SelectedBookChapterCount: controller.selectedBookChapterCount.value,
-                                                                                );
+                                                                                    MarkAsReadScreen.open(
+                                                                                    ReadedChapter: controller.selectedChapter.value,
+                                                                                    RededBookName: controller.selectedBook.value,
+                                                                                    SelectedBookChapterCount: controller.selectedBookChapterCount.value,
+                                                                                    );
                                                                             } else {
                                                                               // Ad shown recently, skip ad but still navigate
-                                                                              MarkAsReadScreen.open(
-                                                                                  ReadedChapter: controller.selectedChapter.value,
-                                                                                  RededBookName: controller.selectedBook.value,
-                                                                                  SelectedBookChapterCount: controller.selectedBookChapterCount.value,
-                                                                                );
+                                                                                    MarkAsReadScreen.open(
+                                                                                    ReadedChapter: controller.selectedChapter.value,
+                                                                                    RededBookName: controller.selectedBook.value,
+                                                                                    SelectedBookChapterCount: controller.selectedBookChapterCount.value,
+                                                                                    );
                                                                             }
                                                                           } else {
                                                                             print('Not Load Interstitial Ad');
-                                                                            MarkAsReadScreen.open(
-                                                                                  ReadedChapter: controller.selectedChapter.value,
-                                                                                  RededBookName: controller.selectedBook.value,
-                                                                                  SelectedBookChapterCount: controller.selectedBookChapterCount.value,
-                                                                                );
+                                                                                  MarkAsReadScreen.open(
+                                                                                    ReadedChapter: controller.selectedChapter.value,
+                                                                                    RededBookName: controller.selectedBook.value,
+                                                                                    SelectedBookChapterCount: controller.selectedBookChapterCount.value,
+                                                                                  );
                                                                           }
                                                                         },
                                                                       );
                                                                     } else {
-                                                                      controller
-                                                                          .isReadLoad
-                                                                          .value = true;
-                                                                      if (controller
-                                                                              .bookReadPer
-                                                                              .value ==
+                                                                            controller.isReadLoad.value =
+                                                                                true;
+                                                                            if (controller.bookReadPer.value ==
                                                                           0) {
                                                                       } else {
-                                                                        double
-                                                                            readPer =
-                                                                            (100 * 1) /
-                                                                                double.parse(controller.selectedBookChapterCount.value.toString());
-                                                                        double
-                                                                            finalRead =
-                                                                            double.parse(controller.bookReadPer.value.toString()) -
-                                                                                readPer;
-                                                                        await DBHelper()
-                                                                            .updateBookData(
-                                                                                int.parse(controller.selectedBookId.value.toString()),
-                                                                                "read_per",
-                                                                                finalRead.toStringAsFixed(1).toString())
-                                                                            .then((value) {});
-                                                                      }
-                                                                      for (var i =
-                                                                              0;
+                                                                              double readPer = (100 * 1) / double.parse(controller.selectedBookChapterCount.value.toString());
+                                                                              double finalRead = double.parse(controller.bookReadPer.value.toString()) - readPer;
+                                                                              await DBHelper().updateBookData(int.parse(controller.selectedBookId.value.toString()), "read_per", finalRead.toStringAsFixed(1).toString()).then((value) {});
+                                                                            }
+                                                                            for (var i = 0;
                                                                           i < controller.selectedBookContent.length;
                                                                           i++) {
-                                                                        await DBHelper()
-                                                                            .updateVersesData(
-                                                                                int.parse(controller.selectedBookContent[i].id.toString()),
-                                                                                "is_read",
-                                                                                "no")
-                                                                            .then((value) {});
-                                                                        var data = VerseBookContentModel(
-                                                                            id: controller.selectedBookContent[i].id,
-                                                                            bookNum: controller.selectedBookContent[i].bookNum,
-                                                                            chapterNum: controller.selectedBookContent[i].chapterNum,
-                                                                            verseNum: controller.selectedBookContent[i].verseNum,
-                                                                            content: controller.selectedBookContent[i].content,
-                                                                            isBookmarked: controller.selectedBookContent[i].isBookmarked,
-                                                                            isHighlighted: controller.selectedBookContent[i].isHighlighted,
-                                                                            isNoted: controller.selectedBookContent[i].isNoted,
-                                                                            isUnderlined: controller.selectedBookContent[i].isUnderlined,
-                                                                            isRead: "no");
-                                                                        controller.selectedBookContent[i] =
-                                                                            data;
-                                                                      }
-                                                                      Future.delayed(
-                                                                          const Duration(
-                                                                              milliseconds: 200),
-                                                                          () {
-                                                                        controller
-                                                                            .isReadLoad
-                                                                            .value = false;
+                                                                              await DBHelper().updateVersesData(int.parse(controller.selectedBookContent[i].id.toString()), "is_read", "no").then((value) {});
+                                                                              var data = VerseBookContentModel(id: controller.selectedBookContent[i].id, bookNum: controller.selectedBookContent[i].bookNum, chapterNum: controller.selectedBookContent[i].chapterNum, verseNum: controller.selectedBookContent[i].verseNum, content: controller.selectedBookContent[i].content, isBookmarked: controller.selectedBookContent[i].isBookmarked, isHighlighted: controller.selectedBookContent[i].isHighlighted, isNoted: controller.selectedBookContent[i].isNoted, isUnderlined: controller.selectedBookContent[i].isUnderlined, isRead: "no");
+                                                                              controller.selectedBookContent[i] = data;
+                                                                            }
+                                                                            Future.delayed(const Duration(milliseconds: 200),
+                                                                                () {
+                                                                              controller.isReadLoad.value = false;
                                                                       });
                                                                     }
                                                                   });
                                                                 });
                                                               },
-                                                              child: Container(
-                                                                width: 200,
-                                                                height: 40,
+                                                                    child:
+                                                                        Container(
+                                                                      width:
+                                                                          200,
+                                                                      height:
+                                                                          40,
                                                                 decoration:
                                                                     BoxDecoration(
-                                                                  color: controller
-                                                                              .selectedBookContent[
-                                                                                  1]
-                                                                              .isRead ==
-                                                                          "no"
-                                                                      ? Colors
-                                                                          .black38
-                                                                      : CommanColor
-                                                                          .whiteLightModePrimary(
-                                                                              context),
-                                                                  borderRadius:
-                                                                      const BorderRadius
+                                                                        color: controller.selectedBookContent[1].isRead ==
+                                                                                "no"
+                                                                            ? Colors.black38
+                                                                            : CommanColor.whiteLightModePrimary(context),
+                                                                        borderRadius: const BorderRadius
                                                                           .all(
-                                                                          Radius.circular(
-                                                                              5)),
+                                                                            Radius.circular(5)),
                                                                   boxShadow: [
                                                                     const BoxShadow(
-                                                                        color: Colors
-                                                                            .black26,
-                                                                        blurRadius:
-                                                                            2)
+                                                                              color: Colors.black26,
+                                                                              blurRadius: 2)
                                                                   ],
                                                                 ),
                                                                 child: Center(
-                                                                    child: controller.isReadLoad.value ==
-                                                                            false
+                                                                          child: controller.isReadLoad.value == false
                                                                         ? Text(
-                                                                            controller.selectedBookContent[1].isRead == "no"
-                                                                                ? 'Mark as Read'
-                                                                                : "Marked as Read",
-                                                                            style: TextStyle(
-                                                                                letterSpacing: BibleInfo.letterSpacing,
-                                                                                fontSize: screenWidth > 450 ? BibleInfo.fontSizeScale * 20 : BibleInfo.fontSizeScale * 14,
-                                                                                fontWeight: FontWeight.w500,
-                                                                                color: controller.selectedBookContent[1].isRead == "no" ? Colors.white : CommanColor.darkModePrimaryWhite(context)),
+                                                                                  controller.selectedBookContent[1].isRead == "no" ? 'Mark as Read' : "Marked as Read",
+                                                                                  style: TextStyle(letterSpacing: BibleInfo.letterSpacing, fontSize: screenWidth > 450 ? BibleInfo.fontSizeScale * 20 : BibleInfo.fontSizeScale * 14, fontWeight: FontWeight.w500, color: controller.selectedBookContent[1].isRead == "no" ? Colors.white : CommanColor.darkModePrimaryWhite(context)),
                                                                           )
                                                                         : const SizedBox(
-                                                                            height:
-                                                                                22,
-                                                                            width:
-                                                                                22,
-                                                                            child:
-                                                                                CircularProgressIndicator(
+                                                                                  height: 22,
+                                                                                  width: 22,
+                                                                                  child: CircularProgressIndicator(
                                                                               color: Colors.white,
                                                                               strokeWidth: 2.2,
                                                                             ))),
@@ -4968,13 +4896,16 @@ class _HomeScreenState extends State<HomeScreen>
                                                           controller
                                                               .isPopupBannerAdHomeLoaded
                                                               .value &&
-                                                          controller.adFree
+                                                                controller
+                                                                        .adFree
                                                                   .value ==
                                                               false)
                                                         Builder(
-                                                          builder: (context) {
+                                                                builder:
+                                                                    (context) {
                                                             try {
-                                                              final ad = controller
+                                                                    final ad =
+                                                                        controller
                                                                   .popupBannerAdHome!;
                                                               // Check if ad has valid size (indicates it's loaded)
                                                               if (ad.size.width >
@@ -4982,8 +4913,7 @@ class _HomeScreenState extends State<HomeScreen>
                                                                   ad.size.height >
                                                                       0) {
                                                                 return Padding(
-                                                                  padding:
-                                                                      const EdgeInsets
+                                                                        padding: const EdgeInsets
                                                                           .only(
                                                                           top:
                                                                               20,
@@ -4999,8 +4929,8 @@ class _HomeScreenState extends State<HomeScreen>
                                                                         .size
                                                                         .width
                                                                         .toDouble(),
-                                                                    child: AdWidget(
-                                                                        ad: ad),
+                                                                          child:
+                                                                              AdWidget(ad: ad),
                                                                   ),
                                                                 );
                                                               }
@@ -5015,7 +4945,8 @@ class _HomeScreenState extends State<HomeScreen>
                                                     ],
                                                   ))
                                               : const SizedBox(),
-                                      p.Provider.of<ThemeProvider>(context)
+                                            p.Provider.of<ThemeProvider>(
+                                                            context)
                                                   .currentCustomTheme ==
                                               AppCustomTheme.lightbrown
                                           ? controller.selectedBookContent
@@ -5023,21 +4954,21 @@ class _HomeScreenState extends State<HomeScreen>
                                                   index + 1
                                               ? Padding(
                                                   padding:
-                                                      const EdgeInsets.only(
-                                                          top: 12),
+                                                            const EdgeInsets
+                                                                .only(top: 12),
                                                   child: Row(
-                                                    children: List.generate(
+                                                          children:
+                                                              List.generate(
                                                         150 ~/ 3,
-                                                        (index) => Expanded(
-                                                              child: Container(
-                                                                color: index %
-                                                                            2 ==
-                                                                        0
-                                                                    ? Colors
-                                                                        .transparent
-                                                                    : Colors
-                                                                        .grey,
-                                                                height: 2,
+                                                                  (index) =>
+                                                                      Expanded(
+                                                                        child:
+                                                                            Container(
+                                                                          color: index % 2 == 0
+                                                                              ? Colors.transparent
+                                                                              : Colors.grey,
+                                                                          height:
+                                                                              2,
                                                               ),
                                                             )),
                                                   ),
@@ -5613,7 +5544,6 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-
   /// iOS-style accordion drawer (visual only). Callbacks keep existing navigation logic.
   Drawer _buildIosHomeDrawer({
     required BuildContext context,
@@ -5629,15 +5559,12 @@ class _HomeScreenState extends State<HomeScreen>
     Future<void> openPaywallFromDrawer() async {
       adsIcon = false;
       await SharPreferences.setString('OpenAd', '1');
-      final sixMonthPlan =
-          await SharPreferences.getString('sixMonthPlan') ??
-              BibleInfo.sixMonthPlanid;
-      final oneYearPlan =
-          await SharPreferences.getString('oneYearPlan') ??
-              BibleInfo.oneYearPlanid;
-      final lifeTimePlan =
-          await SharPreferences.getString('lifeTimePlan') ??
-              BibleInfo.lifeTimePlanid;
+      final sixMonthPlan = await SharPreferences.getString('sixMonthPlan') ??
+          BibleInfo.sixMonthPlanid;
+      final oneYearPlan = await SharPreferences.getString('oneYearPlan') ??
+          BibleInfo.oneYearPlanid;
+      final lifeTimePlan = await SharPreferences.getString('lifeTimePlan') ??
+          BibleInfo.lifeTimePlanid;
       SubscriptionScreen.openPaywallStacked(
         sixMonthPlan: sixMonthPlan,
         oneYearPlan: oneYearPlan,
@@ -5879,8 +5806,7 @@ class _HomeScreenState extends State<HomeScreen>
               duration: const Duration(milliseconds: 350));
         },
         onShareTap: () async {
-          final appPackageName =
-              (await PackageInfo.fromPlatform()).packageName;
+          final appPackageName = (await PackageInfo.fromPlatform()).packageName;
           String message = '';
           final appid = BibleInfo.apple_AppId;
           if (Platform.isAndroid) {
@@ -5956,9 +5882,8 @@ class _HomeScreenState extends State<HomeScreen>
               )?.then((_) async {
                 final fontSize = await SharPreferences.getString(
                     SharPreferences.selectedFontSize);
-                controller.fontSize.value = fontSize == null
-                    ? 19.0
-                    : double.parse(fontSize.toString());
+                controller.fontSize.value =
+                    fontSize == null ? 19.0 : double.parse(fontSize.toString());
                 final fontFamily = await SharPreferences.getString(
                     SharPreferences.selectedFontFamily);
                 controller.selectedFontFamily.value = fontFamily ?? "Arial";
@@ -6107,8 +6032,7 @@ class _HomeScreenState extends State<HomeScreen>
     if (notification.metrics.pixels < 0) {
       return;
     }
-    if (notification is OverscrollNotification &&
-        notification.overscroll < 0) {
+    if (notification is OverscrollNotification && notification.overscroll < 0) {
       return;
     }
 
@@ -6131,7 +6055,7 @@ class _HomeScreenState extends State<HomeScreen>
           _readerAppBarDragDelta = 0;
           return;
         }
-        _readerAppBarScrollUpIntent = true;
+          _readerAppBarScrollUpIntent = true;
         return;
       }
 
@@ -6782,8 +6706,7 @@ Future<bool> isTrackingAllowed() async {
     // 1. Platform-specific tracking (iOS ATT)
     bool platformTrackingAllowed = true;
     if (Platform.isIOS) {
-      final status =
-          await AppTrackingTransparency.trackingAuthorizationStatus;
+      final status = await AppTrackingTransparency.trackingAuthorizationStatus;
       platformTrackingAllowed = status == TrackingStatus.authorized;
     }
 
@@ -6798,7 +6721,8 @@ Future<bool> isTrackingAllowed() async {
   }
 }
 
-class _SmoothReaderAppBar extends StatelessWidget implements PreferredSizeWidget {
+class _SmoothReaderAppBar extends StatelessWidget
+    implements PreferredSizeWidget {
   const _SmoothReaderAppBar({
     required this.visible,
     required this.height,
@@ -7055,8 +6979,7 @@ class PremiumWelcomeAlert {
       'assets/gold-premium-icons/calendar_icon.png';
   static const String _shieldIcon = 'assets/gold-premium-icons/Shield_icon.png';
 
-  static const Duration _kClearUpgradeDeferDelay =
-      Duration(milliseconds: 300);
+  static const Duration _kClearUpgradeDeferDelay = Duration(milliseconds: 300);
 
   static Future<void> show(BuildContext context) async {
     final size = MediaQuery.of(context).size;

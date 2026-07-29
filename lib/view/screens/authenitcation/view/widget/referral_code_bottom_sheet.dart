@@ -197,10 +197,13 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
         );
       }
       const rewardCredits = 100;
+      final appliedReferralCode = _referralController.text.trim();
       await WalletService.addCredits(rewardCredits);
       // Notify backend that the referee reward was claimed (also credits referrer).
-      // Restored — accidentally removed in a UI-only change.
-      await updateReferralRewardClaimed(value: rewardCredits);
+      await updateReferralRewardClaimed(
+        value: rewardCredits,
+        referredBy: appliedReferralCode,
+      );
       if (!mounted) return;
       _dismissKeyboard();
       Navigator.of(context).pop();
@@ -208,15 +211,21 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
     } catch (e) {
       final message = e is String ? e : e.toString();
       final lower = message.toLowerCase();
+      final loggedInFallback =
+          'Unable to apply referral code. Please check the code and try again.';
       // Always show a referral-specific message for apply failures.
       if (lower.contains('invalid referral') ||
           lower.contains('own referral') ||
           lower.contains('already applied') ||
           lower.contains('please enter') ||
-          lower.contains('sign up') ||
+          lower.contains('unable to apply') ||
+          lower.contains('sign out and sign in') ||
           lower.contains('no internet') ||
-          lower.contains('something went wrong')) {
+          lower.contains('something went wrong') ||
+          (!widget.useLoggedInSession && lower.contains('sign up'))) {
         Constants.showToast(message);
+      } else if (widget.useLoggedInSession) {
+        Constants.showToast(loggedInFallback);
       } else {
         Constants.showToast('Enter this referral ID on the Sign Up screen');
       }
@@ -344,18 +353,19 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        'New accounts: enter the ID on Sign Up for best results.',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
-                          fontSize: screenWidth > 450
-                              ? BibleInfo.fontSizeScale * 14
-                              : BibleInfo.fontSizeScale * 12,
-                          height: 1.3,
-                          letterSpacing: BibleInfo.letterSpacing,
+                      if (!widget.useLoggedInSession)
+                        Text(
+                          'New accounts: enter the ID on Sign Up for best results.',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: screenWidth > 450
+                                ? BibleInfo.fontSizeScale * 14
+                                : BibleInfo.fontSizeScale * 12,
+                            height: 1.3,
+                            letterSpacing: BibleInfo.letterSpacing,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
                       const SizedBox(height: 18),
                       Container(
                         padding: EdgeInsets.symmetric(

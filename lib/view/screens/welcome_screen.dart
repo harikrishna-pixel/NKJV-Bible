@@ -75,128 +75,147 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             height: double.infinity,
           ),
           SafeArea(
-            child: Align(
-              alignment: const Alignment(0, -0.10),
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: EdgeInsets.fromLTRB(
-                  isTablet ? size.width * 0.14 : 16,
-                  8,
-                  isTablet ? size.width * 0.14 : 16,
-                  isTablet ? 36 : 28,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (showComparison)
-                      _welcomeLogoComparison(isTablet: isTablet)
-                    else
-                      _welcomeSingleNewLogo(isTablet: isTablet),
-                    SizedBox(height: isTablet ? 18 : 14),
-                    Text(
-                      'Welcome to the',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: isTablet ? 24 : 20,
-                        fontWeight: FontWeight.w600,
-                        color: _kWelcomeInk,
-                        fontFamily: 'Georgia',
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      BibleInfo.bible_shortName,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: isTablet ? 34 : 28,
-                        fontWeight: FontWeight.w800,
-                        color: _kWelcomeInk,
-                        fontFamily: 'Georgia',
-                        height: 1.1,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _welcomeGoldDivider(),
-                    const SizedBox(height: 12),
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isTablet ? 24 : 8,
-                      ),
-                      child: Text(
-                        'The Bible you trust, now with a refreshed design and powerful new tools to support your daily walk with God.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: isTablet ? 17 : 14.5,
-                          height: 1.55,
-                          fontWeight: FontWeight.w500,
-                          color: _kWelcomeInk.withOpacity(0.9),
-                          fontFamily: 'Georgia',
+            child: Column(
+              children: [
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        padding: EdgeInsets.fromLTRB(
+                          isTablet ? size.width * 0.14 : 16,
+                          isTablet ? 8 : 4,
+                          isTablet ? size.width * 0.14 : 16,
+                          isTablet ? 12 : 8,
                         ),
-                      ),
-                    ),
-                    SizedBox(height: isTablet ? 20 : 14),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        for (var i = 0; i < _features.length; i++) ...[
-                          if (i > 0) SizedBox(width: isTablet ? 10 : 6),
-                          Expanded(
-                            child: _WelcomeFeatureCard(
-                              iconAsset: _features[i].icon,
-                              label: _features[i].label,
-                              isTablet: isTablet,
-                            ),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight,
                           ),
-                        ],
-                      ],
-                    ),
-                    SizedBox(height: isTablet ? 28 : 22),
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isTablet ? 40 : 18,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Center(
+                                child: showComparison
+                                    ? _welcomeLogoComparison(
+                                        isTablet: isTablet)
+                                    : _welcomeSingleNewLogo(
+                                        isTablet: isTablet),
+                              ),
+                              SizedBox(height: isTablet ? 18 : 14),
+                              Text(
+                                'Welcome to the',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: isTablet ? 24 : 20,
+                                  fontWeight: FontWeight.w600,
+                                  color: _kWelcomeInk,
+                                  fontFamily: 'Georgia',
+                                  height: 1.2,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                BibleInfo.bible_shortName,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: isTablet ? 34 : 28,
+                                  fontWeight: FontWeight.w800,
+                                  color: _kWelcomeInk,
+                                  fontFamily: 'Georgia',
+                                  height: 1.1,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              _welcomeGoldDivider(),
+                              const SizedBox(height: 12),
+                              Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: isTablet ? 24 : 8,
+                                ),
+                                child: Text(
+                                  'The Bible you trust, now with a refreshed design and powerful new tools to support your daily walk with God.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: isTablet ? 17 : 14.5,
+                                    height: 1.55,
+                                    fontWeight: FontWeight.w500,
+                                    color: _kWelcomeInk.withOpacity(0.9),
+                                    fontFamily: 'Georgia',
+                                  ),
+                                ),
+                              ),
+                              SizedBox(height: isTablet ? 20 : 14),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  for (var i = 0;
+                                      i < _features.length;
+                                      i++) ...[
+                                    if (i > 0)
+                                      SizedBox(width: isTablet ? 10 : 6),
+                                    Expanded(
+                                      child: _WelcomeFeatureCard(
+                                        iconAsset: _features[i].icon,
+                                        label: _features[i].label,
+                                        isTablet: isTablet,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    isTablet ? size.width * 0.14 + 18 : 18,
+                    isTablet ? 12 : 8,
+                    isTablet ? size.width * 0.14 + 18 : 18,
+                    isTablet ? 18 : 14,
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: isTablet ? 64 : 56,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFF763201),
+                            Color(0xFFD5821F),
+                            Color(0xFF763201),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      child: SizedBox(
-                        width: double.infinity,
-                        height: isTablet ? 64 : 56,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [
-                                Color(0xFF763201),
-                                Color(0xFFD5821F),
-                                Color(0xFF763201),
-                              ],
-                            ),
+                      child: ElevatedButton(
+                        onPressed: _continueToOnboarding,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
-                          child: ElevatedButton(
-                            onPressed: _continueToOnboarding,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              shadowColor: Colors.transparent,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                            child: Text(
-                              'Continue',
-                              style: TextStyle(
-                                fontSize: isTablet ? 20 : 18,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                                fontFamily: 'Georgia',
-                              ),
-                            ),
+                        ),
+                        child: Text(
+                          'Continue',
+                          style: TextStyle(
+                            fontSize: isTablet ? 20 : 18,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            fontFamily: 'Georgia',
                           ),
                         ),
                       ),
                     ),
-                    SizedBox(height: isTablet ? 12 : 8),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ],
@@ -207,18 +226,14 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   /// Additive: new users — only the in-app new logo (no Old→New row).
   Widget _welcomeSingleNewLogo({required bool isTablet}) {
     final iconSize = isTablet ? 128.0 : 110.0;
-    return Column(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Image.asset(
-            'assets/new_logos.jpg',
-            height: iconSize,
-            width: iconSize,
-            fit: BoxFit.contain,
-          ),
-        ),
-      ],
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: Image.asset(
+        'assets/new_logos.jpg',
+        height: iconSize,
+        width: iconSize,
+        fit: BoxFit.contain,
+      ),
     );
   }
 

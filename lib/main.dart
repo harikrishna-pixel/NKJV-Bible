@@ -13,7 +13,8 @@ import 'package:biblebookapp/view/widget/adhelper.dart';
 import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
-import 'package:biblebookapp/streak/streak_live_activity.dart';
+import 'package:biblebookapp/home_widget/bible_home_widget.dart';
+import 'package:biblebookapp/live_activity/live_activity_queue.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -170,8 +171,9 @@ Future<void> _bootstrapBackgroundStartup() async {
     debugPrint("main: home widget init failed: $e");
   }
 
-  // Refresh streak Live Activity if one is already active (no-op otherwise).
-  StreakLiveActivitySync.sync();
+  // One Live Activity at a time + home-screen widget mirrors (display-only).
+  LiveActivityQueue.sync(forceStart: true);
+  syncWeeklyStreakWidget();
 
   LibraryBackupUploadService.scheduleDeferredBackupCheck();
 }
@@ -232,6 +234,10 @@ class _LifecycleWrapperState extends State<LifecycleWrapper>
         }
         break;
       case AppLifecycleState.resumed:
+        // Display-only: one Live Activity + streak widget for current device date.
+        unawaited(LiveActivityQueue.sync());
+        unawaited(syncWeeklyStreakWidget());
+
         final checkad = await SharPreferences.getString('OpenAd') ?? "1";
         final closead = await SharPreferences.getBoolean('closead') ?? true;
         debugPrint(

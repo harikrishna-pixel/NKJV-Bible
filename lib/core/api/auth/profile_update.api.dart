@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:developer' as devtools show log;
 
 import 'package:biblebookapp/core/api/auth/temp_token.api.dart';
-import 'package:biblebookapp/utils/referral_api_logger.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:flutter/foundation.dart';
@@ -62,10 +61,6 @@ class ProfileUpdateApi {
       devtools.log("profile update api msg is $statuscode - $body");
 
       if (body.isNotEmpty) {
-        try {
-          final parsed = jsonDecode(body);
-          logAuthApiReferralFields('PROFILE UPDATE API', parsed);
-        } catch (_) {}
         return body;
       } else {
         devtools.log("lprofile update api  is not found");
@@ -86,7 +81,10 @@ class ProfileUpdateApi {
     }
   }
 
-  Future<String?> updateReferralRewardClaimed({required int value}) async {
+  Future<String?> updateReferralRewardClaimed({
+    required int value,
+    String? referredBy,
+  }) async {
     final Uri uri =
         Uri.parse(AppApiConstant.baseurl + AppApiConstant.updateprofleapi);
     final userid = await cacheNotifier.readCache(key: 'userid');
@@ -99,6 +97,7 @@ class ProfileUpdateApi {
           email != null ? email.toString().trim() : '';
       final nameStr = name != null ? name.toString().trim() : '';
       final userId = userid.toString();
+      final referredByCode = referredBy?.trim() ?? '';
 
       if (emailStr.isNotEmpty && nameStr.isNotEmpty) {
         await _postProfileUpdate(
@@ -115,27 +114,76 @@ class ProfileUpdateApi {
         );
       }
 
-      final body = await _postProfileUpdate(
-        uri: uri,
-        authtoken: authtoken,
-        logLabel: 'referral_reward_claimed',
-        payload: {
+      final claimAttempts = <Map<String, String>>[
+        {
           'action': '1',
           'key': 'referral_reward_claimed',
           'value': value.toString(),
           'user_id': userId,
           'app_id': BibleInfo.appID,
           if (nameStr.isNotEmpty) 'name': nameStr,
+          if (referredByCode.isNotEmpty) 'referred_by': referredByCode,
         },
-      );
-      if (body != null && body.isNotEmpty) {
-        return body;
+        {
+          'action': '1',
+          'key': 'referral_reward_claimed',
+          'value': value.toString(),
+          'user_id': userId,
+          'app_id': BibleInfo.appID,
+          if (referredByCode.isNotEmpty) 'referred_by': referredByCode,
+        },
+      ];
+
+      String? lastBody;
+      for (var i = 0; i < claimAttempts.length; i++) {
+        final body = await _postProfileUpdate(
+          uri: uri,
+          authtoken: authtoken,
+          logLabel: 'referral_reward_claimed attempt ${i + 1}',
+          payload: claimAttempts[i],
+        );
+        lastBody = body;
+        if (_profileResponseSucceeded(body)) {
+          return body;
+        }
+      }
+
+      if (lastBody != null && lastBody.isNotEmpty) {
+        return lastBody;
       }
       return null;
     } catch (e) {
       devtools.log('profile update referral_reward_claimed error: $e');
       return null;
     }
+  }
+
+  /// Read-only profile snapshot for logged-in users (referral_count sync).
+  Future<String?> fetchLoggedInUserProfileSnapshot() async {
+    final Uri uri =
+        Uri.parse(AppApiConstant.baseurl + AppApiConstant.updateprofleapi);
+    final userid = await cacheNotifier.readCache(key: 'userid');
+    final authtoken = await cacheNotifier.readCache(key: 'authtoken');
+    final email = await cacheNotifier.readCache(key: 'user');
+    final name = await cacheNotifier.readCache(key: 'name');
+
+    if (userid == null || authtoken == null) return null;
+    final emailStr = email?.toString().trim() ?? '';
+    final nameStr = name?.toString().trim() ?? '';
+    if (emailStr.isEmpty || nameStr.isEmpty) return null;
+
+    return _postProfileUpdate(
+      uri: uri,
+      authtoken: authtoken,
+      logLabel: 'profile snapshot referral',
+      payload: {
+        'action': '1',
+        'email': emailStr,
+        'name': nameStr,
+        'user_id': userid.toString(),
+        'app_id': BibleInfo.appID,
+      },
+    );
   }
 
   bool _profileResponseSucceeded(String? body) {
@@ -176,10 +224,6 @@ class ProfileUpdateApi {
           'profile update $logLabel RESPONSE: status=$statuscode body=$body');
 
       if (body.isNotEmpty) {
-        try {
-          final parsed = jsonDecode(body);
-          logAuthApiReferralFields('PROFILE UPDATE API ($logLabel)', parsed);
-        } catch (_) {}
         return body;
       }
       return null;
@@ -211,10 +255,6 @@ class ProfileUpdateApi {
         'profile update $logLabel RESPONSE: status=$statuscode body=$body');
 
     if (body.isNotEmpty) {
-      try {
-        final parsed = jsonDecode(body);
-        logAuthApiReferralFields('PROFILE UPDATE API ($logLabel)', parsed);
-      } catch (_) {}
       return body;
     }
     return null;
@@ -296,6 +336,15 @@ class ProfileUpdateApi {
       // Do NOT send email / do NOT write key=referral_code (that is the user's
       // own code). Only set referred_by to the invite code.
       final profileAttempts = <Map<String, String>>[
+        if (resolvedEmail.isNotEmpty && resolvedName.isNotEmpty)
+          {
+            'action': '1',
+            'email': resolvedEmail,
+            'name': resolvedName,
+            'user_id': userId,
+            'app_id': appId,
+            'referred_by': code,
+          },
         {
           'action': '1',
           'key': 'referred_by',
@@ -310,12 +359,7 @@ class ProfileUpdateApi {
           'value': code,
           'user_id': userId,
           'app_id': appId,
-        },
-        {
-          'action': '1',
-          'user_id': userId,
-          'app_id': appId,
-          'referred_by': code,
+          if (resolvedEmail.isNotEmpty) 'email': resolvedEmail,
           if (resolvedName.isNotEmpty) 'name': resolvedName,
         },
         {
@@ -323,6 +367,8 @@ class ProfileUpdateApi {
           'user_id': userId,
           'app_id': appId,
           'referred_by': code,
+          if (resolvedEmail.isNotEmpty) 'email': resolvedEmail,
+          if (resolvedName.isNotEmpty) 'name': resolvedName,
         },
       ];
 

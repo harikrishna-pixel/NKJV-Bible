@@ -9,7 +9,6 @@ import 'package:biblebookapp/core/api/auth/profile_update.api.dart';
 import 'package:biblebookapp/core/library_backup_upload_service.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
-import 'package:biblebookapp/utils/referral_api_logger.dart';
 import 'package:biblebookapp/view/constants/assets_constants.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
@@ -570,15 +569,77 @@ Future<String> getTempToken() async {
   }
 }
 
-Future<bool> updateReferralRewardClaimed({required int value}) async {
-  final result =
-      await ProfileUpdateApi().updateReferralRewardClaimed(value: value);
+Future<bool> updateReferralRewardClaimed({
+  required int value,
+  String? referredBy,
+}) async {
+  final resolvedReferredBy = referredBy?.trim().isNotEmpty == true
+      ? referredBy!.trim()
+      : (await cacheNotifier.readCache(key: 'referred_by'))?.toString().trim();
+  final result = await ProfileUpdateApi().updateReferralRewardClaimed(
+    value: value,
+    referredBy: resolvedReferredBy,
+  );
   if (result == null || result.isEmpty) return false;
   try {
     final parsed = jsonDecode(result) as Map<String, dynamic>;
     return parsed['status'] == true;
   } catch (_) {
     return false;
+  }
+}
+
+UserModel? _userModelFromApiPayload(
+  Map<String, dynamic> parsed,
+  String token,
+) {
+  final userMap = _userFromAuthResponse(parsed);
+  if (userMap != null && userMap['user_id'] != null) {
+    return UserModel.fromJson(userMap, token);
+  }
+  final data = parsed['data'];
+  if (data is Map<String, dynamic> && data['user_id'] != null) {
+    return UserModel.fromJson(data, token);
+  }
+  if (data is Map<String, dynamic> &&
+      data['user'] is Map<String, dynamic>) {
+    return UserModel.fromJson(
+      Map<String, dynamic>.from(data['user'] as Map),
+      token,
+    );
+  }
+  return null;
+}
+
+/// Additive: sync referrer wallet when [referral_count] grew (logged-in session).
+Future<void> syncReferrerCreditsFromSession() async {
+  try {
+    final authtoken = await cacheNotifier.readCache(key: 'authtoken');
+    final userid = await cacheNotifier.readCache(key: 'userid');
+    if (authtoken == null ||
+        authtoken.toString().trim().isEmpty ||
+        userid == null) {
+      return;
+    }
+
+    final body =
+        await ProfileUpdateApi().fetchLoggedInUserProfileSnapshot();
+    if (body == null || body.isEmpty) return;
+
+    final parsed = jsonDecode(body);
+    if (parsed is! Map<String, dynamic>) return;
+
+    final user = _userModelFromApiPayload(
+      parsed,
+      authtoken.toString(),
+    );
+    if (user == null) return;
+
+    debugPrint('syncReferrerCreditsFromSession referral_count → '
+        '${user.referralCount}');
+    await syncReferrerCreditsFromProfile(user);
+  } catch (e) {
+    debugPrint('syncReferrerCreditsFromSession: $e');
   }
 }
 
@@ -671,11 +732,19 @@ bool _isMisleadingLoginSuccessMessage(String? message) {
       lower.contains('login successful');
 }
 
-String _referralApplyFailureMessage(String? profileResult) {
+String _referralApplyFailureMessage(
+  String? profileResult, {
+  bool forLoggedInSession = false,
+}) {
   final profileError = _profileUpdateErrorMessage(profileResult);
+  final signUpFallback = 'Enter this referral ID on the Sign Up screen';
+  final loggedInFallback =
+      'Unable to apply referral code. Please check the code and try again.';
+  final genericFallback =
+      forLoggedInSession ? loggedInFallback : signUpFallback;
+
   if (profileError == null || profileError.isEmpty) {
-    // Backend only wires referred_by during register — not login/profile.
-    return 'Enter this referral ID on the Sign Up screen';
+    return genericFallback;
   }
   final lower = profileError.toLowerCase();
   if (lower.contains('referral') ||
@@ -691,7 +760,7 @@ String _referralApplyFailureMessage(String? profileResult) {
       lower.contains('password') ||
       lower.contains('the email field') ||
       lower.contains('the name field')) {
-    return 'Enter this referral ID on the Sign Up screen';
+    return genericFallback;
   }
   return profileError;
 }
@@ -897,8 +966,6 @@ Future<String?> registerUser(
       'Authorization': 'Bearer $token'
     }, body: body);
     final data = jsonDecode(resp.body);
-
-    logAuthApiReferralFields('REGISTER API', data);
     debugPrint("sign up - $data ");
 
     if (data['status']) {
@@ -992,8 +1059,6 @@ Future<UserModel> loginUser(
       'Authorization': 'Bearer $token'
     }, body: body);
     final data = jsonDecode(resp.body);
-
-    logAuthApiReferralFields('LOGIN API', data);
     debugPrint("user login - $data");
     if (data['status']) {
       await cacheNotifier.writeCache(
@@ -1108,15 +1173,23 @@ Future<void> applyReferralWhileLoggedIn({
     throw 'Referral code already applied';
   }
 
-  final email = await cacheNotifier.readCache(key: 'user');
-  final name = await cacheNotifier.readCache(key: 'name');
+  final email =
+      (await cacheNotifier.readCache(key: 'user'))?.toString().trim() ?? '';
+  final name =
+      (await cacheNotifier.readCache(key: 'name'))?.toString().trim() ?? '';
+  if (email.isEmpty || name.isEmpty) {
+    throw 'Unable to apply referral code. Please sign out and sign in again, then try once more.';
+  }
   final profileResult = await ProfileUpdateApi().updateReferredBy(
     referralCode: code,
-    email: email?.toString(),
-    name: name?.toString(),
+    email: email,
+    name: name,
   );
   if (!_profileUpdateSucceeded(profileResult)) {
-    throw _referralApplyFailureMessage(profileResult);
+    throw _referralApplyFailureMessage(
+      profileResult,
+      forLoggedInSession: true,
+    );
   }
   await cacheNotifier.writeCache(key: 'referred_by', value: code);
 }
@@ -1173,8 +1246,6 @@ Future<void> applyReferralViaLogin({
     debugPrint(
         'applyReferralViaLogin HTTP status: ${resp.statusCode}, raw body: ${resp.body}');
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
-
-    logAuthApiReferralFields('LOGIN API (referral apply)', data);
     debugPrint('applyReferralViaLogin parsed response: $data');
 
     // Login always authenticates with status true/200 even when referral is

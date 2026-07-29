@@ -19,6 +19,9 @@ class SharPreferences {
   static const isNotificationOn = "isNotificationOn";
   static const isNotificationOn1 = "isNotificationOn1";
   static const isNotificationOn2 = "isNotificationOn2";
+  /// True after onboarding OS permission Allow/Deny synced Morning/Afternoon/Evening prefs.
+  static const notificationSlotsSyncedFromPermission =
+      "notificationSlotsSyncedFromPermission";
   static const isRewardAdViewTime = "isRewardAdViewTime";
   static const selectedDailyVerse = "selectedDailyVerse";
   static const dailyVerseUpdateTime = "dailyVerseUpdateTime";
@@ -41,6 +44,9 @@ class SharPreferences {
   static const googleInterstitialAd = 'googleInterstitialAd';
   static const googleBannerId = 'googleBannerId';
   static const nativeAdId = 'nativeAdId';
+  /// Display-only: Memory Verse Live Activity review progress (does not affect verse logic).
+  static const liveActivityMemoryReviewed = 'live_activity_memory_reviewed';
+  static const liveActivityMemoryReviewTotal = 'live_activity_memory_review_total';
   static const adPauseDiff = 'adPauseDiff';
   static const isTtsActive = 'isTTSActive';
   static const lastExportedDate = 'lastExportedDate';

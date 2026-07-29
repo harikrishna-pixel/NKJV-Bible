@@ -57,6 +57,7 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
 
   String _currentMessage = "";
   String _readingPercentage = "0";
+
   /// Prevents rapid Next Chapter taps from stacking overlapping Home routes.
   bool _isNavigating = false;
 
@@ -436,7 +437,8 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                 ),
               if (normalized > 0)
                 Positioned(
-                  left: (fillWidth - knobSize / 2).clamp(0.0, constraints.maxWidth - knobSize),
+                  left: (fillWidth - knobSize / 2)
+                      .clamp(0.0, constraints.maxWidth - knobSize),
                   top: 0,
                   child: Container(
                     width: knobSize,
@@ -562,14 +564,17 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
         isCompact ? 16 : 20,
         isCompact ? 10 : 12,
         isCompact ? 16 : 20,
-        bottomInset > 0 ? bottomInset + (isCompact ? 4 : 8) : (isCompact ? 12 : 20),
+        bottomInset > 0
+            ? bottomInset + (isCompact ? 4 : 8)
+            : (isCompact ? 12 : 20),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           _markAsReadProgressCard(progress),
           SizedBox(height: isCompact ? 12 : 16),
-          InkWell(
+          // UI-only press blink — onNextChapter logic unchanged.
+          _PressBlinkButton(
             onTap: onNextChapter,
             borderRadius: BorderRadius.circular(999),
             child: Container(
@@ -620,8 +625,7 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
         int.parse("${int.parse(widget.SelectedBookChapterCount)}");
     final media = MediaQuery.of(context);
     // iPhone SE and other compact screens.
-    final isCompact =
-        media.size.width < 375 || media.size.height < 700;
+    final isCompact = media.size.width < 375 || media.size.height < 700;
     final titleSize = isCompact ? 24.0 : 28.0;
     final messageSize = isCompact ? 14.0 : 15.0;
     final bookNameSize = isCompact ? 20.0 : 24.0;
@@ -675,7 +679,9 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                         ),
                         SizedBox(height: messageGap),
                         Text(
-                          _currentMessage.isEmpty ? 'Loading...' : _currentMessage,
+                          _currentMessage.isEmpty
+                              ? 'Loading...'
+                              : _currentMessage,
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: messageSize,
@@ -813,9 +819,10 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                       // Next Book - Get the next book and navigate to first chapter
                       try {
                         // Get current book number from SharedPreferences
-                        final currentBookNumStr = await SharPreferences.getString(
-                                SharPreferences.selectedBookNum) ??
-                            "0";
+                        final currentBookNumStr =
+                            await SharPreferences.getString(
+                                    SharPreferences.selectedBookNum) ??
+                                "0";
                         final currentBookNum = int.parse(currentBookNumStr);
 
                         // Get next book from database
@@ -826,7 +833,8 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                               "SELECT * FROM book WHERE book_num = $nextBookNum LIMIT 1");
 
                           if (result.isNotEmpty) {
-                            final nextBook = MainBookListModel.fromJson(result[0]);
+                            final nextBook =
+                                MainBookListModel.fromJson(result[0]);
                             final nextBookNumValue = nextBook.bookNum!.toInt();
                             final nextBookName = nextBook.title ?? "";
                             final nextBookChapterCount =
@@ -848,7 +856,8 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                             try {
                               controller = Get.find<DashBoardController>();
                             } catch (e) {
-                              debugPrint("DashBoardController not available: $e");
+                              debugPrint(
+                                  "DashBoardController not available: $e");
                             }
                             if (controller != null) {
                               controller.selectedBook.value = nextBookName;
@@ -914,6 +923,73 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Display-only tap feedback. Calls [onTap] immediately (no logic delay).
+class _PressBlinkButton extends StatefulWidget {
+  const _PressBlinkButton({
+    required this.onTap,
+    required this.child,
+    this.borderRadius,
+  });
+
+  final VoidCallback onTap;
+  final Widget child;
+  final BorderRadius? borderRadius;
+
+  @override
+  State<_PressBlinkButton> createState() => _PressBlinkButtonState();
+}
+
+class _PressBlinkButtonState extends State<_PressBlinkButton> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value || !mounted) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = widget.borderRadius ?? BorderRadius.circular(999);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => _setPressed(true),
+      onTapCancel: () => _setPressed(false),
+      onTapUp: (_) => _setPressed(false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _pressed ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 80),
+        curve: Curves.easeOut,
+        child: AnimatedOpacity(
+          opacity: _pressed ? 0.72 : 1.0,
+          duration: const Duration(milliseconds: 80),
+          curve: Curves.easeOut,
+          child: ClipRRect(
+            borderRadius: radius,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                widget.child,
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: AnimatedOpacity(
+                      opacity: _pressed ? 1 : 0,
+                      duration: const Duration(milliseconds: 80),
+                      child: ColoredBox(
+                        color: Colors.white.withOpacity(0.28),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

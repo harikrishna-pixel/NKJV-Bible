@@ -1086,6 +1086,7 @@ class DownloadProvider with ChangeNotifier {
         verseText: v.verse ?? '',
         reference: ref.isEmpty ? 'Daily Verse' : ref,
       );
+      syncVerseFamilyWidgetsFromDailyList(dailyVerseList);
     }
   }
 

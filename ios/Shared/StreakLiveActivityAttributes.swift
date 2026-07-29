@@ -10,6 +10,9 @@ struct StreakLiveActivityAttributes: ActivityAttributes {
     var stepsCompleted: Int
     var stepsTotal: Int
     var statusText: String
+    /// Local calendar day (yyyy-MM-dd) this snapshot was written for.
+    /// Optional for backward compatibility with older activities.
+    var contentDayKey: String?
   }
 
   /// Static title shown with the activity.

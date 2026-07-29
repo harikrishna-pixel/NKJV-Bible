@@ -21,6 +21,7 @@ import '../../../controller/dpProvider.dart';
 import '../../constants/colors.dart';
 import '../../constants/constant.dart';
 import '../../constants/share_preferences.dart';
+import 'package:biblebookapp/view/widget/library_list_ads_helper.dart';
 
 class UnderLineScreen extends StatefulWidget {
   const UnderLineScreen({super.key});
@@ -34,6 +35,13 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
   double fontSize = Sizecf.scrnWidth! > 450 ? 25.0 : 15.0;
   var fontSizeS = "";
   var selectedFontFamily = "";
+
+  /// Display-only ads (same pattern as Explore Topics detail).
+  late final LibraryListAdsHelper _libraryAds =
+      LibraryListAdsHelper(onChanged: () {
+        if (mounted) setState(() {});
+      });
+
   Future<void> getFont() async {
     fontSizeS =
         await SharPreferences.getString(SharPreferences.selectedFontSize) ??
@@ -61,6 +69,12 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
       underListData = DBHelper().getUnderLine();
     });
     print(underListData);
+  }
+
+  @override
+  void dispose() {
+    _libraryAds.dispose();
+    super.dispose();
   }
 
   @override
@@ -108,6 +122,14 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
             }
             final items = snapshot.data;
             if (items != null && items.isNotEmpty) {
+              // Display-only: adaptive banners between items + interstitial every 10 actions.
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                _libraryAds.initIfNeeded(
+                  itemCount: items.length,
+                  context: context,
+                );
+              });
               return ListView.builder(
                 shrinkWrap: true,
                 itemCount: items.length,
@@ -133,7 +155,7 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                     height: 10,
                                   ),
                                   GestureDetector(
-                                    onTap: () {
+                                    onTap: () async {
                                       showModalBottomSheet(
                                         enableDrag: true,
                                         shape: const RoundedRectangleBorder(
@@ -212,6 +234,7 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                       children: [
                                                         InkWell(
                                                             onTap: () async {
+                                                              await _libraryAds.runCountedAction(() async {
                                                               await Clipboard.setData(
                                                                   ClipboardData(
                                                                       text:
@@ -219,6 +242,7 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                               Constants
                                                                   .showToast(
                                                                       "Copied");
+                                                              });
                                                             },
                                                             child: Container(
                                                                 padding:
@@ -260,6 +284,7 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                     ),
                                                     InkWell(
                                                       onTap: () async {
+                                                        await _libraryAds.runCountedAction(() async {
                                                         await SharPreferences
                                                             .setString(
                                                                 SharPreferences
@@ -299,6 +324,7 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                             transition: Transition
                                                                 .cupertinoDialog,
                                                             duration: const Duration(milliseconds: 300));
+                                                        });
                                                       },
                                                       child: Column(
                                                         children: [
@@ -345,6 +371,7 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                       children: [
                                                         InkWell(
                                                             onTap: () async {
+                                                              await _libraryAds.runCountedAction(() async {
                                                               // final appPackageName =
                                                               //     (await PackageInfo
                                                               //             .fromPlatform())
@@ -466,6 +493,7 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                                   },
                                                                 ),
                                                               );
+                                                              });
                                                             },
                                                             child: Image.asset(
                                                                 "assets/share.png",
@@ -486,7 +514,8 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                       width: 30,
                                                     ),
                                                     InkWell(
-                                                      onTap: () {
+                                                      onTap: () async {
+                                                        await _libraryAds.runCountedAction(() async {
                                                         Get.back();
                                                         Get.to(
                                                           () => ChatScreen(
@@ -515,6 +544,7 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                                   milliseconds:
                                                                       300),
                                                         );
+                                                        });
                                                       },
                                                       child: Column(
                                                         children: [
@@ -765,7 +795,7 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               InkWell(
-                                onTap: () {
+                                onTap: () async {
                                   showModalBottomSheet(
                                     enableDrag: true,
                                     shape: const RoundedRectangleBorder(
@@ -840,12 +870,14 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                   children: [
                                                     InkWell(
                                                         onTap: () async {
+                                                          await _libraryAds.runCountedAction(() async {
                                                           await Clipboard.setData(
                                                               ClipboardData(
                                                                   text:
                                                                       "${parse(data.content).body?.text}\n${data.bookName} ${data.chapterNum}:${data.verseNum}"));
                                                           Constants.showToast(
                                                               "Copied");
+                                                          });
                                                         },
                                                         child: Container(
                                                             padding:
@@ -887,6 +919,7 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                 ),
                                                 InkWell(
                                                   onTap: () async {
+                                                    await _libraryAds.runCountedAction(() async {
                                                     await SharPreferences
                                                         .setString(
                                                             SharPreferences
@@ -926,6 +959,7 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                                     .toString()),
                                                         transition: Transition.cupertinoDialog,
                                                         duration: const Duration(milliseconds: 300));
+                                                    });
                                                   },
                                                   child: Column(
                                                     children: [
@@ -970,6 +1004,7 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                   children: [
                                                     InkWell(
                                                         onTap: () async {
+                                                          await _libraryAds.runCountedAction(() async {
                                                           // final appPackageName =
                                                           //     (await PackageInfo
                                                           //             .fromPlatform())
@@ -1092,6 +1127,7 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                               },
                                                             ),
                                                           );
+                                                          });
                                                         },
                                                         child: Image.asset(
                                                             "assets/share.png",
@@ -1112,7 +1148,8 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                   width: 30,
                                                 ),
                                                 InkWell(
-                                                  onTap: () {
+                                                  onTap: () async {
+                                                    await _libraryAds.runCountedAction(() async {
                                                     Get.back();
                                                     Get.to(
                                                       () => ChatScreen(
@@ -1137,6 +1174,7 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                                                       duration: const Duration(
                                                           milliseconds: 300),
                                                     );
+                                                    });
                                                   },
                                                   child: Column(
                                                     children: [
@@ -1403,7 +1441,9 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                           child: Divider(
                             thickness: 0.5,
                             color: CommanColor.whiteBlack(context),
-                          ))
+                          )),
+                      if (_libraryAds.shouldShowBannerAfter(index))
+                        _libraryAds.buildInlineBanner(index, keyPrefix: 'underline'),
                     ],
                   );
                 },

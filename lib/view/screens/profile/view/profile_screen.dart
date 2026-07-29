@@ -1,3 +1,4 @@
+import 'package:biblebookapp/controller/api_service.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
@@ -190,6 +191,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         _referralCode = referralCode?.trim() ?? '';
         _referredBy = referredBy?.toString().trim() ?? '';
       });
+      // Additive: pick up referrer credits when referral_count grew on backend.
+      syncReferrerCreditsFromSession();
     } else {
       setState(() {
         user = '';
@@ -205,6 +208,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
       loadDB();
+      syncReferrerCreditsFromSession();
     }
   }
 

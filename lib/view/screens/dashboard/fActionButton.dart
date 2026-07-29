@@ -89,6 +89,11 @@ class floatingButtonState extends State<floatingButton>
   // Stream subscriptions for audio player - must be cancelled in dispose
   StreamSubscription<PlayerState>? _playerStateSubscription;
   StreamSubscription<Duration>? _durationSubscription;
+  // Additive: MP3 chapter-complete lives on State (not sheet), so auto-next
+  // continues after the player sheet is dismissed.
+  StreamSubscription<void>? _completeSubscription;
+  bool _isAudioSheetOpen = false;
+  void Function(void Function())? _audioSheetSetState;
 
   checkTTS() async {
     final ttsStatus =
@@ -144,8 +149,302 @@ class floatingButtonState extends State<floatingButton>
       }
     });
 
+    // Additive: keep auto-next alive while FAB State is alive (sheet dismiss safe).
+    _ensureMp3CompletionListener();
+
     // Store initial book name
     _storedBookName = widget.bookName;
+  }
+
+  /// Rebuild FAB and open audio sheet (if any) from the same State fields.
+  void _mp3UiSetState(void Function() fn) {
+    if (mounted) {
+      setState(fn);
+    }
+    final sheetSet = _audioSheetSetState;
+    if (sheetSet != null) {
+      sheetSet(fn);
+    }
+  }
+
+  void _ensureMp3CompletionListener() {
+    if (_completeSubscription != null) return;
+    _completeSubscription = audioPlayer.onPlayerComplete.listen((_) async {
+      await _handleMp3PlayerComplete();
+    });
+  }
+
+  /// Same auto-next / repeat behavior as the former sheet-scoped listener.
+  Future<void> _handleMp3PlayerComplete() async {
+    if (!mounted) return;
+
+    // If not repeating, auto-advance to next chapter (if available)
+    // and avoid re-entrant calls using isNext flag.
+    if (!repeat && !isNext) {
+      // Prefer widget/controller chapter count (same as Next button) so
+      // auto-advance does not stall when currentBookChapterCount is stale.
+      final lastChapter =
+          int.tryParse(widget.chapterCount) ?? currentBookChapterCount;
+      if (Get.isRegistered<DashBoardController>()) {
+        final countStr = Get.find<DashBoardController>()
+            .selectedBookChapterCount
+            .value
+            .trim();
+        final fromController = int.tryParse(countStr);
+        if (fromController != null && fromController > 0) {
+          currentBookChapterCount = fromController;
+        }
+      }
+      final effectiveLastChapter = currentBookChapterCount > lastChapter
+          ? currentBookChapterCount
+          : lastChapter;
+      if (audioChapterNum < effectiveLastChapter) {
+        _mp3UiSetState(() {
+          isNext = true; // prevent duplicate triggers
+          audioChapterNum++;
+          audioBaseUrl =
+              "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$audioChapterNum.mp3";
+        });
+        // Update reading screen to match audio chapter - do this before loading audio
+        await updateReadingScreenChapter(audioChapterNum);
+
+        // Stop TTS if it's playing
+        if (isSpeech && _isTtsInitialized) {
+          await _stop();
+          if (mounted) {
+            _mp3UiSetState(() {
+              isSpeech = false;
+            });
+          }
+        }
+
+        // Additional delay to ensure UI updates before loading next audio
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        // load next source, reset position and resume playback
+        bool loadSuccess = false;
+        // Check internet connection before loading audio
+        final hasInternet = await InternetConnection().hasInternetAccess;
+        if (!hasInternet) {
+          Constants.showToast("Check your internet connection.");
+          return;
+        }
+
+        int retryCount = 0;
+        const maxRetries = 2;
+
+        while (!loadSuccess && retryCount < maxRetries && mounted) {
+          try {
+            await audioPlayer.setSourceUrl(audioBaseUrl);
+            // ensure position and duration will update from streams
+            await audioPlayer.seek(Duration.zero);
+            await audioPlayer.resume();
+            loadSuccess = true;
+            if (mounted) {
+              _mp3UiSetState(() {
+                isAudioPlaying = true;
+                position = Duration.zero; // Reset position for new chapter
+              });
+            }
+          } catch (e) {
+            retryCount++;
+            debugPrint(
+                "Error loading next chapter audio (attempt $retryCount): $e");
+            if (retryCount < maxRetries) {
+              // Wait a bit before retrying
+              await Future.delayed(const Duration(milliseconds: 500));
+            } else {
+              // After max retries, still try to continue but log the error
+              debugPrint(
+                  "Failed to load next chapter after $maxRetries attempts, but continuing");
+              // Don't stop - let it try to continue
+              if (mounted) {
+                _mp3UiSetState(() {
+                  isAudioPlaying = false;
+                  position = Duration.zero;
+                });
+              }
+            }
+          }
+        }
+
+        // Clear the isNext guard after a delay, regardless of success/failure
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            _mp3UiSetState(() => isNext = false);
+          }
+        });
+      } else {
+        // Last chapter reached - check for next book
+        _mp3UiSetState(() {
+          isNext = true; // prevent duplicate triggers
+        });
+
+        // Get current book number (0-indexed from widget.bookNum)
+        final currentBookNum = int.parse(widget.bookNum.toString());
+
+        // Try to get the next book
+        final nextBook = await getNextBook(currentBookNum);
+
+        if (nextBook != null &&
+            nextBook.bookNum != null &&
+            nextBook.chapterCount != null) {
+          // Next book exists - load first chapter of next book
+          final nextBookNum = nextBook.bookNum!.toInt();
+          final nextBookChapterCount = nextBook.chapterCount!.toInt();
+          final nextBookName = nextBook.title ?? "";
+
+          // Update audio book and chapter numbers
+          // audioBookNum is 1-indexed for URL (bookNum + 1)
+          _mp3UiSetState(() {
+            audioBookNum = nextBookNum + 1;
+            audioChapterNum = 1;
+            currentBookChapterCount =
+                nextBookChapterCount; // Update chapter count for new book
+            audioBaseUrl =
+                "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$audioChapterNum.mp3";
+          });
+
+          // Update reading screen to match next book and first chapter
+          // Pass chapter count so it can be updated in the controller
+          await updateReadingScreenForNextBook(
+              nextBookNum, 1, nextBookName, nextBookChapterCount);
+
+          // Update _storedBookName with the new book name
+          if (mounted && nextBookName.isNotEmpty) {
+            _mp3UiSetState(() {
+              _storedBookName = nextBookName;
+            });
+          }
+
+          // Force a small delay and then refresh controller to ensure UI updates
+          await Future.delayed(const Duration(milliseconds: 100));
+          if (Get.isRegistered<DashBoardController>()) {
+            final controller = Get.find<DashBoardController>();
+            // Trigger update again to ensure UI reflects changes
+            controller.getSelectedChapterAndBook();
+          }
+
+          // Check internet connection before loading audio
+          final hasInternet = await InternetConnection().hasInternetAccess;
+          if (!hasInternet) {
+            Constants.showToast("Check your internet connection.");
+            return;
+          }
+
+          // Load next book's first chapter audio
+          bool loadSuccess = false;
+          int retryCount = 0;
+          const maxRetries = 2;
+
+          while (!loadSuccess && retryCount < maxRetries && mounted) {
+            try {
+              await audioPlayer.setSourceUrl(audioBaseUrl);
+              // ensure position and duration will update from streams
+              await audioPlayer.seek(Duration.zero);
+              await audioPlayer.resume();
+              loadSuccess = true;
+              if (mounted) {
+                _mp3UiSetState(() {
+                  isAudioPlaying = true;
+                  position = Duration.zero; // Reset position for new book
+                });
+              }
+            } catch (e) {
+              retryCount++;
+              debugPrint(
+                  "Error loading next book audio (attempt $retryCount): $e");
+              if (retryCount < maxRetries) {
+                // Wait a bit before retrying
+                await Future.delayed(const Duration(milliseconds: 500));
+              } else {
+                // After max retries, stop audio
+                debugPrint(
+                    "Failed to load next book after $maxRetries attempts");
+                if (mounted) {
+                  _mp3UiSetState(() {
+                    isAudioPlaying = false;
+                    position = Duration.zero;
+                  });
+                }
+              }
+            }
+          }
+
+          // Clear the isNext guard after a delay
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted) {
+              _mp3UiSetState(() => isNext = false);
+            }
+          });
+        } else {
+          // No next book - stop audio and reset
+          try {
+            await audioPlayer.stop();
+            if (mounted) {
+              _mp3UiSetState(() {
+                position = Duration.zero; // Reset position to zero
+                isAudioPlaying = false;
+                isNext = false; // Reset flag
+              });
+            }
+          } catch (e) {
+            // handle errors
+            if (mounted) {
+              _mp3UiSetState(() {
+                position = Duration.zero;
+                isAudioPlaying = false;
+                isNext = false; // Reset flag
+              });
+            }
+          }
+        }
+      }
+    } else if (repeat) {
+      // Repeat mode - restart current chapter
+      // Stop TTS if it's playing
+      if (isSpeech && _isTtsInitialized) {
+        await _stop();
+        if (mounted) {
+          _mp3UiSetState(() {
+            isSpeech = false;
+          });
+        }
+      }
+      try {
+        await audioPlayer.setSourceUrl(audioBaseUrl);
+        // ensure position and duration will update from streams
+        await audioPlayer.seek(Duration.zero);
+        await audioPlayer.resume();
+        if (mounted) {
+          _mp3UiSetState(() {
+            isAudioPlaying = true;
+            position = Duration.zero; // Reset position when repeating
+          });
+        }
+      } catch (e) {
+        // handle errors
+        if (mounted) {
+          _mp3UiSetState(() {
+            position = Duration.zero;
+            isAudioPlaying = false;
+          });
+        }
+      }
+    } else {
+      // Should not reach here, but ensure audio stops if it does
+      try {
+        await audioPlayer.stop();
+        if (mounted) {
+          _mp3UiSetState(() {
+            position = Duration.zero;
+            isAudioPlaying = false;
+          });
+        }
+      } catch (e) {
+        // handle errors
+      }
+    }
   }
 
   @override
@@ -1314,8 +1613,11 @@ class floatingButtonState extends State<floatingButton>
     // Cancel all stream subscriptions to prevent setState after dispose
     _playerStateSubscription?.cancel();
     _durationSubscription?.cancel();
+    _completeSubscription?.cancel();
     _playerStateSubscription = null;
     _durationSubscription = null;
+    _completeSubscription = null;
+    _audioSheetSetState = null;
 
     // Stop TTS if running - safely check if flutterTts is initialized
     // Note: TTS handlers already check 'mounted' before calling setState, so they're safe
@@ -1436,6 +1738,14 @@ class floatingButtonState extends State<floatingButton>
                 if (mounted) {
                   setState(() {
                     isAudioPlaying = true;
+                  });
+                }
+                // Additive: reopen player UI if it was dismissed while audio was active.
+                if (mounted && !_isAudioSheetOpen) {
+                  audioPlayerBottomSheet().then((value) {
+                    if (mounted) {
+                      setState(() {});
+                    }
                   });
                 }
               } else if (!hasConnection &&
@@ -1633,13 +1943,19 @@ class floatingButtonState extends State<floatingButton>
     bool listenersAttached = false;
     StreamSubscription<Duration>? positionSub;
     StreamSubscription<Duration>? durationSub;
-    StreamSubscription<void>? completeSub;
+
+    // Additive: completion listener lives on State so minimize keeps auto-next.
+    _ensureMp3CompletionListener();
+    _isAudioSheetOpen = true;
 
     return showModalBottomSheet(
       backgroundColor: Colors.black12,
       context: context,
       builder: (context) {
         return StatefulBuilder(builder: (context, setState) {
+          // Let State completion handler refresh this sheet UI when open.
+          _audioSheetSetState = setState;
+
           // Attach listeners only once for this sheet
           if (!listenersAttached) {
             listenersAttached = true;
@@ -1658,289 +1974,6 @@ class floatingButtonState extends State<floatingButton>
               setState(() {
                 duration = d;
               });
-            });
-
-            // Completion handler: mark position at end, optionally go to next chapter
-            completeSub = audioPlayer.onPlayerComplete.listen((_) async {
-              if (!context.mounted) return;
-
-              // If not repeating, auto-advance to next chapter (if available)
-              // and avoid re-entrant calls using isNext flag.
-              if (!repeat && !isNext) {
-                // Prefer widget/controller chapter count (same as Next button) so
-                // auto-advance does not stall when currentBookChapterCount is stale.
-                final lastChapter = int.tryParse(widget.chapterCount) ??
-                    currentBookChapterCount;
-                if (Get.isRegistered<DashBoardController>()) {
-                  final countStr = Get.find<DashBoardController>()
-                      .selectedBookChapterCount
-                      .value
-                      .trim();
-                  final fromController = int.tryParse(countStr);
-                  if (fromController != null && fromController > 0) {
-                    currentBookChapterCount = fromController;
-                  }
-                }
-                final effectiveLastChapter =
-                    currentBookChapterCount > lastChapter
-                        ? currentBookChapterCount
-                        : lastChapter;
-                if (audioChapterNum < effectiveLastChapter) {
-                  setState(() {
-                    isNext = true; // prevent duplicate triggers
-                    audioChapterNum++;
-                    audioBaseUrl =
-                        "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$audioChapterNum.mp3";
-                  });
-                  // Update reading screen to match audio chapter - do this before loading audio
-                  await updateReadingScreenChapter(audioChapterNum);
-
-                  // Stop TTS if it's playing
-                  if (isSpeech && _isTtsInitialized) {
-                    await _stop();
-                    if (context.mounted) {
-                      setState(() {
-                        isSpeech = false;
-                      });
-                    }
-                  }
-
-                  // Additional delay to ensure UI updates before loading next audio
-                  await Future.delayed(const Duration(milliseconds: 100));
-
-                  // load next source, reset position and resume playback
-                  bool loadSuccess = false;
-                  // Check internet connection before loading audio
-                  final hasInternet =
-                      await InternetConnection().hasInternetAccess;
-                  if (!hasInternet) {
-                    Constants.showToast("Check your internet connection.");
-                    return;
-                  }
-
-                  int retryCount = 0;
-                  const maxRetries = 2;
-
-                  while (!loadSuccess &&
-                      retryCount < maxRetries &&
-                      context.mounted) {
-                    try {
-                      await audioPlayer.setSourceUrl(audioBaseUrl);
-                      // ensure position and duration will update from streams
-                      await audioPlayer.seek(Duration.zero);
-                      await audioPlayer.resume();
-                      loadSuccess = true;
-                      if (context.mounted) {
-                        setState(() {
-                          isAudioPlaying = true;
-                          position =
-                              Duration.zero; // Reset position for new chapter
-                        });
-                      }
-                    } catch (e) {
-                      retryCount++;
-                      debugPrint(
-                          "Error loading next chapter audio (attempt $retryCount): $e");
-                      if (retryCount < maxRetries) {
-                        // Wait a bit before retrying
-                        await Future.delayed(const Duration(milliseconds: 500));
-                      } else {
-                        // After max retries, still try to continue but log the error
-                        debugPrint(
-                            "Failed to load next chapter after $maxRetries attempts, but continuing");
-                        // Don't stop - let it try to continue
-                        if (context.mounted) {
-                          setState(() {
-                            isAudioPlaying = false;
-                            position = Duration.zero;
-                          });
-                        }
-                      }
-                    }
-                  }
-
-                  // Clear the isNext guard after a delay, regardless of success/failure
-                  Future.delayed(const Duration(milliseconds: 500), () {
-                    if (mounted && context.mounted) {
-                      setState(() => isNext = false);
-                    }
-                  });
-                } else {
-                  // Last chapter reached - check for next book
-                  setState(() {
-                    isNext = true; // prevent duplicate triggers
-                  });
-
-                  // Get current book number (0-indexed from widget.bookNum)
-                  final currentBookNum = int.parse(widget.bookNum.toString());
-
-                  // Try to get the next book
-                  final nextBook = await getNextBook(currentBookNum);
-
-                  if (nextBook != null &&
-                      nextBook.bookNum != null &&
-                      nextBook.chapterCount != null) {
-                    // Next book exists - load first chapter of next book
-                    final nextBookNum = nextBook.bookNum!.toInt();
-                    final nextBookChapterCount = nextBook.chapterCount!.toInt();
-                    final nextBookName = nextBook.title ?? "";
-
-                    // Update audio book and chapter numbers
-                    // audioBookNum is 1-indexed for URL (bookNum + 1)
-                    setState(() {
-                      audioBookNum = nextBookNum + 1;
-                      audioChapterNum = 1;
-                      currentBookChapterCount =
-                          nextBookChapterCount; // Update chapter count for new book
-                      audioBaseUrl =
-                          "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$audioChapterNum.mp3";
-                    });
-
-                    // Update reading screen to match next book and first chapter
-                    // Pass chapter count so it can be updated in the controller
-                    await updateReadingScreenForNextBook(
-                        nextBookNum, 1, nextBookName, nextBookChapterCount);
-
-                    // Update _storedBookName with the new book name
-                    if (mounted && nextBookName.isNotEmpty) {
-                      setState(() {
-                        _storedBookName = nextBookName;
-                      });
-                    }
-
-                    // Force a small delay and then refresh controller to ensure UI updates
-                    await Future.delayed(const Duration(milliseconds: 100));
-                    if (Get.isRegistered<DashBoardController>()) {
-                      final controller = Get.find<DashBoardController>();
-                      // Trigger update again to ensure UI reflects changes
-                      controller.getSelectedChapterAndBook();
-                    }
-
-                    // Check internet connection before loading audio
-                    final hasInternet =
-                        await InternetConnection().hasInternetAccess;
-                    if (!hasInternet) {
-                      Constants.showToast("Check your internet connection.");
-                      return;
-                    }
-
-                    // Load next book's first chapter audio
-                    bool loadSuccess = false;
-                    int retryCount = 0;
-                    const maxRetries = 2;
-
-                    while (!loadSuccess &&
-                        retryCount < maxRetries &&
-                        context.mounted) {
-                      try {
-                        await audioPlayer.setSourceUrl(audioBaseUrl);
-                        // ensure position and duration will update from streams
-                        await audioPlayer.seek(Duration.zero);
-                        await audioPlayer.resume();
-                        loadSuccess = true;
-                        if (context.mounted) {
-                          setState(() {
-                            isAudioPlaying = true;
-                            position =
-                                Duration.zero; // Reset position for new book
-                          });
-                        }
-                      } catch (e) {
-                        retryCount++;
-                        debugPrint(
-                            "Error loading next book audio (attempt $retryCount): $e");
-                        if (retryCount < maxRetries) {
-                          // Wait a bit before retrying
-                          await Future.delayed(
-                              const Duration(milliseconds: 500));
-                        } else {
-                          // After max retries, stop audio
-                          debugPrint(
-                              "Failed to load next book after $maxRetries attempts");
-                          if (context.mounted) {
-                            setState(() {
-                              isAudioPlaying = false;
-                              position = Duration.zero;
-                            });
-                          }
-                        }
-                      }
-                    }
-
-                    // Clear the isNext guard after a delay
-                    Future.delayed(const Duration(milliseconds: 500), () {
-                      if (mounted && context.mounted) {
-                        setState(() => isNext = false);
-                      }
-                    });
-                  } else {
-                    // No next book - stop audio and reset
-                    try {
-                      await audioPlayer.stop();
-                      if (context.mounted) {
-                        setState(() {
-                          position = Duration.zero; // Reset position to zero
-                          isAudioPlaying = false;
-                          isNext = false; // Reset flag
-                        });
-                      }
-                    } catch (e) {
-                      // handle errors
-                      if (context.mounted) {
-                        setState(() {
-                          position = Duration.zero;
-                          isAudioPlaying = false;
-                          isNext = false; // Reset flag
-                        });
-                      }
-                    }
-                  }
-                }
-              } else if (repeat) {
-                // Repeat mode - restart current chapter
-                // Stop TTS if it's playing
-                if (isSpeech && _isTtsInitialized) {
-                  await _stop();
-                  if (context.mounted) {
-                    setState(() {
-                      isSpeech = false;
-                    });
-                  }
-                }
-                try {
-                  await audioPlayer.setSourceUrl(audioBaseUrl);
-                  // ensure position and duration will update from streams
-                  await audioPlayer.seek(Duration.zero);
-                  await audioPlayer.resume();
-                  if (context.mounted) {
-                    setState(() {
-                      isAudioPlaying = true;
-                      position = Duration.zero; // Reset position when repeating
-                    });
-                  }
-                } catch (e) {
-                  // handle errors
-                  if (context.mounted) {
-                    setState(() {
-                      position = Duration.zero;
-                      isAudioPlaying = false;
-                    });
-                  }
-                }
-              } else {
-                // Should not reach here, but ensure audio stops if it does
-                try {
-                  await audioPlayer.stop();
-                  if (context.mounted) {
-                    setState(() {
-                      position = Duration.zero;
-                      isAudioPlaying = false;
-                    });
-                  }
-                } catch (e) {
-                  // handle errors
-                }
-              }
             });
           } // end attach listeners
 
@@ -2392,7 +2425,9 @@ class floatingButtonState extends State<floatingButton>
         });
       },
     ).then((value) {
-      // sheet closed: cancel listeners & refresh parent UI if needed
+      // sheet closed: cancel sheet-local listeners only (keep completion for auto-next).
+      _isAudioSheetOpen = false;
+      _audioSheetSetState = null;
       if (positionSub != null) {
         positionSub!.cancel();
         positionSub = null;
@@ -2400,10 +2435,6 @@ class floatingButtonState extends State<floatingButton>
       if (durationSub != null) {
         durationSub!.cancel();
         durationSub = null;
-      }
-      if (completeSub != null) {
-        completeSub!.cancel();
-        completeSub = null;
       }
       if (mounted) {
         setState(() {}); // update parent if needed

@@ -1594,8 +1594,19 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     final trackingAllowed = await isTrackingAllowed();
     debugPrint('ad pop trackingAllowed -  ${!trackingAllowed}');
 
+    // Success-dialog banner only: adaptive width (same pattern as topic detail).
+    // Display logic unchanged — dialog still uses ad.size.width / ad.size.height.
+    final width = _successPopupAdaptiveBannerWidth();
+    final adaptiveSize =
+        await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
+    if (adaptiveSize == null) {
+      debugPrint('initPopUpAd: adaptive banner size unavailable (width=$width)');
+      return;
+    }
+
+    popupBannerAd?.dispose();
     popupBannerAd = BannerAd(
-        size: AdSize.mediumRectangle,
+        size: adaptiveSize,
         adUnitId: adUnitId,
         listener: BannerAdListener(onAdLoaded: (ad) {
           if (kDebugMode) {}
@@ -1603,12 +1614,29 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
           //  DebugConsole.log('initPopUpAd Ad loaded1:  - adUnitId - $adUnitId');
         }, onAdFailedToLoad: (ad, error) {
           ad.dispose();
+          isPopupBannerAdLoaded.value = false;
           // DebugConsole.log(
           // 'initPopUpAd Ad error1: ${error.message} - ${ad.responseInfo} adUnitId - $adUnitId');
         }),
         request: await AdConsentManager.getAdRequest());
     popupBannerAd?.load();
     //  DebugConsole.log(" popup2BannerAd is running ");
+  }
+
+  /// Logical width for the success-popup adaptive banner (matches AlertDialog content).
+  int _successPopupAdaptiveBannerWidth() {
+    const dialogContentWidth = 400;
+    if (Sizecf.scrnWidth != null && Sizecf.scrnWidth! > 0) {
+      return Sizecf.scrnWidth!.truncate().clamp(320, dialogContentWidth);
+    }
+    final views = WidgetsBinding.instance.platformDispatcher.views;
+    if (views.isNotEmpty) {
+      final view = views.first;
+      final logical =
+          (view.physicalSize.width / view.devicePixelRatio).truncate();
+      return logical.clamp(320, dialogContentWidth);
+    }
+    return dialogContentWidth;
   }
 
   final openAdIsPaused = false.obs;

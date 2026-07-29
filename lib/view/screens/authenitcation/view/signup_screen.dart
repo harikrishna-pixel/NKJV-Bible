@@ -316,7 +316,9 @@ class SignupScreen extends HookConsumerWidget {
                                                 await WalletService.addCredits(
                                                     rewardCredits);
                                                 await updateReferralRewardClaimed(
-                                                    value: rewardCredits);
+                                                  value: rewardCredits,
+                                                  referredBy: inviteCode,
+                                                );
                                                 Constants.showToast(
                                                     'You received 100 free coins!');
                                               }

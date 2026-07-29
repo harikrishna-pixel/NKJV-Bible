@@ -12,29 +12,6 @@ import WidgetKit
 
 private let appGroupId = "group.com.balaklrapps.newkingsjamesversion"
 
-// MARK: - Container Background (iOS 17+)
-
-/// Wraps widget content with the correct background for the OS: containerBackground on iOS 17+,
-/// ZStack fallback on earlier iOS. Adopting containerBackground fixes "Please adopt containerBackground API" and widget not showing on iOS 17+ devices.
-struct WidgetContainerBackground<Content: View>: View {
-  let background: Color
-  @ViewBuilder let content: () -> Content
-
-  var body: some View {
-    if #available(iOS 17.0, *) {
-      content()
-        .containerBackground(for: .widget) {
-          background
-        }
-    } else {
-      ZStack {
-        background
-        content()
-      }
-    }
-  }
-}
-
 // MARK: - Old Paper Theme
 
 private let oldPaperBackground = Color(red: 0.95, green: 0.92, blue: 0.84)
@@ -56,7 +33,8 @@ private struct OldPaperTitleRow: View {
         .frame(height: 1)
       Text(title)
         .font(.system(size: 10, weight: .semibold, design: .serif))
-        .foregroundColor(oldPaperText)
+        .foregroundStyle(oldPaperText)
+        .widgetFullColorContent()
         .lineLimit(1)
         .minimumScaleFactor(0.8)
       Rectangle()
@@ -72,128 +50,153 @@ private struct WidgetFlourish: View {
   var body: some View {
     Text("❦")
       .font(.system(size: 11, design: .serif))
-      .foregroundColor(color)
+      .foregroundStyle(color)
+      .widgetFullColorContent()
   }
 }
 
-private struct WidgetImageSurface<Content: View>: View {
-  let imageName: String
-  let fallback: Color
-  @ViewBuilder let content: () -> Content
+// MARK: - Widget backgrounds (solid gradients — reliable in Add Widget gallery; PNGs in nested containerBackground often fail preview)
 
-  var body: some View {
-    if #available(iOS 17.0, *) {
-      content()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .containerBackground(for: .widget) {
-          ZStack {
-            fallback
-            Image(imageName)
-              .resizable()
-              .scaledToFill()
-              .frame(maxWidth: .infinity, maxHeight: .infinity)
-              .clipped()
-            RadialGradient(
-              colors: [Color.clear, Color.black.opacity(0.18)],
-              center: .center,
-              startRadius: 20,
-              endRadius: 180
-            )
-          }
-        }
-    } else {
+private enum WidgetBackgroundStyle {
+  case parchment
+  case leather
+  case prayerGuidance
+  case verseScenic
+
+  @ViewBuilder
+  var background: some View {
+    switch self {
+    case .parchment:
+      LinearGradient(
+        colors: [
+          Color(red: 0.97, green: 0.94, blue: 0.88),
+          oldPaperBackground,
+          Color(red: 0.90, green: 0.85, blue: 0.76),
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+      )
+    case .leather:
+      LinearGradient(
+        colors: [
+          Color(red: 0.42, green: 0.28, blue: 0.18),
+          leatherBackground,
+          Color(red: 0.28, green: 0.16, blue: 0.10),
+        ],
+        startPoint: .top,
+        endPoint: .bottom
+      )
+    case .prayerGuidance:
+      LinearGradient(
+        colors: [
+          Color(red: 1.0, green: 0.92, blue: 0.84),
+          Color(red: 0.99, green: 0.86, blue: 0.76),
+          Color(red: 0.95, green: 0.78, blue: 0.68),
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+      )
+    case .verseScenic:
+      LinearGradient(
+        colors: [
+          Color(red: 0.96, green: 0.93, blue: 0.86),
+          Color(red: 0.88, green: 0.82, blue: 0.72),
+          Color(red: 0.76, green: 0.68, blue: 0.55),
+        ],
+        startPoint: .top,
+        endPoint: .bottom
+      )
+    }
+  }
+}
+
+/// Optional asset image for Medium/Large widgets (small sizes keep gradient for clarity).
+private struct WidgetBackgroundContainer<Content: View>: View {
+  let style: WidgetBackgroundStyle
+  let largeImage: String?
+  private let content: () -> Content
+  @Environment(\.widgetFamily) private var family
+
+  init(
+    style: WidgetBackgroundStyle,
+    largeImage: String?,
+    @ViewBuilder content: @escaping () -> Content
+  ) {
+    self.style = style
+    self.largeImage = largeImage
+    self.content = content
+  }
+
+  @ViewBuilder
+  private var backgroundView: some View {
+    if (family == .systemLarge || family == .systemMedium), let imageName = largeImage {
       ZStack {
-        fallback
         Image(imageName)
           .resizable()
           .scaledToFill()
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-          .clipped()
-        content()
+        LinearGradient(
+          colors: [
+            Color.white.opacity(0.72),
+            Color.white.opacity(0.52),
+            Color(red: 0.95, green: 0.92, blue: 0.84).opacity(0.65),
+          ],
+          startPoint: .topLeading,
+          endPoint: .bottomTrailing
+        )
       }
+    } else {
+      style.background
     }
   }
-}
-
-private struct OldPaperSurface<Content: View>: View {
-  @ViewBuilder let content: () -> Content
 
   var body: some View {
-    WidgetImageSurface(imageName: "widget_parchment_bg", fallback: oldPaperBackground) {
+    if #available(iOSApplicationExtension 17.0, *) {
       content()
-    }
-  }
-}
-
-private struct LeatherSurface<Content: View>: View {
-  @ViewBuilder let content: () -> Content
-
-  var body: some View {
-    if #available(iOS 17.0, *) {
-      content()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .containerBackground(for: .widget) {
-          ZStack {
-            leatherBackground
-            Image("widget_leather_bg")
-              .resizable()
-              .scaledToFill()
-              .frame(maxWidth: .infinity, maxHeight: .infinity)
-              .clipped()
-            Color(red: 0.28, green: 0.16, blue: 0.10).opacity(0.72)
-          }
+          backgroundView
         }
     } else {
       ZStack {
-        leatherBackground
-        Image("widget_leather_bg")
-          .resizable()
-          .scaledToFill()
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-          .clipped()
-          .opacity(0.55)
-        Color(red: 0.28, green: 0.16, blue: 0.10).opacity(0.7)
+        backgroundView
         content()
       }
     }
   }
 }
 
-private struct DarkWidgetButton: View {
-  let title: String
-
-  var body: some View {
-    Text(title)
-      .font(.system(size: 11, weight: .semibold, design: .serif))
-      .foregroundColor(.white)
-      .frame(maxWidth: .infinity)
-      .padding(.vertical, 7)
-      .background(oldPaperText)
-      .clipShape(RoundedRectangle(cornerRadius: 8))
-  }
+/// Single containerBackground per widget — required for iOS 17+ gallery and home screen.
+private func widgetWithBackground<Content: View>(
+  _ style: WidgetBackgroundStyle,
+  largeImage: String? = nil,
+  @ViewBuilder content: @escaping () -> Content
+) -> some View {
+  WidgetBackgroundContainer(style: style, largeImage: largeImage, content: content)
 }
 
-private struct StaticWidgetEntry: TimelineEntry {
-  let date: Date
+private func loadWeeklyStreakCount(from defaults: UserDefaults?) -> Int {
+  if let raw = defaults?.string(forKey: "widget_weekly_streak_count_str"),
+     let parsed = Int(raw.trimmingCharacters(in: .whitespacesAndNewlines)) {
+    return max(parsed, 0)
+  }
+  if defaults?.object(forKey: "widget_weekly_streak_count") != nil {
+    return max(defaults?.integer(forKey: "widget_weekly_streak_count") ?? 0, 0)
+  }
+  return 0
 }
 
-private struct StaticWidgetProvider: TimelineProvider {
-  func placeholder(in context: Context) -> StaticWidgetEntry {
-    StaticWidgetEntry(date: Date())
-  }
-
-  func getSnapshot(in context: Context, completion: @escaping (StaticWidgetEntry) -> Void) {
-    completion(StaticWidgetEntry(date: Date()))
-  }
-
-  func getTimeline(in context: Context, completion: @escaping (Timeline<StaticWidgetEntry>) -> Void) {
-    completion(Timeline(entries: [StaticWidgetEntry(date: Date())], policy: .never))
-  }
-}
-
-// Default content when app has not sent data
+// MARK: - Verse of the Day Widget
 private let defaultVerseText = "Be still and know that I am God."
 private let defaultVerseRef = "Psalm 46:10"
+private let defaultFavoriteVerseText = "For God so loved the world, that he gave his only begotten Son, that whoever believes in him should not perish but have eternal life."
+private let defaultHourlyVerseText = "Commit your work to the Lord, and your plans will be established."
+private let defaultHourlyVerseRef = "Proverbs 16:3"
+private let defaultVerseImageText = "I can do all things through Christ who strengthens me."
+private let defaultVerseImageRef = "Philippians 4:13"
+private let defaultContinueBookChapter = "Genesis 12"
+private let defaultContinueSubtitle = "Chapter 12 · 32% of book"
+private let defaultContinueProgress = 0.32
+private let defaultContinueProgressLabel = "32%"
+private let defaultHourlyNextLabel = "Next verse in 42 min"
 private let defaultPrayerText = "Lord, guide my heart today. Give me strength to face challenges and peace in uncertainty. May I reflect Your love to others. Amen."
 private let defaultChatQuestion = "What is faith?"
 private let defaultChatAnswer = "Faith is confidence in what we hope for and assurance about what we do not see. — Hebrews 11:1"
@@ -211,6 +214,28 @@ private func plainVerseTextForWidget(_ raw: String) -> String {
     .trimmingCharacters(in: .whitespacesAndNewlines)
 }
 
+private func loadSharedVerse(
+  textKey: String,
+  refKey: String,
+  defaultText: String,
+  defaultRef: String
+) -> (String, String) {
+  let defaults = UserDefaults(suiteName: appGroupId)
+  var text = defaults?.string(forKey: textKey) ?? ""
+  var ref = defaults?.string(forKey: refKey) ?? ""
+  if text.isEmpty { text = defaultText }
+  if ref.isEmpty { ref = defaultRef }
+  return (plainVerseTextForWidget(text), ref)
+}
+
+private func parseWeeklyStreakStatuses(_ raw: String) -> [Int] {
+  let parts = raw.split(separator: ",").map { Int($0.trimmingCharacters(in: .whitespaces)) ?? 0 }
+  if parts.count >= 7 { return Array(parts.prefix(7)) }
+  var padded = parts
+  while padded.count < 7 { padded.append(0) }
+  return padded
+}
+
 // MARK: - Verse of the Day Widget
 
 struct VerseOfTheDayEntry: TimelineEntry {
@@ -225,10 +250,6 @@ struct VerseOfTheDayProvider: TimelineProvider {
   }
 
   func getSnapshot(in context: Context, completion: @escaping (VerseOfTheDayEntry) -> Void) {
-    if context.isPreview {
-      completion(placeholder(in: context))
-      return
-    }
     let defaults = UserDefaults(suiteName: appGroupId)
     var text = defaults?.string(forKey: "widget_verse_text") ?? ""
     var ref = defaults?.string(forKey: "widget_verse_reference") ?? ""
@@ -246,36 +267,63 @@ struct VerseOfTheDayProvider: TimelineProvider {
 
 struct VerseOfTheDayView: View {
   var entry: VerseOfTheDayEntry
+  @Environment(\.widgetFamily) private var family
 
   var body: some View {
-    OldPaperSurface {
-      VStack(spacing: 5) {
-        ZStack {
-          Image(systemName: "book.closed.fill")
-            .font(.system(size: 12))
-            .foregroundColor(oldPaperText)
-          Image(systemName: "plus")
-            .font(.system(size: 5, weight: .bold))
-            .foregroundColor(oldPaperText)
-            .offset(y: -1)
+    widgetWithBackground(.parchment, largeImage: "widget_path_bg") {
+      Group {
+        if family == .systemLarge {
+          VStack(spacing: 10) {
+            Spacer(minLength: 0)
+            OldPaperTitleRow(title: "Daily Verse")
+            Text(plainVerseTextForWidget(entry.verseText))
+              .font(.system(size: 16, weight: .bold, design: .serif))
+              .foregroundStyle(oldPaperText)
+              .widgetFullColorContent()
+              .multilineTextAlignment(.center)
+              .lineLimit(6)
+              .minimumScaleFactor(0.82)
+              .padding(.horizontal, 8)
+            Text(entry.verseReference)
+              .font(.system(size: 12, weight: .medium, design: .serif))
+              .foregroundStyle(oldPaperSecondary)
+              .widgetFullColorContent()
+              .multilineTextAlignment(.center)
+            WidgetFlourish()
+            Spacer(minLength: 0)
+          }
+        } else {
+          VStack(spacing: 5) {
+            ZStack {
+              Image(systemName: "book.closed.fill")
+                .font(.system(size: 12))
+                .foregroundColor(oldPaperText)
+              Image(systemName: "plus")
+                .font(.system(size: 5, weight: .bold))
+                .foregroundColor(oldPaperText)
+                .offset(y: -1)
+            }
+            OldPaperTitleRow(title: "Daily Verse")
+            Text(plainVerseTextForWidget(entry.verseText))
+              .font(.system(size: 13, weight: .bold, design: .serif))
+              .foregroundStyle(oldPaperText)
+              .widgetFullColorContent()
+              .multilineTextAlignment(.center)
+              .lineLimit(4)
+              .minimumScaleFactor(0.82)
+              .padding(.horizontal, 2)
+            Spacer(minLength: 0)
+            Text(entry.verseReference)
+              .font(.system(size: 10, weight: .medium, design: .serif))
+              .foregroundStyle(oldPaperSecondary)
+              .widgetFullColorContent()
+              .multilineTextAlignment(.center)
+            WidgetFlourish()
+          }
         }
-        OldPaperTitleRow(title: "Daily Verse")
-        Text(plainVerseTextForWidget(entry.verseText))
-          .font(.system(size: 13, weight: .bold, design: .serif))
-          .foregroundColor(oldPaperText)
-          .multilineTextAlignment(.center)
-          .lineLimit(4)
-          .minimumScaleFactor(0.82)
-          .padding(.horizontal, 2)
-        Spacer(minLength: 0)
-        Text(entry.verseReference)
-          .font(.system(size: 10, weight: .medium, design: .serif))
-          .foregroundColor(oldPaperSecondary)
-          .multilineTextAlignment(.center)
-        WidgetFlourish()
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .padding(10)
+      .padding(family == .systemLarge ? 16 : 10)
     }
     .widgetURL(URL(string: "biblebookapp://verse?homeWidget"))
   }
@@ -290,17 +338,18 @@ struct VerseOfTheDayWidget: Widget {
     }
     .configurationDisplayName("Daily Verse")
     .description("Today's Bible verse on your home screen.")
-    .contentMarginsDisabledIfAvailable()
   }
 }
 
-/// iOS 17+ requires edge-to-edge widget backgrounds; without this the picker shows a grey placeholder.
-private extension WidgetConfiguration {
-  func contentMarginsDisabledIfAvailable() -> some WidgetConfiguration {
+/// Ensures labels render in the Add Widget gallery (WidgetKit may otherwise redact Text).
+private extension View {
+  @ViewBuilder
+  func widgetFullColorContent() -> some View {
     if #available(iOSApplicationExtension 17.0, *) {
-      return contentMarginsDisabled()
+      self.widgetAccentable(false)
+    } else {
+      self
     }
-    return self
   }
 }
 
@@ -362,7 +411,7 @@ struct BiblePrayerView: View {
     // Full-bleed layout for Medium/Large. On iOS 17+ we use containerBackground
     // with the same gradient to ensure edge-to-edge rendering inside widget bounds.
     if family == .systemLarge || family == .systemMedium {
-      ZStack {
+      widgetWithBackground(.prayerGuidance, largeImage: "widget_prayer_guidance_bg") {
         VStack(spacing: 0) {
             HStack {
               Spacer()
@@ -373,7 +422,8 @@ struct BiblePrayerView: View {
                   .font(.caption)
                   .fontWeight(.semibold)
               }
-              .foregroundColor(.white)
+              .foregroundStyle(.white)
+              .widgetFullColorContent()
               .padding(.horizontal, 10)
               .padding(.vertical, 4)
               .background(Color.white.opacity(0.22))
@@ -384,7 +434,8 @@ struct BiblePrayerView: View {
 
             Text(entry.prayerTime)
               .font(.system(size: family == .systemLarge ? 54 : 44, weight: .bold, design: .rounded))
-              .foregroundColor(.white)
+              .foregroundStyle(.white)
+              .widgetFullColorContent()
               .padding(.top, 8)
 
             Spacer(minLength: 10)
@@ -393,12 +444,14 @@ struct BiblePrayerView: View {
               Text(entry.title)
                 .font(.title3)
                 .fontWeight(.semibold)
-                .foregroundColor(oldPaperText)
+                .foregroundStyle(oldPaperText)
+                .widgetFullColorContent()
                 .multilineTextAlignment(.center)
 
               Text(entry.prayerText)
                 .font(.body)
-                .foregroundColor(oldPaperText)
+                .foregroundStyle(oldPaperText)
+                .widgetFullColorContent()
                 .lineLimit(family == .systemLarge ? 4 : 3)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 8)
@@ -406,7 +459,8 @@ struct BiblePrayerView: View {
               Text(entry.prayerReference)
                 .font(.subheadline)
                 .fontWeight(.semibold)
-                .foregroundColor(oldPaperSecondary)
+                .foregroundStyle(oldPaperSecondary)
+                .widgetFullColorContent()
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 16)
@@ -424,7 +478,8 @@ struct BiblePrayerView: View {
             Text("Pray Now")
               .font(.headline)
               .fontWeight(.bold)
-              .foregroundColor(.white)
+              .foregroundStyle(.white)
+              .widgetFullColorContent()
               .frame(maxWidth: .infinity)
               .padding(.vertical, 12)
               .background(Color.orange)
@@ -434,12 +489,9 @@ struct BiblePrayerView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .padding(0)
       .widgetURL(URL(string: "biblebookapp://prayer?homeWidget"))
-      .modifier(_PrayerWidgetImageBackground())
     } else {
-      OldPaperSurface {
+      widgetWithBackground(.parchment) {
         VStack(alignment: .leading, spacing: 6) {
           HStack(spacing: 4) {
             Image(systemName: "hands.sparkles")
@@ -452,67 +504,14 @@ struct BiblePrayerView: View {
           }
           Text(entry.prayerText)
             .font(.subheadline)
-            .foregroundColor(oldPaperText)
+            .foregroundStyle(oldPaperText)
+            .widgetFullColorContent()
             .lineLimit(4)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(12)
       }
       .widgetURL(URL(string: "biblebookapp://prayer?homeWidget"))
-    }
-  }
-}
-
-/// Full-bleed prayer background image (dashboard ads / IAP logic untouched).
-private struct _PrayerWidgetImageBackground: ViewModifier {
-  func body(content: Content) -> some View {
-    if #available(iOS 17.0, *) {
-      content
-        .containerBackground(for: .widget) {
-          ZStack {
-            Color(red: 0.99, green: 0.86, blue: 0.76)
-            Image("widget_prayer_guidance_bg")
-              .resizable()
-              .scaledToFill()
-              .frame(maxWidth: .infinity, maxHeight: .infinity)
-              .clipped()
-          }
-        }
-    } else {
-      ZStack {
-        Image("widget_prayer_guidance_bg")
-          .resizable()
-          .scaledToFill()
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-          .clipped()
-        content
-      }
-    }
-  }
-}
-
-private struct _VerseImageBackground: ViewModifier {
-  func body(content: Content) -> some View {
-    if #available(iOS 17.0, *) {
-      content.containerBackground(for: .widget) {
-        ZStack {
-          oldPaperBackground
-          Image("widget_verse_image_bg")
-            .resizable()
-            .scaledToFill()
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipped()
-        }
-      }
-    } else {
-      ZStack {
-        Image("widget_verse_image_bg")
-          .resizable()
-          .scaledToFill()
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-          .clipped()
-        content
-      }
     }
   }
 }
@@ -526,9 +525,6 @@ struct BiblePrayerWidget: Widget {
     }
     .configurationDisplayName("Bible Prayer")
     .description("A moment of prayer on your home screen.")
-    .contentMarginsDisabledIfAvailable()
-    // Remove default widget content padding so the design is full-bleed (iOS 17+).
-    .contentMarginsDisabled()
   }
 }
 
@@ -563,31 +559,68 @@ struct BibleChatProvider: TimelineProvider {
 
 struct BibleChatView: View {
   var entry: BibleChatEntry
+  @Environment(\.widgetFamily) private var family
 
   var body: some View {
-    OldPaperSurface {
-      VStack(alignment: .leading, spacing: 6) {
-        HStack(spacing: 4) {
-          Image(systemName: "message")
-            .font(.caption)
-            .foregroundColor(oldPaperAccent)
-          Text("Bible Chat")
-            .font(.caption)
-            .fontWeight(.semibold)
-            .foregroundColor(oldPaperAccent)
+    widgetWithBackground(.parchment, largeImage: "widget_path_bg") {
+      Group {
+        if family == .systemLarge {
+          VStack(spacing: 10) {
+            Spacer(minLength: 0)
+            HStack(spacing: 4) {
+              Image(systemName: "message")
+                .font(.caption)
+                .foregroundColor(oldPaperAccent)
+              Text("Bible Chat")
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(oldPaperAccent)
+            }
+            Text("Q: " + entry.question)
+              .font(.headline)
+              .fontWeight(.medium)
+              .foregroundStyle(oldPaperText)
+              .widgetFullColorContent()
+              .multilineTextAlignment(.center)
+              .lineLimit(3)
+              .padding(.horizontal, 8)
+            Text(entry.answer)
+              .font(.body)
+              .foregroundStyle(oldPaperSecondary)
+              .widgetFullColorContent()
+              .multilineTextAlignment(.center)
+              .lineLimit(5)
+              .padding(.horizontal, 8)
+            Spacer(minLength: 0)
+          }
+        } else {
+          VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+              Image(systemName: "message")
+                .font(.caption)
+                .foregroundColor(oldPaperAccent)
+              Text("Bible Chat")
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(oldPaperAccent)
+            }
+            Text("Q: " + entry.question)
+              .font(.subheadline)
+              .fontWeight(.medium)
+              .foregroundStyle(oldPaperText)
+              .widgetFullColorContent()
+              .lineLimit(2)
+            Text(entry.answer)
+              .font(.caption)
+              .foregroundStyle(oldPaperSecondary)
+              .widgetFullColorContent()
+              .lineLimit(3)
+          }
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        Text("Q: " + entry.question)
-          .font(.subheadline)
-          .fontWeight(.medium)
-          .foregroundColor(oldPaperText)
-          .lineLimit(2)
-        Text(entry.answer)
-          .font(.caption)
-          .foregroundColor(oldPaperSecondary)
-          .lineLimit(3)
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      .padding(12)
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .padding(family == .systemLarge ? 16 : 12)
     }
     .widgetURL(URL(string: "biblebookapp://chat?homeWidget"))
   }
@@ -602,15 +635,62 @@ struct BibleChatWidget: Widget {
     }
     .configurationDisplayName("Bible Chat")
     .description("A Bible Q&A on your home screen.")
-    .contentMarginsDisabledIfAvailable()
   }
 }
 
 // MARK: - Continue Reading Widget
 
+struct ContinueReadingEntry: TimelineEntry {
+  let date: Date
+  let bookChapter: String
+  let subtitle: String
+  let progress: Double
+  let progressLabel: String
+}
+
+struct ContinueReadingProvider: TimelineProvider {
+  func placeholder(in context: Context) -> ContinueReadingEntry {
+    ContinueReadingEntry(
+      date: Date(),
+      bookChapter: defaultContinueBookChapter,
+      subtitle: defaultContinueSubtitle,
+      progress: defaultContinueProgress,
+      progressLabel: defaultContinueProgressLabel
+    )
+  }
+
+  func getSnapshot(in context: Context, completion: @escaping (ContinueReadingEntry) -> Void) {
+    let defaults = UserDefaults(suiteName: appGroupId)
+    let bookChapter = defaults?.string(forKey: "widget_continue_book_chapter") ?? defaultContinueBookChapter
+    let subtitle = defaults?.string(forKey: "widget_continue_subtitle") ?? defaultContinueSubtitle
+    let progressRaw = defaults?.string(forKey: "widget_continue_progress") ?? ""
+    let progress = Double(progressRaw) ?? defaultContinueProgress
+    let progressLabel = defaults?.string(forKey: "widget_continue_progress_label") ?? defaultContinueProgressLabel
+    completion(
+      ContinueReadingEntry(
+        date: Date(),
+        bookChapter: bookChapter,
+        subtitle: subtitle,
+        progress: min(max(progress, 0), 1),
+        progressLabel: progressLabel
+      )
+    )
+  }
+
+  func getTimeline(in context: Context, completion: @escaping (Timeline<ContinueReadingEntry>) -> Void) {
+    getSnapshot(in: context) { entry in
+      completion(Timeline(entries: [entry], policy: .atEnd))
+    }
+  }
+}
+
 struct ContinueReadingView: View {
+  var entry: ContinueReadingEntry
+  @Environment(\.widgetFamily) private var family
+
   var body: some View {
-    LeatherSurface {
+    // Brown leather gradient on every size (small/medium/large) — display-only.
+    widgetWithBackground(.leather) {
       ZStack {
         RoundedRectangle(cornerRadius: 10)
           .inset(by: 6)
@@ -618,47 +698,98 @@ struct ContinueReadingView: View {
             leatherText.opacity(0.35),
             style: StrokeStyle(lineWidth: 1, dash: [5, 4])
           )
-        VStack(alignment: .leading, spacing: 5) {
-          Image(systemName: "bookmark.fill")
-            .font(.system(size: 11))
-            .foregroundColor(ribbonGold)
-            .rotationEffect(.degrees(-12))
-          Text("Continue Reading")
-            .font(.system(size: 11, weight: .semibold, design: .serif))
-            .foregroundColor(leatherText.opacity(0.92))
-          Text("Genesis 12")
-            .font(.system(size: 19, weight: .bold, design: .serif))
-            .foregroundColor(leatherText)
-          Text("Verse 8 of 26")
-            .font(.system(size: 10, design: .serif))
-            .foregroundColor(leatherText.opacity(0.88))
-          HStack(spacing: 6) {
-            GeometryReader { geo in
-              ZStack(alignment: .leading) {
-                Capsule().fill(Color.black.opacity(0.28))
-                Capsule()
-                  .fill(Color.white.opacity(0.92))
-                  .frame(width: geo.size.width * 0.32)
+        Group {
+          if family == .systemLarge {
+            VStack(spacing: 10) {
+              Spacer(minLength: 0)
+              Image(systemName: "bookmark.fill")
+                .font(.system(size: 16))
+                .foregroundColor(ribbonGold)
+                .rotationEffect(.degrees(-12))
+              Text("Continue Reading")
+                .font(.system(size: 13, weight: .semibold, design: .serif))
+                .foregroundColor(leatherText.opacity(0.92))
+              Text(entry.bookChapter)
+                .font(.system(size: 24, weight: .bold, design: .serif))
+                .foregroundColor(leatherText)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.75)
+              Text(entry.subtitle)
+                .font(.system(size: 12, design: .serif))
+                .foregroundColor(leatherText.opacity(0.88))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+              HStack(spacing: 8) {
+                GeometryReader { geo in
+                  ZStack(alignment: .leading) {
+                    Capsule().fill(Color.black.opacity(0.28))
+                    Capsule()
+                      .fill(Color.white.opacity(0.92))
+                      .frame(width: geo.size.width * entry.progress)
+                  }
+                }
+                .frame(height: 6)
+                Text(entry.progressLabel)
+                  .font(.system(size: 10, weight: .semibold, design: .serif))
+                  .foregroundColor(leatherText)
+              }
+              .padding(.horizontal, 12)
+              Text("Keep reading God's Word")
+                .font(.system(size: 11, design: .serif))
+                .foregroundColor(leatherText.opacity(0.88))
+              Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(14)
+          } else {
+            VStack(alignment: .leading, spacing: 5) {
+              Image(systemName: "bookmark.fill")
+                .font(.system(size: 11))
+                .foregroundColor(ribbonGold)
+                .rotationEffect(.degrees(-12))
+              Text("Continue Reading")
+                .font(.system(size: 11, weight: .semibold, design: .serif))
+                .foregroundColor(leatherText.opacity(0.92))
+              Text(entry.bookChapter)
+                .font(.system(size: 19, weight: .bold, design: .serif))
+                .foregroundColor(leatherText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+              Text(entry.subtitle)
+                .font(.system(size: 10, design: .serif))
+                .foregroundColor(leatherText.opacity(0.88))
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+              HStack(spacing: 6) {
+                GeometryReader { geo in
+                  ZStack(alignment: .leading) {
+                    Capsule().fill(Color.black.opacity(0.28))
+                    Capsule()
+                      .fill(Color.white.opacity(0.92))
+                      .frame(width: geo.size.width * entry.progress)
+                  }
+                }
+                .frame(height: 5)
+                Text(entry.progressLabel)
+                  .font(.system(size: 9, weight: .semibold, design: .serif))
+                  .foregroundColor(leatherText)
+              }
+              Spacer(minLength: 0)
+              HStack {
+                Text("Keep reading God's Word")
+                  .font(.system(size: 9, design: .serif))
+                  .foregroundColor(leatherText.opacity(0.88))
+                Spacer()
+                Image(systemName: "book.fill")
+                  .font(.system(size: 11))
+                  .foregroundColor(leatherText.opacity(0.88))
               }
             }
-            .frame(height: 5)
-            Text("32%")
-              .font(.system(size: 9, weight: .semibold, design: .serif))
-              .foregroundColor(leatherText)
-          }
-          Spacer(minLength: 0)
-          HStack {
-            Text("Keep reading God's Word")
-              .font(.system(size: 9, design: .serif))
-              .foregroundColor(leatherText.opacity(0.88))
-            Spacer()
-            Image(systemName: "book.fill")
-              .font(.system(size: 11))
-              .foregroundColor(leatherText.opacity(0.88))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(10)
           }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(10)
       }
     }
     .widgetURL(URL(string: "biblebookapp://verse?homeWidget"))
@@ -669,120 +800,148 @@ struct ContinueReadingWidget: Widget {
   let kind: String = "ContinueReadingWidget"
 
   var body: some WidgetConfiguration {
-    StaticConfiguration(kind: kind, provider: StaticWidgetProvider()) { _ in
-      ContinueReadingView()
+    StaticConfiguration(kind: kind, provider: ContinueReadingProvider()) { entry in
+      ContinueReadingView(entry: entry)
     }
     .configurationDisplayName("Continue Reading")
     .description("Pick up where you left off in Scripture.")
-    .contentMarginsDisabledIfAvailable()
-  }
-}
-
-// MARK: - Reading Plan Widget
-
-struct ReadingPlanView: View {
-  var body: some View {
-    OldPaperSurface {
-      VStack(alignment: .leading, spacing: 5) {
-        HStack {
-          Text("Today's Reading")
-            .font(.system(size: 11, weight: .semibold, design: .serif))
-            .foregroundColor(oldPaperText)
-          Spacer()
-          Image(systemName: "calendar")
-            .font(.system(size: 11))
-            .foregroundColor(oldPaperSecondary)
-        }
-        planRow("Genesis 1", done: true)
-        planRow("Genesis 2", done: false)
-        planRow("Psalm 1", done: false)
-        Spacer(minLength: 0)
-        HStack {
-          Text("1 / 3 Completed")
-            .font(.system(size: 9, design: .serif))
-            .foregroundColor(oldPaperSecondary)
-          Spacer()
-          Image(systemName: "pencil.and.scribble")
-            .font(.system(size: 11))
-            .foregroundColor(oldPaperSecondary)
-        }
-      }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      .padding(10)
-    }
-    .widgetURL(URL(string: "biblebookapp://verse?homeWidget"))
-  }
-
-  private func planRow(_ title: String, done: Bool) -> some View {
-    HStack(spacing: 7) {
-      Image(systemName: done ? "checkmark.circle.fill" : "circle")
-        .font(.system(size: 12))
-        .foregroundColor(done ? oldPaperText : oldPaperSecondary.opacity(0.55))
-      Text(title)
-        .font(.system(size: 11, design: .serif))
-        .foregroundColor(oldPaperText)
-        .lineLimit(1)
-    }
-    .padding(.top, 2)
-  }
-}
-
-struct ReadingPlanWidget: Widget {
-  let kind: String = "ReadingPlanWidget"
-
-  var body: some WidgetConfiguration {
-    StaticConfiguration(kind: kind, provider: StaticWidgetProvider()) { _ in
-      ReadingPlanView()
-    }
-    .configurationDisplayName("Reading Plan")
-    .description("Track today's Bible reading plan.")
-    .contentMarginsDisabledIfAvailable()
   }
 }
 
 // MARK: - Weekly Reading Streak Widget
 
+struct WeeklyReadingStreakEntry: TimelineEntry {
+  let date: Date
+  let dayStatuses: [Int]
+  let streakCount: Int
+}
+
+struct WeeklyReadingStreakProvider: TimelineProvider {
+  func placeholder(in context: Context) -> WeeklyReadingStreakEntry {
+    WeeklyReadingStreakEntry(date: Date(), dayStatuses: [1, 1, 1, 0, 0, 0, 0], streakCount: 7)
+  }
+
+  func getSnapshot(in context: Context, completion: @escaping (WeeklyReadingStreakEntry) -> Void) {
+    let defaults = UserDefaults(suiteName: appGroupId)
+    let statusRaw = defaults?.string(forKey: "widget_weekly_streak_status") ?? "1,1,1,0,0,0,0"
+    let streakCount = loadWeeklyStreakCount(from: defaults)
+    completion(
+      WeeklyReadingStreakEntry(
+        date: Date(),
+        dayStatuses: parseWeeklyStreakStatuses(statusRaw),
+        streakCount: streakCount
+      )
+    )
+  }
+
+  func getTimeline(in context: Context, completion: @escaping (Timeline<WeeklyReadingStreakEntry>) -> Void) {
+    getSnapshot(in: context) { entry in
+      completion(Timeline(entries: [entry], policy: .atEnd))
+    }
+  }
+}
+
 struct WeeklyReadingStreakView: View {
+  var entry: WeeklyReadingStreakEntry
+  @Environment(\.widgetFamily) private var family
   private let days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
-  var body: some View {
-    OldPaperSurface {
-      VStack(alignment: .leading, spacing: 6) {
-        HStack(spacing: 4) {
-          Image(systemName: "flame.fill")
-            .font(.system(size: 11))
-            .foregroundColor(.orange)
-          Text("Reading Streak")
-            .font(.system(size: 11, weight: .semibold, design: .serif))
-            .foregroundColor(oldPaperText)
+  private func iconName(for status: Int) -> String {
+    switch status {
+    case 1: return "checkmark.circle.fill"
+    case 2: return "circle"
+    default: return "circle"
+    }
+  }
+
+  private func iconColor(for status: Int) -> Color {
+    switch status {
+    case 1: return oldPaperText
+    case 2: return .orange.opacity(0.85)
+    default: return oldPaperSecondary.opacity(0.45)
+    }
+  }
+
+  private var streakLabel: String {
+    entry.streakCount == 1 ? "1 Day" : "\(entry.streakCount) Days"
+  }
+
+  private var weekRow: some View {
+    HStack {
+      ForEach(Array(days.enumerated()), id: \.offset) { index, day in
+        let status = index < entry.dayStatuses.count ? entry.dayStatuses[index] : 0
+        VStack(spacing: 3) {
+          Text(day)
+            .font(.system(size: family == .systemLarge ? 9 : 7, weight: .medium, design: .serif))
+            .foregroundColor(oldPaperSecondary)
+          Image(systemName: iconName(for: status))
+            .font(.system(size: family == .systemLarge ? 14 : 10))
+            .foregroundColor(iconColor(for: status))
         }
-        HStack {
-          ForEach(Array(days.enumerated()), id: \.offset) { index, day in
-            VStack(spacing: 3) {
-              Text(day)
-                .font(.system(size: 7, weight: .medium, design: .serif))
-                .foregroundColor(oldPaperSecondary)
-              Image(systemName: index < 3 ? "checkmark.circle.fill" : "circle")
-                .font(.system(size: 10))
-                .foregroundColor(index < 3 ? oldPaperText : oldPaperSecondary.opacity(0.45))
-            }
-            if index < days.count - 1 { Spacer(minLength: 0) }
-          }
-        }
-        Rectangle()
-          .fill(oldPaperAccent.opacity(0.25))
-          .frame(height: 1)
-          .padding(.vertical, 2)
-        Text("7 Days")
-          .font(.system(size: 17, weight: .bold, design: .serif))
-          .foregroundColor(oldPaperText)
-        Text("Keep it up!")
-          .font(.system(size: 10, design: .serif))
-          .foregroundColor(oldPaperSecondary)
-          .frame(maxWidth: .infinity, alignment: .center)
+        if index < days.count - 1 { Spacer(minLength: 0) }
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      .padding(10)
+    }
+  }
+
+  var body: some View {
+    widgetWithBackground(.parchment, largeImage: "widget_welcome_bg") {
+      Group {
+        if family == .systemLarge {
+          VStack(spacing: 14) {
+            Spacer(minLength: 0)
+            HStack(spacing: 6) {
+              Image(systemName: "flame.fill")
+                .font(.system(size: 14))
+                .foregroundColor(.orange)
+              Text("Reading Streak")
+                .font(.system(size: 14, weight: .semibold, design: .serif))
+                .foregroundColor(oldPaperText)
+            }
+            weekRow
+              .padding(.horizontal, 4)
+            Rectangle()
+              .fill(oldPaperAccent.opacity(0.25))
+              .frame(height: 1)
+              .padding(.horizontal, 8)
+            Text(streakLabel)
+              .font(.system(size: 28, weight: .bold, design: .serif))
+              .foregroundColor(oldPaperText)
+              .multilineTextAlignment(.center)
+            Text("Keep it up!")
+              .font(.system(size: 13, design: .serif))
+              .foregroundColor(oldPaperSecondary)
+              .multilineTextAlignment(.center)
+            Spacer(minLength: 0)
+          }
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .padding(16)
+        } else {
+          VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+              Image(systemName: "flame.fill")
+                .font(.system(size: 11))
+                .foregroundColor(.orange)
+              Text("Reading Streak")
+                .font(.system(size: 11, weight: .semibold, design: .serif))
+                .foregroundColor(oldPaperText)
+            }
+            weekRow
+            Rectangle()
+              .fill(oldPaperAccent.opacity(0.25))
+              .frame(height: 1)
+              .padding(.vertical, 2)
+            Text(streakLabel)
+              .font(.system(size: 17, weight: .bold, design: .serif))
+              .foregroundColor(oldPaperText)
+            Text("Keep it up!")
+              .font(.system(size: 10, design: .serif))
+              .foregroundColor(oldPaperSecondary)
+              .frame(maxWidth: .infinity, alignment: .center)
+          }
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+          .padding(10)
+        }
+      }
     }
     .widgetURL(URL(string: "biblebookapp://verse?homeWidget"))
   }
@@ -792,46 +951,107 @@ struct WeeklyReadingStreakWidget: Widget {
   let kind: String = "WeeklyReadingStreakWidget"
 
   var body: some WidgetConfiguration {
-    StaticConfiguration(kind: kind, provider: StaticWidgetProvider()) { _ in
-      WeeklyReadingStreakView()
+    StaticConfiguration(kind: kind, provider: WeeklyReadingStreakProvider()) { entry in
+      WeeklyReadingStreakView(entry: entry)
     }
     .configurationDisplayName("Weekly Reading Streak")
     .description("See your weekly reading streak.")
-    .contentMarginsDisabledIfAvailable()
   }
 }
 
 // MARK: - Favorite Verse Widget
 
+struct FavoriteVerseEntry: TimelineEntry {
+  let date: Date
+  let verseText: String
+  let verseReference: String
+}
+
+struct FavoriteVerseProvider: TimelineProvider {
+  func placeholder(in context: Context) -> FavoriteVerseEntry {
+    FavoriteVerseEntry(
+      date: Date(),
+      verseText: defaultFavoriteVerseText,
+      verseReference: defaultVerseRef
+    )
+  }
+
+  func getSnapshot(in context: Context, completion: @escaping (FavoriteVerseEntry) -> Void) {
+    let pair = loadSharedVerse(
+      textKey: "widget_favorite_verse_text",
+      refKey: "widget_favorite_verse_reference",
+      defaultText: defaultFavoriteVerseText,
+      defaultRef: defaultVerseRef
+    )
+    completion(FavoriteVerseEntry(date: Date(), verseText: pair.0, verseReference: pair.1))
+  }
+
+  func getTimeline(in context: Context, completion: @escaping (Timeline<FavoriteVerseEntry>) -> Void) {
+    getSnapshot(in: context) { entry in
+      completion(Timeline(entries: [entry], policy: .atEnd))
+    }
+  }
+}
+
 struct FavoriteVerseView: View {
+  var entry: FavoriteVerseEntry
+  @Environment(\.widgetFamily) private var family
   private let ribbonRed = Color(red: 0.75, green: 0.22, blue: 0.18)
 
   var body: some View {
-    OldPaperSurface {
-      VStack(spacing: 5) {
-        HStack {
-          Image(systemName: "bookmark.fill")
-            .font(.system(size: 12))
-            .foregroundColor(ribbonRed)
-          Spacer()
-          Image(systemName: "heart")
-            .font(.system(size: 11))
-            .foregroundColor(oldPaperSecondary)
+    widgetWithBackground(.parchment, largeImage: "widget_verse_image_bg") {
+      Group {
+        if family == .systemLarge {
+          VStack(spacing: 10) {
+            Spacer(minLength: 0)
+            HStack(spacing: 6) {
+              Image(systemName: "bookmark.fill")
+                .font(.system(size: 14))
+                .foregroundColor(ribbonRed)
+              Text("Favorite Verse")
+                .font(.system(size: 13, weight: .semibold, design: .serif))
+                .foregroundColor(oldPaperText)
+            }
+            Text(entry.verseText)
+              .font(.system(size: 15, weight: .semibold, design: .serif))
+              .foregroundColor(oldPaperText)
+              .multilineTextAlignment(.center)
+              .lineLimit(6)
+              .minimumScaleFactor(0.84)
+              .padding(.horizontal, 10)
+            Text(entry.verseReference)
+              .font(.system(size: 12, weight: .medium, design: .serif))
+              .foregroundColor(oldPaperSecondary)
+              .multilineTextAlignment(.center)
+            Spacer(minLength: 0)
+          }
+        } else {
+          VStack(spacing: 5) {
+            HStack {
+              Image(systemName: "bookmark.fill")
+                .font(.system(size: 12))
+                .foregroundColor(ribbonRed)
+              Spacer()
+              Image(systemName: "heart")
+                .font(.system(size: 11))
+                .foregroundColor(oldPaperSecondary)
+            }
+            Text(entry.verseText)
+              .font(.system(size: 10.5, design: .serif))
+              .foregroundColor(oldPaperText)
+              .multilineTextAlignment(.leading)
+              .lineLimit(5)
+              .minimumScaleFactor(0.84)
+            Spacer(minLength: 0)
+            Text(entry.verseReference)
+              .font(.system(size: 10, weight: .medium, design: .serif))
+              .foregroundColor(oldPaperSecondary)
+              .frame(maxWidth: .infinity, alignment: .trailing)
+          }
         }
-        Text("For God so loved the world, that he gave his only begotten Son, that whoever believes in him should not perish but have eternal life.")
-          .font(.system(size: 10.5, design: .serif))
-          .foregroundColor(oldPaperText)
-          .multilineTextAlignment(.leading)
-          .lineLimit(5)
-          .minimumScaleFactor(0.84)
-        Spacer(minLength: 0)
-        Text("John 3:16")
-          .font(.system(size: 10, weight: .medium, design: .serif))
-          .foregroundColor(oldPaperSecondary)
-          .frame(maxWidth: .infinity, alignment: .trailing)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .padding(10)
+      .padding(family == .systemLarge ? 16 : 10)
     }
     .widgetURL(URL(string: "biblebookapp://verse?homeWidget"))
   }
@@ -841,53 +1061,135 @@ struct FavoriteVerseWidget: Widget {
   let kind: String = "FavoriteVerseWidget"
 
   var body: some WidgetConfiguration {
-    StaticConfiguration(kind: kind, provider: StaticWidgetProvider()) { _ in
-      FavoriteVerseView()
+    StaticConfiguration(kind: kind, provider: FavoriteVerseProvider()) { entry in
+      FavoriteVerseView(entry: entry)
     }
     .configurationDisplayName("Favorite Verse")
     .description("Your saved favorite verse.")
-    .contentMarginsDisabledIfAvailable()
   }
 }
 
 // MARK: - Hourly Verse Widget
 
+struct HourlyVerseEntry: TimelineEntry {
+  let date: Date
+  let verseText: String
+  let verseReference: String
+  let nextLabel: String
+}
+
+struct HourlyVerseProvider: TimelineProvider {
+  func placeholder(in context: Context) -> HourlyVerseEntry {
+    HourlyVerseEntry(
+      date: Date(),
+      verseText: defaultHourlyVerseText,
+      verseReference: defaultHourlyVerseRef,
+      nextLabel: defaultHourlyNextLabel
+    )
+  }
+
+  func getSnapshot(in context: Context, completion: @escaping (HourlyVerseEntry) -> Void) {
+    let defaults = UserDefaults(suiteName: appGroupId)
+    let pair = loadSharedVerse(
+      textKey: "widget_hourly_verse_text",
+      refKey: "widget_hourly_verse_reference",
+      defaultText: defaultHourlyVerseText,
+      defaultRef: defaultHourlyVerseRef
+    )
+    let nextLabel = defaults?.string(forKey: "widget_hourly_next_label") ?? defaultHourlyNextLabel
+    completion(
+      HourlyVerseEntry(
+        date: Date(),
+        verseText: pair.0,
+        verseReference: pair.1,
+        nextLabel: nextLabel
+      )
+    )
+  }
+
+  func getTimeline(in context: Context, completion: @escaping (Timeline<HourlyVerseEntry>) -> Void) {
+    getSnapshot(in: context) { entry in
+      completion(Timeline(entries: [entry], policy: .atEnd))
+    }
+  }
+}
+
 struct HourlyVerseView: View {
+  var entry: HourlyVerseEntry
+  @Environment(\.widgetFamily) private var family
+
   var body: some View {
-    OldPaperSurface {
-      VStack(spacing: 5) {
-        HStack(spacing: 4) {
-          Image(systemName: "clock.fill")
-            .font(.system(size: 10))
-            .foregroundColor(oldPaperSecondary)
-          Text("Hourly Verse")
-            .font(.system(size: 11, weight: .semibold, design: .serif))
-            .foregroundColor(oldPaperText)
-        }
-        .frame(maxWidth: .infinity, alignment: .center)
-        Text("Commit your work to the Lord, and your plans will be established.")
-          .font(.system(size: 12, weight: .bold, design: .serif))
-          .foregroundColor(oldPaperText)
-          .multilineTextAlignment(.center)
-          .lineLimit(4)
-          .minimumScaleFactor(0.84)
-        Text("Proverbs 16:3")
-          .font(.system(size: 10, design: .serif))
-          .foregroundColor(oldPaperSecondary)
-          .frame(maxWidth: .infinity, alignment: .center)
-        Spacer(minLength: 0)
-        HStack {
-          Text("Next verse in 42 min")
-            .font(.system(size: 9, design: .serif))
-            .foregroundColor(oldPaperSecondary)
-          Spacer()
-          Image(systemName: "hourglass")
-            .font(.system(size: 10))
-            .foregroundColor(oldPaperSecondary)
+    widgetWithBackground(.parchment, largeImage: "widget_verse_image_bg") {
+      Group {
+        if family == .systemLarge {
+          VStack(spacing: 10) {
+            Spacer(minLength: 0)
+            HStack(spacing: 6) {
+              Image(systemName: "clock.fill")
+                .font(.system(size: 13))
+                .foregroundColor(oldPaperSecondary)
+              Text("Hourly Verse")
+                .font(.system(size: 14, weight: .semibold, design: .serif))
+                .foregroundColor(oldPaperText)
+            }
+            Text(entry.verseText)
+              .font(.system(size: 16, weight: .bold, design: .serif))
+              .foregroundColor(oldPaperText)
+              .multilineTextAlignment(.center)
+              .lineLimit(6)
+              .minimumScaleFactor(0.84)
+              .padding(.horizontal, 10)
+            Text(entry.verseReference)
+              .font(.system(size: 12, design: .serif))
+              .foregroundColor(oldPaperSecondary)
+              .multilineTextAlignment(.center)
+            Spacer(minLength: 0)
+            HStack {
+              Text(entry.nextLabel)
+                .font(.system(size: 10, design: .serif))
+                .foregroundColor(oldPaperSecondary)
+              Spacer()
+              Image(systemName: "hourglass")
+                .font(.system(size: 11))
+                .foregroundColor(oldPaperSecondary)
+            }
+          }
+        } else {
+          VStack(spacing: 5) {
+            HStack(spacing: 4) {
+              Image(systemName: "clock.fill")
+                .font(.system(size: 10))
+                .foregroundColor(oldPaperSecondary)
+              Text("Hourly Verse")
+                .font(.system(size: 11, weight: .semibold, design: .serif))
+                .foregroundColor(oldPaperText)
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+            Text(entry.verseText)
+              .font(.system(size: 12, weight: .bold, design: .serif))
+              .foregroundColor(oldPaperText)
+              .multilineTextAlignment(.center)
+              .lineLimit(4)
+              .minimumScaleFactor(0.84)
+            Text(entry.verseReference)
+              .font(.system(size: 10, design: .serif))
+              .foregroundColor(oldPaperSecondary)
+              .frame(maxWidth: .infinity, alignment: .center)
+            Spacer(minLength: 0)
+            HStack {
+              Text(entry.nextLabel)
+                .font(.system(size: 9, design: .serif))
+                .foregroundColor(oldPaperSecondary)
+              Spacer()
+              Image(systemName: "hourglass")
+                .font(.system(size: 10))
+                .foregroundColor(oldPaperSecondary)
+            }
+          }
         }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .padding(10)
+      .padding(family == .systemLarge ? 16 : 10)
     }
     .widgetURL(URL(string: "biblebookapp://verse?homeWidget"))
   }
@@ -897,51 +1199,111 @@ struct HourlyVerseWidget: Widget {
   let kind: String = "HourlyVerseWidget"
 
   var body: some WidgetConfiguration {
-    StaticConfiguration(kind: kind, provider: StaticWidgetProvider()) { _ in
-      HourlyVerseView()
+    StaticConfiguration(kind: kind, provider: HourlyVerseProvider()) { entry in
+      HourlyVerseView(entry: entry)
     }
     .configurationDisplayName("Hourly Verse")
     .description("A fresh verse every hour.")
-    .contentMarginsDisabledIfAvailable()
   }
 }
 
 // MARK: - Random Bible Verse Widget
 
+struct RandomBibleVerseEntry: TimelineEntry {
+  let date: Date
+  let verseText: String
+  let verseReference: String
+}
+
+struct RandomBibleVerseProvider: TimelineProvider {
+  func placeholder(in context: Context) -> RandomBibleVerseEntry {
+    RandomBibleVerseEntry(date: Date(), verseText: defaultVerseText, verseReference: defaultVerseRef)
+  }
+
+  func getSnapshot(in context: Context, completion: @escaping (RandomBibleVerseEntry) -> Void) {
+    let pair = loadSharedVerse(
+      textKey: "widget_random_verse_text",
+      refKey: "widget_random_verse_reference",
+      defaultText: defaultVerseText,
+      defaultRef: defaultVerseRef
+    )
+    completion(RandomBibleVerseEntry(date: Date(), verseText: pair.0, verseReference: pair.1))
+  }
+
+  func getTimeline(in context: Context, completion: @escaping (Timeline<RandomBibleVerseEntry>) -> Void) {
+    getSnapshot(in: context) { entry in
+      completion(Timeline(entries: [entry], policy: .atEnd))
+    }
+  }
+}
+
 struct RandomBibleVerseView: View {
+  var entry: RandomBibleVerseEntry
+  @Environment(\.widgetFamily) private var family
+
   var body: some View {
-    OldPaperSurface {
-      VStack(spacing: 5) {
-        HStack(spacing: 4) {
-          Image(systemName: "shuffle")
-            .font(.system(size: 10))
-            .foregroundColor(oldPaperSecondary)
-          Text("Random Verse")
-            .font(.system(size: 11, weight: .semibold, design: .serif))
-            .foregroundColor(oldPaperText)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        Text("Be still, and know that I am God.")
-          .font(.system(size: 13, weight: .bold, design: .serif))
-          .foregroundColor(oldPaperText)
-          .multilineTextAlignment(.center)
-          .lineLimit(3)
-        Text("Psalm 46:10")
-          .font(.system(size: 10, design: .serif))
-          .foregroundColor(oldPaperSecondary)
-        Spacer(minLength: 0)
-        HStack {
-          Text("Tap to get a new verse")
-            .font(.system(size: 9, design: .serif))
-            .foregroundColor(oldPaperSecondary)
-          Spacer()
-          Image(systemName: "arrow.clockwise.circle")
-            .font(.system(size: 11))
-            .foregroundColor(oldPaperSecondary)
+    widgetWithBackground(.parchment, largeImage: "widget_path_bg") {
+      Group {
+        if family == .systemLarge {
+          VStack(spacing: 10) {
+            Spacer(minLength: 0)
+            HStack(spacing: 6) {
+              Image(systemName: "shuffle")
+                .font(.system(size: 13))
+                .foregroundColor(oldPaperSecondary)
+              Text("Random Verse")
+                .font(.system(size: 14, weight: .semibold, design: .serif))
+                .foregroundColor(oldPaperText)
+            }
+            Text(entry.verseText)
+              .font(.system(size: 16, weight: .bold, design: .serif))
+              .foregroundColor(oldPaperText)
+              .multilineTextAlignment(.center)
+              .lineLimit(6)
+            Text(entry.verseReference)
+              .font(.system(size: 12, design: .serif))
+              .foregroundColor(oldPaperSecondary)
+              .multilineTextAlignment(.center)
+            Spacer(minLength: 0)
+            Text("Tap to get a new verse")
+              .font(.system(size: 10, design: .serif))
+              .foregroundColor(oldPaperSecondary)
+              .multilineTextAlignment(.center)
+          }
+        } else {
+          VStack(spacing: 5) {
+            HStack(spacing: 4) {
+              Image(systemName: "shuffle")
+                .font(.system(size: 10))
+                .foregroundColor(oldPaperSecondary)
+              Text("Random Verse")
+                .font(.system(size: 11, weight: .semibold, design: .serif))
+                .foregroundColor(oldPaperText)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Text(entry.verseText)
+              .font(.system(size: 13, weight: .bold, design: .serif))
+              .foregroundColor(oldPaperText)
+              .multilineTextAlignment(.center)
+              .lineLimit(3)
+            Text(entry.verseReference)
+              .font(.system(size: 10, design: .serif))
+              .foregroundColor(oldPaperSecondary)
+            Spacer(minLength: 0)
+            HStack {
+              Text("Tap to get a new verse")
+                .font(.system(size: 9, design: .serif))
+                .foregroundColor(oldPaperSecondary)
+              Spacer()
+              Image(systemName: "arrow.clockwise.circle")
+                .font(.system(size: 11))
+                .foregroundColor(oldPaperSecondary)
+            }
+          }
         }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .padding(10)
+      .padding(family == .systemLarge ? 16 : 10)
     }
     .widgetURL(URL(string: "biblebookapp://verse?homeWidget"))
   }
@@ -951,36 +1313,76 @@ struct RandomBibleVerseWidget: Widget {
   let kind: String = "RandomBibleVerseWidget"
 
   var body: some WidgetConfiguration {
-    StaticConfiguration(kind: kind, provider: StaticWidgetProvider()) { _ in
-      RandomBibleVerseView()
+    StaticConfiguration(kind: kind, provider: RandomBibleVerseProvider()) { entry in
+      RandomBibleVerseView(entry: entry)
     }
     .configurationDisplayName("Random Bible Verse")
     .description("Discover a random Scripture verse.")
-    .contentMarginsDisabledIfAvailable()
   }
 }
 
 // MARK: - Verse Image Widget
 
-struct VerseImageView: View {
-  var body: some View {
-    VStack(spacing: 5) {
-      Spacer(minLength: 0)
-      Text("I can do all things through Christ who strengthens me.")
-        .font(.system(size: 12, weight: .bold, design: .serif))
-        .foregroundColor(oldPaperText)
-        .multilineTextAlignment(.center)
-        .lineLimit(4)
-        .minimumScaleFactor(0.84)
-      Text("Philippians 4:13")
-        .font(.system(size: 10, weight: .medium, design: .serif))
-        .foregroundColor(oldPaperSecondary)
-      WidgetFlourish(color: flourishGold)
-        .padding(.bottom, 2)
+struct VerseImageEntry: TimelineEntry {
+  let date: Date
+  let verseText: String
+  let verseReference: String
+}
+
+struct VerseImageProvider: TimelineProvider {
+  func placeholder(in context: Context) -> VerseImageEntry {
+    VerseImageEntry(
+      date: Date(),
+      verseText: defaultVerseImageText,
+      verseReference: defaultVerseImageRef
+    )
+  }
+
+  func getSnapshot(in context: Context, completion: @escaping (VerseImageEntry) -> Void) {
+    let pair = loadSharedVerse(
+      textKey: "widget_verse_image_text",
+      refKey: "widget_verse_image_reference",
+      defaultText: defaultVerseImageText,
+      defaultRef: defaultVerseImageRef
+    )
+    completion(VerseImageEntry(date: Date(), verseText: pair.0, verseReference: pair.1))
+  }
+
+  func getTimeline(in context: Context, completion: @escaping (Timeline<VerseImageEntry>) -> Void) {
+    getSnapshot(in: context) { entry in
+      completion(Timeline(entries: [entry], policy: .atEnd))
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .padding(10)
-    .modifier(_VerseImageBackground())
+  }
+}
+
+struct VerseImageView: View {
+  var entry: VerseImageEntry
+  @Environment(\.widgetFamily) private var family
+
+  var body: some View {
+    widgetWithBackground(.verseScenic, largeImage: "widget_verse_image_bg") {
+      VStack(spacing: family == .systemLarge ? 10 : 5) {
+        Spacer(minLength: 0)
+        Text(entry.verseText)
+          .font(.system(size: family == .systemLarge ? 16 : 12, weight: .bold, design: .serif))
+          .foregroundStyle(oldPaperText)
+          .widgetFullColorContent()
+          .multilineTextAlignment(.center)
+          .lineLimit(family == .systemLarge ? 6 : 4)
+          .minimumScaleFactor(0.84)
+          .padding(.horizontal, family == .systemLarge ? 12 : 4)
+        Text(entry.verseReference)
+          .font(.system(size: family == .systemLarge ? 12 : 10, weight: .medium, design: .serif))
+          .foregroundStyle(oldPaperSecondary)
+          .widgetFullColorContent()
+          .multilineTextAlignment(.center)
+        WidgetFlourish(color: flourishGold)
+          .padding(.bottom, 2)
+        Spacer(minLength: 0)
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .padding(family == .systemLarge ? 16 : 10)
+    }
     .widgetURL(URL(string: "biblebookapp://verse?homeWidget"))
   }
 }
@@ -989,102 +1391,11 @@ struct VerseImageWidget: Widget {
   let kind: String = "VerseImageWidget"
 
   var body: some WidgetConfiguration {
-    StaticConfiguration(kind: kind, provider: StaticWidgetProvider()) { _ in
-      VerseImageView()
+    StaticConfiguration(kind: kind, provider: VerseImageProvider()) { entry in
+      VerseImageView(entry: entry)
     }
     .configurationDisplayName("Verse Image")
     .description("A scenic verse image for your home screen.")
-    .contentMarginsDisabledIfAvailable()
-    .contentMarginsDisabled()
-  }
-}
-
-// MARK: - Bible Trivia Widget
-
-struct BibleTriviaView: View {
-  var body: some View {
-    OldPaperSurface {
-      VStack(spacing: 7) {
-        ZStack {
-          Circle()
-            .fill(oldPaperText)
-            .frame(width: 30, height: 30)
-          Text("?")
-            .font(.system(size: 17, weight: .bold, design: .serif))
-            .foregroundColor(oldPaperBackground)
-        }
-        OldPaperTitleRow(title: "Question of the Day")
-        Text("Who built the ark?")
-          .font(.system(size: 14, weight: .bold, design: .serif))
-          .foregroundColor(oldPaperText)
-          .multilineTextAlignment(.center)
-          .lineLimit(2)
-        Spacer(minLength: 0)
-        DarkWidgetButton(title: "Tap to Answer")
-      }
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .padding(10)
-    }
-    .widgetURL(URL(string: "biblebookapp://chat?homeWidget"))
-  }
-}
-
-struct BibleTriviaWidget: Widget {
-  let kind: String = "BibleTriviaWidget"
-
-  var body: some WidgetConfiguration {
-    StaticConfiguration(kind: kind, provider: StaticWidgetProvider()) { _ in
-      BibleTriviaView()
-    }
-    .configurationDisplayName("Bible Trivia")
-    .description("Answer a daily Bible question.")
-    .contentMarginsDisabledIfAvailable()
-  }
-}
-
-// MARK: - Prayer Reminder Widget
-
-struct PrayerReminderView: View {
-  var body: some View {
-    OldPaperSurface {
-      HStack(spacing: 10) {
-        Image("widget_prayer_hands")
-          .resizable()
-          .scaledToFit()
-          .frame(width: 52, height: 52)
-        VStack(alignment: .leading, spacing: 5) {
-          HStack(spacing: 4) {
-            Text("Prayer Reminder")
-              .font(.system(size: 11, weight: .semibold, design: .serif))
-              .foregroundColor(oldPaperText)
-            Image(systemName: "bell.fill")
-              .font(.system(size: 9))
-              .foregroundColor(oldPaperSecondary)
-          }
-          Text("Take one minute to talk to God.")
-            .font(.system(size: 10, design: .serif))
-            .foregroundColor(oldPaperSecondary)
-            .lineLimit(2)
-          DarkWidgetButton(title: "Let's Pray")
-        }
-      }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-      .padding(10)
-    }
-    .widgetURL(URL(string: "biblebookapp://prayer?homeWidget"))
-  }
-}
-
-struct PrayerReminderWidget: Widget {
-  let kind: String = "PrayerReminderWidget"
-
-  var body: some WidgetConfiguration {
-    StaticConfiguration(kind: kind, provider: StaticWidgetProvider()) { _ in
-      PrayerReminderView()
-    }
-    .configurationDisplayName("Prayer Reminder")
-    .description("A gentle reminder to pray.")
-    .contentMarginsDisabledIfAvailable()
   }
 }
 
@@ -1095,18 +1406,17 @@ struct BibleHomeWidgetBundle: WidgetBundle {
   var body: some Widget {
     VerseOfTheDayWidget()
     ContinueReadingWidget()
-    ReadingPlanWidget()
     WeeklyReadingStreakWidget()
     FavoriteVerseWidget()
     HourlyVerseWidget()
     RandomBibleVerseWidget()
     VerseImageWidget()
-    BibleTriviaWidget()
-    PrayerReminderWidget()
     BiblePrayerWidget()
     BibleChatWidget()
     if #available(iOS 16.1, *) {
       StreakLiveActivityWidget()
+      MemoryVerseLiveActivityWidget()
+      ContinueReadingLiveActivityWidget()
     }
   }
 }

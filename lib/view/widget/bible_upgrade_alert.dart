@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:flutter/gestures.dart';
@@ -318,156 +319,153 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
     return Dialog(
       key: key,
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 56),
       child: Material(
         color: Colors.transparent,
-        child: Container(
-          decoration: BoxDecoration(
-            color: _dialogCream,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.14),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.72,
           ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(18, 12, 18, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Align(
-                  alignment: Alignment.topRight,
-                  child: IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
+          child: Container(
+            decoration: BoxDecoration(
+              color: _dialogCream,
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.14),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () =>
+                          unawaited(_dismissUpgradePermanently(context)),
+                      icon: const Icon(
+                        Icons.close,
+                        size: 20,
+                        color: Color(0xFF7A5A3A),
+                      ),
+                    ),
+                  ),
+                  _buildHeaderIcon(),
+                  const SizedBox(height: 8),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: _ink,
+                      height: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _formatUpdateMessageForDisplay(
+                      message,
+                      messages.message(UpgraderMessage.prompt),
+                    ),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      height: 1.35,
+                      color: _muted,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (notes != null && notes.trim().isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _buildReleaseNotesCard(
+                      messages.message(UpgraderMessage.releaseNotes) ??
+                          'Release Notes',
+                      notes,
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  _buildPrimaryButton(
+                    title: messages.message(UpgraderMessage.buttonTitleUpdate) ??
+                        'UPDATE NOW',
+                    subtitle: 'Get the latest version',
                     onPressed: () =>
-                        unawaited(_dismissUpgradePermanently(context)),
-                    icon: const Icon(
-                      Icons.close,
-                      size: 22,
-                      color: Color(0xFF7A5A3A),
-                    ),
+                        onUserUpdated(context, !widget.upgrader.blocked()),
                   ),
-                ),
-                _buildHeaderIcon(),
-                const SizedBox(height: 10),
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: _ink,
-                    height: 1.1,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  message,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    height: 1.45,
-                    color: _muted,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  messages.message(UpgraderMessage.prompt) ?? '',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    height: 1.45,
-                    color: _muted,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                if (notes != null && notes.trim().isNotEmpty) ...[
-                  const SizedBox(height: 18),
-                  _buildReleaseNotesCard(
-                    messages.message(UpgraderMessage.releaseNotes) ??
-                        'Release Notes',
-                    notes,
-                  ),
-                ],
-                const SizedBox(height: 18),
-                _buildPrimaryButton(
-                  title: messages.message(UpgraderMessage.buttonTitleUpdate) ??
-                      'UPDATE NOW',
-                  subtitle: 'Get the latest version',
-                  onPressed: () =>
-                      onUserUpdated(context, !widget.upgrader.blocked()),
-                ),
-                const SizedBox(height: 14),
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () => unawaited(_onIntroRemindLater(context)),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Column(
-                        children: [
-                          Text(
-                            'Remind Later',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: _accent,
+                  const SizedBox(height: 10),
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => unawaited(_onIntroRemindLater(context)),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Remind Later',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: _accent,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Not now? We\'ll remind you again in 3 days.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              height: 1.35,
-                              color: _muted,
-                              fontWeight: FontWeight.w500,
+                            const SizedBox(height: 2),
+                            const Text(
+                              'Not now? We\'ll remind you again in 3 days.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 12,
+                                height: 1.3,
+                                color: _muted,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Divider(
-                        color: _muted.withOpacity(0.25),
-                        thickness: 1,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      child: Text(
-                        'or',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: _muted.withOpacity(0.8),
-                          fontWeight: FontWeight.w500,
+                          ],
                         ),
                       ),
                     ),
-                    Expanded(
-                      child: Divider(
-                        color: _muted.withOpacity(0.25),
-                        thickness: 1,
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Divider(
+                          color: _muted.withOpacity(0.25),
+                          thickness: 1,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _buildStoreFooterNote(),
-              ],
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Text(
+                          'or',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _muted.withOpacity(0.8),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Divider(
+                          color: _muted.withOpacity(0.25),
+                          thickness: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  _buildStoreFooterNote(),
+                ],
+              ),
             ),
           ),
         ),
@@ -502,94 +500,91 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
     return Dialog(
       key: key,
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 56),
       child: Material(
         color: Colors.transparent,
-        child: Container(
-          decoration: BoxDecoration(
-            color: _dialogCream,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.14),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.72,
           ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(18, 12, 18, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Align(
-                  alignment: Alignment.topRight,
-                  child: IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    onPressed: () =>
-                        unawaited(_dismissUpgradePermanently(context)),
-                    icon: const Icon(
-                      Icons.close,
-                      size: 22,
-                      color: Color(0xFF7A5A3A),
+          child: Container(
+            decoration: BoxDecoration(
+              color: _dialogCream,
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.14),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () =>
+                          unawaited(_dismissUpgradePermanently(context)),
+                      icon: const Icon(
+                        Icons.close,
+                        size: 20,
+                        color: Color(0xFF7A5A3A),
+                      ),
                     ),
                   ),
-                ),
-                _buildHeaderIcon(),
-                const SizedBox(height: 10),
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: _ink,
-                    height: 1.1,
+                  _buildHeaderIcon(),
+                  const SizedBox(height: 8),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: _ink,
+                      height: 1.1,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  message,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    height: 1.45,
-                    color: _muted,
-                    fontWeight: FontWeight.w500,
+                  const SizedBox(height: 8),
+                  Text(
+                    _formatUpdateMessageForDisplay(
+                      message,
+                      messages.message(UpgraderMessage.prompt),
+                    ),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      height: 1.35,
+                      color: _muted,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  messages.message(UpgraderMessage.prompt) ?? '',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    height: 1.45,
-                    color: _muted,
-                    fontWeight: FontWeight.w500,
+                  if (notes != null && notes.trim().isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _buildReleaseNotesCard(
+                      messages.message(UpgraderMessage.releaseNotes) ??
+                          'Release Notes',
+                      notes,
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  _buildPrimaryButton(
+                    title: messages.message(UpgraderMessage.buttonTitleUpdate) ??
+                        'UPDATE NOW',
+                    subtitle: 'Get the latest version',
+                    onPressed: () =>
+                        onUserUpdated(context, !widget.upgrader.blocked()),
                   ),
-                ),
-                if (notes != null && notes.trim().isNotEmpty) ...[
-                  const SizedBox(height: 18),
-                  _buildReleaseNotesCard(
-                    messages.message(UpgraderMessage.releaseNotes) ??
-                        'Release Notes',
-                    notes,
-                  ),
+                  const SizedBox(height: 10),
+                  _buildStoreFooterNote(),
                 ],
-                const SizedBox(height: 18),
-                _buildPrimaryButton(
-                  title: messages.message(UpgraderMessage.buttonTitleUpdate) ??
-                      'UPDATE NOW',
-                  subtitle: 'Get the latest version',
-                  onPressed: () =>
-                      onUserUpdated(context, !widget.upgrader.blocked()),
-                ),
-                const SizedBox(height: 14),
-                _buildStoreFooterNote(),
-              ],
+              ),
             ),
           ),
         ),
@@ -598,17 +593,62 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
   }
 
   Widget _buildHeaderIcon() {
-    return Image.asset(
-      'assets/start.png',
-      height: 92,
-      width: 92,
-      fit: BoxFit.contain,
-      errorBuilder: (_, __, ___) => const Icon(
-        Icons.menu_book_rounded,
-        size: 36,
-        color: _ink,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Image.asset(
+        Images.appIcon1024,
+        height: 64,
+        width: 64,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.asset(
+            'assets/new_logos.jpg',
+            height: 64,
+            width: 64,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const Icon(
+              Icons.menu_book_rounded,
+              size: 30,
+              color: _ink,
+            ),
+          ),
+        ),
       ),
     );
+  }
+
+  /// Display-only: one concise update line (no upgrader logic changes).
+  String _formatUpdateMessageForDisplay(String message, String? prompt) {
+    final body = message.trim();
+    final promptText = prompt?.trim() ?? '';
+
+    final versionMatch = RegExp(
+      r'Version\s+([\d.]+)\s+is\s+now\s+available[-\s–]*you\s+have\s+([\d.]+)',
+      caseSensitive: false,
+    ).firstMatch(body);
+    if (versionMatch != null) {
+      final newVersion = versionMatch.group(1);
+      final currentVersion = versionMatch.group(2);
+      return 'Version $newVersion of ${BibleInfo.bible_shortName} is available. You\'re on $currentVersion.';
+    }
+
+    if (body.isNotEmpty) {
+      // Drop redundant follow-up when the primary CTA already asks to update.
+      if (promptText.isNotEmpty &&
+          RegExp(
+            r'would you like|update it now|update now',
+            caseSensitive: false,
+          ).hasMatch(promptText)) {
+        return body;
+      }
+      if (promptText.isNotEmpty && !body.toLowerCase().contains(promptText.toLowerCase())) {
+        return '$body $promptText';
+      }
+      return body;
+    }
+
+    return promptText;
   }
 
   Widget _buildReleaseNotesCard(String heading, String notes) {
@@ -621,10 +661,10 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
       decoration: BoxDecoration(
         color: _notesBg,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -633,48 +673,58 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
             children: [
               const Icon(
                 Icons.description_outlined,
-                size: 18,
+                size: 16,
                 color: _ink,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Text(
                 heading,
                 style: const TextStyle(
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: FontWeight.w800,
                   color: _ink,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          ...items.map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
+          const SizedBox(height: 8),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 120),
+            child: SingleChildScrollView(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 7, right: 10),
-                    width: 6,
-                    height: 6,
-                    decoration: const BoxDecoration(
-                      color: _accent,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      item,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        height: 1.4,
-                        color: _muted,
-                        fontWeight: FontWeight.w500,
+                children: items
+                    .map(
+                      (item) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              margin: const EdgeInsets.only(top: 6, right: 8),
+                              width: 5,
+                              height: 5,
+                              decoration: const BoxDecoration(
+                                color: _accent,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                item,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  height: 1.35,
+                                  color: _muted,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ),
-                ],
+                    )
+                    .toList(),
               ),
             ),
           ),
@@ -767,15 +817,15 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
               ],
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               child: Row(
                 children: [
                   const Icon(
                     Icons.download_rounded,
                     color: Colors.white,
-                    size: 24,
+                    size: 22,
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -783,17 +833,17 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
                         Text(
                           title.toUpperCase(),
                           style: const TextStyle(
-                            fontSize: 15,
+                            fontSize: 14,
                             fontWeight: FontWeight.w800,
                             color: Colors.white,
                             letterSpacing: 0.2,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 1),
                         Text(
                           subtitle,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             color: Colors.white.withOpacity(0.92),
                             fontWeight: FontWeight.w500,
                           ),

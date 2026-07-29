@@ -4,6 +4,12 @@
 
 import 'dart:io';
 
+import 'package:biblebookapp/Model/dailyVerseList.dart';
+import 'package:biblebookapp/Model/verseBookContentModel.dart';
+import 'package:biblebookapp/controller/dpProvider.dart';
+import 'package:biblebookapp/live_activity/live_activity_queue.dart';
+import 'package:biblebookapp/streak/streak_service.dart';
+import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
 
@@ -29,6 +35,12 @@ const String _kAppGroupId = 'group.com.balaklrapps.newkingsjamesversion';
 const String _kVerseOfTheDayKind = 'VerseOfTheDayWidget';
 const String _kBiblePrayerKind = 'BiblePrayerWidget';
 const String _kBibleChatKind = 'BibleChatWidget';
+const String _kContinueReadingKind = 'ContinueReadingWidget';
+const String _kWeeklyStreakKind = 'WeeklyReadingStreakWidget';
+const String _kFavoriteVerseKind = 'FavoriteVerseWidget';
+const String _kHourlyVerseKind = 'HourlyVerseWidget';
+const String _kRandomVerseKind = 'RandomBibleVerseWidget';
+const String _kVerseImageKind = 'VerseImageWidget';
 
 /// Data keys stored in UserDefaults (App Group) for the widgets.
 const String _kVerseTextKey = 'widget_verse_text';
@@ -42,6 +54,23 @@ const String _kPrayerTextKey = 'widget_prayer_text';
 const String _kChatQuestionKey = 'widget_chat_question';
 const String _kChatAnswerKey = 'widget_chat_answer';
 const String _kBibleChatTitleKey = 'widget_bible_chat_title';
+const String _kStreakDaysKey = 'widget_streak_days';
+const String _kFavoriteVerseTextKey = 'widget_favorite_verse_text';
+const String _kFavoriteVerseReferenceKey = 'widget_favorite_verse_reference';
+const String _kRandomVerseTextKey = 'widget_random_verse_text';
+const String _kRandomVerseReferenceKey = 'widget_random_verse_reference';
+const String _kHourlyVerseTextKey = 'widget_hourly_verse_text';
+const String _kHourlyVerseReferenceKey = 'widget_hourly_verse_reference';
+const String _kHourlyNextLabelKey = 'widget_hourly_next_label';
+const String _kVerseImageTextKey = 'widget_verse_image_text';
+const String _kVerseImageReferenceKey = 'widget_verse_image_reference';
+const String _kContinueBookChapterKey = 'widget_continue_book_chapter';
+const String _kContinueSubtitleKey = 'widget_continue_subtitle';
+const String _kContinueProgressKey = 'widget_continue_progress';
+const String _kContinueProgressLabelKey = 'widget_continue_progress_label';
+const String _kWeeklyStreakStatusKey = 'widget_weekly_streak_status';
+const String _kWeeklyStreakCountKey = 'widget_weekly_streak_count';
+const String _kWeeklyStreakCountStrKey = 'widget_weekly_streak_count_str';
 
 /// Deep-link host names when user taps a widget (must match widgetURL in Swift).
 const String kWidgetRouteVerse = 'verse';
@@ -87,6 +116,239 @@ String stripHtmlTagsForWidgetVerse(String raw) {
   return s.replaceAll(RegExp(r'\s+'), ' ').trim();
 }
 
+String _formatDailyVerseReference(DailyVerseList verse) {
+  final book = verse.book?.trim() ?? '';
+  final chapter = dailyVerseUiChapter(verse.chapter);
+  final verseNum = dailyVerseUiVerse(verse.verseNum);
+  final ref = '$book $chapter:$verseNum'.trim();
+  return ref.isEmpty ? 'Daily Verse' : ref;
+}
+
+String _widgetVerseTextFromDaily(DailyVerseList verse) {
+  final raw = verse.verse?.trim() ?? '';
+  if (raw.isEmpty) return _kDefaultVerseText;
+  return stripHtmlTagsForWidgetVerse(raw);
+}
+
+String _hourlyNextLabel() {
+  final now = DateTime.now();
+  final nextHour = DateTime(now.year, now.month, now.day, now.hour + 1);
+  final minutes = nextHour.difference(now).inMinutes.clamp(1, 59);
+  return 'Next verse in $minutes min';
+}
+
+int _weekDayStatusCode(WeekDayStatus status) {
+  switch (status) {
+    case WeekDayStatus.completed:
+      return 1;
+    case WeekDayStatus.ongoing:
+      return 2;
+    case WeekDayStatus.missed:
+    case WeekDayStatus.future:
+      return 0;
+  }
+}
+
+/// Display-only encoding for the weekly streak widget (does not change streak logic).
+int _weekDayStatusCodeForWidget(WeekDayStatus status, {required bool todayComplete}) {
+  if (status == WeekDayStatus.ongoing) {
+    return todayComplete ? 1 : 2;
+  }
+  return _weekDayStatusCode(status);
+}
+
+/// Read-only: whether today's streak is finished (same prefs the app already uses).
+Future<bool> _isTodayStreakCompleteForWidget() async {
+  final today = DateTime.now().toIso8601String().split('T')[0];
+  final lastShown = await SharPreferences.getString(
+      SharPreferences.streakFlowLastShownDate);
+  if (lastShown == today) return true;
+
+  final lastActivity = await SharPreferences.getString(
+      SharPreferences.streakLastActivityDate);
+  if (lastActivity == today) {
+    final count =
+        await SharPreferences.getInt(SharPreferences.streakCount) ?? 0;
+    if (count > 0) return true;
+  }
+
+  final started =
+      await SharPreferences.getString(SharPreferences.streakFlowStartedDate);
+  if (started == today) {
+    final steps = await SharPreferences.getInt(
+            SharPreferences.streakFlowStepsCompletedToday) ??
+        0;
+    if (steps >= 4) return true;
+  }
+  return false;
+}
+
+/// Read-only mirror: pushes verse-family widgets from [dailyVerseList] (same source as Daily Verse).
+Future<void> syncVerseFamilyWidgetsFromDailyList(
+  List<DailyVerseList> dailyVerseList,
+) async {
+  if (!Platform.isIOS || dailyVerseList.isEmpty) return;
+  try {
+    final daily = dailyVerseList.first;
+    final dailyText = _widgetVerseTextFromDaily(daily);
+    final dailyRef = _formatDailyVerseReference(daily);
+
+    // Favorite: latest bookmark when available, otherwise second daily verse or first.
+    var favoriteText = dailyText;
+    var favoriteRef = dailyRef;
+    try {
+      final bookmarks = await DBHelper().getBookMark();
+      if (bookmarks.isNotEmpty) {
+        bookmarks.sort((a, b) {
+          final ta = a.timestamp ?? '';
+          final tb = b.timestamp ?? '';
+          return tb.compareTo(ta);
+        });
+        final bm = bookmarks.first;
+        final raw = bm.content?.trim() ?? '';
+        if (raw.isNotEmpty) {
+          favoriteText = stripHtmlTagsForWidgetVerse(raw);
+          final book = bm.bookName?.trim() ?? '';
+          final ch = (bm.chapterNum ?? 0).toInt();
+          final vs = (bm.verseNum ?? 0).toInt();
+          favoriteRef = '$book $ch:$vs'.trim();
+          if (favoriteRef.isEmpty) favoriteRef = dailyRef;
+        }
+      } else if (dailyVerseList.length > 1) {
+        final fav = dailyVerseList[1];
+        favoriteText = _widgetVerseTextFromDaily(fav);
+        favoriteRef = _formatDailyVerseReference(fav);
+      }
+    } catch (e) {
+      debugPrint('BibleHomeWidget: favorite bookmark read failed: $e');
+    }
+
+    final daySeed = DateTime.now().day + DateTime.now().month * 31;
+    final randomIndex = daySeed % dailyVerseList.length;
+    final randomVerse = dailyVerseList[randomIndex];
+    final hourlyIndex = DateTime.now().hour % dailyVerseList.length;
+    final hourlyVerse = dailyVerseList[hourlyIndex];
+
+    await HomeWidget.saveWidgetData<String>(_kFavoriteVerseTextKey, favoriteText);
+    await HomeWidget.saveWidgetData<String>(
+        _kFavoriteVerseReferenceKey, favoriteRef);
+    await HomeWidget.saveWidgetData<String>(
+      _kRandomVerseTextKey,
+      _widgetVerseTextFromDaily(randomVerse),
+    );
+    await HomeWidget.saveWidgetData<String>(
+      _kRandomVerseReferenceKey,
+      _formatDailyVerseReference(randomVerse),
+    );
+    await HomeWidget.saveWidgetData<String>(
+      _kHourlyVerseTextKey,
+      _widgetVerseTextFromDaily(hourlyVerse),
+    );
+    await HomeWidget.saveWidgetData<String>(
+      _kHourlyVerseReferenceKey,
+      _formatDailyVerseReference(hourlyVerse),
+    );
+    await HomeWidget.saveWidgetData<String>(_kHourlyNextLabelKey, _hourlyNextLabel());
+    await HomeWidget.saveWidgetData<String>(_kVerseImageTextKey, dailyText);
+    await HomeWidget.saveWidgetData<String>(_kVerseImageReferenceKey, dailyRef);
+
+    await HomeWidget.updateWidget(iOSName: _kFavoriteVerseKind);
+    await HomeWidget.updateWidget(iOSName: _kRandomVerseKind);
+    await HomeWidget.updateWidget(iOSName: _kHourlyVerseKind);
+    await HomeWidget.updateWidget(iOSName: _kVerseImageKind);
+  } catch (e) {
+    debugPrint('BibleHomeWidget: syncVerseFamilyWidgetsFromDailyList failed: $e');
+  }
+}
+
+/// Read-only mirror: continue-reading widget from prefs + DB (no reading-flow changes).
+Future<void> syncContinueReadingWidget() async {
+  if (!Platform.isIOS) return;
+  try {
+    final book =
+        (await SharPreferences.getString(SharPreferences.selectedBook))?.trim() ??
+            '';
+    final chapter =
+        (await SharPreferences.getString(SharPreferences.selectedChapter))
+                ?.trim() ??
+            '';
+    final bookNumStr =
+        (await SharPreferences.getString(SharPreferences.selectedBookNum)) ??
+            '0';
+    final bookNum = int.tryParse(bookNumStr) ?? 0;
+
+    var bookChapter = [book, chapter].where((s) => s.isNotEmpty).join(' ');
+    if (bookChapter.isEmpty) bookChapter = 'Genesis 1';
+
+    var progressLabel = '0';
+    var progressValue = 0.0;
+    try {
+      final db = await DBHelper().db;
+      if (db != null && bookNum >= 0) {
+        final rows = await db.rawQuery(
+          'SELECT read_per FROM book WHERE book_num = ? LIMIT 1',
+          [bookNum],
+        );
+        if (rows.isNotEmpty && rows.first['read_per'] != null) {
+          final readPer =
+              double.tryParse(rows.first['read_per'].toString()) ?? 0.0;
+          progressValue = (readPer / 100.0).clamp(0.0, 1.0);
+          progressLabel =
+              readPer >= 99.9 ? '100' : readPer.toStringAsFixed(0);
+        }
+      }
+    } catch (e) {
+      debugPrint('BibleHomeWidget: continue reading DB read failed: $e');
+    }
+
+    final subtitle = chapter.isNotEmpty
+        ? 'Chapter $chapter · $progressLabel% of book'
+        : '$progressLabel% of book';
+
+    await HomeWidget.saveWidgetData<String>(
+        _kContinueBookChapterKey, bookChapter);
+    await HomeWidget.saveWidgetData<String>(_kContinueSubtitleKey, subtitle);
+    await HomeWidget.saveWidgetData<String>(
+        _kContinueProgressKey, progressValue.toStringAsFixed(3));
+    await HomeWidget.saveWidgetData<String>(
+        _kContinueProgressLabelKey, '$progressLabel%');
+    await HomeWidget.updateWidget(iOSName: _kContinueReadingKind);
+    // Display-only: refresh Live Activity queue + streak widget mirrors.
+    await LiveActivityQueue.sync();
+    await syncWeeklyStreakWidget();
+  } catch (e) {
+    debugPrint('BibleHomeWidget: syncContinueReadingWidget failed: $e');
+  }
+}
+
+/// Read-only mirror: weekly streak widget from [StreakService] (no streak logic changes).
+Future<void> syncWeeklyStreakWidget() async {
+  if (!Platform.isIOS) return;
+  try {
+    final statuses = await StreakService.getWeekDayStatuses();
+    final streakCount = await StreakService.getCurrentStreak();
+    final todayComplete = await _isTodayStreakCompleteForWidget();
+    final statusCsv = statuses
+        .map((s) => _weekDayStatusCodeForWidget(s, todayComplete: todayComplete))
+        .join(',');
+
+    await HomeWidget.saveWidgetData<String>(_kWeeklyStreakStatusKey, statusCsv);
+    await HomeWidget.saveWidgetData<int>(_kWeeklyStreakCountKey, streakCount);
+    await HomeWidget.saveWidgetData<String>(
+        _kWeeklyStreakCountStrKey, '$streakCount');
+    await HomeWidget.updateWidget(iOSName: _kWeeklyStreakKind);
+  } catch (e) {
+    debugPrint('BibleHomeWidget: syncWeeklyStreakWidget failed: $e');
+  }
+}
+
+Future<void> _mirrorStreakDaysForPrayerWidget() async {
+  try {
+    final streakCount = await StreakService.getCurrentStreak();
+    await HomeWidget.saveWidgetData<int>(_kStreakDaysKey, streakCount);
+  } catch (_) {}
+}
+
 /// Updates the "Verse of the day" widget with the given verse text and reference.
 /// Uses defaults if empty. Call after loading daily verses (e.g. from DownloadProvider.loadDailyVerses).
 /// No-op on non-iOS.
@@ -103,6 +365,9 @@ Future<void> updateVerseOfTheDayWidget({
     await HomeWidget.saveWidgetData<String>(_kVerseTextKey, text);
     await HomeWidget.saveWidgetData<String>(_kVerseReferenceKey, ref);
     await HomeWidget.updateWidget(iOSName: _kVerseOfTheDayKind);
+    // Display-only: refresh Live Activity queue + streak widget mirrors.
+    await LiveActivityQueue.sync();
+    await syncWeeklyStreakWidget();
   } catch (e) {
     debugPrint('BibleHomeWidget: updateVerseOfTheDayWidget failed: $e');
   }
@@ -121,6 +386,7 @@ Future<void> updateBiblePrayerWidget({String? prayerText}) async {
           : prayerText.trim();
       await HomeWidget.saveWidgetData<String>(_kPrayerTextKey, snippet);
     }
+    await _mirrorStreakDaysForPrayerWidget();
     await HomeWidget.updateWidget(iOSName: _kBiblePrayerKind);
   } catch (e) {
     debugPrint('BibleHomeWidget: updateBiblePrayerWidget failed: $e');
@@ -135,7 +401,10 @@ Future<void> updateBibleChatWidget({String? question, String? answer}) async {
     await HomeWidget.saveWidgetData<String>(_kBibleChatTitleKey, 'Bible Chat');
     if (question != null && question.trim().isNotEmpty) {
       await HomeWidget.saveWidgetData<String>(
-          _kChatQuestionKey, question.trim().length > 120 ? '${question.trim().substring(0, 120)}...' : question.trim());
+          _kChatQuestionKey,
+          question.trim().length > 120
+              ? '${question.trim().substring(0, 120)}...'
+              : question.trim());
     }
     if (answer != null && answer.trim().isNotEmpty) {
       final snippet = answer.length > 240
@@ -150,12 +419,19 @@ Future<void> updateBibleChatWidget({String? question, String? answer}) async {
 }
 
 /// Call once after app is ready (e.g. when home is first built) to refresh
-/// launcher widgets so they show default content. No-op on non-iOS.
-Future<void> updateAllLauncherWidgets() async {
+/// launcher widgets from existing app data. No-op on non-iOS.
+Future<void> updateAllLauncherWidgets({
+  List<DailyVerseList>? dailyVerses,
+}) async {
   if (!Platform.isIOS) return;
   try {
     await updateBiblePrayerWidget();
     await updateBibleChatWidget();
+    await syncContinueReadingWidget();
+    await syncWeeklyStreakWidget();
+    if (dailyVerses != null && dailyVerses.isNotEmpty) {
+      await syncVerseFamilyWidgetsFromDailyList(dailyVerses);
+    }
   } catch (e) {
     debugPrint('BibleHomeWidget: updateAllLauncherWidgets failed: $e');
   }

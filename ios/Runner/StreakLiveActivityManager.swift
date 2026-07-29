@@ -23,7 +23,16 @@ private enum StreakLiveActivityManager {
       let steps = intValue(args?["stepsCompleted"], fallback: 0)
       let total = max(1, intValue(args?["stepsTotal"], fallback: 4))
       let forceStart = boolValue(args?["forceStart"], fallback: false)
-      Task { await sync(streak: streak, steps: steps, total: total, forceStart: forceStart) }
+      let contentDayKey = args?["contentDayKey"] as? String
+      Task {
+        await sync(
+          streak: streak,
+          steps: steps,
+          total: total,
+          forceStart: forceStart,
+          contentDayKey: contentDayKey
+        )
+      }
       return true
     case "end":
       Task { await endAll() }
@@ -59,26 +68,55 @@ private enum StreakLiveActivityManager {
     return "Start today's journey to begin your streak"
   }
 
+  /// Local yyyy-MM-dd for the snapshot (display-only day key).
+  private static func localDayKey(for date: Date = Date()) -> String {
+    let formatter = DateFormatter()
+    formatter.calendar = Calendar.current
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = .current
+    formatter.dateFormat = "yyyy-MM-dd"
+    return formatter.string(from: date)
+  }
+
+  /// Next local midnight (+5s) so the activity can be marked stale overnight.
+  /// Display-only hint for WidgetKit; does not change streak data.
+  private static func nextLocalStaleDate() -> Date {
+    let calendar = Calendar.current
+    let startOfToday = calendar.startOfDay(for: Date())
+    if let next = calendar.date(byAdding: .day, value: 1, to: startOfToday) {
+      return next.addingTimeInterval(5)
+    }
+    return Date().addingTimeInterval(60 * 60 * 24)
+  }
+
   private static func sync(
     streak: Int,
     steps: Int,
     total: Int,
-    forceStart: Bool
+    forceStart: Bool,
+    contentDayKey: String?
   ) async {
     guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+
+    let dayKey = {
+      if let contentDayKey, !contentDayKey.isEmpty { return contentDayKey }
+      return localDayKey()
+    }()
 
     let state = StreakLiveActivityAttributes.ContentState(
       streakCount: max(0, streak),
       stepsCompleted: min(max(0, steps), total),
       stepsTotal: total,
-      statusText: statusText(streak: streak, steps: steps, total: total)
+      statusText: statusText(streak: streak, steps: steps, total: total),
+      contentDayKey: dayKey
     )
+    let staleDate = nextLocalStaleDate()
 
     let existing = Activity<StreakLiveActivityAttributes>.activities
     if let activity = existing.first {
       if #available(iOS 16.2, *) {
         await activity.update(
-          ActivityContent(state: state, staleDate: nil)
+          ActivityContent(state: state, staleDate: staleDate)
         )
       } else {
         await activity.update(using: state)
@@ -94,7 +132,7 @@ private enum StreakLiveActivityManager {
       if #available(iOS 16.2, *) {
         _ = try Activity.request(
           attributes: attributes,
-          content: ActivityContent(state: state, staleDate: nil),
+          content: ActivityContent(state: state, staleDate: staleDate),
           pushType: nil
         )
       } else {

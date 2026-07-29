@@ -4021,7 +4021,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     String? bottomBanner;
     if (isTwoYear) {
       bottomBanner = 'LOWEST COST';
-    } else if (isOneYear && badgeText != null) {
+    } else if (isSelected && isOneYear && badgeText != null) {
       bottomBanner = badgeText.toUpperCase();
     } else if (isSelected && isLifetime) {
       bottomBanner = 'LOWEST COST';

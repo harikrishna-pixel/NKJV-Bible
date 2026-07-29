@@ -24,6 +24,10 @@
 		B1D7E0100001000000010004 /* StreakLiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D7E0100001000000010002 /* StreakLiveActivityAttributes.swift */; };
 		B1D7E0110001000000010003 /* StreakLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D7E0110001000000010002 /* StreakLiveActivityWidget.swift */; };
 		B1D7E0120001000000010003 /* StreakLiveActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D7E0120001000000010002 /* StreakLiveActivityManager.swift */; };
+		B1D7E0200001000000010003 /* ContentLiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D7E0200001000000010002 /* ContentLiveActivityAttributes.swift */; };
+		B1D7E0200001000000010004 /* ContentLiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D7E0200001000000010002 /* ContentLiveActivityAttributes.swift */; };
+		B1D7E0210001000000010003 /* ContentLiveActivityWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D7E0210001000000010002 /* ContentLiveActivityWidgets.swift */; };
+		B1D7E0220001000000010003 /* ContentLiveActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D7E0220001000000010002 /* ContentLiveActivityManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -91,6 +95,9 @@
 		B1D7E0100001000000010002 /* StreakLiveActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreakLiveActivityAttributes.swift; sourceTree = "<group>"; };
 		B1D7E0110001000000010002 /* StreakLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreakLiveActivityWidget.swift; sourceTree = "<group>"; };
 		B1D7E0120001000000010002 /* StreakLiveActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreakLiveActivityManager.swift; sourceTree = "<group>"; };
+		B1D7E0200001000000010002 /* ContentLiveActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentLiveActivityAttributes.swift; sourceTree = "<group>"; };
+		B1D7E0210001000000010002 /* ContentLiveActivityWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentLiveActivityWidgets.swift; sourceTree = "<group>"; };
+		B1D7E0220001000000010002 /* ContentLiveActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentLiveActivityManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -168,6 +175,7 @@
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				B1D7E0120001000000010002 /* StreakLiveActivityManager.swift */,
+				B1D7E0220001000000010002 /* ContentLiveActivityManager.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 			);
 			path = Runner;
@@ -180,6 +188,7 @@
 				B1D7E0020001000000010002 /* Assets.xcassets */,
 				B1D7E0010001000000010002 /* BibleHomeWidget.swift */,
 				B1D7E0110001000000010002 /* StreakLiveActivityWidget.swift */,
+				B1D7E0210001000000010002 /* ContentLiveActivityWidgets.swift */,
 				B1D7E0010001000000010004 /* Info.plist */,
 				B1D7E0010001000000010005 /* BibleHomeWidget.entitlements */,
 			);
@@ -190,6 +199,7 @@
 			isa = PBXGroup;
 			children = (
 				B1D7E0100001000000010002 /* StreakLiveActivityAttributes.swift */,
+				B1D7E0200001000000010002 /* ContentLiveActivityAttributes.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -409,7 +419,9 @@
 			files = (
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				B1D7E0120001000000010003 /* StreakLiveActivityManager.swift in Sources */,
+				B1D7E0220001000000010003 /* ContentLiveActivityManager.swift in Sources */,
 				B1D7E0100001000000010003 /* StreakLiveActivityAttributes.swift in Sources */,
+				B1D7E0200001000000010003 /* ContentLiveActivityAttributes.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -420,7 +432,9 @@
 			files = (
 				B1D7E0010001000000010001 /* BibleHomeWidget.swift in Sources */,
 				B1D7E0110001000000010003 /* StreakLiveActivityWidget.swift in Sources */,
+				B1D7E0210001000000010003 /* ContentLiveActivityWidgets.swift in Sources */,
 				B1D7E0100001000000010004 /* StreakLiveActivityAttributes.swift in Sources */,
+				B1D7E0200001000000010004 /* ContentLiveActivityAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

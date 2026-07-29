@@ -21,6 +21,7 @@ import '../../../controller/dpProvider.dart';
 import '../../constants/colors.dart';
 import '../../constants/constant.dart';
 import '../../constants/share_preferences.dart';
+import 'package:biblebookapp/view/widget/library_list_ads_helper.dart';
 
 class BookMarkScreen extends StatefulWidget {
   const BookMarkScreen({super.key});
@@ -34,6 +35,13 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
   double fontSize = Sizecf.scrnWidth! > 450 ? 25.0 : 15.0;
   var fontSizeS = "";
   var selectedFontFamily = "";
+
+  /// Display-only ads (same pattern as Explore Topics detail).
+  late final LibraryListAdsHelper _libraryAds =
+      LibraryListAdsHelper(onChanged: () {
+        if (mounted) setState(() {});
+      });
+
   Future<void> getFont() async {
     fontSizeS =
         await SharPreferences.getString(SharPreferences.selectedFontSize) ??
@@ -76,6 +84,12 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
   }
 
   //final bookMarkKey = GlobalKey<ScaffoldState>();
+  @override
+  void dispose() {
+    _libraryAds.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
@@ -122,6 +136,14 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
             }
             final items = snapshot.data;
             if (items != null && items.isNotEmpty) {
+              // Display-only: adaptive banners between items + interstitial every 10 actions.
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                _libraryAds.initIfNeeded(
+                  itemCount: items.length,
+                  context: context,
+                );
+              });
               return ListView.builder(
                 shrinkWrap: true,
                 itemCount: items.length,
@@ -147,7 +169,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                     height: 10,
                                   ),
                                   GestureDetector(
-                                    onTap: () {
+                                    onTap: () async {
                                       showModalBottomSheet(
                                         enableDrag: true,
                                         shape: const RoundedRectangleBorder(
@@ -226,6 +248,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                       children: [
                                                         InkWell(
                                                             onTap: () async {
+                                                              await _libraryAds.runCountedAction(() async {
                                                               await Clipboard.setData(
                                                                   ClipboardData(
                                                                       text:
@@ -233,6 +256,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                               Constants
                                                                   .showToast(
                                                                       "Copied");
+                                                              });
                                                             },
                                                             child: Container(
                                                                 padding:
@@ -273,6 +297,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                     ),
                                                     InkWell(
                                                       onTap: () async {
+                                                        await _libraryAds.runCountedAction(() async {
                                                         // Navigator.push(context, MaterialPageRoute(builder: (context) => );
                                                         await SharPreferences
                                                             .setString(
@@ -317,6 +342,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                             transition: Transition
                                                                 .cupertinoDialog,
                                                             duration: const Duration(milliseconds: 300));
+                                                        });
                                                       },
                                                       child: Column(
                                                         children: [
@@ -363,6 +389,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                       children: [
                                                         InkWell(
                                                             onTap: () async {
+                                                              await _libraryAds.runCountedAction(() async {
                                                               // final appPackageName =
                                                               //     (await PackageInfo
                                                               //             .fromPlatform())
@@ -484,6 +511,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                                   },
                                                                 ),
                                                               );
+                                                              });
                                                             },
                                                             child: Image.asset(
                                                                 "assets/share.png",
@@ -504,7 +532,8 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                       width: 25,
                                                     ),
                                                     InkWell(
-                                                      onTap: () {
+                                                      onTap: () async {
+                                                        await _libraryAds.runCountedAction(() async {
                                                         Get.back();
                                                         Get.to(
                                                           () => ChatScreen(
@@ -533,6 +562,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                                   milliseconds:
                                                                       300),
                                                         );
+                                                        });
                                                       },
                                                       child: Column(
                                                         children: [
@@ -857,7 +887,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               InkWell(
-                                onTap: () {
+                                onTap: () async {
                                   showModalBottomSheet(
                                     enableDrag: true,
                                     shape: const RoundedRectangleBorder(
@@ -932,12 +962,14 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                   children: [
                                                     InkWell(
                                                         onTap: () async {
+                                                          await _libraryAds.runCountedAction(() async {
                                                           await Clipboard.setData(
                                                               ClipboardData(
                                                                   text:
                                                                       "${parse(data.content).body?.text} \n${data.bookName} ${data.chapterNum}:${data.verseNum}"));
                                                           Constants.showToast(
                                                               "Copied");
+                                                          });
                                                         },
                                                         child: Container(
                                                             padding:
@@ -975,6 +1007,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                 ),
                                                 InkWell(
                                                   onTap: () async {
+                                                    await _libraryAds.runCountedAction(() async {
                                                     await SharPreferences
                                                         .setString(
                                                             SharPreferences
@@ -1016,6 +1049,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                                     .toString()),
                                                         transition: Transition.cupertinoDialog,
                                                         duration: const Duration(milliseconds: 300));
+                                                    });
                                                   },
                                                   child: Column(
                                                     children: [
@@ -1060,6 +1094,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                   children: [
                                                     InkWell(
                                                         onTap: () async {
+                                                          await _libraryAds.runCountedAction(() async {
                                                           // final appPackageName =
                                                           //     (await PackageInfo
                                                           //             .fromPlatform())
@@ -1182,6 +1217,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                               },
                                                             ),
                                                           );
+                                                          });
                                                         },
                                                         child: Image.asset(
                                                             "assets/share.png",
@@ -1200,7 +1236,8 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                 ),
                                                 const SizedBox(width: 25),
                                                 InkWell(
-                                                  onTap: () {
+                                                  onTap: () async {
+                                                    await _libraryAds.runCountedAction(() async {
                                                     Get.back();
                                                     Get.to(
                                                       () => ChatScreen(
@@ -1225,6 +1262,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                       duration: const Duration(
                                                           milliseconds: 300),
                                                     );
+                                                    });
                                                   },
                                                   child: Column(
                                                     children: [
@@ -1546,7 +1584,9 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                           child: Divider(
                             thickness: 0.5,
                             color: CommanColor.whiteBlack(context),
-                          ))
+                          )),
+                      if (_libraryAds.shouldShowBannerAfter(index))
+                        _libraryAds.buildInlineBanner(index, keyPrefix: 'bookmark'),
                     ],
                   );
                 },
