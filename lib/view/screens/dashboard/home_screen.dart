@@ -3569,74 +3569,75 @@ class _HomeScreenState extends State<HomeScreen>
                                   size: screenWidth > 450 ? 40 : 24,
                                 ),
                               ),
-                        SizedBox(width: 12),
-                              // IAP icon is independent of ads being completely disabled
-                              // (ads_Type == "0"). Ads stay off; only visibility is uncoupled.
-                              controller.adFree.value
-                                ? DateTime.tryParse(controller
-                                            .RewardAdExpireDate.value) !=
-                                        null
-                                      // UI only: subscription info icon removed from
-                                      // reading bar (same sheet remains in the drawer).
-                                      ? const SizedBox.shrink()
-                                    : Visibility(
-                                          visible: controller
-                                                  .isSubscriptionEnabled ??
-                                                true,
-                                        child: GestureDetector(
-                                          onTap: () async {
-                                            // Navigate directly to the paywall from Home
-                                            // instead of showing the Home exit-offer bottom sheet.
-                                            // This keeps purchase logic unchanged and avoids
-                                            // displaying the in-place exit-offer sheet on Home.
-                                            if (controller.connectionStatus
-                                                        .first ==
-                                                    ConnectivityResult.wifi ||
-                                                controller.connectionStatus
-                                                        .first ==
-                                                      ConnectivityResult
-                                                          .mobile) {
-                                              adsIcon = false;
-                                              debugPrint(
-                                                  "all plans - ${controller.sixMonthPlan} ${controller.oneYearPlan}  ${controller.lifeTimePlan}");
-                                              await SubscriptionScreen
-                                                  .navigateToPaywallFromHome(
-                                                      context);
-                                            } else {
-                                              Constants.showToast(
-                                                  "Check your Internet Connection");
-                                            }
-                                          },
-                                          child: Image.asset(
-                                            'assets/no-ad.png',
-                                            height:
-                                                screenWidth > 450 ? 40 : 24,
-                                            width:
-                                                screenWidth > 450 ? 40 : 24,
-                                            color: CommanColor.whiteBlack(
-                                                context),
-                                          ),
-                                        ))
-                                : Visibility(
-                                      visible:
-                                          controller.isSubscriptionEnabled ??
-                                        false,
-                                    child: GestureDetector(
-                                      onTap: () async {
-                                        adsIcon = false;
-                                        await SubscriptionScreen
-                                              .navigateToPaywallFromHome(
-                                                  context);
-                                      },
-                                      child: Image.asset(
-                                        'assets/no-ad.png',
-                                        height: screenWidth > 450 ? 35 : 24,
-                                        width: screenWidth > 450 ? 35 : 24,
-                                        color:
-                                            CommanColor.whiteBlack(context),
-                                      ),
-                                    ),
-                                  ),
+                        // SizedBox(width: 12),
+                        // IAP icon moved to left drawer menu — hidden on reading bar.
+                        // // IAP icon is independent of ads being completely disabled
+                        // // (ads_Type == "0"). Ads stay off; only visibility is uncoupled.
+                        // controller.adFree.value
+                        //   ? DateTime.tryParse(controller
+                        //               .RewardAdExpireDate.value) !=
+                        //           null
+                        //         // UI only: subscription info icon removed from
+                        //         // reading bar (same sheet remains in the drawer).
+                        //         ? const SizedBox.shrink()
+                        //       : Visibility(
+                        //             visible: controller
+                        //                     .isSubscriptionEnabled ??
+                        //                   true,
+                        //           child: GestureDetector(
+                        //             onTap: () async {
+                        //               // Navigate directly to the paywall from Home
+                        //               // instead of showing the Home exit-offer bottom sheet.
+                        //               // This keeps purchase logic unchanged and avoids
+                        //               // displaying the in-place exit-offer sheet on Home.
+                        //               if (controller.connectionStatus
+                        //                           .first ==
+                        //                       ConnectivityResult.wifi ||
+                        //                   controller.connectionStatus
+                        //                           .first ==
+                        //                     ConnectivityResult
+                        //                         .mobile) {
+                        //                 adsIcon = false;
+                        //                 debugPrint(
+                        //                     "all plans - ${controller.sixMonthPlan} ${controller.oneYearPlan}  ${controller.lifeTimePlan}");
+                        //                 await SubscriptionScreen
+                        //                     .navigateToPaywallFromHome(
+                        //                         context);
+                        //               } else {
+                        //                 Constants.showToast(
+                        //                     "Check your Internet Connection");
+                        //               }
+                        //             },
+                        //             child: Image.asset(
+                        //               'assets/no-ad.png',
+                        //               height:
+                        //                   screenWidth > 450 ? 40 : 24,
+                        //               width:
+                        //                   screenWidth > 450 ? 40 : 24,
+                        //               color: CommanColor.whiteBlack(
+                        //                   context),
+                        //             ),
+                        //           ))
+                        //   : Visibility(
+                        //         visible:
+                        //             controller.isSubscriptionEnabled ??
+                        //           false,
+                        //       child: GestureDetector(
+                        //         onTap: () async {
+                        //           adsIcon = false;
+                        //           await SubscriptionScreen
+                        //                 .navigateToPaywallFromHome(
+                        //                     context);
+                        //         },
+                        //         child: Image.asset(
+                        //           'assets/no-ad.png',
+                        //           height: screenWidth > 450 ? 35 : 24,
+                        //           width: screenWidth > 450 ? 35 : 24,
+                        //           color:
+                        //               CommanColor.whiteBlack(context),
+                        //         ),
+                        //       ),
+                        //     ),
                       ],
                     ),
                     actions: [

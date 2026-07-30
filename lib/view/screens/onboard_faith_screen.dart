@@ -41,13 +41,13 @@ class FaithSurveyData {
   String? theme; // step 6
 
   Map<String, dynamic> toJson() => {
-        'purpose': purpose,
-        'ageGroup': ageGroup,
-        'challenge': challenge,
-        'frequency': frequency,
-        'growthWay': growthWay,
-        'theme': theme,
-      };
+    'purpose': purpose,
+    'ageGroup': ageGroup,
+    'challenge': challenge,
+    'frequency': frequency,
+    'growthWay': growthWay,
+    'theme': theme,
+  };
 
   static FaithSurveyData fromJson(Map<String, dynamic> json) =>
       FaithSurveyData()
@@ -131,8 +131,10 @@ class _FaithOnboardingScreenState extends State<FaithOnboardingScreen> {
         status.isGranted || status.isLimited || status.isProvisional;
     if (!permitted) {
       await SharPreferences.setBoolean(SharPreferences.isNotificationOn, false);
-      await SharPreferences.setBoolean(SharPreferences.isNotificationOn1, false);
-      await SharPreferences.setBoolean(SharPreferences.isNotificationOn2, false);
+      await SharPreferences.setBoolean(
+          SharPreferences.isNotificationOn1, false);
+      await SharPreferences.setBoolean(
+          SharPreferences.isNotificationOn2, false);
       await SharPreferences.setBoolean(
           SharPreferences.notificationSlotsSyncedFromPermission, true);
       return;
@@ -141,13 +143,14 @@ class _FaithOnboardingScreenState extends State<FaithOnboardingScreen> {
     // Additive: Allow → mirror Settings Morning/Afternoon/Evening ON
     // (OS permission alone did not flip these prefs, so Settings looked Off).
     final nt =
-        await SharPreferences.getBoolean(SharPreferences.isNotificationOn);
+    await SharPreferences.getBoolean(SharPreferences.isNotificationOn);
     final nt1 =
-        await SharPreferences.getBoolean(SharPreferences.isNotificationOn1);
+    await SharPreferences.getBoolean(SharPreferences.isNotificationOn1);
     final nt2 =
-        await SharPreferences.getBoolean(SharPreferences.isNotificationOn2);
-    final allOff =
-        (nt ?? false) == false && (nt1 ?? false) == false && (nt2 ?? false) == false;
+    await SharPreferences.getBoolean(SharPreferences.isNotificationOn2);
+    final allOff = (nt ?? false) == false &&
+        (nt1 ?? false) == false &&
+        (nt2 ?? false) == false;
     if (allOff) {
       await SharPreferences.setBoolean(SharPreferences.isNotificationOn, true);
       await SharPreferences.setBoolean(SharPreferences.isNotificationOn1, true);
@@ -191,24 +194,24 @@ class _FaithOnboardingScreenState extends State<FaithOnboardingScreen> {
           // Do NOT set onboarding here — set it only when user completes theme
           // selection (onThemeSelected), so closing on Theme screen reopens to onboarding.
           Get.to(() => OnboardingThemeSelectionScreen(
-                onThemeSelected: () {
-                  // Do NOT set onboarding here — set it only when user completes
-                  // preference/category selection (PreferenceSelectionScreen "Start now"
-                  // or BibleVersionsScreen completion), so closing on that screen
-                  // reopens to onboarding.
-                  debugPrint("folders leng - ${BibleInfo.folders.length}");
-                  if (BibleInfo.folders.length == 1) {
-                    Get.off(() => PreferenceSelectionScreen(
-                          isSetting: false,
-                          selectedbible: BibleInfo.folders.first,
-                        ));
-                  } else {
-                    Get.off(() => BibleVersionsScreen(
-                          from: 'onboard',
-                        ));
-                  }
-                },
-              ));
+            onThemeSelected: () {
+              // Do NOT set onboarding here — set it only when user completes
+              // preference/category selection (PreferenceSelectionScreen "Start now"
+              // or BibleVersionsScreen completion), so closing on that screen
+              // reopens to onboarding.
+              debugPrint("folders leng - ${BibleInfo.folders.length}");
+              if (BibleInfo.folders.length == 1) {
+                Get.off(() => PreferenceSelectionScreen(
+                  isSetting: false,
+                  selectedbible: BibleInfo.folders.first,
+                ));
+              } else {
+                Get.off(() => BibleVersionsScreen(
+                  from: 'onboard',
+                ));
+              }
+            },
+          ));
         }
 
         Get.to(() => OnboardingGuidanceScreen(onContinue: goNext));
@@ -233,7 +236,7 @@ class _FaithOnboardingScreenState extends State<FaithOnboardingScreen> {
         Navigator.of(context).pop();
       } else {
         Get.off(
-          () => const WelcomeScreen(),
+              () => const WelcomeScreen(),
           transition: Transition.leftToRight,
           duration: const Duration(milliseconds: 400),
         );
@@ -356,19 +359,19 @@ class _FaithOnboardingScreenState extends State<FaithOnboardingScreen> {
                                 children: [
                                   _MultiSelectQuestionPage(
                                     question:
-                                        'What brings you to our Bible app today?',
+                                    'What brings you to our Bible app today?',
                                     options: const [
-                                      'Find peace and comfort',
+                                      'Find peace & comfort',
                                       'Deepen my faith',
-                                      'Study the Bible regularly',
+                                      'Build a daily Bible habit',
                                       "Overcome life's challenges",
-                                      'Strengthen my connection with God',
+                                      'Grow closer to God',
                                     ],
                                     selections: _purposeSelections,
                                     onToggle: (option) => _toggleMultiSelect(
                                       _purposeSelections,
                                       option,
-                                      (value) => data.purpose = value,
+                                          (value) => data.purpose = value,
                                     ),
                                   ),
                                   _QuestionPage(
@@ -387,7 +390,7 @@ class _FaithOnboardingScreenState extends State<FaithOnboardingScreen> {
                                   ),
                                   _MultiSelectQuestionPage(
                                     question:
-                                        'What challenges affect your spiritual growth the most?',
+                                    'What challenges affect your spiritual growth the most?',
                                     options: const [
                                       'Life feels overwhelming',
                                       'Doubts about faith',
@@ -399,12 +402,12 @@ class _FaithOnboardingScreenState extends State<FaithOnboardingScreen> {
                                     onToggle: (option) => _toggleMultiSelect(
                                       _challengeSelections,
                                       option,
-                                      (value) => data.challenge = value,
+                                          (value) => data.challenge = value,
                                     ),
                                   ),
                                   _QuestionPage(
                                     question:
-                                        'How often do you read or study the Bible?',
+                                    'How often do you read or study the Bible?',
                                     options: const [
                                       'I read the Bible daily',
                                       'A few times a week',
@@ -418,7 +421,7 @@ class _FaithOnboardingScreenState extends State<FaithOnboardingScreen> {
                                   ),
                                   _MultiSelectQuestionPage(
                                     question:
-                                        "What's your favorite way to grow spiritually?",
+                                    "What's your favorite way to grow spiritually?",
                                     options: const [
                                       'Journaling or taking notes',
                                       'Highlighting key verses',
@@ -429,7 +432,7 @@ class _FaithOnboardingScreenState extends State<FaithOnboardingScreen> {
                                     onToggle: (option) => _toggleMultiSelect(
                                       _growthWaySelections,
                                       option,
-                                      (value) => data.growthWay = value,
+                                          (value) => data.growthWay = value,
                                     ),
                                   ),
                                 ],
@@ -445,12 +448,12 @@ class _FaithOnboardingScreenState extends State<FaithOnboardingScreen> {
                                   decoration: BoxDecoration(
                                     gradient: _isStepAnswered(step)
                                         ? const LinearGradient(
-                                            colors: [
-                                              Color(0xFF763201),
-                                              Color(0xFFD5821F),
-                                              Color(0xFF763201),
-                                            ],
-                                          )
+                                      colors: [
+                                        Color(0xFF763201),
+                                        Color(0xFFD5821F),
+                                        Color(0xFF763201),
+                                      ],
+                                    )
                                         : null,
                                     color: _isStepAnswered(step)
                                         ? null
@@ -459,23 +462,36 @@ class _FaithOnboardingScreenState extends State<FaithOnboardingScreen> {
                                   ),
                                   child: ElevatedButton(
                                     onPressed:
-                                        _isStepAnswered(step) ? _next : null,
+                                    _isStepAnswered(step) ? _next : null,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.transparent,
-                                      disabledBackgroundColor: Colors.transparent,
+                                      disabledBackgroundColor:
+                                      Colors.transparent,
                                       shadowColor: Colors.transparent,
                                       elevation: 0,
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(14),
                                       ),
                                     ),
-                                    child: Text(
-                                      step == 5 ? 'Continue' : 'Continue',
-                                      style: TextStyle(
-                                        fontSize: isTablet ? 20 : 18,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white,
-                                      ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                      MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          'Continue',
+                                          style: TextStyle(
+                                            fontSize: isTablet ? 20 : 18,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Icon(
+                                          Icons.arrow_forward,
+                                          color: Colors.white,
+                                          size: isTablet ? 22 : 20,
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
@@ -531,6 +547,17 @@ class _MultiSelectQuestionPage extends StatelessWidget {
                 color: const Color(0xFF2E2C2B),
                 height: 1.3,
               ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Select all that apply',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: isTablet ? 16 : 14,
+              fontWeight: FontWeight.w500,
+              color: const Color(0xFF5C4033).withOpacity(0.85),
+              height: 1.3,
             ),
           ),
           const SizedBox(height: 18),
@@ -617,92 +644,92 @@ class _QuestionPage extends StatelessWidget {
 
 // /// Final theme page with preview card
 // class _ThemePage extends StatelessWidget {
-//   final String question;
-//   final List<String> options;
-//   final String? Function() getValue;
-//   final ValueChanged<String> onChanged;
+// final String question;
+// final List<String> options;
+// final String? Function() getValue;
+// final ValueChanged<String> onChanged;
 
-//   const _ThemePage({
-//     required this.question,
-//     required this.options,
-//     required this.getValue,
-//     required this.onChanged,
-//   });
+// const _ThemePage({
+// required this.question,
+// required this.options,
+// required this.getValue,
+// required this.onChanged,
+// });
 
-//   @override
-//   Widget build(BuildContext context) {
-//     final mq = MediaQuery.of(context);
-//     final isTablet = mq.size.width >= 600;
+// @override
+// Widget build(BuildContext context) {
+// final mq = MediaQuery.of(context);
+// final isTablet = mq.size.width >= 600;
 
-//     return Padding(
-//       padding: EdgeInsets.symmetric(horizontal: 16, vertical: isTablet ? 8 : 4),
-//       child: Column(
-//         crossAxisAlignment: CrossAxisAlignment.stretch,
-//         children: [
-//           const SizedBox(height: 4),
-//           Padding(
-//             padding: const EdgeInsets.symmetric(horizontal: 8),
-//             child: Text(
-//               question,
-//               textAlign: TextAlign.center,
-//               style: TextStyle(
-//                 fontSize: isTablet ? 22 : 18,
-//                 fontWeight: FontWeight.w700,
-//                 color: const Color(0xFF2E2C2B),
-//                 height: 1.3,
-//               ),
-//             ),
-//           ),
-//           const SizedBox(height: 18),
-//           ...options.map((e) {
-//             final selected = getValue() == e;
-//             return Padding(
-//               padding: const EdgeInsets.only(bottom: 14),
-//               child: _SelectButton(
-//                 label: e,
-//                 selected: selected,
-//                 leading: _RadioVisual(selected: selected),
-//                 onTap: () => onChanged(e),
-//               ),
-//             );
-//           }),
-//           const SizedBox(height: 8),
-//           Center(
-//             child: Text(
-//               'Preview',
-//               style: TextStyle(
-//                 fontSize: isTablet ? 16 : 14,
-//                 fontWeight: FontWeight.w600,
-//                 color: const Color(0xFF7A5435),
-//               ),
-//             ),
-//           ),
-//           const SizedBox(height: 10),
-//           Container(
-//             decoration: BoxDecoration(
-//               color: Colors.white.withOpacity(0.7),
-//               borderRadius: BorderRadius.circular(12),
-//               border:
-//                   Border.all(color: const Color(0xFFB08D6E).withOpacity(0.6)),
-//             ),
-//             padding: const EdgeInsets.all(14),
-//             child: const Text(
-//               '1. In the beginning God created the heaven and the earth.\n\n'
-//               '2. And the earth was without form, and void; and darkness was upon the face of the deep. '
-//               'And the Spirit of God moved upon the face of the waters.',
-//               style: TextStyle(
-//                 height: 1.4,
-//                 fontSize: 14,
-//                 color: Color(0xFF2E2C2B),
-//                 fontWeight: FontWeight.w500,
-//               ),
-//             ),
-//           ),
-//           const Spacer(),
-//         ],
-//       ),
-//     );
-//   }
+// return Padding(
+// padding: EdgeInsets.symmetric(horizontal: 16, vertical: isTablet ? 8 : 4),
+// child: Column(
+// crossAxisAlignment: CrossAxisAlignment.stretch,
+// children: [
+// const SizedBox(height: 4),
+// Padding(
+// padding: const EdgeInsets.symmetric(horizontal: 8),
+// child: Text(
+// question,
+// textAlign: TextAlign.center,
+// style: TextStyle(
+// fontSize: isTablet ? 22 : 18,
+// fontWeight: FontWeight.w700,
+// color: const Color(0xFF2E2C2B),
+// height: 1.3,
+// ),
+// ),
+// ),
+// const SizedBox(height: 18),
+// ...options.map((e) {
+// final selected = getValue() == e;
+// return Padding(
+// padding: const EdgeInsets.only(bottom: 14),
+// child: _SelectButton(
+// label: e,
+// selected: selected,
+// leading: _RadioVisual(selected: selected),
+// onTap: () => onChanged(e),
+// ),
+// );
+// }),
+// const SizedBox(height: 8),
+// Center(
+// child: Text(
+// 'Preview',
+// style: TextStyle(
+// fontSize: isTablet ? 16 : 14,
+// fontWeight: FontWeight.w600,
+// color: const Color(0xFF7A5435),
+// ),
+// ),
+// ),
+// const SizedBox(height: 10),
+// Container(
+// decoration: BoxDecoration(
+// color: Colors.white.withOpacity(0.7),
+// borderRadius: BorderRadius.circular(12),
+// border:
+// Border.all(color: const Color(0xFFB08D6E).withOpacity(0.6)),
+// ),
+// padding: const EdgeInsets.all(14),
+// child: const Text(
+// '1. In the beginning God created the heaven and the earth.\n\n'
+// '2. And the earth was without form, and void; and darkness was upon the face of the deep. '
+// 'And the Spirit of God moved upon the face of the waters.',
+// style: TextStyle(
+// height: 1.4,
+// fontSize: 14,
+// color: Color(0xFF2E2C2B),
+// fontWeight: FontWeight.w500,
+// ),
+// ),
+// ),
+// const Spacer(),
+// ],
+// ),
+// );
+// }
 // }
 
 /// Theme selection screen for onboarding flow
@@ -768,8 +795,8 @@ class _OnboardingThemeSelectionScreenState
           for (final chapterNum in const [0, 1]) {
             final rows = await db.rawQuery(
               'SELECT verse_num, content FROM verse '
-              'WHERE book_num = ? AND chapter_num = ? '
-              'ORDER BY verse_num ASC LIMIT 5',
+                  'WHERE book_num = ? AND chapter_num = ? '
+                  'ORDER BY verse_num ASC LIMIT 5',
               [bookNum, chapterNum],
             );
             if (rows.isNotEmpty) {
@@ -797,18 +824,18 @@ class _OnboardingThemeSelectionScreenState
       // app's current bible asset (language/version) so ref isn't stuck on EN.
       if (bookTitle == null || bookTitle.isEmpty) {
         final saved =
-            await SharPreferences.getString(SharPreferences.selectedBook);
+        await SharPreferences.getString(SharPreferences.selectedBook);
         if (saved != null && saved.trim().isNotEmpty) {
           bookTitle = saved.trim();
         }
       }
       if (bookTitle == null || bookTitle.isEmpty) {
         final folder =
-            BibleInfo.folders.isNotEmpty ? BibleInfo.folders.first : null;
+        BibleInfo.folders.isNotEmpty ? BibleInfo.folders.first : null;
         if (folder != null) {
           try {
-            final raw = await rootBundle
-                .loadString('assets/zipped/$folder/book.json');
+            final raw =
+            await rootBundle.loadString('assets/zipped/$folder/book.json');
             final decoded = jsonDecode(raw);
             if (decoded is List && decoded.isNotEmpty) {
               final first = decoded.first;
@@ -833,7 +860,7 @@ class _OnboardingThemeSelectionScreenState
               ? 2
               : (previewBody != null ? 1 : 2);
           _previewRef =
-              endVerse > 1 ? '$bookTitle 1:1–$endVerse' : '$bookTitle 1:1';
+          endVerse > 1 ? '$bookTitle 1:1–$endVerse' : '$bookTitle 1:1';
         }
         if (previewBody != null && previewBody.isNotEmpty) {
           _previewBody = previewBody;
@@ -910,9 +937,9 @@ class _OnboardingThemeSelectionScreenState
                         color: color,
                         image: theme == AppCustomTheme.vintage
                             ? DecorationImage(
-                                image: AssetImage(Images.bgImage(context)),
-                                fit: BoxFit.cover,
-                              )
+                          image: AssetImage(Images.bgImage(context)),
+                          fit: BoxFit.cover,
+                        )
                             : null,
                       ),
                       child: const SizedBox.expand(),
@@ -930,7 +957,8 @@ class _OnboardingThemeSelectionScreenState
                         color: Color(0xFF7A5435),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.check, color: Colors.white, size: 14),
+                      child: const Icon(Icons.check,
+                          color: Colors.white, size: 14),
                     ),
                   ),
               ],
@@ -966,8 +994,7 @@ class _OnboardingThemeSelectionScreenState
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         crossAxisAlignment: CrossAxisAlignment.start,
-        children:
-            themes.map((theme) => _themeOption(theme, isTablet)).toList(),
+        children: themes.map((theme) => _themeOption(theme, isTablet)).toList(),
       ),
     );
   }
@@ -994,16 +1021,16 @@ class _OnboardingThemeSelectionScreenState
         borderRadius: BorderRadius.circular(12),
         child: DecoratedBox(
           decoration: Provider.of<ThemeProvider>(context).currentCustomTheme ==
-                  AppCustomTheme.vintage
+              AppCustomTheme.vintage
               ? BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage(Images.bgImage(context)),
-                    fit: BoxFit.cover,
-                  ),
-                )
+            image: DecorationImage(
+              image: AssetImage(Images.bgImage(context)),
+              fit: BoxFit.cover,
+            ),
+          )
               : BoxDecoration(
-                  color: Provider.of<ThemeProvider>(context).backgroundColor,
-                ),
+            color: Provider.of<ThemeProvider>(context).backgroundColor,
+          ),
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: Column(
@@ -1110,8 +1137,7 @@ class _OnboardingThemeSelectionScreenState
                   slivers: [
                     SliverToBoxAdapter(
                       child: Padding(
-                        padding:
-                            EdgeInsets.fromLTRB(6, isTablet ? 8 : 4, 6, 0),
+                        padding: EdgeInsets.fromLTRB(6, isTablet ? 8 : 4, 6, 0),
                         child: Row(
                           children: [
                             IconButton(
@@ -1141,7 +1167,7 @@ class _OnboardingThemeSelectionScreenState
                       child: Center(
                         child: ConstrainedBox(
                           constraints:
-                              BoxConstraints(maxWidth: maxContentWidth),
+                          BoxConstraints(maxWidth: maxContentWidth),
                           child: Padding(
                             padding: EdgeInsets.fromLTRB(
                                 16, isTablet ? 8 : 4, 16, 0),
@@ -1154,8 +1180,7 @@ class _OnboardingThemeSelectionScreenState
                                 SizedBox(height: isTablet ? 20 : 12),
                                 _buildPreviewDivider(isTablet),
                                 SizedBox(height: isTablet ? 12 : 8),
-                                _buildThemePreviewCard(
-                                    context, compact: true),
+                                _buildThemePreviewCard(context, compact: true),
                               ],
                             ),
                           ),
@@ -1164,8 +1189,7 @@ class _OnboardingThemeSelectionScreenState
                     ),
                     SliverToBoxAdapter(
                       child: SizedBox(
-                        height: (isTablet ? 64 : 56) +
-                            (isTablet ? 14 : 8),
+                        height: (isTablet ? 64 : 56) + (isTablet ? 14 : 8),
                       ),
                     ),
                   ],
@@ -1176,14 +1200,10 @@ class _OnboardingThemeSelectionScreenState
                   bottom: 0,
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(
-                        16,
-                        isTablet ? 12 : 8,
-                        16,
-                        isTablet ? 20 : 12),
+                        16, isTablet ? 12 : 8, 16, isTablet ? 20 : 12),
                     child: Center(
                       child: ConstrainedBox(
-                        constraints:
-                            BoxConstraints(maxWidth: maxContentWidth),
+                        constraints: BoxConstraints(maxWidth: maxContentWidth),
                         child: SizedBox(
                           width: double.infinity,
                           height: isTablet ? 64 : 56,
@@ -1306,9 +1326,9 @@ class _ThemePageState extends State<_ThemePage> {
               color: color,
               image: theme == AppCustomTheme.vintage
                   ? DecorationImage(
-                      image: AssetImage(Images.bgImage(context)),
-                      fit: BoxFit.cover,
-                    )
+                image: AssetImage(Images.bgImage(context)),
+                fit: BoxFit.cover,
+              )
                   : null,
             ),
             child: const SizedBox.expand(),
@@ -1374,24 +1394,24 @@ class _ThemePageState extends State<_ThemePage> {
               borderRadius: BorderRadius.circular(12),
               child: DecoratedBox(
                 decoration: Provider.of<ThemeProvider>(context)
-                            .currentCustomTheme ==
-                        AppCustomTheme.vintage
+                    .currentCustomTheme ==
+                    AppCustomTheme.vintage
                     ? BoxDecoration(
-                        image: DecorationImage(
-                          image: AssetImage(Images.bgImage(context)),
-                          fit: BoxFit.cover,
-                        ),
-                      )
+                  image: DecorationImage(
+                    image: AssetImage(Images.bgImage(context)),
+                    fit: BoxFit.cover,
+                  ),
+                )
                     : BoxDecoration(
-                        color:
-                            Provider.of<ThemeProvider>(context).backgroundColor,
-                      ),
+                  color:
+                  Provider.of<ThemeProvider>(context).backgroundColor,
+                ),
                 child: const Padding(
                   padding: EdgeInsets.all(14),
                   child: Text(
                     '1. In the beginning God created the heaven and the earth.\n\n'
-                    '2. And the earth was without form, and void; and darkness was upon the face of the deep. '
-                    'And the Spirit of God moved upon the face of the waters.',
+                        '2. And the earth was without form, and void; and darkness was upon the face of the deep. '
+                        'And the Spirit of God moved upon the face of the waters.',
                     style: TextStyle(
                       height: 1.4,
                       fontSize: 14,
@@ -1427,11 +1447,11 @@ class _RadioVisual extends StatelessWidget {
       alignment: Alignment.center,
       child: selected
           ? Container(
-              width: 8,
-              height: 8,
-              decoration: const BoxDecoration(
-                  color: Colors.white, shape: BoxShape.circle),
-            )
+        width: 8,
+        height: 8,
+        decoration: const BoxDecoration(
+            color: Colors.white, shape: BoxShape.circle),
+      )
           : null,
     );
   }
@@ -1458,7 +1478,10 @@ class _SelectButton extends StatelessWidget {
     final borderRadius = BorderRadius.circular(7);
     // Border with increased thickness when selected
     final baseBorder = Border.all(
-      color: selected ? const Color(0xFF805531) : const Color(0xFF9E9E9E), // Border color: #805531 when selected, 9E9E9E when not
+      color: selected
+          ? const Color(0xFF805531)
+          : const Color(
+          0xFF9E9E9E), // Border color: #805531 when selected, 9E9E9E when not
       width: selected ? 2.0 : 1.0, // Increase thickness when selected
     );
 
@@ -1480,7 +1503,7 @@ class _SelectButton extends StatelessWidget {
             color: bg,
             borderRadius: borderRadius,
             border:
-                baseBorder, // Always show border with thickness based on selection
+            baseBorder, // Always show border with thickness based on selection
           ),
           padding: EdgeInsets.symmetric(
               horizontal: 18, vertical: isTablet ? 18 : 16),
@@ -1560,13 +1583,13 @@ class _StepperDots extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: isActive
               ? const RadialGradient(
-                  colors: [
-                    Color(0xFF763201),
-                    Color(0xFFD5821F),
-                    Color(0xFFAD4D08),
-                    Color(0xFF763201),
-                  ],
-                )
+            colors: [
+              Color(0xFF763201),
+              Color(0xFFD5821F),
+              Color(0xFFAD4D08),
+              Color(0xFF763201),
+            ],
+          )
               : null,
           color: isActive ? null : inactiveColor,
           shape: BoxShape.circle,
@@ -1587,15 +1610,16 @@ class _StepperDots extends StatelessWidget {
 // -------------------------
 // 1) Add shared_preferences to pubspec.yaml
 // dependencies:
-//   shared_preferences: ^2.2.3
+// shared_preferences: ^2.2.3
 //
 // 2) (Optional) Add a parchment background image to assets and uncomment the Image.asset
 // flutter:
-//   assets:
-//     - assets/images/parchment_bg.jpg
+// assets:
+// - assets/images/parchment_bg.jpg
 //
 // 3) Push FaithOnboardingScreen() from your start flow. Example:
 // Navigator.of(context).push(
-//   MaterialPageRoute(builder: (_) => const FaithOnboardingScreen()),
+// MaterialPageRoute(builder: (_) => const FaithOnboardingScreen()),
 // );
 // When the final Continue is pressed, answers are saved and the page pops.
+

@@ -167,7 +167,7 @@ class SignupScreen extends HookConsumerWidget {
                                   const SizedBox(height: 20),
                                   CustomTextFormField(
                                     controller: signupState.referralCon,
-                                    hintText: 'Referral ID (optional)',
+                                    hintText: 'Referral Code (optional)',
                                   ),
                                   SizedBox(height: screenWidth > 450 ? 19 : 15),
                                   Row(

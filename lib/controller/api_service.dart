@@ -737,7 +737,7 @@ String _referralApplyFailureMessage(
   bool forLoggedInSession = false,
 }) {
   final profileError = _profileUpdateErrorMessage(profileResult);
-  final signUpFallback = 'Enter this referral ID on the Sign Up screen';
+  final signUpFallback = 'Enter this referral code on the Sign Up screen';
   final loggedInFallback =
       'Unable to apply referral code. Please check the code and try again.';
   final genericFallback =
@@ -1151,7 +1151,7 @@ Future<void> applyReferralWhileLoggedIn({
 }) async {
   final code = referralCode.trim();
   if (code.isEmpty) {
-    throw 'Please enter a referral ID';
+    throw 'Please enter a referral code';
   }
   if (ownReferralCode != null &&
       ownReferralCode.trim().isNotEmpty &&
@@ -1194,7 +1194,7 @@ Future<void> applyReferralViaLogin({
 }) async {
   final code = referralCode.trim();
   if (code.isEmpty) {
-    throw 'Please enter a referral ID';
+    throw 'Please enter a referral code';
   }
   if (ownReferralCode != null &&
       ownReferralCode.trim().isNotEmpty &&

@@ -93,7 +93,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
     try {
       final dbClient = await DBHelper().db;
       List<Map<String, dynamic>>? raw =
-          await dbClient?.rawQuery("SELECT * FROM dailyVersesMainList");
+      await dbClient?.rawQuery("SELECT * FROM dailyVersesMainList");
       var dailyVersesMainData = raw ?? [];
 
       if (dailyVersesMainData.isEmpty) {
@@ -112,7 +112,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
 
       if (categoryIcons.isEmpty) {
         final jsonString =
-            await rootBundle.loadString('assets/jsonFile/dailyVerse.json');
+        await rootBundle.loadString('assets/jsonFile/dailyVerse.json');
         categoryIcons = await compute(
             preferenceSelectionCategoryMapFromJsonString, jsonString);
       }
@@ -120,7 +120,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
       debugPrint('PreferenceSelection loadIconNames: $e\n$st');
       try {
         final jsonString =
-            await rootBundle.loadString('assets/jsonFile/dailyVerse.json');
+        await rootBundle.loadString('assets/jsonFile/dailyVerse.json');
         categoryIcons = await compute(
             preferenceSelectionCategoryMapFromJsonString, jsonString);
       } catch (e2) {
@@ -155,7 +155,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
       final db = await DBHelper().db;
       if (db == null) return;
       final String jsonString =
-          await rootBundle.loadString('assets/jsonFile/dailyVerse.json');
+      await rootBundle.loadString('assets/jsonFile/dailyVerse.json');
       final List<DailyVersesMainListModel> dataList = await compute(
           preferenceSelectionParseDailyVerseModels, jsonString);
       if (dataList.isEmpty) return;
@@ -356,7 +356,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
     if (db == null) return;
 
     final countRows =
-        await db.rawQuery('SELECT COUNT(*) AS c FROM dailyVersesMainList');
+    await db.rawQuery('SELECT COUNT(*) AS c FROM dailyVersesMainList');
     final mainCount = int.tryParse('${countRows.first['c']}') ?? 0;
     if (mainCount == 0) {
       final verseRows = await db.rawQuery('SELECT COUNT(*) AS c FROM verse');
@@ -518,7 +518,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
       }
 
       final verseFile =
-          await BibleExtractPaths.resolveVerseJsonFile(foldername);
+      await BibleExtractPaths.resolveVerseJsonFile(foldername);
       if (verseFile != null && await verseFile.exists()) {
         await verseFile.delete();
         debugPrint('verse_json deleted successfully');
@@ -531,6 +531,81 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
   }
 
   bool _isSelected(String category) => _selectedCategories.contains(category);
+
+  Widget _buildPreferenceTopicsHeader(double screenWidth) {
+    final isTablet = screenWidth > 600;
+    final iconOuter = isTablet ? 104.0 : 92.0;
+    final iconInner = isTablet ? 82.0 : 72.0;
+
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+        Center(
+          child: Container(
+            width: iconOuter,
+            height: iconOuter,
+            decoration: const BoxDecoration(
+              color: Color(0xFFE0D5C4),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Container(
+                width: iconOuter * 0.82,
+                height: iconOuter * 0.82,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF5F0E1),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Image.asset(
+                    'assets/preference_topics_dove.png',
+                    width: iconInner,
+                    height: iconInner,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Which verses speak to you?',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: const Color(0xFF2D1E12),
+            fontSize: isTablet ? 28 : 24,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'Georgia',
+          ),
+        ),
+        const SizedBox(height: 10),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Text(
+            'Pick the themes closest to your heart — choose at least 3. We\'ll build your daily verses around them.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: const Color(0xFF554D44),
+              fontSize: isTablet ? 18 : 15,
+              height: 1.4,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          'CHOOSE YOUR TOPICS',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: const Color(0xFF947B39),
+            fontSize: isTablet ? 16 : 14,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.1,
+          ),
+        ),
+      ],
+    );
+  }
 
   // String _getIconPath(String name, bool selected) {
   //   final baseName = _iconNames[name] ?? 'default';
@@ -549,23 +624,23 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
     final backgroundColor =
-        isDark ? CommanColor.darkPrimaryColor : themeProvider.backgroundColor;
+    isDark ? CommanColor.darkPrimaryColor : themeProvider.backgroundColor;
     return Scaffold(
       backgroundColor: backgroundColor,
       body: Container(
         height: MediaQuery.of(context).size.height,
         width: MediaQuery.of(context).size.width,
         color: Provider.of<ThemeProvider>(context).currentCustomTheme ==
-                AppCustomTheme.vintage
+            AppCustomTheme.vintage
             ? null
             : backgroundColor,
         decoration: Provider.of<ThemeProvider>(context).currentCustomTheme ==
-                AppCustomTheme.vintage
+            AppCustomTheme.vintage
             ? BoxDecoration(
-                color: backgroundColor,
-                image: DecorationImage(
-                    image: AssetImage(Images.bgImage(context)),
-                    fit: BoxFit.fill))
+            color: backgroundColor,
+            image: DecorationImage(
+                image: AssetImage(Images.bgImage(context)),
+                fit: BoxFit.fill))
             : null,
         child: SafeArea(
           child: Padding(
@@ -601,13 +676,13 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                       child: InkWell(
                         onTap: () {
                           Get.off(() => OnboardingThemeSelectionScreen(
-                                onThemeSelected: () {
-                                  Get.off(() => PreferenceSelectionScreen(
-                                        isSetting: false,
-                                        selectedbible: widget.selectedbible,
-                                      ));
-                                },
+                            onThemeSelected: () {
+                              Get.off(() => PreferenceSelectionScreen(
+                                isSetting: false,
+                                selectedbible: widget.selectedbible,
                               ));
+                            },
+                          ));
                         },
                         child: Icon(
                           Icons.arrow_back_ios,
@@ -618,61 +693,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                     ),
                   ],
                 ),
-              if (widget.isSetting) ...[
-                const SizedBox(height: 8),
-                Center(
-                  child: Image.asset(
-                    Images.searchPlaceHolder(context),
-                    height: screenWidth > 600 ? 88 : 72,
-                    width: screenWidth > 600 ? 88 : 72,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  "Jesus Will Guide You!",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      color: CommanColor.whiteBlack(context),
-                      fontSize: screenWidth > 600 ? 25 : 22,
-                      fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "Choose your preferred verse topics",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      color: CommanColor.whiteBlack(context),
-                      fontSize: screenWidth > 600 ? 22 : 16),
-                ),
-              ] else ...[
-                const SizedBox(height: 8),
-                Center(
-                  child: Image.asset(
-                    Images.searchPlaceHolder(context),
-                    height: screenWidth > 600 ? 88 : 72,
-                    width: screenWidth > 600 ? 88 : 72,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  "Jesus Will Guide You!",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      color: CommanColor.whiteBlack(context),
-                      fontSize: screenWidth > 600 ? 28 : 24,
-                      fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "Choose your preferred verse topics",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      color: CommanColor.whiteBlack(context),
-                      fontSize: screenWidth > 600 ? 20 : 16),
-                ),
-              ],
+              _buildPreferenceTopicsHeader(screenWidth),
               const SizedBox(height: 16),
               Expanded(
                 child: SingleChildScrollView(
@@ -682,346 +703,360 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                     ),
                     child: _iconNames.isEmpty
                         ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 32, horizontal: 24),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 32, horizontal: 24),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CircularProgressIndicator.adaptive(
+                              valueColor:
+                              AlwaysStoppedAnimation<Color>(
+                                isDark
+                                    ? Colors.white70
+                                    : const Color(0xFF805531),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            Text(
+                              'Loading topics…',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: CommanColor.whiteBlack(context)
+                                    .withOpacity(0.9),
+                                fontSize: screenWidth > 600 ? 18 : 15,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Your verse categories will appear here in a moment.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: CommanColor.whiteBlack(context)
+                                    .withOpacity(0.65),
+                                fontSize: screenWidth > 600 ? 16 : 13,
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                        : Wrap(
+                      spacing: screenWidth > 600 ? 20 : 10,
+                      runSpacing: screenWidth > 600 ? 16 : 12,
+                      children: _iconNames.entries.map((category) {
+                        final selected = _isSelected(category.key);
+
+                        return InkWell(
+                          onTap: () => _toggleSelection(category.key),
+                          borderRadius: BorderRadius.circular(7),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              // Selected option: background color 805531 with 20% opacity
+                              color: selected
+                                  ? const Color(0xFF805531)
+                                  .withOpacity(0.2)
+                                  : Colors.transparent,
+                              // Border with increased thickness when selected
+                              border: Border.all(
+                                // Border stroke color: yellow when selected in dark mode, otherwise use default colors
+                                color: selected && isDark
+                                    ? Colors
+                                    .yellow // Yellow border for selected topics in dark mode
+                                    : (isDark
+                                    ? Colors.grey.shade400
+                                    : const Color(0xFF805531)),
+                                width: selected
+                                    ? 2.0
+                                    : 1.0, // Increase thickness when selected
+                              ),
+                              borderRadius: BorderRadius.circular(7),
+                            ),
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: screenWidth -
+                                    (screenWidth > 600 ? 80 : 56),
+                              ),
+                              child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  CircularProgressIndicator.adaptive(
-                                    valueColor:
-                                        AlwaysStoppedAnimation<Color>(
-                                      isDark
-                                          ? Colors.white70
-                                          : const Color(0xFF805531),
+                                  ColorFiltered(
+                                    colorFilter: ColorFilter.mode(
+                                      // White/Black for normal (unselected) based on theme
+                                      // Theme color (805531) when selected in light mode, white when selected in dark mode
+                                      selected
+                                          ? (isDark
+                                          ? Colors.white
+                                          : const Color(0xFF805531))
+                                          : (isDark
+                                          ? CommanColor.whiteBlack(
+                                          context)
+                                          : const Color(0xFF805531)),
+                                      BlendMode.srcIn,
+                                    ),
+                                    child: Image.asset(
+                                      _getIconPath(
+                                          category.key,
+                                          Provider.of<ThemeProvider>(
+                                              context,
+                                              listen: false)
+                                              .themeMode ==
+                                              ThemeMode.dark
+                                              ? !selected
+                                              : selected),
+                                      width: screenWidth > 600 ? 40 : 20,
+                                      height: screenWidth > 600 ? 40 : 20,
+                                      errorBuilder: (_, __, ___) =>
+                                          SizedBox(
+                                            width:
+                                            screenWidth > 600 ? 40 : 20,
+                                            height:
+                                            screenWidth > 600 ? 40 : 20,
+                                            child: Icon(
+                                              Icons.menu_book_outlined,
+                                              size: screenWidth > 600
+                                                  ? 28
+                                                  : 16,
+                                            ),
+                                          ),
                                     ),
                                   ),
-                                  const SizedBox(height: 20),
-                                  Text(
-                                    'Loading topics…',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: CommanColor.whiteBlack(context)
-                                          .withOpacity(0.9),
-                                      fontSize: screenWidth > 600 ? 18 : 15,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Your verse categories will appear here in a moment.',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: CommanColor.whiteBlack(context)
-                                          .withOpacity(0.65),
-                                      fontSize: screenWidth > 600 ? 16 : 13,
-                                      height: 1.35,
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      category.key,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize:
+                                        screenWidth > 600 ? 19 : null,
+                                        // White/Black for normal (unselected) based on theme
+                                        // Theme color (805531) when selected in light mode, white when selected in dark mode
+                                        color: selected
+                                            ? (isDark
+                                            ? Colors.white
+                                            : const Color(0xFF805531))
+                                            : (isDark
+                                            ? CommanColor.whiteBlack(
+                                            context)
+                                            : const Color(
+                                            0xFF805531)),
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          )
-                        : Wrap(
-                            spacing: screenWidth > 600 ? 20 : 10,
-                            runSpacing: screenWidth > 600 ? 16 : 12,
-                            children: _iconNames.entries.map((category) {
-                              final selected = _isSelected(category.key);
-
-                              return InkWell(
-                                onTap: () => _toggleSelection(category.key),
-                                borderRadius: BorderRadius.circular(7),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    // Selected option: background color 805531 with 20% opacity
-                                    color: selected
-                                        ? const Color(0xFF805531)
-                                            .withOpacity(0.2)
-                                        : Colors.transparent,
-                                    // Border with increased thickness when selected
-                                    border: Border.all(
-                                      // Border stroke color: yellow when selected in dark mode, otherwise use default colors
-                                      color: selected && isDark
-                                          ? Colors
-                                              .yellow // Yellow border for selected topics in dark mode
-                                          : (isDark
-                                              ? Colors.grey.shade400
-                                              : const Color(0xFF805531)),
-                                      width: selected
-                                          ? 2.0
-                                          : 1.0, // Increase thickness when selected
-                                    ),
-                                    borderRadius: BorderRadius.circular(7),
-                                  ),
-                                  child: ConstrainedBox(
-                                    constraints: BoxConstraints(
-                                      maxWidth: screenWidth -
-                                          (screenWidth > 600 ? 80 : 56),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        ColorFiltered(
-                                          colorFilter: ColorFilter.mode(
-                                            // White/Black for normal (unselected) based on theme
-                                            // Theme color (805531) when selected in light mode, white when selected in dark mode
-                                            selected
-                                                ? (isDark
-                                                    ? Colors.white
-                                                    : const Color(0xFF805531))
-                                                : (isDark
-                                                    ? CommanColor.whiteBlack(
-                                                        context)
-                                                    : const Color(0xFF805531)),
-                                            BlendMode.srcIn,
-                                          ),
-                                          child: Image.asset(
-                                            _getIconPath(
-                                                category.key,
-                                                Provider.of<ThemeProvider>(
-                                                                context,
-                                                                listen: false)
-                                                            .themeMode ==
-                                                        ThemeMode.dark
-                                                    ? !selected
-                                                    : selected),
-                                            width: screenWidth > 600 ? 40 : 20,
-                                            height: screenWidth > 600 ? 40 : 20,
-                                            errorBuilder: (_, __, ___) =>
-                                                SizedBox(
-                                              width:
-                                                  screenWidth > 600 ? 40 : 20,
-                                              height:
-                                                  screenWidth > 600 ? 40 : 20,
-                                              child: Icon(
-                                                Icons.menu_book_outlined,
-                                                size: screenWidth > 600
-                                                    ? 28
-                                                    : 16,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Flexible(
-                                          child: Text(
-                                            category.key,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              fontSize:
-                                                  screenWidth > 600 ? 19 : null,
-                                              // White/Black for normal (unselected) based on theme
-                                              // Theme color (805531) when selected in light mode, white when selected in dark mode
-                                              color: selected
-                                                  ? (isDark
-                                                      ? Colors.white
-                                                      : const Color(0xFF805531))
-                                                  : (isDark
-                                                      ? CommanColor.whiteBlack(
-                                                          context)
-                                                      : const Color(
-                                                          0xFF805531)),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
                           ),
+                        );
+                      }).toList(),
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
+              Text(
+                _selectedCategories.length >= 3
+                    ? '${_selectedCategories.length} topics selected'
+                    : 'Choose at least ${3 - _selectedCategories.length} more',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: screenWidth > 600 ? 17 : 14,
+                  fontWeight: FontWeight.w600,
+                  color: _selectedCategories.length >= 3
+                      ? const Color(0xFF6B8F71)
+                      : CommanColor.whiteBlack(context).withOpacity(0.75),
+                ),
+              ),
+              const SizedBox(height: 12),
               GestureDetector(
                 onTap: isLoading
                     ? null
-                    : _selectedCategories.isNotEmpty
-                        ? () async {
-                            debugPrint("dailyVersesnew 1");
-                            if (widget.isSetting == true) {
-                              debugPrint("dailyVersesnew 2");
-                              if (!mounted) return;
-                              setState(() {
-                                isLoading = true;
-                              });
-                              _savePreferences();
-                              await Future.delayed(Duration(seconds: 1));
-                              Constants.showToast("Saved successfully");
-                              if (!mounted) return;
-                              setState(() {
-                                isLoading = false;
-                              });
-                              Get.back();
+                    : _selectedCategories.length >= 3
+                    ? () async {
+                  debugPrint("dailyVersesnew 1");
+                  if (widget.isSetting == true) {
+                    debugPrint("dailyVersesnew 2");
+                    if (!mounted) return;
+                    setState(() {
+                      isLoading = true;
+                    });
+                    _savePreferences();
+                    await Future.delayed(Duration(seconds: 1));
+                    Constants.showToast("Saved successfully");
+                    if (!mounted) return;
+                    setState(() {
+                      isLoading = false;
+                    });
+                    Get.back();
+                  } else {
+                    if (widget.selectedbible != null &&
+                        widget.selectedbible!.isNotEmpty) {
+                      if (!mounted) return;
+                      setState(() {
+                        isLoading = true;
+                      });
+                      FaithJourneyDialog.showLoadingDialog(
+                        context,
+                        onContinue: () {
+                          // Show success dialog when user taps Continue
+                          FaithJourneyDialog.showSuccessDialog(
+                              context,
+                              isFromOnboarding: !widget.isSetting);
+                        },
+                      );
+                      debugPrint(
+                          "folders leng - ${BibleInfo.folders.length}");
+                      if (BibleInfo.folders.length == 1) {
+                        await extractFromFolder(
+                          folderName: BibleInfo.folders.first,
+                          password: dotenv
+                              .env[AssetsConstants.holybibleKey]
+                              .toString(),
+                        );
+
+                        await loadBookContent(
+                            BibleInfo.folders.first);
+                        await loadBookList(BibleInfo.folders.first);
+                        await _finalizeBibleSetupAndPreloadHomeData();
+                        await DBHelper().db.then((db) async {
+                          if (db != null) {
+                            final result = await db.rawQuery(
+                              "SELECT * FROM book WHERE book_num = ?",
+                              [int.parse("0")],
+                            );
+
+                            if (result.isNotEmpty &&
+                                result[0]["title"] != null) {
+                              final title =
+                              result[0]["title"].toString();
+                              // final data =
+                              //     await SharPreferences.getString(
+                              //           SharPreferences.selectedBook,
+                              //         ) ??
+                              //         "";
+                              // if (data.isEmpty) {
+                              await SharPreferences.setString(
+                                SharPreferences.selectedBook,
+                                title,
+                              );
+                              // }
                             } else {
-                              if (widget.selectedbible != null &&
-                                  widget.selectedbible!.isNotEmpty) {
-                                if (!mounted) return;
-                                setState(() {
-                                  isLoading = true;
-                                });
-                                FaithJourneyDialog.showLoadingDialog(
-                                  context,
-                                  onContinue: () {
-                                    // Show success dialog when user taps Continue
-                                    FaithJourneyDialog.showSuccessDialog(
-                                        context,
-                                        isFromOnboarding: !widget.isSetting);
-                                  },
-                                );
-                                debugPrint(
-                                    "folders leng - ${BibleInfo.folders.length}");
-                                if (BibleInfo.folders.length == 1) {
-                                  await extractFromFolder(
-                                    folderName: BibleInfo.folders.first,
-                                    password: dotenv
-                                        .env[AssetsConstants.holybibleKey]
-                                        .toString(),
-                                  );
-
-                                  await loadBookContent(
-                                      BibleInfo.folders.first);
-                                  await loadBookList(BibleInfo.folders.first);
-                                  await _finalizeBibleSetupAndPreloadHomeData();
-                                  await DBHelper().db.then((db) async {
-                                    if (db != null) {
-                                      final result = await db.rawQuery(
-                                        "SELECT * FROM book WHERE book_num = ?",
-                                        [int.parse("0")],
-                                      );
-
-                                      if (result.isNotEmpty &&
-                                          result[0]["title"] != null) {
-                                        final title =
-                                            result[0]["title"].toString();
-                                        // final data =
-                                        //     await SharPreferences.getString(
-                                        //           SharPreferences.selectedBook,
-                                        //         ) ??
-                                        //         "";
-                                        // if (data.isEmpty) {
-                                        await SharPreferences.setString(
-                                          SharPreferences.selectedBook,
-                                          title,
-                                        );
-                                        // }
-                                      } else {
-                                        debugPrint(
-                                            "testapp No book found with book_num = 0");
-                                      }
-                                    } else {
-                                      debugPrint(
-                                          "testapp Database instance is null");
-                                    }
-                                  });
-                                  await deleteFiles(BibleInfo.folders.first);
-                                  if (!mounted) return;
-                                  setState(() {
-                                    isLoading = false;
-                                  });
-                                  // Don't auto-dismiss - let user tap Continue button
-                                  // Navigator.pop(context); // Close loading
-                                  // Show success dialog after user dismisses loading dialog
-                                  // This will be handled when user taps Continue button
-                                } else {
-                                  await loadBookContent(widget.selectedbible);
-                                  await loadBookList(widget.selectedbible);
-                                  await _finalizeBibleSetupAndPreloadHomeData();
-                                  await DBHelper().db.then((db) async {
-                                    if (db != null) {
-                                      final result = await db.rawQuery(
-                                        "SELECT * FROM book WHERE book_num = ?",
-                                        [int.parse("0")],
-                                      );
-
-                                      if (result.isNotEmpty &&
-                                          result[0]["title"] != null) {
-                                        final title =
-                                            result[0]["title"].toString();
-                                        // final data =
-                                        //     await SharPreferences.getString(
-                                        //           SharPreferences.selectedBook,
-                                        //         ) ??
-                                        //         "";
-                                        // if (data.isEmpty) {
-                                        await SharPreferences.setString(
-                                          SharPreferences.selectedBook,
-                                          title,
-                                        );
-                                        // }
-                                      } else {
-                                        debugPrint(
-                                            "testapp No book found with book_num = 0");
-                                      }
-                                    } else {
-                                      debugPrint(
-                                          "testapp Database instance is null");
-                                    }
-                                  });
-                                  await deleteFiles(widget.selectedbible);
-                                  if (!mounted) return;
-                                  setState(() {
-                                    isLoading = false;
-                                  });
-                                  // Don't auto-dismiss - let user tap Continue button
-                                  // Navigator.pop(context); // Close loading
-                                  // Success dialog will be shown when user taps Continue
-                                }
-                                // Get.offAll(() => HomeScreen(
-                                //       From: "splash",
-                                //       selectedVerseNumForRead: "",
-                                //       selectedBookForRead: "",
-                                //       selectedChapterForRead: "",
-                                //       selectedBookNameForRead: "",
-                                //       selectedVerseForRead: "",
-                                //     ));
-                              }
+                              debugPrint(
+                                  "testapp No book found with book_num = 0");
                             }
-                            // ScaffoldMessenger.of(context).showSnackBar(
-                            //   const SnackBar(
-                            //     backgroundColor: CommanColor.darkPrimaryColor,
-                            //     content: Text(
-                            //       'Preferences saved!',
-                            //       style: TextStyle(color: CommanColor.white),
-                            //     ),
-                            //   ),
-                            // );
+                          } else {
+                            debugPrint(
+                                "testapp Database instance is null");
                           }
-                        : null,
+                        });
+                        await deleteFiles(BibleInfo.folders.first);
+                        if (!mounted) return;
+                        setState(() {
+                          isLoading = false;
+                        });
+                        // Don't auto-dismiss - let user tap Continue button
+                        // Navigator.pop(context); // Close loading
+                        // Show success dialog after user dismisses loading dialog
+                        // This will be handled when user taps Continue button
+                      } else {
+                        await loadBookContent(widget.selectedbible);
+                        await loadBookList(widget.selectedbible);
+                        await _finalizeBibleSetupAndPreloadHomeData();
+                        await DBHelper().db.then((db) async {
+                          if (db != null) {
+                            final result = await db.rawQuery(
+                              "SELECT * FROM book WHERE book_num = ?",
+                              [int.parse("0")],
+                            );
+
+                            if (result.isNotEmpty &&
+                                result[0]["title"] != null) {
+                              final title =
+                              result[0]["title"].toString();
+                              // final data =
+                              //     await SharPreferences.getString(
+                              //           SharPreferences.selectedBook,
+                              //         ) ??
+                              //         "";
+                              // if (data.isEmpty) {
+                              await SharPreferences.setString(
+                                SharPreferences.selectedBook,
+                                title,
+                              );
+                              // }
+                            } else {
+                              debugPrint(
+                                  "testapp No book found with book_num = 0");
+                            }
+                          } else {
+                            debugPrint(
+                                "testapp Database instance is null");
+                          }
+                        });
+                        await deleteFiles(widget.selectedbible);
+                        if (!mounted) return;
+                        setState(() {
+                          isLoading = false;
+                        });
+                        // Don't auto-dismiss - let user tap Continue button
+                        // Navigator.pop(context); // Close loading
+                        // Success dialog will be shown when user taps Continue
+                      }
+                      // Get.offAll(() => HomeScreen(
+                      //       From: "splash",
+                      //       selectedVerseNumForRead: "",
+                      //       selectedBookForRead: "",
+                      //       selectedChapterForRead: "",
+                      //       selectedBookNameForRead: "",
+                      //       selectedVerseForRead: "",
+                      //     ));
+                    }
+                  }
+                  // ScaffoldMessenger.of(context).showSnackBar(
+                  //   const SnackBar(
+                  //     backgroundColor: CommanColor.darkPrimaryColor,
+                  //     content: Text(
+                  //       'Preferences saved!',
+                  //       style: TextStyle(color: CommanColor.white),
+                  //     ),
+                  //   ),
+                  // );
+                }
+                    : null,
                 child: Center(
                   child: Container(
-                    width: screenWidth > 600 ? 160 : 130,
+                    width: screenWidth > 600 ? 200 : 170,
                     height: screenWidth > 600 ? 65 : 40,
                     decoration: BoxDecoration(
-                        gradient: _selectedCategories.isNotEmpty
+                        gradient: _selectedCategories.length >= 3
                             ? (Provider.of<ThemeProvider>(context,
-                                            listen: false)
-                                        .themeMode ==
-                                    ThemeMode.dark
-                                ? null
-                                : const LinearGradient(
-                                    colors: [
-                                      Color(0xFF763201),
-                                      Color(0xFFD5821F),
-                                      Color(0xFF763201),
-                                    ],
-                                  ))
+                            listen: false)
+                            .themeMode ==
+                            ThemeMode.dark
+                            ? null
+                            : const LinearGradient(
+                          colors: [
+                            Color(0xFF763201),
+                            Color(0xFFD5821F),
+                            Color(0xFF763201),
+                          ],
+                        ))
                             : null,
-                        color: _selectedCategories.isNotEmpty
+                        color: _selectedCategories.length >= 3
                             ? (Provider.of<ThemeProvider>(context,
-                                            listen: false)
-                                        .themeMode ==
-                                    ThemeMode.dark
-                                ? CommanColor.backgrondcolor
-                                : null)
+                            listen: false)
+                            .themeMode ==
+                            ThemeMode.dark
+                            ? CommanColor.backgrondcolor
+                            : null)
                             : Color(0XFFC9B7A5),
                         borderRadius: BorderRadius.circular(9) // Brown color
-                        ),
+                    ),
                     // onPressed: _selectedCategories.length == 4
                     //     ? () {
                     //         _savePreferences();
@@ -1042,17 +1077,17 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                           isLoading
                               ? "Loading..."
                               : widget.isSetting == true
-                                  ? "Save"
-                                  : "Continue",
+                              ? "Save"
+                              : "Continue",
                           style: TextStyle(
                               fontSize: screenWidth > 600 ? 20 : 17,
-                              color: _selectedCategories.isNotEmpty
+                              color: _selectedCategories.length >= 3
                                   ? Provider.of<ThemeProvider>(context,
-                                                  listen: false)
-                                              .themeMode ==
-                                          ThemeMode.dark
-                                      ? CommanColor.darkPrimaryColor
-                                      : CommanColor.white
+                                  listen: false)
+                                  .themeMode ==
+                                  ThemeMode.dark
+                                  ? CommanColor.darkPrimaryColor
+                                  : CommanColor.white
                                   : null)),
                     ),
                   ),
@@ -1063,18 +1098,18 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
               ),
               widget.isSetting != true
                   ? Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          "You can change these anytime in Settings.",
-                          style: TextStyle(
-                              color: CommanColor.whiteBlack(context),
-                              fontSize: screenWidth > 600 ? 21 : 16,
-                              fontStyle: FontStyle.italic,
-                              fontWeight: FontWeight.w400),
-                        ),
-                      ],
-                    )
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    "You can change these anytime in Settings.",
+                    style: TextStyle(
+                        color: CommanColor.whiteBlack(context),
+                        fontSize: screenWidth > 600 ? 21 : 16,
+                        fontStyle: FontStyle.italic,
+                        fontWeight: FontWeight.w400),
+                  ),
+                ],
+              )
                   : SizedBox(),
               const SizedBox(height: 16),
             ]),
@@ -1086,8 +1121,8 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
 
   Future<void> extractFromFolder(
       {String? from,
-      required String folderName,
-      required String password}) async {
+        required String folderName,
+        required String password}) async {
     // if (from.toString() != "home") {
     //   setState(() {
     //     buttonStates[folderName] = DownloadButtonState.downloading;
@@ -1167,7 +1202,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
 
     // Load json and parse
     final String dailyVerseResponse =
-        await rootBundle.loadString('assets/jsonFile/dailyVerse.json');
+    await rootBundle.loadString('assets/jsonFile/dailyVerse.json');
     final List<DailyVersesMainListModel> dataList = await compute(
         preferenceSelectionParseDailyVerseModels, dailyVerseResponse);
 
@@ -1204,8 +1239,8 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
 
       final selectedVerse = await db.rawQuery(
         "SELECT * FROM verse WHERE book_num ='${int.parse(m["Book_Id"].toString()) - 1}' "
-        "AND chapter_num ='${int.parse(m["Chapter"].toString()) - 1}' "
-        "AND verse_num ='$verseNum'",
+            "AND chapter_num ='${int.parse(m["Chapter"].toString()) - 1}' "
+            "AND verse_num ='$verseNum'",
       );
 
       if (selectedVerse.isNotEmpty) {
@@ -1219,7 +1254,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
             "Book_Id": m["Book_Id"],
             "Chapter": m["Chapter"],
             "Verse": selectedVerse[0]
-                ["content"], // ✅ Only Verse content inserted
+            ["content"], // ✅ Only Verse content inserted
             "Date": "$date",
             "Verse_Num": m["Verse"].toString().length == 2
                 ? int.parse(m["Verse"].toString())
@@ -1306,7 +1341,7 @@ Future<List<VerseBookContentModel>> _parseVerseContent(
   return List.from(data)
       .map<VerseBookContentModel>(
         (item) => VerseBookContentModel.fromJson(item),
-      )
+  )
       .toList();
 }
 
@@ -1517,8 +1552,8 @@ class FaithJourneyDialog {
                     fontSize: screenWidth < 380
                         ? 12.5
                         : isTablet
-                            ? 16
-                            : 14.7,
+                        ? 16
+                        : 14.7,
                     height: 1.45,
                     color: const Color(0xFF3D2914),
                   ),
@@ -1535,7 +1570,7 @@ class FaithJourneyDialog {
 
                       // Skip IAP when offline or paywall product data is unavailable.
                       final shouldShowPaywall =
-                          await PaywallPreloadService.canShowOnboardingPaywall();
+                      await PaywallPreloadService.canShowOnboardingPaywall();
                       if (!shouldShowPaywall) {
                         await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
                         return;
@@ -1544,7 +1579,7 @@ class FaithJourneyDialog {
                       // Very slow networks: skip IAP and continue to home/streak.
                       try {
                         final connectionSpeed =
-                            await InternetSpeedChecker.checkSpeed(
+                        await InternetSpeedChecker.checkSpeed(
                           timeout: const Duration(seconds: 8),
                         );
                         final isVerySlowConnection = connectionSpeed != null &&
@@ -1563,11 +1598,11 @@ class FaithJourneyDialog {
                       final oneYearPlan = BibleInfo.oneYearPlanid;
                       final lifeTimePlan = BibleInfo.lifeTimePlanid;
                       Get.offAll(() => SubscriptionScreen(
-                            sixMonthPlan: sixMonthPlan,
-                            oneYearPlan: oneYearPlan,
-                            lifeTimePlan: lifeTimePlan,
-                            checkad: 'onboard',
-                          ),
+                        sixMonthPlan: sixMonthPlan,
+                        oneYearPlan: oneYearPlan,
+                        lifeTimePlan: lifeTimePlan,
+                        checkad: 'onboard',
+                      ),
                           transition: SubscriptionScreen.paywallRouteTransition,
                           duration: SubscriptionScreen.paywallRouteDuration);
                     } else {
@@ -1705,7 +1740,7 @@ class _AnimatedJourneyDialogState extends State<_AnimatedJourneyDialog>
     // Initialize step controllers
     _stepControllers = List.generate(
       _steps.length,
-      (index) => AnimationController(
+          (index) => AnimationController(
         vsync: this,
         duration: const Duration(
             milliseconds: 1500), // Increased from 1800ms to 2000ms
@@ -1717,7 +1752,7 @@ class _AnimatedJourneyDialogState extends State<_AnimatedJourneyDialog>
       vsync: this,
       duration: const Duration(
           milliseconds:
-              8000), // Matches total tick animation time (2000ms × 4 steps)
+          8000), // Matches total tick animation time (2000ms × 4 steps)
     );
     _progressAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
@@ -1879,8 +1914,8 @@ class _AnimatedJourneyDialogState extends State<_AnimatedJourneyDialog>
                 fontSize: screenWidth < 380
                     ? 14
                     : isTablet
-                        ? 18
-                        : 16,
+                    ? 18
+                    : 16,
                 color: const Color(0xFF7B5536),
                 height: 1.4,
               ),
@@ -1901,7 +1936,7 @@ class _AnimatedJourneyDialogState extends State<_AnimatedJourneyDialog>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   ...List.generate(_steps.length,
-                      (index) => _buildStep(_steps[index], index)),
+                          (index) => _buildStep(_steps[index], index)),
                   const SizedBox(height: 10),
                   AnimatedBuilder(
                     animation: _progressAnimation,
@@ -1940,11 +1975,11 @@ class _AnimatedJourneyDialogState extends State<_AnimatedJourneyDialog>
                     child: GestureDetector(
                       onTap: _allStepsCompleted
                           ? () {
-                              Navigator.of(context).pop();
-                              if (widget.onContinue != null) {
-                                widget.onContinue!();
-                              }
-                            }
+                        Navigator.of(context).pop();
+                        if (widget.onContinue != null) {
+                          widget.onContinue!();
+                        }
+                      }
                           : null,
                       child: Container(
                         width: double.infinity,
@@ -2009,7 +2044,7 @@ class _SpinnerPainter extends CustomPainter {
 
     for (int i = 0; i < segmentCount; i++) {
       final double opacity =
-          ((i / segmentCount + (1.0 - progress)) % 1.0).clamp(0.2, 1.0);
+      ((i / segmentCount + (1.0 - progress)) % 1.0).clamp(0.2, 1.0);
       paint.color = color.withValues(alpha: opacity);
 
       final x1 = radius + radius * 0.6 * math.cos(angle * i);

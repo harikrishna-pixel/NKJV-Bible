@@ -163,7 +163,7 @@ class ImageBottomSheets extends StatelessWidget {
       this.verseTextNudgeDown = 0,
       this.useFixedVerseBackground = false});
 
-  /// Daily Verses share preview: single verse_image_bg, no background cycling.
+  /// Daily Verses share preview: same background list + tap-to-cycle as Home image share.
   factory ImageBottomSheets.dailyVerse({
     required DashBoardController controller,
     required String content,
@@ -181,7 +181,7 @@ class ImageBottomSheets extends StatelessWidget {
       shareFooterMessage: shareFooterMessage,
       showNavButtons: false,
       verseTextNudgeDown: 0,
-      useFixedVerseBackground: true,
+      useFixedVerseBackground: false,
     );
   }
 

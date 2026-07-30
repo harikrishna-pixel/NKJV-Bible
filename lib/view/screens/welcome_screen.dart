@@ -19,20 +19,20 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   static const List<({String icon, String label})> _features = [
     (
-      icon: 'assets/splash_welcome_icons/bible_assitant.png',
-      label: 'AI Bible\nAssistant',
+    icon: 'assets/splash_welcome_icons/bible_assitant.png',
+    label: 'AI Bible\nAssistant',
     ),
     (
-      icon: 'assets/splash_welcome_icons/prayer_support.png',
-      label: 'Prayer\nSupport',
+    icon: 'assets/splash_welcome_icons/prayer_support.png',
+    label: 'Prayer\nSupport',
     ),
     (
-      icon: 'assets/splash_welcome_icons/easier-reading.png',
-      label: 'Easier\nReading',
+    icon: 'assets/splash_welcome_icons/easier-reading.png',
+    label: 'Easier\nReading',
     ),
     (
-      icon: 'assets/splash_welcome_icons/audio_bible.png',
-      label: 'Audio\nBible',
+    icon: 'assets/splash_welcome_icons/audio_bible.png',
+    label: 'Audio\nBible',
     ),
   ];
 
@@ -47,7 +47,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   Future<void> _loadLogoMode() async {
     final show = await SharPreferences.getBoolean(
-            SharPreferences.showWelcomeLogoComparison) ??
+        SharPreferences.showWelcomeLogoComparison) ??
         false;
     if (!mounted) return;
     setState(() => _showLogoComparison = show);
@@ -98,9 +98,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                               Center(
                                 child: showComparison
                                     ? _welcomeLogoComparison(
-                                        isTablet: isTablet)
+                                    isTablet: isTablet)
                                     : _welcomeSingleNewLogo(
-                                        isTablet: isTablet),
+                                    isTablet: isTablet),
                               ),
                               SizedBox(height: isTablet ? 18 : 14),
                               Text(
@@ -150,8 +150,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   for (var i = 0;
-                                      i < _features.length;
-                                      i++) ...[
+                                  i < _features.length;
+                                  i++) ...[
                                     if (i > 0)
                                       SizedBox(width: isTablet ? 10 : 6),
                                     Expanded(

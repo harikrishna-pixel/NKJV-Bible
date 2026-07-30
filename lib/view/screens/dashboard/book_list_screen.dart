@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
@@ -7,7 +6,6 @@ import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/dashboard/chapterListScreen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:flutter/material.dart';
-import 'package:percent_indicator/circular_percent_indicator.dart';
 import 'package:provider/provider.dart';
 import '../../../Model/mainBookListModel.dart';
 import '../../../controller/dpProvider.dart';
@@ -31,9 +29,9 @@ class _BookListScreenState extends State<BookListScreen> {
   Future<void> _openChapterListForBook(MainBookListModel data) async {
     await SharPreferences.setString('OpenAd', '1');
     final previousBookNum =
-        await SharPreferences.getString(SharPreferences.selectedBookNum);
+    await SharPreferences.getString(SharPreferences.selectedBookNum);
     final savedChapter =
-        await SharPreferences.getString(SharPreferences.selectedChapter);
+    await SharPreferences.getString(SharPreferences.selectedChapter);
 
     await SharPreferences.setString(
         SharPreferences.selectedBookNum, data.bookNum.toString());
@@ -42,10 +40,10 @@ class _BookListScreenState extends State<BookListScreen> {
 
     final sameBook = previousBookNum == data.bookNum.toString();
     final chapterArg =
-        sameBook ? (int.tryParse(savedChapter ?? '') ?? 1) : 1;
+    sameBook ? (int.tryParse(savedChapter ?? '') ?? 1) : 1;
 
     Get.to(
-      () => ChapterListScreen(
+          () => ChapterListScreen(
         chapterCount: data.chapterCount,
         book_num: data.bookNum,
         selectedChapter: chapterArg,
@@ -73,7 +71,7 @@ class _BookListScreenState extends State<BookListScreen> {
     if (db == null) return;
 
     final bookResponse =
-        await db.rawQuery("SELECT * FROM book ORDER BY book_num");
+    await db.rawQuery("SELECT * FROM book ORDER BY book_num");
     if (!mounted) return;
 
     bookList = bookResponse
@@ -87,7 +85,7 @@ class _BookListScreenState extends State<BookListScreen> {
 
     try {
       final downloadProvider =
-          Provider.of<DownloadProvider>(context, listen: false);
+      Provider.of<DownloadProvider>(context, listen: false);
       if (downloadProvider.bookList.isNotEmpty) {
         bookList = List<MainBookListModel>.from(downloadProvider.bookList);
         _splitTestaments();
@@ -167,19 +165,19 @@ class _BookListScreenState extends State<BookListScreen> {
       backgroundColor: isVintage
           ? (isDark ? CommanColor.black : const Color(0xFFF5F0E6))
           : (isDark
-              ? CommanColor.darkPrimaryColor
-              : themeProvider.backgroundColor),
+          ? CommanColor.darkPrimaryColor
+          : themeProvider.backgroundColor),
       appBar: AppBar(
         toolbarHeight: 50,
         flexibleSpace: Container(
           decoration: Provider.of<ThemeProvider>(context).currentCustomTheme ==
-                  AppCustomTheme.vintage
+              AppCustomTheme.vintage
               ? BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage(Images.bgImage((context))),
-                    fit: BoxFit.cover,
-                  ),
-                )
+            image: DecorationImage(
+              image: AssetImage(Images.bgImage((context))),
+              fit: BoxFit.cover,
+            ),
+          )
               : null,
         ),
         backgroundColor: Colors.transparent,
@@ -212,336 +210,303 @@ class _BookListScreenState extends State<BookListScreen> {
         height: MediaQuery.of(context).size.height,
         width: MediaQuery.of(context).size.width,
         decoration: Provider.of<ThemeProvider>(context).currentCustomTheme ==
-                AppCustomTheme.vintage
+            AppCustomTheme.vintage
             ? BoxDecoration(
-                image: DecorationImage(
-                    image: AssetImage(Images.bgImage(context)),
-                    fit: BoxFit.fill))
+            image: DecorationImage(
+                image: AssetImage(Images.bgImage(context)),
+                fit: BoxFit.fill))
             : null,
         child: loader == false
             ? Center(
-                child: Loader(),
-              )
+          child: Loader(),
+        )
             : bookList.isEmpty
-                ? Center(
-                    child: Text(
-                      'No books available',
-                      style: CommanStyle.bw16500(context),
-                    ),
-                  )
-                : Column(
-                children: [
-                  Expanded(
-                    child: DefaultTabController(
-                      length: 2,
-                      animationDuration: Duration(milliseconds: 200),
-                      initialIndex: 0,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Container(
-                            // color: Colors.black12,
-                            color: CommanColor.white,
-                            height: screenWidth > 450 ? 55 : 45,
-                            child: TabBar(
-                              isScrollable: false,
-                              indicatorWeight: 0,
-                              padding: EdgeInsets.zero,
-                              indicatorPadding: EdgeInsets.zero,
-                              labelPadding: EdgeInsets.zero,
-                              indicatorSize: TabBarIndicatorSize.label,
-                              unselectedLabelStyle:
-                                  CommanStyle.darkPrimary16600,
-                              labelStyle: CommanStyle.grey16600,
-                              labelColor: CommanColor.darkPrimaryColor,
-                              unselectedLabelColor: CommanColor.lightGrey,
-                              indicator: UnderlineTabIndicator(
-                                  borderRadius: BorderRadius.circular(1),
-                                  borderSide: BorderSide(
-                                      color: CommanColor.darkPrimaryColor,
-                                      width: 2.5)),
-                              tabs: <Widget>[
-                                Tab(
-                                  child: Container(
-                                    padding: EdgeInsets.symmetric(
-                                        horizontal: 15.0, vertical: 7.0),
-                                    child: Text(
-                                      'Old Testament',
-                                      style: TextStyle(
-                                          fontSize: screenWidth > 450
-                                              ? BibleInfo.fontSizeScale * 25
-                                              : BibleInfo.fontSizeScale * 18),
-                                    ),
-                                  ),
-                                ),
-                                Tab(
-                                  child: Container(
-                                    padding: EdgeInsets.symmetric(
-                                        horizontal: 15.0, vertical: 7.0),
-                                    child: Text(
-                                      'New Testament',
-                                      style: TextStyle(
-                                          fontSize: screenWidth > 450
-                                              ? BibleInfo.fontSizeScale * 25
-                                              : BibleInfo.fontSizeScale * 18),
-                                    ),
-                                  ),
-                                ),
-                              ],
+            ? Center(
+          child: Text(
+            'No books available',
+            style: CommanStyle.bw16500(context),
+          ),
+        )
+            : Column(
+          children: [
+            Expanded(
+              child: DefaultTabController(
+                length: 2,
+                animationDuration: Duration(milliseconds: 200),
+                initialIndex: 0,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      // color: Colors.black12,
+                      color: CommanColor.white,
+                      height: screenWidth > 450 ? 55 : 45,
+                      child: TabBar(
+                        isScrollable: false,
+                        indicatorWeight: 0,
+                        padding: EdgeInsets.zero,
+                        indicatorPadding: EdgeInsets.zero,
+                        labelPadding: EdgeInsets.zero,
+                        indicatorSize: TabBarIndicatorSize.label,
+                        unselectedLabelStyle:
+                        CommanStyle.darkPrimary16600,
+                        labelStyle: CommanStyle.grey16600,
+                        labelColor: CommanColor.darkPrimaryColor,
+                        unselectedLabelColor: CommanColor.lightGrey,
+                        indicator: UnderlineTabIndicator(
+                            borderRadius: BorderRadius.circular(1),
+                            borderSide: BorderSide(
+                                color: CommanColor.darkPrimaryColor,
+                                width: 2.5)),
+                        tabs: <Widget>[
+                          Tab(
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 15.0, vertical: 7.0),
+                              child: Text(
+                                'Old Testament',
+                                style: TextStyle(
+                                    fontSize: screenWidth > 450
+                                        ? BibleInfo.fontSizeScale * 25
+                                        : BibleInfo.fontSizeScale * 18),
+                              ),
                             ),
                           ),
-                          Flexible(
-                            flex: 1,
-                            child: TabBarView(
-                              children: [
-                                ListView.builder(
-                                  itemCount: oldTestamentCount,
-                                  padding: EdgeInsets.symmetric(horizontal: 15),
-                                  physics: const BouncingScrollPhysics(
-                                    parent: AlwaysScrollableScrollPhysics(),
-                                  ),
-                                  cacheExtent: 400,
-                                  addAutomaticKeepAlives: false,
-                                  itemBuilder: (context, index) {
-                                    if (index >= _oldTestamentBooks.length) {
-                                      return const SizedBox.shrink();
-                                    }
-                                    var data = _oldTestamentBooks[index];
-                                    return Padding(
-                                      padding: const EdgeInsets.only(
-                                          top: 20.0, bottom: 2),
-                                      child: InkWell(
-                                        onTap: () => _openChapterListForBook(data),
-                                        child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.start,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.center,
-                                          children: [
-                                            Text(
-                                              "${data.title}",
-                                              style: CommanStyle.bw16500(
-                                                      context)
-                                                  .copyWith(
-                                                      fontSize: screenWidth >
-                                                              450
-                                                          ? BibleInfo
-                                                                  .fontSizeScale *
-                                                              23
-                                                          : BibleInfo
-                                                                  .fontSizeScale *
-                                                              16),
-                                            ),
-                                            Spacer(),
-                                            SizedBox(
-                                              width:
-                                                  screenWidth > 450 ? 90 : 80,
-                                              child: Row(
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment
-                                                        .spaceBetween,
-                                                children: [
-                                                  SizedBox(
-                                                    height: screenWidth > 450
-                                                        ? 50
-                                                        : 30,
-                                                    width: screenWidth > 450
-                                                        ? 50
-                                                        : 30,
-                                                    child:
-                                                        CircularPercentIndicator(
-                                                      radius: screenWidth > 450
-                                                          ? 25
-                                                          : 14.0,
-                                                      lineWidth:
-                                                          screenWidth > 450
-                                                              ? 3
-                                                              : 2.5,
-                                                      animationDuration: 500,
-                                                      percent: (double.parse(data
-                                                                  .readPer!) /
-                                                              100)
-                                                          .clamp(0.0, 1.0),
-                                                      animation: true,
-                                                      progressColor: CommanColor
-                                                          .progressFillColor(
-                                                              context),
-                                                      backgroundColor: CommanColor
-                                                          .progressUnFillColor(
-                                                              context),
-                                                      center: Text(
-                                                        "${(double.parse(data.readPer!) >= 99.9 ? 100 : double.parse(data.readPer!).toInt())} %",
-                                                        style: TextStyle(
-                                                            letterSpacing:
-                                                                BibleInfo
-                                                                    .letterSpacing,
-                                                            fontSize: screenWidth >
-                                                                    450
-                                                                ? BibleInfo
-                                                                        .fontSizeScale *
-                                                                    9
-                                                                : BibleInfo
-                                                                        .fontSizeScale *
-                                                                    6,
-                                                            fontWeight:
-                                                                FontWeight
-                                                                    .w600),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    "${data.chapterCount}",
-                                                    style: CommanStyle.bw16500(
-                                                            context)
-                                                        .copyWith(
-                                                            fontSize: screenWidth >
-                                                                    450
-                                                                ? BibleInfo
-                                                                        .fontSizeScale *
-                                                                    20
-                                                                : BibleInfo
-                                                                        .fontSizeScale *
-                                                                    16),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            SizedBox(
-                                              width: 10,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                ListView.builder(
-                                  itemCount: newTestmentBookList.length,
-                                  padding: EdgeInsets.symmetric(horizontal: 15),
-                                  physics: const BouncingScrollPhysics(
-                                    parent: AlwaysScrollableScrollPhysics(),
-                                  ),
-                                  cacheExtent: 400,
-                                  addAutomaticKeepAlives: false,
-                                  itemBuilder: (context, index) {
-                                    var data = newTestmentBookList[index];
-                                    return Padding(
-                                      padding: const EdgeInsets.only(top: 20.0),
-                                      child: InkWell(
-                                        onTap: () => _openChapterListForBook(data),
-                                        child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.start,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.center,
-                                          children: [
-                                            Text(
-                                              "${data.title}",
-                                              style: CommanStyle.bw16500(
-                                                      context)
-                                                  .copyWith(
-                                                      fontSize: screenWidth >
-                                                              450
-                                                          ? BibleInfo
-                                                                  .fontSizeScale *
-                                                              23
-                                                          : BibleInfo
-                                                                  .fontSizeScale *
-                                                              16),
-                                            ),
-                                            Spacer(),
-                                            SizedBox(
-                                              width:
-                                                  screenWidth > 450 ? 90 : 80,
-                                              child: Row(
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment
-                                                        .spaceBetween,
-                                                children: [
-                                                  SizedBox(
-                                                    height: screenWidth > 450
-                                                        ? 50
-                                                        : 30,
-                                                    width: screenWidth > 450
-                                                        ? 50
-                                                        : 30,
-                                                    child:
-                                                        CircularPercentIndicator(
-                                                      radius: screenWidth > 450
-                                                          ? 25
-                                                          : 14.0,
-                                                      lineWidth:
-                                                          screenWidth > 450
-                                                              ? 3
-                                                              : 2.5,
-                                                      percent: (double.parse(data
-                                                                  .readPer!) /
-                                                              100)
-                                                          .clamp(0.0, 1.0),
-                                                      animation: true,
-                                                      progressColor: CommanColor
-                                                          .progressFillColor(
-                                                              context),
-                                                      backgroundColor: CommanColor
-                                                          .progressUnFillColor(
-                                                              context),
-                                                      center: Text(
-                                                        "${(double.parse(data.readPer!) >= 99.9 ? 100 : double.parse(data.readPer!).toInt())} %",
-                                                        style: TextStyle(
-                                                            letterSpacing:
-                                                                BibleInfo
-                                                                    .letterSpacing,
-                                                            fontSize: screenWidth >
-                                                                    450
-                                                                ? BibleInfo
-                                                                        .fontSizeScale *
-                                                                    9
-                                                                : BibleInfo
-                                                                        .fontSizeScale *
-                                                                    6,
-                                                            fontWeight:
-                                                                FontWeight
-                                                                    .w600),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    "${data.chapterCount}",
-                                                    style: CommanStyle.bw16500(
-                                                            context)
-                                                        .copyWith(
-                                                            fontSize: screenWidth >
-                                                                    450
-                                                                ? BibleInfo
-                                                                        .fontSizeScale *
-                                                                    20
-                                                                : BibleInfo
-                                                                        .fontSizeScale *
-                                                                    16),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            SizedBox(
-                                              width: 10,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-
-                                // employee_profile(),
-                              ],
+                          Tab(
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 15.0, vertical: 7.0),
+                              child: Text(
+                                'New Testament',
+                                style: TextStyle(
+                                    fontSize: screenWidth > 450
+                                        ? BibleInfo.fontSizeScale * 25
+                                        : BibleInfo.fontSizeScale * 18),
+                              ),
                             ),
-                          )
+                          ),
                         ],
                       ),
                     ),
-                  ),
-                ],
+                    Flexible(
+                      flex: 1,
+                      child: TabBarView(
+                        children: [
+                          ListView.builder(
+                            itemCount: oldTestamentCount,
+                            padding: EdgeInsets.symmetric(horizontal: 15),
+                            physics: const BouncingScrollPhysics(
+                              parent: AlwaysScrollableScrollPhysics(),
+                            ),
+                            cacheExtent: 400,
+                            addAutomaticKeepAlives: false,
+                            itemBuilder: (context, index) {
+                              if (index >= _oldTestamentBooks.length) {
+                                return const SizedBox.shrink();
+                              }
+                              var data = _oldTestamentBooks[index];
+                              return Padding(
+                                padding: const EdgeInsets.only(
+                                    top: 20.0, bottom: 2),
+                                child: InkWell(
+                                  onTap: () => _openChapterListForBook(data),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                    MainAxisAlignment.start,
+                                    crossAxisAlignment:
+                                    CrossAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        "${data.title}",
+                                        style: CommanStyle.bw16500(
+                                            context)
+                                            .copyWith(
+                                            fontSize: screenWidth >
+                                                450
+                                                ? BibleInfo
+                                                .fontSizeScale *
+                                                23
+                                                : BibleInfo
+                                                .fontSizeScale *
+                                                16),
+                                      ),
+                                      Spacer(),
+                                      SizedBox(
+                                        width:
+                                        screenWidth > 450 ? 120 : 100,
+                                        child: Row(
+                                          mainAxisAlignment:
+                                          MainAxisAlignment
+                                              .spaceBetween,
+                                          children: [
+                                            _bookReadProgressCapsule(
+                                              context: context,
+                                              readPer: data.readPer,
+                                              screenWidth: screenWidth,
+                                            ),
+                                            Text(
+                                              "${data.chapterCount}",
+                                              style: CommanStyle.bw16500(
+                                                  context)
+                                                  .copyWith(
+                                                  fontSize: screenWidth >
+                                                      450
+                                                      ? BibleInfo
+                                                      .fontSizeScale *
+                                                      20
+                                                      : BibleInfo
+                                                      .fontSizeScale *
+                                                      16),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      SizedBox(
+                                        width: 10,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          ListView.builder(
+                            itemCount: newTestmentBookList.length,
+                            padding: EdgeInsets.symmetric(horizontal: 15),
+                            physics: const BouncingScrollPhysics(
+                              parent: AlwaysScrollableScrollPhysics(),
+                            ),
+                            cacheExtent: 400,
+                            addAutomaticKeepAlives: false,
+                            itemBuilder: (context, index) {
+                              var data = newTestmentBookList[index];
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 20.0),
+                                child: InkWell(
+                                  onTap: () => _openChapterListForBook(data),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                    MainAxisAlignment.start,
+                                    crossAxisAlignment:
+                                    CrossAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        "${data.title}",
+                                        style: CommanStyle.bw16500(
+                                            context)
+                                            .copyWith(
+                                            fontSize: screenWidth >
+                                                450
+                                                ? BibleInfo
+                                                .fontSizeScale *
+                                                23
+                                                : BibleInfo
+                                                .fontSizeScale *
+                                                16),
+                                      ),
+                                      Spacer(),
+                                      SizedBox(
+                                        width:
+                                        screenWidth > 450 ? 120 : 100,
+                                        child: Row(
+                                          mainAxisAlignment:
+                                          MainAxisAlignment
+                                              .spaceBetween,
+                                          children: [
+                                            _bookReadProgressCapsule(
+                                              context: context,
+                                              readPer: data.readPer,
+                                              screenWidth: screenWidth,
+                                            ),
+                                            Text(
+                                              "${data.chapterCount}",
+                                              style: CommanStyle.bw16500(
+                                                  context)
+                                                  .copyWith(
+                                                  fontSize: screenWidth >
+                                                      450
+                                                      ? BibleInfo
+                                                      .fontSizeScale *
+                                                      20
+                                                      : BibleInfo
+                                                      .fontSizeScale *
+                                                      16),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      SizedBox(
+                                        width: 10,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+
+                          // employee_profile(),
+                        ],
+                      ),
+                    )
+                  ],
+                ),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Capsule progress for book read %. Hidden when the book has not been read.
+  Widget _bookReadProgressCapsule({
+    required BuildContext context,
+    required String? readPer,
+    required double screenWidth,
+  }) {
+    final raw = double.tryParse(readPer ?? '0') ?? 0.0;
+    if (raw <= 0) return const SizedBox.shrink();
+
+    final displayPct = raw >= 99.9 ? 100 : raw.toInt();
+    final fraction = (raw / 100).clamp(0.0, 1.0);
+    final width = screenWidth > 450 ? 78.0 : 64.0;
+    final height = screenWidth > 450 ? 28.0 : 22.0;
+    final fillColor = CommanColor.progressFillColor(context);
+    final trackColor = CommanColor.progressUnFillColor(context).withOpacity(0.28);
+    final textColor =
+    displayPct >= 100 ? Colors.white : CommanColor.whiteBlack(context);
+
+    return SizedBox(
+      width: width,
+      height: height,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(height / 2),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(color: trackColor),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FractionallySizedBox(
+                widthFactor: fraction,
+                heightFactor: 1,
+                child: Container(color: fillColor),
+              ),
+            ),
+            Text(
+              '$displayPct%',
+              style: TextStyle(
+                letterSpacing: BibleInfo.letterSpacing,
+                fontSize: screenWidth > 450
+                    ? BibleInfo.fontSizeScale * 12
+                    : BibleInfo.fontSizeScale * 11,
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

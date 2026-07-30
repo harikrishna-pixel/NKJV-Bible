@@ -70,10 +70,10 @@ ${_appStoreLink()}''';
   }
 
   static Future<void> shareReferralCode(
-    BuildContext context,
-    String referralCode, {
-    bool includeAppLink = false,
-  }) async {
+      BuildContext context,
+      String referralCode, {
+        bool includeAppLink = false,
+      }) async {
     final code = referralCode.trim();
     if (code.isEmpty) return;
 
@@ -115,36 +115,154 @@ class ReferralCodeProfileSection extends StatelessWidget {
     return !hasReferrer && !claimed;
   }
 
-  Widget _sectionDivider(BuildContext context) {
-    return Divider(
-      indent: 8,
-      endIndent: 8,
-      color: CommanColor.whiteBlack(context).withOpacity(0.5),
+  void _showHowItWorks(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: const Color(0xFFFDF6EA),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'How it works',
+                        style: TextStyle(
+                          fontFamily: 'Georgia',
+                          fontWeight: FontWeight.w700,
+                          fontSize: BibleInfo.fontSizeScale * 20,
+                          color: const Color(0xFF472F1F),
+                        ),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () => Navigator.of(dialogContext).pop(),
+                      borderRadius: BorderRadius.circular(16),
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(Icons.close, size: 20, color: Color(0xFF472F1F)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const _HowItWorksStep(
+                  number: '1',
+                  title: 'Share your referral code',
+                  body:
+                  'Share your unique referral code with your friends via any platform.',
+                  icon: Icons.share_rounded,
+                  showConnector: true,
+                ),
+                const _HowItWorksStep(
+                  number: '2',
+                  title: 'Friend signs up using your code',
+                  body:
+                  'Your friend installs the app and signs up using your referral code.',
+                  icon: Icons.person_add_alt_1_rounded,
+                  showConnector: true,
+                ),
+                const _HowItWorksStep(
+                  number: '3',
+                  title: 'Both get 100 Free Credits',
+                  body:
+                  'You and your friend will both receive 100 Free Credits instantly!',
+                  icon: Icons.card_giftcard_rounded,
+                  showConnector: false,
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3E7D5),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.verified_user_outlined,
+                          size: 18, color: Color(0xFF6B8F71)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'This referral code is unique to you and is valid for up to 10 users only.',
+                          style: TextStyle(
+                            fontSize: BibleInfo.fontSizeScale * 12,
+                            height: 1.35,
+                            color: const Color(0xFF472F1F).withOpacity(0.85),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF472F1F),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text(
+                      'Got it!',
+                      style: TextStyle(
+                        fontSize: BibleInfo.fontSizeScale * 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _circleIcon(BuildContext context, IconData icon) {
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        color: CommanColor.lightDarkPrimary200(context).withOpacity(0.35),
-        shape: BoxShape.circle,
-      ),
-      child: Icon(
-        icon,
-        color: CommanColor.lightDarkPrimary(context),
-        size: 22,
-      ),
+  Widget _leafIcon({bool mirror = false}) {
+    final leaf = Image.asset(
+      'assets/referral_leaf.png',
+      width: 36,
+      height: 34,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
+    );
+    if (!mirror) return leaf;
+    return Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.identity()..scale(-1.0, 1.0, 1.0),
+      child: leaf,
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final code = referralCode.trim();
-    final subtitleColor = CommanColor.whiteBlack(context).withOpacity(0.65);
+    final titleColor = CommanColor.whiteBlack(context);
+    final subtitleColor = titleColor.withOpacity(0.62);
     final showEnter = _canEnterReferral && onEnterReferralTap != null;
     final showOwn = code.isNotEmpty;
+    final cardFill =
+    CommanColor.lightDarkPrimary200(context).withOpacity(0.28);
+    final buttonFill = const Color(0xFF472F1F);
 
     if (!showEnter && !showOwn) {
       return const SizedBox.shrink();
@@ -153,18 +271,29 @@ class ReferralCodeProfileSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _ProfileReferralOrnamentalDivider(),
         if (showEnter) ...[
-          _sectionDivider(context),
           InkWell(
             onTap: onEnterReferralTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+              decoration: BoxDecoration(
+                color: cardFill,
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  _circleIcon(context, Icons.redeem_rounded),
-                  const SizedBox(width: 10),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: buttonFill,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.redeem_rounded,
+                        color: Colors.white, size: 20),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -172,125 +301,227 @@ class ReferralCodeProfileSection extends StatelessWidget {
                         Text(
                           'Enter Referral Code'.toUpperCase(),
                           style: TextStyle(
-                            letterSpacing: BibleInfo.letterSpacing,
-                            fontSize: BibleInfo.fontSizeScale * 14,
-                            fontWeight: FontWeight.bold,
-                            color: CommanColor.whiteBlack(context),
+                            letterSpacing: 0.7,
+                            fontSize: BibleInfo.fontSizeScale * 13,
+                            fontWeight: FontWeight.w700,
+                            color: titleColor,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 3),
                         Text(
                           'Enter a referral code to claim your welcome reward.',
                           style: TextStyle(
                             color: subtitleColor,
-                            fontSize: BibleInfo.fontSizeScale * 12,
-                            height: 1.25,
+                            fontSize: BibleInfo.fontSizeScale * 12.5,
+                            height: 1.3,
                           ),
                         ),
                       ],
                     ),
                   ),
                   Icon(
-                    Icons.keyboard_arrow_right_outlined,
-                    color: CommanColor.whiteBlack(context),
-                    size: 28,
+                    Icons.chevron_right,
+                    color: titleColor.withOpacity(0.7),
+                    size: 24,
                   ),
                 ],
               ),
             ),
           ),
-          _sectionDivider(context),
+          if (showOwn) const SizedBox(height: 16),
         ],
         if (showOwn) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                _circleIcon(context, Icons.groups_rounded),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Your Referral Code'.toUpperCase(),
+                  style: TextStyle(
+                    letterSpacing: 0.7,
+                    fontSize: BibleInfo.fontSizeScale * 13,
+                    fontWeight: FontWeight.w700,
+                    color: titleColor,
+                  ),
+                ),
+              ),
+              InkWell(
+                onTap: () => _showHowItWorks(context),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: titleColor.withOpacity(0.28),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'Your Referral Code'.toUpperCase(),
+                        'How it works?',
                         style: TextStyle(
-                          letterSpacing: BibleInfo.letterSpacing,
-                          fontSize: BibleInfo.fontSizeScale * 14,
-                          fontWeight: FontWeight.bold,
-                          color: CommanColor.whiteBlack(context),
+                          fontSize: BibleInfo.fontSizeScale * 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: titleColor.withOpacity(0.85),
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        code,
-                        style: TextStyle(
-                          color: CommanColor.whiteBlack(context),
-                          fontSize: BibleInfo.fontSizeScale * 17,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Share your code and invite your friends.',
-                        style: TextStyle(
-                          color: subtitleColor,
-                          fontSize: BibleInfo.fontSizeScale * 12,
-                          height: 1.25,
-                        ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.help_outline,
+                        size: 14,
+                        color: titleColor.withOpacity(0.75),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                ReferralCodeShareActions(
-                  referralCode: code,
-                  includeAppLink: true,
-                  stacked: true,
-                ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Share your code with friends and earn together!',
+            style: TextStyle(
+              color: subtitleColor,
+              fontSize: BibleInfo.fontSizeScale * 12.5,
+              height: 1.3,
             ),
           ),
-          _sectionDivider(context),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            decoration: BoxDecoration(
+              color: cardFill,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _leafIcon(),
+                  const SizedBox(width: 6),
+                  Text(
+                    code,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: titleColor,
+                      fontSize: BibleInfo.fontSizeScale * 18,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Georgia',
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  _leafIcon(mirror: true),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          ReferralCodeShareActions(
+            referralCode: code,
+            includeAppLink: true,
+            profileFilled: true,
+          ),
         ],
       ],
     );
   }
 }
 
-class _ProfileReferralOrnamentalDivider extends StatelessWidget {
-  const _ProfileReferralOrnamentalDivider();
+class _HowItWorksStep extends StatelessWidget {
+  const _HowItWorksStep({
+    required this.number,
+    required this.title,
+    required this.body,
+    required this.icon,
+    required this.showConnector,
+  });
+
+  final String number;
+  final String title;
+  final String body;
+  final IconData icon;
+  final bool showConnector;
 
   @override
   Widget build(BuildContext context) {
-    final lineColor = CommanColor.whiteBlack(context).withOpacity(0.45);
-    final accent = CommanColor.lightDarkPrimary(context);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+    return IntrinsicHeight(
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(child: Container(height: 1, color: lineColor)),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Icon(Icons.diamond_outlined, size: 9, color: accent),
-          ),
-          Text(
-            '✝',
-            style: TextStyle(
-              color: accent,
-              fontSize: 13,
-              height: 1,
-              fontWeight: FontWeight.w500,
+          SizedBox(
+            width: 28,
+            child: Column(
+              children: [
+                Container(
+                  width: 22,
+                  height: 22,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF6B8F71),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    number,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                if (showConnector)
+                  Expanded(
+                    child: Container(
+                      width: 1.5,
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      color: const Color(0xFF6B8F71).withOpacity(0.45),
+                    ),
+                  ),
+              ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Icon(Icons.diamond_outlined, size: 9, color: accent),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: showConnector ? 14 : 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(icon, size: 18, color: const Color(0xFF472F1F)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: BibleInfo.fontSizeScale * 13.5,
+                            color: const Color(0xFF472F1F),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          body,
+                          style: TextStyle(
+                            fontSize: BibleInfo.fontSizeScale * 12,
+                            height: 1.35,
+                            color: const Color(0xFF472F1F).withOpacity(0.72),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-          Expanded(child: Container(height: 1, color: lineColor)),
         ],
       ),
     );
@@ -304,12 +535,14 @@ class ReferralCodeShareActions extends StatefulWidget {
     this.includeAppLink = false,
     this.compact = false,
     this.stacked = false,
+    this.profileFilled = false,
   });
 
   final String referralCode;
   final bool includeAppLink;
   final bool compact;
   final bool stacked;
+  final bool profileFilled;
 
   @override
   State<ReferralCodeShareActions> createState() =>
@@ -342,7 +575,7 @@ class _ReferralCodeShareActionsState extends State<ReferralCodeShareActions> {
     final primary = CommanColor.lightDarkPrimary(context);
     final isDark = CommanColor.isDarkTheme(context);
     final copyActionColor =
-        isDark ? CommanColor.whiteBlack(context) : primary;
+    isDark ? CommanColor.whiteBlack(context) : primary;
     final copyBorderColor = isDark
         ? CommanColor.whiteBlack(context).withOpacity(0.45)
         : primary.withOpacity(0.5);
@@ -350,6 +583,55 @@ class _ReferralCodeShareActionsState extends State<ReferralCodeShareActions> {
     final compact = widget.compact || stacked;
     final actionFontSize = BibleInfo.fontSizeScale * (compact ? 13 : 15);
     final actionIconSize = compact ? 15.0 : 18.0;
+
+    if (widget.profileFilled) {
+      final filledStyle = ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF472F1F),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      );
+      return Row(
+        children: [
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () => OwnReferralCodeDialog.copyReferralCode(
+                widget.referralCode,
+              ),
+              icon: const Icon(Icons.copy_rounded, size: 16),
+              label: Text(
+                'Copy',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: BibleInfo.fontSizeScale * 14,
+                ),
+              ),
+              style: filledStyle,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: ElevatedButton.icon(
+              key: _shareButtonKey,
+              onPressed: _share,
+              icon: const Icon(Icons.share_rounded, size: 16),
+              label: Text(
+                'Share',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: BibleInfo.fontSizeScale * 14,
+                ),
+              ),
+              style: filledStyle,
+            ),
+          ),
+        ],
+      );
+    }
+
     final outlinedButtonStyle = OutlinedButton.styleFrom(
       side: BorderSide(color: copyBorderColor),
       padding: EdgeInsets.symmetric(
@@ -366,7 +648,7 @@ class _ReferralCodeShareActionsState extends State<ReferralCodeShareActions> {
 
     if (stacked) {
       return SizedBox(
-        width: 78,
+        width: 84,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -389,7 +671,7 @@ class _ReferralCodeShareActionsState extends State<ReferralCodeShareActions> {
                 style: outlinedButtonStyle,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(

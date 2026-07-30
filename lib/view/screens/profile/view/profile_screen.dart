@@ -32,10 +32,10 @@ void confirmLogoutAccount(BuildContext context) {
       return Dialog(
           backgroundColor: CommanColor.white,
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
           elevation: 16,
           insetPadding:
-              screenWidth > 450 ? EdgeInsets.symmetric(horizontal: 260) : null,
+          screenWidth > 450 ? EdgeInsets.symmetric(horizontal: 260) : null,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
             child: Column(
@@ -53,7 +53,7 @@ void confirmLogoutAccount(BuildContext context) {
                 GestureDetector(
                   onTap: () async {
                     final cacheprovider =
-                        P.Provider.of<CacheNotifier>(context, listen: false);
+                    P.Provider.of<CacheNotifier>(context, listen: false);
 
                     await cacheprovider.removeCache(key: 'userid');
                     await cacheprovider.removeCache(key: 'user');
@@ -99,7 +99,7 @@ void confirmLogoutAccount(BuildContext context) {
                       decoration: BoxDecoration(
                         color: CommanColor.lightGrey1,
                         borderRadius:
-                            const BorderRadius.all(Radius.circular(5)),
+                        const BorderRadius.all(Radius.circular(5)),
                         boxShadow: const [
                           BoxShadow(color: Colors.black26, blurRadius: 2)
                         ],
@@ -228,7 +228,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       WidgetsBinding.instance.addPostFrameCallback((callback) async {
         ref.read(bookmarkSharedPrefBloc).getBookmarks();
         lastExportedDate = DateTime.tryParse((await SharPreferences.getString(
-                SharPreferences.lastExportedDate) ??
+            SharPreferences.lastExportedDate) ??
             ''));
         setState(() {});
       });
@@ -288,253 +288,345 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
     return Scaffold(
         backgroundColor:
-            p.Provider.of<ThemeProvider>(context).currentCustomTheme ==
-                    AppCustomTheme.vintage
-                ? const Color(0xFFF5F0E6)
-                : p.Provider.of<ThemeProvider>(context).backgroundColor,
+        p.Provider.of<ThemeProvider>(context).currentCustomTheme ==
+            AppCustomTheme.vintage
+            ? const Color(0xFFF5F0E6)
+            : p.Provider.of<ThemeProvider>(context).backgroundColor,
         body: Container(
-      height: MediaQuery.of(context).size.height,
-      width: MediaQuery.of(context).size.width,
-      decoration: p.Provider.of<ThemeProvider>(context).currentCustomTheme ==
+          height: MediaQuery.of(context).size.height,
+          width: MediaQuery.of(context).size.width,
+          decoration: p.Provider.of<ThemeProvider>(context).currentCustomTheme ==
               AppCustomTheme.vintage
-          ? BoxDecoration(
+              ? BoxDecoration(
               image: DecorationImage(
                   image: AssetImage(Images.bgImage(context)), fit: BoxFit.fill))
-          : null,
-      child: SafeArea(
-        child: Column(
-          children: [
-            SizedBox(
-              height: 12,
-            ),
-            Row(
+              : null,
+          child: SafeArea(
+            child: Column(
               children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () {
-                      Get.back();
-                    },
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 15.0),
-                        child: Icon(
-                          Icons.arrow_back_ios,
-                          size: 20,
-                          color: CommanColor.whiteBlack(context),
+                SizedBox(
+                  height: 12,
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          Get.back();
+                        },
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 15.0),
+                            child: Icon(
+                              Icons.arrow_back_ios,
+                              size: 20,
+                              color: CommanColor.whiteBlack(context),
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ),
-                Expanded(
-                    flex: 2,
-                    child: Text("Profile",
-                        textAlign: TextAlign.center,
-                        style: CommanStyle.appBarStyle(context))),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 15),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        GestureDetector(
-                          onTap: () async {
-                            confirmLogoutAccount(context);
-                            // final cacheprovider = P.Provider.of<CacheNotifier>(
-                            //     context,
-                            //     listen: false);
+                    Expanded(
+                        flex: 2,
+                        child: Text("Profile",
+                            textAlign: TextAlign.center,
+                            style: CommanStyle.appBarStyle(context))),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 15),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            GestureDetector(
+                              onTap: () async {
+                                confirmLogoutAccount(context);
+                                // final cacheprovider = P.Provider.of<CacheNotifier>(
+                                //     context,
+                                //     listen: false);
 
-                            // await cacheprovider.removeCache(key: 'userid');
-                            // await cacheprovider.removeCache(key: 'user');
-                            // await cacheprovider.removeCache(key: 'name');
-                            // await cacheprovider.removeCache(key: 'authtoken');
-                            // //   FirebaseAuth.instance.signOut();
-                            // Constants.showToast("Logged Out Successfully");
-                            // Get.offAll(() => HomeScreen(
-                            //     From: "splash",
-                            //     selectedVerseNumForRead: "",
-                            //     selectedBookForRead: "",
-                            //     selectedChapterForRead: "",
-                            //     selectedBookNameForRead: "",
-                            //     selectedVerseForRead: ""));
-                          },
-                          child: Icon(
-                            Icons.logout,
-                            size: 20,
-                            color: CommanColor.whiteBlack(context),
-                          ),
-                        )
-                      ],
+                                // await cacheprovider.removeCache(key: 'userid');
+                                // await cacheprovider.removeCache(key: 'user');
+                                // await cacheprovider.removeCache(key: 'name');
+                                // await cacheprovider.removeCache(key: 'authtoken');
+                                // //   FirebaseAuth.instance.signOut();
+                                // Constants.showToast("Logged Out Successfully");
+                                // Get.offAll(() => HomeScreen(
+                                //     From: "splash",
+                                //     selectedVerseNumForRead: "",
+                                //     selectedBookForRead: "",
+                                //     selectedChapterForRead: "",
+                                //     selectedBookNameForRead: "",
+                                //     selectedVerseForRead: ""));
+                              },
+                              child: Icon(
+                                Icons.logout,
+                                size: 20,
+                                color: CommanColor.whiteBlack(context),
+                              ),
+                            )
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(
-              height: 20,
-            ),
-            Expanded(
-                child: isLoading
-                    ? Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const CircularProgressIndicator.adaptive(),
-                          const SizedBox(height: 20),
-                          Text(message ?? '')
-                        ],
-                      )
-                    : userState.isLoading
+                const SizedBox(
+                  height: 20,
+                ),
+                Expanded(
+                    child: isLoading
+                        ? Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const CircularProgressIndicator.adaptive(),
+                        const SizedBox(height: 20),
+                        Text(message ?? '')
+                      ],
+                    )
+                        : userState.isLoading
                         ? const Center(
-                            child: CircularProgressIndicator.adaptive(),
-                          )
-                        : SingleChildScrollView(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: CircularProgressIndicator.adaptive(),
+                    )
+                        : LayoutBuilder(
+                      builder: (context, constraints) {
+                        return SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: constraints.maxHeight,
+                            ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 Row(
                                   children: [
                                     Container(
-                                      clipBehavior: Clip.hardEdge,
-                                      foregroundDecoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                              width: 2,
-                                              color: CommanColor
-                                                  .lightDarkPrimary200(
-                                                      context))),
-                                      decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                              width: 2,
-                                              color: CommanColor
-                                                  .lightDarkPrimary200(
-                                                      context))),
-                                      child: user != null
-                                          ? CircleAvatar(
-                                              backgroundColor: CommanColor
-                                                      .lightDarkPrimary200(
-                                                          context)
-                                                  .withOpacity(
-                                                      0.4), // Background color
-                                              radius:
-                                                  50, // Adjust size as needed
-                                              child: Text(
-                                                _safeInitials,
-                                                style: TextStyle(
-                                                  fontSize: 32,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors
-                                                      .black, // Text color
-                                                ),
-                                              ),
-                                            )
-                                          : SizedBox(
-                                              height: 84,
-                                              width: 84,
-                                              child: Center(
-                                                child: Text(
-                                                  (((user ?? 'N A')
-                                                              .replaceAll(
-                                                                  ' ', '')
-                                                              .isNotEmpty)
-                                                          ? '${(user ?? 'N A').replaceAll(' ', '')[0].toUpperCase()}${(user ?? 'N A').replaceAll(' ', '').length > 1 ? (user ?? 'N A').replaceAll(' ', '')[1].toUpperCase() : ''}'
-                                                          : '?'),
-                                                  style: const TextStyle(
-                                                      letterSpacing: BibleInfo
-                                                          .letterSpacing,
-                                                      fontSize: BibleInfo
-                                                              .fontSizeScale *
-                                                          20),
-                                                ),
-                                              ),
-                                            ),
+                                      width: 92,
+                                      height: 92,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFFBD5B2),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          _safeInitials,
+                                          style: TextStyle(
+                                            fontSize: 30,
+                                            fontWeight: FontWeight.w700,
+                                            fontFamily: 'Georgia',
+                                            color: CommanColor.whiteBlack(
+                                                context),
+                                          ),
+                                        ),
+                                      ),
                                     ),
-                                    const SizedBox(width: 20),
+                                    const SizedBox(width: 16),
                                     Expanded(
                                         child: Column(
-                                      mainAxisAlignment:
+                                          mainAxisAlignment:
                                           MainAxisAlignment.start,
-                                      crossAxisAlignment:
+                                          crossAxisAlignment:
                                           CrossAxisAlignment.stretch,
-                                      children: [
-                                        Text(
-                                          user ?? '',
-                                          style: const TextStyle(
-                                              letterSpacing:
-                                                  BibleInfo.letterSpacing,
-                                              fontSize:
-                                                  BibleInfo.fontSizeScale * 20,
-                                              fontWeight: FontWeight.w600),
-                                        ),
-                                        Text(
-                                            'Read and study the ${BibleInfo.bible_shortName} with us.'),
-                                        const SizedBox(height: 8),
-                                        Row(
                                           children: [
-                                            GestureDetector(
-                                              onTap: () async {
-                                                Get.to(
-                                                    () => EditProfileScreen());
-                                              },
-                                              child: Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        vertical: 6,
-                                                        horizontal: 8),
-                                                decoration: BoxDecoration(
-                                                    shape: BoxShape.rectangle,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            3),
-                                                    boxShadow: const [
-                                                      BoxShadow(
-                                                        color: Colors.black38,
-                                                        blurRadius: 0.5,
-                                                        spreadRadius: 1,
-                                                        offset: Offset(0, 1),
-                                                      ),
-                                                    ],
-                                                    color: CommanColor
-                                                        .whiteBlack45(context)),
-                                                child: Row(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment
-                                                          .spaceEvenly,
-                                                  children: [
-                                                    Icon(
-                                                      Icons.edit,
-                                                      color: CommanColor
-                                                          .whiteAndDark(
-                                                              context),
-                                                      size: 18,
-                                                    ),
-                                                    const SizedBox(width: 4),
-                                                    Text(
-                                                      "Edit Profile",
-                                                      style: CommanStyle
-                                                              .inDarkPrimaryInLightWhite12400(
-                                                                  context)
-                                                          .copyWith(
-                                                              letterSpacing:
-                                                                  BibleInfo
-                                                                      .letterSpacing,
-                                                              fontSize: BibleInfo
-                                                                      .fontSizeScale *
-                                                                  14),
-                                                    )
-                                                  ],
-                                                ),
+                                            Text(
+                                              user ?? '',
+                                              style: TextStyle(
+                                                  letterSpacing:
+                                                  BibleInfo.letterSpacing,
+                                                  fontSize:
+                                                  BibleInfo.fontSizeScale * 22,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontFamily: 'Georgia',
+                                                  color: CommanColor.whiteBlack(
+                                                      context)),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'Read and study the ${BibleInfo.bible_shortName} with us.',
+                                              style: TextStyle(
+                                                color: CommanColor.whiteBlack(
+                                                    context)
+                                                    .withOpacity(0.68),
+                                                fontSize:
+                                                BibleInfo.fontSizeScale * 13,
+                                                height: 1.3,
                                               ),
                                             ),
+                                            const SizedBox(height: 10),
+                                            Row(
+                                              children: [
+                                                GestureDetector(
+                                                  onTap: () async {
+                                                    Get.to(
+                                                            () => EditProfileScreen());
+                                                  },
+                                                  child: Container(
+                                                    padding:
+                                                    const EdgeInsets.symmetric(
+                                                        vertical: 8,
+                                                        horizontal: 12),
+                                                    decoration: BoxDecoration(
+                                                        borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
+                                                        color: const Color(
+                                                            0xFF472F1F)),
+                                                    child: Row(
+                                                      mainAxisSize:
+                                                      MainAxisSize.min,
+                                                      children: [
+                                                        const Icon(
+                                                          Icons.edit_outlined,
+                                                          color: Colors.white,
+                                                          size: 15,
+                                                        ),
+                                                        const SizedBox(width: 6),
+                                                        Text(
+                                                          "Edit Profile",
+                                                          style: TextStyle(
+                                                            color: Colors.white,
+                                                            letterSpacing: BibleInfo
+                                                                .letterSpacing,
+                                                            fontSize: BibleInfo
+                                                                .fontSizeScale *
+                                                                13,
+                                                            fontWeight:
+                                                            FontWeight.w600,
+                                                            fontFamily: 'Georgia',
+                                                          ),
+                                                        )
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            )
                                           ],
-                                        )
-                                      ],
-                                    ))
+                                        ))
                                   ],
                                 ),
-                                SizedBox(height: mheight * 0.03),
+                                SizedBox(height: mheight * 0.035),
+                                Text(
+                                  'My Library Status'.toUpperCase(),
+                                  style: TextStyle(
+                                      letterSpacing: 0.8,
+                                      fontSize: BibleInfo.fontSizeScale * 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: CommanColor.whiteBlack(context)),
+                                ),
+                                const SizedBox(height: 14),
+                                GridView.builder(
+                                  shrinkWrap: true,
+                                  physics:
+                                  const NeverScrollableScrollPhysics(),
+                                  itemCount: status.length,
+                                  gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 4,
+                                    mainAxisSpacing: 12,
+                                    crossAxisSpacing: 12,
+                                    childAspectRatio: 0.88,
+                                  ),
+                                  itemBuilder: (context, index) => LibraryItem(
+                                    item: status[index],
+                                    index: index,
+                                  ),
+                                ),
+                                SizedBox(height: mheight * 0.028),
+                                InkWell(
+                                  onTap: () async {
+                                    await SharPreferences.setString(
+                                        'OpenAd', '1');
+                                    if (!context.mounted) return;
+                                    await showDialog(
+                                      context: context,
+                                      builder: (context) =>
+                                      const MainBackupDialog(),
+                                    );
+                                    lastExportedDate = DateTime.tryParse(
+                                      (await SharPreferences.getString(
+                                          SharPreferences
+                                              .lastExportedDate) ??
+                                          ''),
+                                    );
+                                    if (mounted) setState(() {});
+                                  },
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 14, horizontal: 14),
+                                    decoration: BoxDecoration(
+                                      color: CommanColor
+                                          .lightDarkPrimary200(context)
+                                          .withOpacity(0.28),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 40,
+                                          height: 40,
+                                          decoration: const BoxDecoration(
+                                            color: Color(0xFF472F1F),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.cloud_outlined,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Backup Library',
+                                                style: TextStyle(
+                                                  letterSpacing:
+                                                  BibleInfo.letterSpacing,
+                                                  fontSize:
+                                                  BibleInfo.fontSizeScale *
+                                                      16,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontFamily: 'Georgia',
+                                                  color: CommanColor.whiteBlack(
+                                                      context),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                'Last Backup Date: ${(lastExportedDate) == null ? 'Not Yet' : DateFormat('yyyy/MM/dd').format(lastExportedDate!)}',
+                                                style: TextStyle(
+                                                  letterSpacing:
+                                                  BibleInfo.letterSpacing,
+                                                  fontSize:
+                                                  BibleInfo.fontSizeScale *
+                                                      12,
+                                                  fontWeight: FontWeight.w400,
+                                                  color: CommanColor.whiteBlack(
+                                                      context)
+                                                      .withOpacity(0.62),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Icon(
+                                          Icons.chevron_right,
+                                          color: CommanColor.whiteBlack(context)
+                                              .withOpacity(0.7),
+                                          size: 24,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(height: mheight * 0.032),
                                 ReferralCodeProfileSection(
                                   referralCode: _referralCode ?? '',
                                   referredBy: _referredBy,
@@ -544,128 +636,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                         .showForLoggedInUser(
                                       context: context,
                                       ownReferralCode:
-                                          (_referralCode ?? '').trim().isEmpty
-                                              ? null
-                                              : _referralCode,
+                                      (_referralCode ?? '').trim().isEmpty
+                                          ? null
+                                          : _referralCode,
                                       initialReferredBy: _referredBy,
                                       initialReferralRewardClaimed:
-                                          _referralRewardClaimed,
+                                      _referralRewardClaimed,
                                     );
                                     if (mounted) {
                                       await checkuserloggedin();
                                     }
                                   },
                                 ),
-                                Text(
-                                  'My Library Status'.toUpperCase(),
-                                  style: const TextStyle(
-                                      letterSpacing: BibleInfo.letterSpacing,
-                                      fontSize: BibleInfo.fontSizeScale * 18,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 10),
-                                MediaQuery.removePadding(
-                                  context: context,
-                                  removeTop: true,
-                                  removeBottom: true,
-                                  child: ListView.separated(
-                                      shrinkWrap: true,
-                                      physics:
-                                          const NeverScrollableScrollPhysics(),
-                                      itemBuilder: (context, index) =>
-                                          LibraryItem(
-                                              item: status[index],
-                                              index: index),
-                                      separatorBuilder: (context, index) =>
-                                          Divider(
-                                            indent: 8,
-                                            endIndent: 8,
-                                            color:
-                                                CommanColor.whiteBlack(context)
-                                                    .withOpacity(0.5),
-                                          ),
-                                      itemCount: status.length),
-                                ),
-                                SizedBox(height: mheight * 0.01),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 10, horizontal: 5),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      InkWell(
-                                        onTap: () async {
-                                          await SharPreferences.setString(
-                                              'OpenAd', '1');
-                                          if (!context.mounted) return;
-                                          await showDialog(
-                                            context: context,
-                                            builder: (context) =>
-                                                const MainBackupDialog(),
-                                          );
-                                          lastExportedDate =
-                                              DateTime.tryParse(
-                                            (await SharPreferences.getString(
-                                                    SharPreferences
-                                                        .lastExportedDate) ??
-                                                ''),
-                                          );
-                                          if (mounted) setState(() {});
-                                        },
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              vertical: 8, horizontal: 12),
-                                          decoration: BoxDecoration(
-                                            color: CommanColor
-                                                .whiteLightModePrimary(context),
-                                            borderRadius:
-                                                const BorderRadius.all(
-                                                    Radius.circular(5)),
-                                            boxShadow: const [
-                                              BoxShadow(
-                                                  color: Colors.black26,
-                                                  blurRadius: 2)
-                                            ],
-                                          ),
-                                          child: Text(
-                                            'Back Up',
-                                            style: CommanStyle.bw16500(context)
-                                                .copyWith(
-                                                    color:
-                                                        CommanColor.Blackwhite(
-                                                            context),
-                                                    letterSpacing:
-                                                        BibleInfo.letterSpacing,
-                                                    fontSize: BibleInfo
-                                                            .fontSizeScale *
-                                                        18),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Text(
-                                        'Last Backup Date: ${(lastExportedDate) == null ? 'Not Yet' : DateFormat('yyyy/MM/dd').format(lastExportedDate!)}',
-                                        textAlign: TextAlign.center,
-                                        style: CommanStyle.bw16500(context)
-                                            .copyWith(
-                                                letterSpacing:
-                                                    BibleInfo.letterSpacing,
-                                                fontSize:
-                                                    BibleInfo.fontSizeScale *
-                                                        12,
-                                                fontWeight: FontWeight.w400),
-                                      ),
-                                    ],
-                                  ),
-                                )
+                                SizedBox(height: mheight * 0.02),
                               ],
                             ),
-                          ))
-          ],
-        ),
-      ),
-    ));
+                          ),
+                        );
+                      },
+                    ))
+              ],
+            ),
+          ),
+        ));
   }
 }
 
@@ -674,49 +667,71 @@ class LibraryItem extends StatelessWidget {
   final LibraryStatusModel item;
   final int index;
 
+  String get _countLabel {
+    if (item.title == 'Images') return '${item.count} images';
+    if (item.title == 'Wallpapers') return '${item.count} wallpapers';
+    if (item.title == 'Quotes') return '${item.count} quotes';
+    if (item.title == 'Notes') return '${item.count} notes';
+    return '${item.count} verses';
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+    final titleColor = CommanColor.whiteBlack(context);
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
         onTap: () {
           Get.to(() => LibraryScreen(initialIndex: index),
               transition: Transition.cupertinoDialog,
               duration: const Duration(milliseconds: 300));
         },
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            item.leading,
-            const SizedBox(width: 8),
-            Text(
-              item.title,
-              style: CommanStyle.bw16500(context).copyWith(
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          decoration: BoxDecoration(
+            color: CommanColor.lightDarkPrimary200(context).withOpacity(0.28),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 22,
+                height: 22,
+                child: FittedBox(
+                  fit: BoxFit.contain,
+                  child: item.leading,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                item.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: CommanStyle.bw16500(context).copyWith(
                   letterSpacing: BibleInfo.letterSpacing,
-                  fontSize: BibleInfo.fontSizeScale * 18),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              item.title == 'Images'
-                  ? '(${item.count} images)'
-                  : item.title == 'Wallpapers'
-                      ? '(${item.count} wallpapers)'
-                      : item.title == 'Quotes'
-                          ? '(${item.count} quotes)'
-                          : '(${item.count} verses)',
-              style: CommanStyle.bw16500(context).copyWith(
+                  fontSize: BibleInfo.fontSizeScale * 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: titleColor,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _countLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: CommanStyle.bw16500(context).copyWith(
                   letterSpacing: BibleInfo.letterSpacing,
-                  fontSize: BibleInfo.fontSizeScale * 14,
-                  fontWeight: FontWeight.w400),
-            ),
-            const Spacer(),
-            Icon(
-              Icons.keyboard_arrow_right_outlined,
-              color: CommanColor.whiteBlack(context),
-              size: 28,
-            )
-          ],
+                  fontSize: BibleInfo.fontSizeScale * 10.5,
+                  fontWeight: FontWeight.w400,
+                  color: titleColor.withOpacity(0.62),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

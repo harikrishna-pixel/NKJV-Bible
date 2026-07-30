@@ -227,7 +227,7 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
       } else if (widget.useLoggedInSession) {
         Constants.showToast(loggedInFallback);
       } else {
-        Constants.showToast('Enter this referral ID on the Sign Up screen');
+        Constants.showToast('Enter this referral code on the Sign Up screen');
       }
     } finally {
       if (mounted) {
@@ -341,7 +341,7 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Enter a friend\'s referral ID and unlock a welcome reward.',
+                        'Enter a friend\'s referral code and unlock a welcome reward.',
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.92),
                           fontSize: screenWidth > 450
@@ -355,7 +355,7 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
                       const SizedBox(height: 8),
                       if (!widget.useLoggedInSession)
                         Text(
-                          'New accounts: enter the ID on Sign Up for best results.',
+                          'New accounts: enter the code on Sign Up for best results.',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.8),
                             fontSize: screenWidth > 450
@@ -464,7 +464,7 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        'Referral ID',
+                        'Referral Code',
                         style: TextStyle(
                           fontSize: screenWidth > 450
                               ? BibleInfo.fontSizeScale * 16
@@ -480,10 +480,10 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
                         child: CustomTextFormField(
                           controller: _referralController,
                           focusNode: _referralFocusNode,
-                          hintText: 'Enter referral ID',
+                          hintText: 'Enter referral code',
                           validator: FormBuilderValidators.compose([
                             FormBuilderValidators.required(
-                                errorText: 'Please enter a referral ID'),
+                                errorText: 'Please enter a referral code'),
                           ]),
                         ),
                       ),

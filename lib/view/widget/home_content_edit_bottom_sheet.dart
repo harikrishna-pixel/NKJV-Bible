@@ -5891,6 +5891,33 @@ class HomeContentEditBottomSheetState
       return Constants.showToast(message);
     }
 
+    // Match no-ad fallback card to adaptive banner size (same as initPopUpAd).
+    const dialogContentWidth = 400;
+    final bannerWidth = MediaQuery.sizeOf(context)
+        .width
+        .truncate()
+        .clamp(320, dialogContentWidth);
+    final adaptiveSize =
+        await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(
+            bannerWidth);
+    if (!mounted) return;
+    final cardWidth = (adaptiveSize?.width ?? bannerWidth).toDouble();
+    final cardHeight = (adaptiveSize?.height ?? 50).toDouble();
+
+    Widget noAdCard() {
+      return SizedBox(
+        height: cardHeight,
+        width: cardWidth,
+        child: Image.asset(
+          "assets/star.png",
+          height: cardHeight,
+          width: cardWidth,
+          fit: BoxFit.contain,
+          color: Colors.brown,
+        ),
+      );
+    }
+
     showDialog(
       context: context,
       builder: (context) {
@@ -5919,26 +5946,10 @@ class HomeContentEditBottomSheetState
                           } catch (e) {
                             debugPrint('Error displaying ad: $e');
                           }
-                          return SizedBox(
-                            height: 150,
-                            child: Image.asset(
-                              "assets/star.png",
-                              height: 150,
-                              width: 150,
-                              color: Colors.brown,
-                            ),
-                          );
+                          return noAdCard();
                         },
                       )
-                    : SizedBox(
-                        height: 150,
-                        child: Image.asset(
-                          "assets/star.png",
-                          height: 150,
-                          width: 150,
-                          color: Colors.brown,
-                        ),
-                      ),
+                    : noAdCard(),
                 const SizedBox(height: 20),
                 const Divider(thickness: 2, color: Colors.brown),
                 const SizedBox(height: 20),
