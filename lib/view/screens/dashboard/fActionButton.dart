@@ -178,9 +178,52 @@ class floatingButtonState extends State<floatingButton>
   Future<void> _handleMp3PlayerComplete() async {
     if (!mounted) return;
 
-    // If not repeating, auto-advance to next chapter (if available)
-    // and avoid re-entrant calls using isNext flag.
-    if (!repeat && !isNext) {
+    // Repeat mode - restart current chapter (unchanged behavior).
+    if (repeat) {
+      if (isSpeech && _isTtsInitialized) {
+        await _stop();
+        if (mounted) {
+          _mp3UiSetState(() {
+            isSpeech = false;
+          });
+        }
+      }
+      try {
+        await audioPlayer.setSourceUrl(audioBaseUrl);
+        await audioPlayer.seek(Duration.zero);
+        await audioPlayer.resume();
+        if (mounted) {
+          _mp3UiSetState(() {
+            isAudioPlaying = true;
+            position = Duration.zero;
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          _mp3UiSetState(() {
+            position = Duration.zero;
+            isAudioPlaying = false;
+          });
+        }
+      }
+      return;
+    }
+
+    // Additive: claim guard synchronously so a second onPlayerComplete
+    // (common when setSourceUrl replaces the track) cannot skip a chapter.
+    if (isNext) return;
+    isNext = true;
+
+    void releaseAdvanceGuard({int delayMs = 2000}) {
+      Future.delayed(Duration(milliseconds: delayMs), () {
+        if (mounted) {
+          isNext = false;
+          _mp3UiSetState(() {});
+        }
+      });
+    }
+
+    try {
       // Prefer widget/controller chapter count (same as Next button) so
       // auto-advance does not stall when currentBookChapterCount is stale.
       final lastChapter =
@@ -198,13 +241,14 @@ class floatingButtonState extends State<floatingButton>
       final effectiveLastChapter = currentBookChapterCount > lastChapter
           ? currentBookChapterCount
           : lastChapter;
+
       if (audioChapterNum < effectiveLastChapter) {
-        _mp3UiSetState(() {
-          isNext = true; // prevent duplicate triggers
-          audioChapterNum++;
-          audioBaseUrl =
-              "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$audioChapterNum.mp3";
-        });
+        audioChapterNum++;
+        audioBaseUrl =
+            "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$audioChapterNum.mp3";
+        if (mounted) {
+          _mp3UiSetState(() {});
+        }
         // Update reading screen to match audio chapter - do this before loading audio
         await updateReadingScreenChapter(audioChapterNum);
 
@@ -227,6 +271,7 @@ class floatingButtonState extends State<floatingButton>
         final hasInternet = await InternetConnection().hasInternetAccess;
         if (!hasInternet) {
           Constants.showToast("Check your internet connection.");
+          releaseAdvanceGuard(delayMs: 0);
           return;
         }
 
@@ -268,18 +313,9 @@ class floatingButtonState extends State<floatingButton>
           }
         }
 
-        // Clear the isNext guard after a delay, regardless of success/failure
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted) {
-            _mp3UiSetState(() => isNext = false);
-          }
-        });
+        releaseAdvanceGuard();
       } else {
         // Last chapter reached - check for next book
-        _mp3UiSetState(() {
-          isNext = true; // prevent duplicate triggers
-        });
-
         // Get current book number (0-indexed from widget.bookNum)
         final currentBookNum = int.parse(widget.bookNum.toString());
 
@@ -296,14 +332,15 @@ class floatingButtonState extends State<floatingButton>
 
           // Update audio book and chapter numbers
           // audioBookNum is 1-indexed for URL (bookNum + 1)
-          _mp3UiSetState(() {
-            audioBookNum = nextBookNum + 1;
-            audioChapterNum = 1;
-            currentBookChapterCount =
-                nextBookChapterCount; // Update chapter count for new book
-            audioBaseUrl =
-                "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$audioChapterNum.mp3";
-          });
+          audioBookNum = nextBookNum + 1;
+          audioChapterNum = 1;
+          currentBookChapterCount =
+              nextBookChapterCount; // Update chapter count for new book
+          audioBaseUrl =
+              "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$audioChapterNum.mp3";
+          if (mounted) {
+            _mp3UiSetState(() {});
+          }
 
           // Update reading screen to match next book and first chapter
           // Pass chapter count so it can be updated in the controller
@@ -329,6 +366,7 @@ class floatingButtonState extends State<floatingButton>
           final hasInternet = await InternetConnection().hasInternetAccess;
           if (!hasInternet) {
             Constants.showToast("Check your internet connection.");
+            releaseAdvanceGuard(delayMs: 0);
             return;
           }
 
@@ -371,12 +409,7 @@ class floatingButtonState extends State<floatingButton>
             }
           }
 
-          // Clear the isNext guard after a delay
-          Future.delayed(const Duration(milliseconds: 500), () {
-            if (mounted) {
-              _mp3UiSetState(() => isNext = false);
-            }
-          });
+          releaseAdvanceGuard();
         } else {
           // No next book - stop audio and reset
           try {
@@ -400,50 +433,9 @@ class floatingButtonState extends State<floatingButton>
           }
         }
       }
-    } else if (repeat) {
-      // Repeat mode - restart current chapter
-      // Stop TTS if it's playing
-      if (isSpeech && _isTtsInitialized) {
-        await _stop();
-        if (mounted) {
-          _mp3UiSetState(() {
-            isSpeech = false;
-          });
-        }
-      }
-      try {
-        await audioPlayer.setSourceUrl(audioBaseUrl);
-        // ensure position and duration will update from streams
-        await audioPlayer.seek(Duration.zero);
-        await audioPlayer.resume();
-        if (mounted) {
-          _mp3UiSetState(() {
-            isAudioPlaying = true;
-            position = Duration.zero; // Reset position when repeating
-          });
-        }
-      } catch (e) {
-        // handle errors
-        if (mounted) {
-          _mp3UiSetState(() {
-            position = Duration.zero;
-            isAudioPlaying = false;
-          });
-        }
-      }
-    } else {
-      // Should not reach here, but ensure audio stops if it does
-      try {
-        await audioPlayer.stop();
-        if (mounted) {
-          _mp3UiSetState(() {
-            position = Duration.zero;
-            isAudioPlaying = false;
-          });
-        }
-      } catch (e) {
-        // handle errors
-      }
+    } catch (e) {
+      debugPrint('_handleMp3PlayerComplete error: $e');
+      releaseAdvanceGuard(delayMs: 0);
     }
   }
 
@@ -617,6 +609,8 @@ class floatingButtonState extends State<floatingButton>
 
   bool isTTSLoop = false;
   bool shouldAutoAdvance = true; // Flag to control auto-advancement
+  // Additive: ignore TTS completion events fired by _stop() during chapter advance.
+  bool _ttsAdvancingChapter = false;
   bool isManualNavigation =
       false; // Flag to track manual navigation to prevent double increment
   bool isManuallyPaused =
@@ -726,6 +720,13 @@ class floatingButtonState extends State<floatingButton>
         return;
       }
 
+      // Additive: _stop() during chapter advance can re-fire completion — ignore it.
+      if (_ttsAdvancingChapter) {
+        debugPrint(
+            'Completion handler: TTS chapter advance in progress, ignoring');
+        return;
+      }
+
       // Loop mode: repeat the current verse only (manual next/prev still works).
       if (isTTSLoop) {
         if (!mounted) return;
@@ -768,46 +769,55 @@ class floatingButtonState extends State<floatingButton>
               selectedChapterContent.length == curretNo + 1) {
             // End of current chapter, move to next chapter
             if (mounted) {
-              // Remember we were in an active TTS session before stop-for-reload.
-              final wasSpeaking = isSpeech || ttsState == TtsState.playing;
-              await _stop();
-              // Clear old voice text to prevent speaking old verse
-              _newVoiceText = null;
-              setState(() {
-                selectedChapter++;
-                curretNo = 0; // Reset to first verse of new chapter
-                // _stop() clears isSpeech; restore so the intended auto-continue runs.
-                if (wasSpeaking && !isManuallyPaused) {
-                  isSpeech = true;
-                  shouldAutoAdvance = true;
-                }
-              });
-              // Wait for setState to complete
-              await Future.delayed(const Duration(milliseconds: 50));
-              // Load chapter content and wait for it to complete
-              await setChapterContent();
-              // Keep reading screen chapter aligned with TTS (same helper as audio).
-              await updateReadingScreenChapter(selectedChapter);
-              if (mounted &&
-                  selectedChapterContent.isNotEmpty &&
-                  curretNo >= 0 &&
-                  curretNo < selectedChapterContent.length) {
+              _ttsAdvancingChapter = true;
+              bool shouldSpeakNext = false;
+              try {
+                // Remember we were in an active TTS session before stop-for-reload.
+                final wasSpeaking = isSpeech || ttsState == TtsState.playing;
+                await _stop();
+                // Clear old voice text to prevent speaking old verse
+                _newVoiceText = null;
                 setState(() {
-                  _newVoiceText = selectedChapterContent[curretNo].content;
+                  selectedChapter++;
+                  curretNo = 0; // Reset to first verse of new chapter
+                  // _stop() clears isSpeech; restore so the intended auto-continue runs.
+                  if (wasSpeaking && !isManuallyPaused) {
+                    isSpeech = true;
+                    shouldAutoAdvance = true;
+                  }
                 });
-                // Wait for UI to update before speaking
+                // Wait for setState to complete
                 await Future.delayed(const Duration(milliseconds: 50));
-                // Don't auto-speak if manually paused
+                // Load chapter content and wait for it to complete
+                await setChapterContent();
+                // Keep reading screen chapter aligned with TTS (same helper as audio).
+                await updateReadingScreenChapter(selectedChapter);
                 if (mounted &&
-                    !isManuallyPaused &&
-                    shouldAutoAdvance &&
-                    _newVoiceText != null &&
-                    _newVoiceText!.isNotEmpty) {
-                  if (!isSpeech) {
+                    selectedChapterContent.isNotEmpty &&
+                    curretNo >= 0 &&
+                    curretNo < selectedChapterContent.length) {
+                  setState(() {
+                    _newVoiceText = selectedChapterContent[curretNo].content;
+                  });
+                  // Wait for UI to update before speaking
+                  await Future.delayed(const Duration(milliseconds: 50));
+                  // Don't auto-speak if manually paused
+                  shouldSpeakNext = mounted &&
+                      !isManuallyPaused &&
+                      shouldAutoAdvance &&
+                      _newVoiceText != null &&
+                      _newVoiceText!.isNotEmpty;
+                  if (shouldSpeakNext && !isSpeech) {
                     setState(() => isSpeech = true);
                   }
-                  await _speak();
                 }
+              } finally {
+                // Release before speak so verse completions can advance normally,
+                // while still ignoring completion events from _stop() above.
+                _ttsAdvancingChapter = false;
+              }
+              if (shouldSpeakNext) {
+                await _speak();
               }
             }
           } else {

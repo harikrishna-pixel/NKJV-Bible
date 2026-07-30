@@ -1173,17 +1173,8 @@ Future<void> applyReferralWhileLoggedIn({
     throw 'Referral code already applied';
   }
 
-  final email =
-      (await cacheNotifier.readCache(key: 'user'))?.toString().trim() ?? '';
-  final name =
-      (await cacheNotifier.readCache(key: 'name'))?.toString().trim() ?? '';
-  if (email.isEmpty || name.isEmpty) {
-    throw 'Unable to apply referral code. Please sign out and sign in again, then try once more.';
-  }
   final profileResult = await ProfileUpdateApi().updateReferredBy(
     referralCode: code,
-    email: email,
-    name: name,
   );
   if (!_profileUpdateSucceeded(profileResult)) {
     throw _referralApplyFailureMessage(
@@ -1320,9 +1311,6 @@ Future<void> applyReferralViaLogin({
         'confirming via profile apply-referral');
     final profileResult = await ProfileUpdateApi().updateReferredBy(
       referralCode: code,
-      email: email,
-      name: userMap['name']?.toString(),
-      password: password,
     );
     if (_profileUpdateSucceeded(profileResult)) {
       debugPrint('applyReferralViaLogin: referral accepted by profile API');
