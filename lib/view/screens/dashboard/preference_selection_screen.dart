@@ -583,7 +583,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Text(
-            'Pick the themes closest to your heart — choose at least 3. We\'ll build your daily verses around them.',
+            'We\'ll shape your daily verses around these.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: const Color(0xFF554D44),
