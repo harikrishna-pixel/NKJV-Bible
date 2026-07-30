@@ -5103,6 +5103,19 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
                           ),
                         ),
                         const SizedBox(height: 18),
+                        Text(
+                          'Daily Streak Completed',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: screenWidth > 450 ? 17 : 15,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                            color: Colors.white.withOpacity(0.96),
+                            fontFamily: 'Georgia',
+                            shadows: _kStreakPhotoTextShadows,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
                         RichText(
                           textAlign: TextAlign.center,
                           text: TextSpan(

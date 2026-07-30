@@ -372,17 +372,6 @@ class _ValueChatBodyState extends State<_ValueChatBody> {
                     color: const Color(0xFF3A2E1C),
                   ),
                 ),
-                const SizedBox(height: 4),
-                const Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    '10:13',
-                    style: TextStyle(
-                      fontSize: 9.5,
-                      color: Color(0xFFA8926A),
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -513,17 +502,6 @@ class _ValueChatBodyState extends State<_ValueChatBody> {
                     fontSize: widget.isTablet ? 13.5 : 12.5,
                     fontWeight: FontWeight.w700,
                     color: _goldDeep,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    '10:13 ✓✓',
-                    style: TextStyle(
-                      fontSize: 9.5,
-                      color: Color(0xFFA8926A),
-                    ),
                   ),
                 ),
               ],

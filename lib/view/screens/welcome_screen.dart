@@ -61,7 +61,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
-    final showComparison = _showLogoComparison ?? false;
 
     return Scaffold(
       body: Stack(
@@ -96,11 +95,16 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Center(
-                                child: showComparison
-                                    ? _welcomeLogoComparison(
-                                    isTablet: isTablet)
-                                    : _welcomeSingleNewLogo(
-                                    isTablet: isTablet),
+                                // Always single logo — Old/New comparison hidden for now.
+                                // Logic (_loadLogoMode / showWelcomeLogoComparison) unchanged.
+                                child: _welcomeSingleNewLogo(
+                                  isTablet: isTablet,
+                                ),
+                                // child: showComparison
+                                //     ? _welcomeLogoComparison(
+                                //         isTablet: isTablet)
+                                //     : _welcomeSingleNewLogo(
+                                //         isTablet: isTablet),
                               ),
                               SizedBox(height: isTablet ? 18 : 14),
                               Text(
