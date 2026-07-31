@@ -3960,13 +3960,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   String _planBadgeLabel(int index, String? badgeText) {
     if (_isOneYearProductId(_products[index].id)) {
-      return '★ MOST POPULAR';
+      return 'MOST POPULAR';
     }
     if (_isTwoYearProductId(_products[index].id)) {
-      return '💎 BEST VALUE';
+      return 'BEST VALUE';
     }
     if (_isLifetimeProductId(_products[index].id)) {
-      return '💎 BEST VALUE';
+      return 'BEST VALUE';
     }
     return badgeText ?? '';
   }

@@ -6324,7 +6324,8 @@ class ImageBottomSheet extends StatelessWidget {
             children: [
               controller.isImageBannerAdLoaded.value &&
                       controller.imageBannerAd != null &&
-                      controller.adFree.value == false
+                      controller.adFree.value == false &&
+                      !controller.isAdsCompletlyDisabled.value
                   ? IgnorePointer(
                       child: SizedBox(
                         height:
@@ -6388,7 +6389,8 @@ class ImageBottomSheet extends StatelessWidget {
                           }
                           try {
                             await SharPreferences.setString('OpenAd', '1');
-                            if (controller.adFree.value == false) {
+                            if (controller.adFree.value == false &&
+                                !controller.isAdsCompletlyDisabled.value) {
                               final adProvider =
                                   context.read<DownloadProvider>();
                               await adProvider
@@ -6415,7 +6417,8 @@ class ImageBottomSheet extends StatelessWidget {
                             return;
                           }
                           controller.selectedVerseView.value += 1;
-                          if (controller.adFree.value == false) {
+                          if (controller.adFree.value == false &&
+                              !controller.isAdsCompletlyDisabled.value) {
                             final adProvider =
                                 context.read<DownloadProvider>();
                             await SharPreferences.setString('OpenAd', '1');

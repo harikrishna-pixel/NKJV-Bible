@@ -407,7 +407,7 @@ option,
 ),
 _QuestionPage(
 question:
-'How often do you read or study the Bible?',
+'How often do you read the Bible?',
 options: const [
 'Every day',
 'A few times a week',

@@ -25,13 +25,24 @@ class _StreakIconVisualState {
     final today = DateTime.now().toIso8601String().split('T')[0];
     final lastShown = await SharPreferences.getString(
         SharPreferences.streakFlowLastShownDate);
+    final started = await SharPreferences.getString(
+        SharPreferences.streakFlowStartedDate);
     final steps = await SharPreferences.getInt(
             SharPreferences.streakFlowStepsCompletedToday) ??
         0;
     final streak = await StreakService.getCurrentStreak();
-    final todayComplete = lastShown == today || steps >= 4;
-    final showCountBadge = streak > 0 && todayComplete;
-    final showNotificationDot = !todayComplete && steps < 1;
+    // Display only — same day-session rules as Daily Journey (no pref writes).
+    int effectiveSteps = 0;
+    if (lastShown == today) {
+      effectiveSteps = 4;
+    } else if (started == today) {
+      effectiveSteps = steps;
+    }
+    final todayComplete =
+        lastShown == today || (started == today && steps >= 4);
+    // Keep streak count visible on following days (not only on completion day).
+    final showCountBadge = streak > 0;
+    final showNotificationDot = !todayComplete && effectiveSteps < 1;
 
     return _StreakIconVisualState(
       streak: streak,
@@ -110,42 +121,64 @@ class StreakIconButton extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(4),
             child: showCountBadge
-                ? Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: iconSize * 0.45,
-                      vertical: iconSize * 0.12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE65100),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFE65100).withOpacity(0.35),
-                          blurRadius: 4,
-                          offset: const Offset(0, 1),
+                ? Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: iconSize * 0.45,
+                          vertical: iconSize * 0.12,
                         ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.local_fire_department_rounded,
-                          size: iconSize * 0.85,
-                          color: Colors.white,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE65100),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFE65100).withOpacity(0.35),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
                         ),
-                        SizedBox(width: iconSize * 0.15),
-                        Text(
-                          '$streak',
-                          style: TextStyle(
-                            fontSize: iconSize * 0.7,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                            height: 1,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.local_fire_department_rounded,
+                              size: iconSize * 0.85,
+                              color: Colors.white,
+                            ),
+                            SizedBox(width: iconSize * 0.15),
+                            Text(
+                              '$streak',
+                              style: TextStyle(
+                                fontSize: iconSize * 0.7,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                height: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (showNotificationDot)
+                        Positioned(
+                          top: -1,
+                          right: -1,
+                          child: Container(
+                            width: 9,
+                            height: 9,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE53935),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 1.5,
+                              ),
+                            ),
                           ),
                         ),
-                      ],
-                    ),
+                    ],
                   )
                 : _inactiveFlame(
                     color: color,

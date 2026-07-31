@@ -1097,19 +1097,15 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                 height: 20,
               ),
               widget.isSetting != true
-                  ? Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "You can change these anytime in Settings.",
-                    style: TextStyle(
-                        color: CommanColor.whiteBlack(context),
-                        fontSize: screenWidth > 600 ? 21 : 16,
-                        fontStyle: FontStyle.italic,
-                        fontWeight: FontWeight.w400),
-                  ),
-                ],
-              )
+                  ? Text(
+                      "You can change these anytime in Settings.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: screenWidth > 600 ? 17 : 15,
+                        color: const Color(0xFF7B5536),
+                        fontStyle: FontStyle.normal,
+                      ),
+                    )
                   : SizedBox(),
               const SizedBox(height: 16),
             ]),
@@ -1961,7 +1957,7 @@ class _AnimatedJourneyDialogState extends State<_AnimatedJourneyDialog>
               style: TextStyle(
                 fontSize: isTablet ? 17 : 15,
                 color: const Color(0xFF7B5536),
-                fontStyle: FontStyle.italic,
+                fontStyle: FontStyle.normal,
               ),
             ),
             const SizedBox(height: 16),

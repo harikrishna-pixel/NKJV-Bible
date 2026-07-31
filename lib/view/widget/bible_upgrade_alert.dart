@@ -414,7 +414,7 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
                               'Remind Later',
                               style: TextStyle(
                                 fontSize: 15,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w500,
                                 color: _accent,
                               ),
                             ),

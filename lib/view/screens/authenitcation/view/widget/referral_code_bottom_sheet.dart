@@ -213,8 +213,15 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
       final lower = message.toLowerCase();
       final loggedInFallback =
           'Unable to apply referral code. Please check the code and try again.';
-      // Always show a referral-specific message for apply failures.
-      if (lower.contains('invalid referral') ||
+      final invalidFallback = 'Invalid Referral code';
+      // Post-registration sheet: always validate on this screen — never
+      // tell the user to enter the code on Sign Up instead.
+      if (lower.contains('enter this referral') &&
+          lower.contains('sign up')) {
+        Constants.showToast(
+          widget.useLoggedInSession ? loggedInFallback : invalidFallback,
+        );
+      } else if (lower.contains('invalid referral') ||
           lower.contains('own referral') ||
           lower.contains('already applied') ||
           lower.contains('please enter') ||
@@ -222,12 +229,14 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
           lower.contains('sign out and sign in') ||
           lower.contains('no internet') ||
           lower.contains('something went wrong') ||
-          (!widget.useLoggedInSession && lower.contains('sign up'))) {
+          lower.contains('does not exist') ||
+          lower.contains('check the code') ||
+          lower.contains('not found')) {
         Constants.showToast(message);
       } else if (widget.useLoggedInSession) {
         Constants.showToast(loggedInFallback);
       } else {
-        Constants.showToast('Enter this referral code on the Sign Up screen');
+        Constants.showToast(invalidFallback);
       }
     } finally {
       if (mounted) {

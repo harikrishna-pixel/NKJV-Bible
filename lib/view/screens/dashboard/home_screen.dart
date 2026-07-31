@@ -5490,9 +5490,10 @@ class _HomeScreenState extends State<HomeScreen>
     required double screenWidth,
   }) {
     final isPremium = controller.adFree.value;
-    final showPremiumBanner = !(controller.isAdsCompletlyDisabled.value) &&
-        (controller.isSubscriptionEnabled ?? false) &&
-        !isPremium;
+    // UI only: show Upgrade banner whenever subscriptions are enabled and
+    // user is not premium — independent of ads being completely disabled.
+    final showPremiumBanner =
+        (controller.isSubscriptionEnabled ?? false) && !isPremium;
 
     Future<void> openPaywallFromDrawer() async {
       adsIcon = false;

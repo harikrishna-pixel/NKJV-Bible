@@ -1294,249 +1294,263 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
         final keyboardInset = MediaQuery.viewInsetsOf(dialogContext).bottom;
         return Padding(
           padding: EdgeInsets.only(bottom: keyboardInset),
-          child: Container(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.sizeOf(dialogContext).height * 0.9,
-            ),
-            decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20),
+          child: GestureDetector(
+            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(dialogContext).height * 0.9,
               ),
-            ),
-            child: SafeArea(
-              top: false,
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          margin: const EdgeInsets.only(bottom: 8),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? Colors.white24
-                                : const Color(0xFFD0C4B4),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                      // Top row: back only (wallet already shown in main header)
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              Icons.arrow_back_ios,
-                              size: 20,
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
+              ),
+              child: SafeArea(
+                top: false,
+                child: SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
                               color: isDark
-                                  ? Colors.white
-                                  : const Color(0xFF3D2914),
+                                  ? Colors.white24
+                                  : const Color(0xFFD0C4B4),
+                              borderRadius: BorderRadius.circular(2),
                             ),
-                            onPressed: () {
-                              Navigator.of(dialogContext).pop();
-                              _customPrayerController.clear();
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      // Praying hands, title, subtitle
-                      Icon(
-                        Icons.volunteer_activism,
-                        size: 48,
-                        color:
-                            isDark ? Colors.white70 : const Color(0xFF5C4033),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'My Prayer',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                          color:
-                              isDark ? Colors.white : const Color(0xFF3D2914),
-                          fontFamily: 'Georgia',
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        ChatTranslations.get('get_guidance_need', 'EN'),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: isDark
-                              ? Colors.white70
-                              : const Color(0xFF6D6D6D),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      // Card: What's on your heart, description, field, button
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? Colors.white.withOpacity(0.08)
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: isDark
-                                ? Colors.white24
-                                : const Color(0xFFE0D5C8),
                           ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        // Top row: back only (wallet already shown in main header)
+                        Row(
                           children: [
-                            Text(
-                              "What's on your heart today?",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
+                            IconButton(
+                              icon: Icon(
+                                Icons.arrow_back_ios,
+                                size: 20,
                                 color: isDark
                                     ? Colors.white
                                     : const Color(0xFF3D2914),
                               ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              "Let your prayer begin with a thought or feeling.",
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: isDark
-                                    ? Colors.white70
-                                    : const Color(0xFF6D6D6D),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            TextField(
-                              controller: _customPrayerController,
-                              maxLines: 4,
-                              maxLength: 300,
-                              decoration: InputDecoration(
-                                hintText: 'Speak from the soul...',
-                                hintStyle: TextStyle(
-                                  color: isDark
-                                      ? Colors.white70
-                                      : Colors.grey.shade600,
-                                  fontStyle: FontStyle.italic,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: isDark
-                                        ? Colors.white24
-                                        : Colors.grey.shade300,
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: isDark
-                                        ? const Color(0xFF8B6F47)
-                                        : const Color(0xFF5C4033),
-                                    width: 1.5,
-                                  ),
-                                ),
-                                filled: true,
-                                fillColor: isDark
-                                    ? Colors.white.withOpacity(0.05)
-                                    : Colors.grey.shade50,
-                                counterText: '',
-                              ),
-                              style: TextStyle(
-                                color: isDark
-                                    ? Colors.white
-                                    : CommanColor.black,
-                                fontSize: 15,
-                              ),
-                            ),
-                            ValueListenableBuilder<TextEditingValue>(
-                              valueListenable: _customPrayerController,
-                              builder: (context, value, _) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 4),
-                                  child: Align(
-                                    alignment: Alignment.centerRight,
-                                    child: Text(
-                                      '${value.text.length}/300',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: isDark
-                                            ? Colors.white54
-                                            : Colors.grey.shade600,
-                                      ),
-                                    ),
-                                  ),
-                                );
+                              onPressed: () {
+                                FocusManager.instance.primaryFocus?.unfocus();
+                                Navigator.of(dialogContext).pop();
+                                _customPrayerController.clear();
                               },
                             ),
-                            const SizedBox(height: 16),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ValueListenableBuilder<TextEditingValue>(
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // Praying hands, title, subtitle
+                        Icon(
+                          Icons.volunteer_activism,
+                          size: 48,
+                          color:
+                              isDark ? Colors.white70 : const Color(0xFF5C4033),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'My Prayer',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            color:
+                                isDark ? Colors.white : const Color(0xFF3D2914),
+                            fontFamily: 'Georgia',
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          ChatTranslations.get('get_guidance_need', 'EN'),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isDark
+                                ? Colors.white70
+                                : const Color(0xFF6D6D6D),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        // Card: What's on your heart, description, field, button
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.white.withOpacity(0.08)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isDark
+                                  ? Colors.white24
+                                  : const Color(0xFFE0D5C8),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "What's on your heart today?",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark
+                                      ? Colors.white
+                                      : const Color(0xFF3D2914),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                "Let your prayer begin with a thought or feeling.",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: isDark
+                                      ? Colors.white70
+                                      : const Color(0xFF6D6D6D),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              TextField(
+                                controller: _customPrayerController,
+                                maxLines: 4,
+                                maxLength: 300,
+                                onTapOutside: (_) {
+                                  FocusManager.instance.primaryFocus
+                                      ?.unfocus();
+                                },
+                                decoration: InputDecoration(
+                                  hintText: 'Speak from the soul...',
+                                  hintStyle: TextStyle(
+                                    color: isDark
+                                        ? Colors.white70
+                                        : Colors.grey.shade600,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                      color: isDark
+                                          ? Colors.white24
+                                          : Colors.grey.shade300,
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                      color: isDark
+                                          ? const Color(0xFF8B6F47)
+                                          : const Color(0xFF5C4033),
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  filled: true,
+                                  fillColor: isDark
+                                      ? Colors.white.withOpacity(0.05)
+                                      : Colors.grey.shade50,
+                                  counterText: '',
+                                ),
+                                style: TextStyle(
+                                  color: isDark
+                                      ? Colors.white
+                                      : CommanColor.black,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              ValueListenableBuilder<TextEditingValue>(
                                 valueListenable: _customPrayerController,
                                 builder: (context, value, _) {
-                                  final hasText =
-                                      value.text.trim().isNotEmpty;
-                                  return ElevatedButton(
-                                    onPressed: hasText
-                                        ? () async {
-                                            final isConnected =
-                                                await InternetConnection()
-                                                    .hasInternetAccess;
-                                            if (!isConnected) {
-                                              Constants.showToast(
-                                                  'No internet connection',
-                                                  5000);
-                                              return;
-                                            }
-                                            final request =
-                                                _customPrayerController.text
-                                                    .trim();
-                                            Navigator.of(dialogContext)
-                                                .pop();
-                                            if (request.isNotEmpty &&
-                                                mounted) {
-                                              await _showPublishOrChatChoice(
-                                                  request);
-                                            }
-                                          }
-                                        : null,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: isDark
-                                          ? CommanColor.darkPrimaryColor
-                                          : const Color(0xFFD4A574),
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 14),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      'Get Prayer',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
-                                        color: isDark
-                                            ? Colors.white
-                                            : const Color(0xFF5C4033),
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Align(
+                                      alignment: Alignment.centerRight,
+                                      child: Text(
+                                        '${value.text.length}/300',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: isDark
+                                              ? Colors.white54
+                                              : Colors.grey.shade600,
+                                        ),
                                       ),
                                     ),
                                   );
                                 },
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ValueListenableBuilder<TextEditingValue>(
+                                  valueListenable: _customPrayerController,
+                                  builder: (context, value, _) {
+                                    final hasText =
+                                        value.text.trim().isNotEmpty;
+                                    return ElevatedButton(
+                                      onPressed: hasText
+                                          ? () async {
+                                              FocusManager
+                                                  .instance.primaryFocus
+                                                  ?.unfocus();
+                                              final isConnected =
+                                                  await InternetConnection()
+                                                      .hasInternetAccess;
+                                              if (!isConnected) {
+                                                Constants.showToast(
+                                                    'No internet connection',
+                                                    5000);
+                                                return;
+                                              }
+                                              final request =
+                                                  _customPrayerController.text
+                                                      .trim();
+                                              Navigator.of(dialogContext)
+                                                  .pop();
+                                              if (request.isNotEmpty &&
+                                                  mounted) {
+                                                await _showPublishOrChatChoice(
+                                                    request);
+                                              }
+                                            }
+                                          : null,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: isDark
+                                            ? CommanColor.darkPrimaryColor
+                                            : const Color(0xFFD4A574),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 14),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'Get Prayer',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          color: isDark
+                                              ? Colors.white
+                                              : const Color(0xFF5C4033),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -2935,6 +2949,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     final horizontalPad = size.width > 450 ? 28.0 : 20.0;
     final isCompact = size.width < 390 || size.height < 750;
     final heroSize = size.width > 450 ? 96.0 : (isCompact ? 68.0 : 80.0);
+    final verseInfo = _verseForCreatingPrayerCategory();
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
@@ -3058,7 +3073,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Call to Me, and I will answer you, and show you great and mighty things.',
+                        verseInfo.$1,
                         style: TextStyle(
                           fontSize: size.width > 450 ? 17 : (isCompact ? 13.5 : 14.5),
                           height: isCompact ? 1.35 : 1.45,
@@ -3069,7 +3084,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                       ),
                       SizedBox(height: isCompact ? 8 : 10),
                       Text(
-                        'Jeremiah 33:3',
+                        verseInfo.$2,
                         style: TextStyle(
                           fontSize: isCompact ? 13 : 14,
                           color: _kPrayerGuidanceInk.withOpacity(0.82),
@@ -3085,6 +3100,76 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
           ),
         );
       },
+    );
+  }
+
+  /// Display-only verse under the creating-prayer steps (by selected category).
+  (String, String) _verseForCreatingPrayerCategory() {
+    final title = (_responseHeaderTitle ?? '').trim().toLowerCase();
+    if (title.contains('thanksgiving') || title.contains('thank')) {
+      return (
+        'Enter into His gates with thanksgiving, And into His courts with praise. Be thankful to Him, and bless His name.',
+        'Psalm 100:4',
+      );
+    }
+    if (title.contains('forgiveness') || title.contains('forgive')) {
+      return (
+        'If we confess our sins, He is faithful and just to forgive us our sins and to cleanse us from all unrighteousness.',
+        '1 John 1:9',
+      );
+    }
+    if (title.contains('guidance') || title.contains('wisdom')) {
+      return (
+        'Trust in the Lord with all your heart, And lean not on your own understanding; In all your ways acknowledge Him, And He shall direct your paths.',
+        'Proverbs 3:5–6',
+      );
+    }
+    if (title.contains('anxiety') || title.contains('peace')) {
+      return (
+        'Be anxious for nothing, but in everything by prayer and supplication, with thanksgiving, let your requests be made known to God; and the peace of God, which surpasses all understanding, will guard your hearts and minds through Christ Jesus.',
+        'Philippians 4:6–7',
+      );
+    }
+    if (title.contains('healing')) {
+      return (
+        'Heal me, O Lord, and I shall be healed; Save me, and I shall be saved, For You are my praise.',
+        'Jeremiah 17:14',
+      );
+    }
+    if (title.contains('family')) {
+      return (
+        'But as for me and my house, we will serve the Lord.',
+        'Joshua 24:15',
+      );
+    }
+    if (title.contains('strength') || title.contains('courage')) {
+      return (
+        'Fear not, for I am with you; Be not dismayed, for I am your God. I will strengthen you, Yes, I will help you, I will uphold you with My righteous right hand.',
+        'Isaiah 41:10',
+      );
+    }
+    if (title.contains('protection') || title.contains('safety')) {
+      return (
+        'For He shall give His angels charge over you, To keep you in all your ways.',
+        'Psalm 91:11',
+      );
+    }
+    if (title.contains('feeling') || title.contains('emotion')) {
+      return (
+        'Trust in Him at all times, you people; Pour out your heart before Him; God is a refuge for us.',
+        'Psalm 62:8',
+      );
+    }
+    if (title.contains('praise') || title.contains('worship')) {
+      return (
+        'Let everything that has breath praise the Lord. Praise the Lord!',
+        'Psalm 150:6',
+      );
+    }
+    // Custom / Pray for Me fallback
+    return (
+      'Call to Me, and I will answer you, and show you great and mighty things.',
+      'Jeremiah 33:3',
     );
   }
 

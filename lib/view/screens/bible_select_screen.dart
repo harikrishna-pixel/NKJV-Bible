@@ -266,136 +266,228 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isTablet = size.width > 600;
+    const ink = Color(0xFF3D2914);
+    const brown = Color(0xFF5C4033);
+    const cardBg = Color(0xFFFFFDF8);
+    const cardBorder = Color(0xFFE6D8BE);
+    const iconBg = Color(0xFFF4EBD7);
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
       },
       child: Scaffold(
-        // appBar: AppBar(title: Text("Bible versions")),
         body: Container(
           height: MediaQuery.of(context).size.height,
           width: MediaQuery.of(context).size.width,
-          decoration: Provider.of<ThemeProvider>(context).currentCustomTheme ==
-                  AppCustomTheme.vintage
-              ? BoxDecoration(
-                  image: DecorationImage(
-                      image: AssetImage(Images.bgImage(context)),
-                      fit: BoxFit.fill))
-              : null,
+          decoration: BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage(Images.bgImage(context)),
+              fit: BoxFit.cover,
+            ),
+          ),
           child: BibleInfo.folders.isEmpty
-              ? Center(child: CircularProgressIndicator())
+              ? const Center(child: CircularProgressIndicator())
               : SafeArea(
                   child: Column(
                     children: [
-                      widget.from.toString() == "home"
-                          ? Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 15.0),
-                                  child: GestureDetector(
-                                    onTap: () async {
-                                      Get.back();
-                                    },
-                                    child: Icon(
-                                      Icons.arrow_back_ios,
-                                      size: 20,
-                                      color: CommanColor.whiteBlack(context),
-                                    ),
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 15.0),
-                                  child: Text("Bible versions",
-                                      style: CommanStyle.appBarStyle(context)),
-                                ),
-                                SizedBox(),
-                              ],
-                            )
-                          : Padding(
-                              padding: const EdgeInsets.only(right: 15.0),
-                              child: Text("Bible versions",
-                                  style: CommanStyle.appBarStyle(context)),
+                      if (widget.from.toString() == "home")
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 12, top: 4),
+                            child: IconButton(
+                              onPressed: () => Get.back(),
+                              icon: Icon(
+                                Icons.arrow_back_ios,
+                                size: isTablet ? 28 : 20,
+                                color: ink,
+                              ),
                             ),
+                          ),
+                        )
+                      else
+                        SizedBox(height: isTablet ? 16 : 10),
+                      // Header icon
+                      Container(
+                        width: isTablet ? 96 : 78,
+                        height: isTablet ? 96 : 78,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFC9A35A).withOpacity(0.45),
+                              blurRadius: 22,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(18),
+                          child: Image.asset(
+                            Images.appIcon1024,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: isTablet ? 18 : 14),
+                      Text(
+                        'Choose Your Bible',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Georgia',
+                          fontSize: isTablet ? 30 : 24,
+                          fontWeight: FontWeight.w700,
+                          color: ink,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Select a version to begin your journey',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Georgia',
+                          fontSize: isTablet ? 16 : 14,
+                          fontWeight: FontWeight.w500,
+                          color: brown.withOpacity(0.9),
+                        ),
+                      ),
+                      SizedBox(height: isTablet ? 22 : 16),
                       Expanded(
                         child: ListView.builder(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isTablet ? size.width * 0.14 : 18,
+                          ),
                           itemCount: BibleInfo.folders.length,
                           itemBuilder: (context, index) {
                             final folder = BibleInfo.folders[index];
                             final state = buttonStates[folder] ??
                                 DownloadButtonState.download;
                             final progress = progressMap[folder] ?? 0.0;
+                            final isActive =
+                                state == DownloadButtonState.active;
 
-                            return ListTile(
-                              title: Text(folder),
-                              trailing: SizedBox(
-                                width: 100,
-                                height: 27,
-                                child: DownloadButton(
-                                  state: state,
-                                  progress: progress,
-                                  onDownload: () async {
-                                    final prefs =
-                                        await SharedPreferences.getInstance();
-                                    final data =
-                                        prefs.getString("appreview1") ?? "1";
-                                    if (data == '1') {
-                                      // await _requestReview();
-                                      // await prefs.setString('appreview1', '2');
-                                    }
-                                    extractFromFolder(
-                                      folderName: folder,
-                                      password: dotenv
-                                          .env[AssetsConstants.holybibleKey]
-                                          .toString(),
-                                    );
-                                  },
-                                  onOpen: () async {
-                                    // ScaffoldMessenger.of(context).showSnackBar(
-                                    //   SnackBar(
-                                    //       content: Text("Opening $folder...")),
-                                    // );
-                                    // if (widget.from == 'onboard') {
-                                    //   Get.to(() => PreferenceSelectionScreen(
-                                    //         isSetting: false,
-                                    //         selectedbible: folder,
-                                    //       ));
-                                    // } else {
-                                    //   await loadBookContent(folder);
-                                    //   await loadBookList(folder);
-                                    //   await deleteFiles(folder);
-                                    //   return Get.back();
-                                    // }
-                                    // setState(() {
-                                    //   foldername = folder;
-                                    //   buttonStates[folder] =
-                                    //       DownloadButtonState.active;
-                                    // });
-                                    final prefs =
-                                        await SharedPreferences.getInstance();
-                                    final data =
-                                        prefs.getString("appreview1") ?? "1";
-                                    if (data == '1') {
-                                      await _requestReview();
-                                    }
-                                    setState(() {
-                                      // Step 1: Reset all active folders to "open"
-                                      buttonStates.updateAll((key, value) {
-                                        if (value ==
-                                            DownloadButtonState.active) {
-                                          return DownloadButtonState.open;
-                                        }
-                                        return value;
-                                      });
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: cardBg,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: isActive
+                                        ? const Color(0xFF8B5E3C)
+                                        : cardBorder,
+                                    width: isActive ? 1.8 : 1.2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.06),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: isTablet ? 48 : 40,
+                                      height: isTablet ? 48 : 40,
+                                      decoration: BoxDecoration(
+                                        color: iconBg,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Icon(
+                                        Icons.menu_book_rounded,
+                                        size: isTablet ? 26 : 22,
+                                        color: brown,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            _bibleDisplayName(folder),
+                                            style: TextStyle(
+                                              fontFamily: 'Georgia',
+                                              fontSize: isTablet ? 18 : 15,
+                                              fontWeight: FontWeight.w700,
+                                              color: ink,
+                                            ),
+                                          ),
+                                          if (isActive) ...[
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              'Currently selected',
+                                              style: TextStyle(
+                                                fontSize: isTablet ? 13 : 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: const Color(0xFF308602),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: 108,
+                                      height: 34,
+                                      child: DownloadButton(
+                                        state: state,
+                                        progress: progress,
+                                        onDownload: () async {
+                                          final prefs = await SharedPreferences
+                                              .getInstance();
+                                          final data =
+                                              prefs.getString("appreview1") ??
+                                                  "1";
+                                          if (data == '1') {
+                                            // await _requestReview();
+                                            // await prefs.setString('appreview1', '2');
+                                          }
+                                          extractFromFolder(
+                                            folderName: folder,
+                                            password: dotenv
+                                                .env[AssetsConstants.holybibleKey]
+                                                .toString(),
+                                          );
+                                        },
+                                        onOpen: () async {
+                                          final prefs = await SharedPreferences
+                                              .getInstance();
+                                          final data =
+                                              prefs.getString("appreview1") ??
+                                                  "1";
+                                          if (data == '1') {
+                                            await _requestReview();
+                                          }
+                                          setState(() {
+                                            // Step 1: Reset all active folders to "open"
+                                            buttonStates.updateAll((key, value) {
+                                              if (value ==
+                                                  DownloadButtonState.active) {
+                                                return DownloadButtonState.open;
+                                              }
+                                              return value;
+                                            });
 
-                                      // Step 2: Mark only the tapped folder as "active"
-                                      foldername = folder;
-                                      buttonStates[folder] =
-                                          DownloadButtonState.active;
-                                    });
-                                  },
-                                  onactive: () {},
+                                            // Step 2: Mark only the tapped folder as "active"
+                                            foldername = folder;
+                                            buttonStates[folder] =
+                                                DownloadButtonState.active;
+                                          });
+                                        },
+                                        onactive: () {},
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             );
@@ -403,26 +495,39 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                         ),
                       ),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 65),
+                        padding: EdgeInsets.fromLTRB(
+                          isTablet ? size.width * 0.14 : 18,
+                          8,
+                          isTablet ? size.width * 0.14 : 18,
+                          isTablet ? 20 : 14,
+                        ),
                         child: SizedBox(
                           width: double.infinity,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Provider.of<ThemeProvider>(
-                                              context,
-                                              listen: false)
-                                          .themeMode ==
-                                      ThemeMode.dark
-                                  ? CommanColor.white
-                                  : const Color(0xFF7B5C3D),
-                              padding: EdgeInsets.symmetric(
-                                vertical: isTablet ? 20 : 14,
+                          height: isTablet ? 64 : 54,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  Color(0xFF763201),
+                                  Color(0xFFD5821F),
+                                  Color(0xFF763201),
+                                ],
                               ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
+                              borderRadius: BorderRadius.circular(14),
                             ),
-                            onPressed: () async {
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                elevation: 0,
+                                padding: EdgeInsets.symmetric(
+                                  vertical: isTablet ? 18 : 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              onPressed: () async {
                               setState(() {
                                 isloading = true;
                               });
@@ -474,31 +579,36 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                                 Constants.showToast("Click Set as Default");
                               }
                             },
-                            child: Text(
-                              isloading == false ? "Continue" : "loading...",
-                              style: TextStyle(
-                                fontSize: isTablet ? 20 : 16,
-                                fontWeight: FontWeight.w600,
-                                color: Provider.of<ThemeProvider>(context,
-                                                listen: false)
-                                            .themeMode ==
-                                        ThemeMode.dark
-                                    ? CommanColor.black
-                                    : Colors.white,
+                              child: Text(
+                                isloading == false ? "Continue" : "loading...",
+                                style: TextStyle(
+                                  fontFamily: 'Georgia',
+                                  fontSize: isTablet ? 20 : 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                      SizedBox(
-                        height: 5,
-                      )
                     ],
                   ),
                 ),
         ),
       ),
     );
+  }
+
+  String _bibleDisplayName(String folder) {
+    switch (folder) {
+      case 'NKJV':
+        return 'NKJV Bible';
+      case 'catholic':
+        return 'Catholic Bible';
+      default:
+        return folder;
+    }
   }
 
   void showMainFeedbackDialog(BuildContext context) {
@@ -1514,7 +1624,9 @@ class DownloadButton extends StatelessWidget {
       case DownloadButtonState.download:
         return OutlinedButton(
           style: OutlinedButton.styleFrom(
-            shape: RoundedRectangleBorder(),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
             side: BorderSide(
                 color: Provider.of<ThemeProvider>(context, listen: false)
                             .themeMode ==
@@ -1526,7 +1638,7 @@ class DownloadButton extends StatelessWidget {
                         ThemeMode.dark
                     ? CommanColor.white
                     : const Color(0xFF8B5E3C),
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
           ),
           onPressed: onDownload,
           child: const Text(
@@ -1575,10 +1687,12 @@ class DownloadButton extends StatelessWidget {
       case DownloadButtonState.open:
         return ElevatedButton(
           style: ElevatedButton.styleFrom(
-            shape: RoundedRectangleBorder(),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
             backgroundColor: const Color(0xFF8B5E3C),
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
           ),
           onPressed: onOpen,
           child: Text(
@@ -1591,10 +1705,12 @@ class DownloadButton extends StatelessWidget {
       case DownloadButtonState.active:
         return ElevatedButton(
           style: ElevatedButton.styleFrom(
-            shape: RoundedRectangleBorder(),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
             backgroundColor: const ui.Color.fromARGB(255, 48, 134, 2),
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
           ),
           onPressed: onOpen,
           child: Text(

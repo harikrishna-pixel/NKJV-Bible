@@ -1318,7 +1318,11 @@ Future<void> applyReferralViaLogin({
       debugPrint(
           'applyReferralViaLogin: profile apply failed '
           '(${_profileUpdateErrorMessage(profileResult) ?? 'unknown'})');
-      throw _referralApplyFailureMessage(profileResult);
+      // Post-login / Account sheet — never redirect users to Sign Up.
+      throw _referralApplyFailureMessage(
+        profileResult,
+        forLoggedInSession: true,
+      );
     }
 
     await cacheNotifier.writeCache(key: 'referred_by', value: code);
