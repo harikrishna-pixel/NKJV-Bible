@@ -5354,13 +5354,15 @@ class _StreakCompleteFlameBadge extends StatelessWidget {
                           width: 2,
                         ),
                       ),
-                      child: Image.asset(
-                        'assets/streak_flame.gif',
-                        width: 12,
-                        height: 12,
-                        // Use contain to avoid cropping the animated flame inside the circle.
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.high,
+                      child: Center(
+                        child: Image.asset(
+                          'assets/streak_flame.gif',
+                          width: 48,
+                          height: 48,
+                          // Use contain to avoid cropping the animated flame inside the circle.
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
+                        ),
                       ),
                     ),
                   ),
