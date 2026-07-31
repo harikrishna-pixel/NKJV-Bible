@@ -102,6 +102,9 @@ class SharPreferences {
   static const streakFlowStepsCompletedToday = 'streak_flow_steps_completed_today';
   /// Streak flow: calendar day (YYYY-MM-DD) user dismissed the flow without completing. Used to avoid re-showing on same day.
   static const streakFlowDismissedDate = 'streak_flow_dismissed_date';
+  /// Continue Today's Journey bottom sheet: once true, never show again for this install.
+  static const streakFlowContinuePromptLifetimeDismissed =
+      'streak_flow_continue_prompt_lifetime_dismissed';
   /// Streak flow: JSON map of dayKey (YYYY-MM-DD) -> steps completed (0-4).
   /// Used by Faith Journey day cards to render accurate completion indicators.
   static const streakFlowStepsByDay = 'streak_flow_steps_by_day';

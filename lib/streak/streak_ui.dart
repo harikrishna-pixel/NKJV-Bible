@@ -61,7 +61,7 @@ class StreakIconButton extends StatelessWidget {
           width: badgeSize,
           height: badgeSize,
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
+            borderRadius: BorderRadius.circular(10),
             color: color.withOpacity(0.12),
             border: Border.all(color: color.withOpacity(0.28)),
           ),

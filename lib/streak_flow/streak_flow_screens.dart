@@ -1969,14 +1969,29 @@ class _FaithJourneyStepPagerState extends State<FaithJourneyStepPager> {
 class ContinueTodayJourneySheet extends StatelessWidget {
   const ContinueTodayJourneySheet({super.key});
 
-  static Future<void> show(BuildContext context) {
-    return showModalBottomSheet<void>(
+  static Future<void> _markPromptHandled() async {
+    final today = DateTime.now().toIso8601String().split('T')[0];
+    await SharPreferences.setString(
+      SharPreferences.streakFlowDismissedDate,
+      today,
+    );
+    await SharPreferences.setBoolean(
+      SharPreferences.streakFlowContinuePromptLifetimeDismissed,
+      true,
+    );
+  }
+
+  static Future<void> show(BuildContext context) async {
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withOpacity(0.35),
       builder: (ctx) => const ContinueTodayJourneySheet(),
     );
+    // Persist after any close (Continue, Not now, or dismiss) so Home
+    // does not show this sheet again the same day.
+    await _markPromptHandled();
   }
 
   @override
@@ -2006,20 +2021,21 @@ class ContinueTodayJourneySheet extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFFFFE0B2).withOpacity(0.55),
-                      border: Border.all(
-                        color: const Color(0xFFE65100).withOpacity(0.35),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      width: 48,
+                      height: 36,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        color: const Color(0xFFE65100),
                       ),
-                    ),
-                    child: const Icon(
-                      Icons.local_fire_department_rounded,
-                      color: Color(0xFFE65100),
-                      size: 24,
+                      child: const Icon(
+                        Icons.local_fire_department_rounded,
+                        color: Colors.white,
+                        size: 22,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -2067,7 +2083,9 @@ class ContinueTodayJourneySheet extends StatelessWidget {
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
+                      await _markPromptHandled();
+                      if (!context.mounted) return;
                       Navigator.of(context).pop();
                       StreakFlowNavigation.openStreakConnectionFlow();
                     },
@@ -2097,12 +2115,7 @@ class ContinueTodayJourneySheet extends StatelessWidget {
                 height: 44,
                 child: OutlinedButton(
                   onPressed: () async {
-                    final today =
-                    DateTime.now().toIso8601String().split('T')[0];
-                    await SharPreferences.setString(
-                      SharPreferences.streakFlowDismissedDate,
-                      today,
-                    );
+                    await _markPromptHandled();
                     if (context.mounted) Navigator.of(context).pop();
                   },
                   style: OutlinedButton.styleFrom(
@@ -2136,6 +2149,12 @@ class ContinueTodayJourneySheet extends StatelessWidget {
 class StreakFlowNavigation {
   /// Whether Home should show the "Continue Today's Journey" bottom sheet.
   static Future<bool> shouldShowContinueJourneyPrompt() async {
+    final lifetimeDismissed = await SharPreferences.getBoolean(
+          SharPreferences.streakFlowContinuePromptLifetimeDismissed,
+        ) ??
+        false;
+    if (lifetimeDismissed) return false;
+
     final today = DateTime.now().toIso8601String().split('T')[0];
     final last = await SharPreferences.getString(
         SharPreferences.streakFlowLastShownDate);
@@ -5337,8 +5356,8 @@ class _StreakCompleteFlameBadge extends StatelessWidget {
                       ),
                       child: Image.asset(
                         'assets/streak_flame.gif',
-                        width: 28,
-                        height: 28,
+                        width: 12,
+                        height: 12,
                         // Use contain to avoid cropping the animated flame inside the circle.
                         fit: BoxFit.contain,
                         filterQuality: FilterQuality.high,

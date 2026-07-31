@@ -143,19 +143,27 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
       // Get reading percentage from database
       final db = await DBHelper().db;
       if (db != null) {
-        final result = await db.rawQuery(
-            "SELECT read_per FROM book WHERE book_num = $currentBookNum LIMIT 1");
+        Future<void> applyFromDb() async {
+          final result = await db.rawQuery(
+              "SELECT read_per FROM book WHERE book_num = ? LIMIT 1",
+              [currentBookNum]);
 
-        if (result.isNotEmpty && result[0]["read_per"] != null) {
-          final readPer =
-              double.tryParse(result[0]["read_per"].toString()) ?? 0.0;
-          if (mounted) {
-            setState(() {
-              _readingPercentage =
-                  readPer >= 99.9 ? "100" : readPer.toStringAsFixed(1);
-            });
+          if (result.isNotEmpty && result[0]["read_per"] != null) {
+            final readPer =
+                double.tryParse(result[0]["read_per"].toString()) ?? 0.0;
+            if (mounted) {
+              setState(() {
+                _readingPercentage =
+                    readPer >= 99.9 ? "100" : readPer.toStringAsFixed(1);
+              });
+            }
           }
         }
+
+        await applyFromDb();
+        // One short refresh in case the write finished a moment later.
+        await Future<void>.delayed(const Duration(milliseconds: 120));
+        if (mounted) await applyFromDb();
       }
     } catch (e) {
       debugPrint("Error loading reading percentage: $e");

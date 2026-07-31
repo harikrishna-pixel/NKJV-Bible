@@ -4297,52 +4297,13 @@ class _HomeScreenState extends State<HomeScreen>
                                                                 "SELECT * From book WHERE book_num = ${int.parse(controller.selectedBookNum.value)}")
                                                             .then(
                                                                 (value) async {
-                                                                controller
-                                                                    .bookReadPer
-                                                                    .value = value[
-                                                                            0][
-                                                                        "read_per"]
-                                                              .toString();
                                                           if (controller
                                                                   .selectedBookContent[
                                                                       0]
                                                                   .isRead ==
                                                               "no") {
-                                                                  if (int.tryParse(controller
-                                                                        .bookReadPer
-                                                                        .value) ==
-                                                                0) {
-                                                              double readPer = (100 *
-                                                                      1) /
-                                                                        double.parse(controller
-                                                                          .selectedBookChapterCount
-                                                                          .value
-                                                                          .toString());
-                                                              DBHelper()
-                                                                  .updateBookData(
-                                                                            int.parse(controller.selectedBookId.value.toString()),
-                                                                      "read_per",
-                                                                            readPer.toStringAsFixed(1).toString())
-                                                                        .then((value) {});
-                                                            } else {
-                                                              double readPer = (100 *
-                                                                      1) /
-                                                                        double.parse(controller
-                                                                          .selectedBookChapterCount
-                                                                          .value
-                                                                          .toString());
-                                                                    double finalRead = double.parse(controller
-                                                                          .bookReadPer
-                                                                          .value
-                                                                          .toString()) +
-                                                                      readPer;
-                                                              DBHelper()
-                                                                  .updateBookData(
-                                                                            int.parse(controller.selectedBookId.value.toString()),
-                                                                      "read_per",
-                                                                            finalRead.toStringAsFixed(1).toString())
-                                                                        .then((value) {});
-                                                            }
+                                                              await controller
+                                                                  .persistMarkChapterReadProgress();
                                                             controller
                                                                 .isReadLoad
                                                                 .value = true;
@@ -4541,29 +4502,8 @@ class _HomeScreenState extends State<HomeScreen>
                                                             controller
                                                                 .isReadLoad
                                                                 .value = true;
-                                                                  if (int.tryParse(controller
-                                                                        .bookReadPer
-                                                                        .value) ==
-                                                                0) {
-                                                            } else {
-                                                              double readPer = (100 *
-                                                                      1) /
-                                                                        double.parse(controller
-                                                                          .selectedBookChapterCount
-                                                                          .value
-                                                                          .toString());
-                                                                    double finalRead = double.parse(controller
-                                                                          .bookReadPer
-                                                                          .value
-                                                                          .toString()) -
-                                                                      readPer;
-                                                              DBHelper()
-                                                                  .updateBookData(
-                                                                            int.parse(controller.selectedBookId.value.toString()),
-                                                                      "read_per",
-                                                                            finalRead.toStringAsFixed(1).toString())
-                                                                        .then((value) {});
-                                                                  }
+                                                                  await controller
+                                                                      .persistUnmarkChapterReadProgress();
                                                                   for (var i =
                                                                           0;
                                                                 i <
@@ -4736,20 +4676,9 @@ class _HomeScreenState extends State<HomeScreen>
                                                                   value!
                                                                             .rawQuery("SELECT * From book WHERE book_num = ${int.parse(controller.selectedBookNum.value)}")
                                                                             .then((value) async {
-                                                                    controller
-                                                                        .bookReadPer
-                                                                              .value = value[0]["read_per"].toString();
                                                                           if (controller.selectedBookContent[1].isRead ==
                                                                         "no") {
-                                                                            if (controller.bookReadPer.value ==
-                                                                          "0") {
-                                                                              double readPer = (100 * 1) / double.parse(controller.selectedBookChapterCount.value.toString());
-                                                                              await DBHelper().updateBookData(int.parse(controller.selectedBookId.value.toString()), "read_per", readPer.toStringAsFixed(1).toString()).then((value) {});
-                                                                      } else {
-                                                                              double readPer = (100 * 1) / double.parse(controller.selectedBookChapterCount.value.toString());
-                                                                              double finalRead = double.parse(controller.bookReadPer.value.toString()) + readPer;
-                                                                              await DBHelper().updateBookData(int.parse(controller.selectedBookId.value.toString()), "read_per", finalRead.toStringAsFixed(1).toString()).then((value) {});
-                                                                            }
+                                                                              await controller.persistMarkChapterReadProgress();
                                                                             controller.isReadLoad.value =
                                                                                 true;
                                                                             for (var i = 0;
@@ -4838,13 +4767,7 @@ class _HomeScreenState extends State<HomeScreen>
                                                                     } else {
                                                                             controller.isReadLoad.value =
                                                                                 true;
-                                                                            if (controller.bookReadPer.value ==
-                                                                          0) {
-                                                                      } else {
-                                                                              double readPer = (100 * 1) / double.parse(controller.selectedBookChapterCount.value.toString());
-                                                                              double finalRead = double.parse(controller.bookReadPer.value.toString()) - readPer;
-                                                                              await DBHelper().updateBookData(int.parse(controller.selectedBookId.value.toString()), "read_per", finalRead.toStringAsFixed(1).toString()).then((value) {});
-                                                                            }
+                                                                              await controller.persistUnmarkChapterReadProgress();
                                                                             for (var i = 0;
                                                                           i < controller.selectedBookContent.length;
                                                                           i++) {

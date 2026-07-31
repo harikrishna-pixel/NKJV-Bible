@@ -216,6 +216,32 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                               if (bookTitle.isNotEmpty) {
                                 c.selectedBook.value = bookTitle;
                               }
+                              // Keep progress write key (book id / read_per) on
+                              // the same book as book_num before Home finishes loading.
+                              try {
+                                final db = await DBHelper().db;
+                                final bookNum = int.tryParse(bookNumStr);
+                                if (db != null && bookNum != null) {
+                                  final rows = await db.rawQuery(
+                                    'SELECT id, read_per, chapter_count FROM book WHERE book_num = ? LIMIT 1',
+                                    [bookNum],
+                                  );
+                                  if (rows.isNotEmpty) {
+                                    c.selectedBookId.value =
+                                        rows.first['id'].toString();
+                                    c.bookReadPer.value =
+                                        rows.first['read_per'].toString();
+                                    if (rows.first['chapter_count'] != null) {
+                                      c.selectedBookChapterCount.value =
+                                          rows.first['chapter_count']
+                                              .toString();
+                                    }
+                                  }
+                                }
+                              } catch (e) {
+                                debugPrint(
+                                    'chapter select book metadata sync: $e');
+                              }
                               c.selectedBookContent.clear();
                               c.selectedVersesContent.clear();
                             }

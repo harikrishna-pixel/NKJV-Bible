@@ -953,6 +953,64 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     debugPrint('testapp No book found with book_num = $bookNum');
   }
 
+  /// Sync id / chapter_count / read_per for [selectedBookNum] before progress writes.
+  Future<bool> syncSelectedBookProgressMetadata() async {
+    final bookNum = int.tryParse(selectedBookNum.value.trim());
+    if (bookNum == null) return false;
+    final db = await DBHelper().db;
+    if (db == null) return false;
+    final rows = await db.rawQuery(
+      'SELECT id, chapter_count, read_per FROM book WHERE book_num = ? LIMIT 1',
+      [bookNum],
+    );
+    if (rows.isEmpty) return false;
+    final row = rows.first;
+    if (row['id'] != null) {
+      selectedBookId.value = row['id'].toString();
+    }
+    if (row['chapter_count'] != null) {
+      selectedBookChapterCount.value = row['chapter_count'].toString();
+    }
+    if (row['read_per'] != null) {
+      bookReadPer.value = row['read_per'].toString();
+    }
+    return selectedBookId.value.trim().isNotEmpty;
+  }
+
+  /// Persist +1 chapter toward this book's read_per. Always writes the row for
+  /// [selectedBookNum] (not a stale previous book id).
+  Future<void> persistMarkChapterReadProgress() async {
+    if (!await syncSelectedBookProgressMetadata()) return;
+    final chapterCount =
+        double.tryParse(selectedBookChapterCount.value.trim()) ?? 0;
+    final bookId = int.tryParse(selectedBookId.value.trim());
+    if (chapterCount <= 0 || bookId == null) return;
+
+    final current = double.tryParse(bookReadPer.value.trim()) ?? 0.0;
+    final step = 100.0 / chapterCount;
+    final next = (current <= 0 ? step : current + step).clamp(0.0, 100.0);
+    final stored = next >= 99.9 ? '100' : next.toStringAsFixed(1);
+    await DBHelper().updateBookData(bookId, 'read_per', stored);
+    bookReadPer.value = stored;
+  }
+
+  /// Persist −1 chapter from this book's read_per (unmark).
+  Future<void> persistUnmarkChapterReadProgress() async {
+    if (!await syncSelectedBookProgressMetadata()) return;
+    final chapterCount =
+        double.tryParse(selectedBookChapterCount.value.trim()) ?? 0;
+    final bookId = int.tryParse(selectedBookId.value.trim());
+    if (chapterCount <= 0 || bookId == null) return;
+
+    final current = double.tryParse(bookReadPer.value.trim()) ?? 0.0;
+    if (current <= 0) return;
+    final step = 100.0 / chapterCount;
+    final next = (current - step).clamp(0.0, 100.0);
+    final stored = next <= 0 ? '0' : next.toStringAsFixed(1);
+    await DBHelper().updateBookData(bookId, 'read_per', stored);
+    bookReadPer.value = stored;
+  }
+
   int _chapterLoadGeneration = 0;
 
   bool _bookIdMatches(String a, String b) {
