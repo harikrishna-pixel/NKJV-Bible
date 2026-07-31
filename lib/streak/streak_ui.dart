@@ -14,11 +14,14 @@ class _StreakIconVisualState {
   const _StreakIconVisualState({
     required this.streak,
     required this.showCountBadge,
+    required this.todayComplete,
     required this.showNotificationDot,
   });
 
   final int streak;
   final bool showCountBadge;
+  /// True when today's streak journey is finished (usual badge style).
+  final bool todayComplete;
   final bool showNotificationDot;
 
   static Future<_StreakIconVisualState> load() async {
@@ -42,11 +45,16 @@ class _StreakIconVisualState {
         lastShown == today || (started == today && steps >= 4);
     // Keep streak count visible on following days (not only on completion day).
     final showCountBadge = streak > 0;
-    final showNotificationDot = !todayComplete && effectiveSteps < 1;
+    // Day-N pending (e.g. Day 2 after Day 1 done): red dart until today completes.
+    // First-time (no streak yet): keep prior cue — red only before first step.
+    final showNotificationDot = showCountBadge
+        ? !todayComplete
+        : (!todayComplete && effectiveSteps < 1);
 
     return _StreakIconVisualState(
       streak: streak,
       showCountBadge: showCountBadge,
+      todayComplete: todayComplete,
       showNotificationDot: showNotificationDot,
     );
   }
@@ -115,6 +123,11 @@ class StreakIconButton extends StatelessWidget {
         final showCountBadge = state?.showCountBadge ?? false;
         final showNotificationDot = state?.showNotificationDot ?? false;
 
+        final todayComplete = state?.todayComplete ?? false;
+        // Not completed today: outlined badge + red dart (screenshot style).
+        // Completed today: full orange filled badge (old style), no dart.
+        final showOutlinedPending = showCountBadge && !todayComplete;
+
         return InkWell(
           onTap: () => Get.to(() => const DailyJourneyScreen()),
           borderRadius: BorderRadius.circular(20),
@@ -130,15 +143,27 @@ class StreakIconButton extends StatelessWidget {
                           vertical: iconSize * 0.12,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE65100),
+                          color: showOutlinedPending
+                              ? Colors.white
+                              : const Color(0xFFE65100),
                           borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFFE65100).withOpacity(0.35),
-                              blurRadius: 4,
-                              offset: const Offset(0, 1),
-                            ),
-                          ],
+                          border: showOutlinedPending
+                              ? Border.all(
+                                  color: const Color(0xFFE65100)
+                                      .withOpacity(0.55),
+                                  width: 1.4,
+                                )
+                              : null,
+                          boxShadow: showOutlinedPending
+                              ? null
+                              : [
+                                  BoxShadow(
+                                    color: const Color(0xFFE65100)
+                                        .withOpacity(0.35),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -146,7 +171,9 @@ class StreakIconButton extends StatelessWidget {
                             Icon(
                               Icons.local_fire_department_rounded,
                               size: iconSize * 0.85,
-                              color: Colors.white,
+                              color: showOutlinedPending
+                                  ? const Color(0xFFE65100)
+                                  : Colors.white,
                             ),
                             SizedBox(width: iconSize * 0.15),
                             Text(
@@ -154,7 +181,9 @@ class StreakIconButton extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: iconSize * 0.7,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                                color: showOutlinedPending
+                                    ? const Color(0xFFE65100)
+                                    : Colors.white,
                                 height: 1,
                               ),
                             ),

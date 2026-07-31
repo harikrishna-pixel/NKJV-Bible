@@ -2021,21 +2021,21 @@ class ContinueTodayJourneySheet extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      width: 48,
-                      height: 36,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        color: const Color(0xFFE65100),
-                      ),
-                      child: const Icon(
-                        Icons.local_fire_department_rounded,
-                        color: Colors.white,
-                        size: 22,
-                      ),
+                  Container(
+                    width: 44,
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFFE8DCC8),
+                    ),
+                    child: Image.asset(
+                      'assets/streak_completed_icons/continue_journey_flame.png',
+                      width: 26,
+                      height: 26,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                      gaplessPlayback: true,
                     ),
                   ),
                   const SizedBox(width: 12),

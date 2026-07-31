@@ -592,17 +592,6 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 14),
-        Text(
-          'CHOOSE YOUR TOPICS',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: const Color(0xFF947B39),
-            fontSize: isTablet ? 16 : 14,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.1,
-          ),
-        ),
       ],
     );
   }

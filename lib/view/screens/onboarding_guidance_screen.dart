@@ -304,42 +304,37 @@ class _ValueChatBodyState extends State<_ValueChatBody> {
 
   Widget _buildOrb() {
     return Container(
-      width: 44,
-      height: 44,
+      width: 52,
+      height: 52,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: const RadialGradient(
-          center: Alignment(0, -0.3),
-          radius: 0.9,
-          colors: [Color(0xFF8A4A22), Color(0xFF5A2C11)],
-        ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFC89646).withOpacity(0.5),
-            blurRadius: 20,
-            spreadRadius: 3,
+            color: const Color(0xFFC89646).withOpacity(0.45),
+            blurRadius: 18,
+            spreadRadius: 2,
           ),
         ],
       ),
-      padding: const EdgeInsets.all(6),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: _appIconImage(size: 32),
+      child: ClipOval(
+        child: _appIconImage(size: 52),
       ),
     );
   }
 
   Widget _appIconImage({required double size}) {
     return Image.asset(
-      Images.appIcon1024,
+      'assets/guidance_brand_icon.png',
       width: size,
       height: size,
       fit: BoxFit.cover,
+      filterQuality: FilterQuality.high,
+      gaplessPlayback: true,
       errorBuilder: (_, __, ___) => Image.asset(
-        'assets/splash_welcome_icons/bible_assitant.png',
+        Images.appIcon1024,
         width: size,
         height: size,
-        fit: BoxFit.contain,
+        fit: BoxFit.cover,
       ),
     );
   }
@@ -403,6 +398,7 @@ class _ValueChatBodyState extends State<_ValueChatBody> {
     return Container(
       width: 32,
       height: 32,
+      alignment: Alignment.center,
       decoration: const BoxDecoration(
         shape: BoxShape.circle,
         gradient: RadialGradient(
@@ -411,10 +407,9 @@ class _ValueChatBodyState extends State<_ValueChatBody> {
           colors: [Color(0xFF8A4A22), Color(0xFF5A2C11)],
         ),
       ),
-      padding: const EdgeInsets.all(4),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(6),
-        child: _appIconImage(size: 24),
+      child: const Text(
+        '📖',
+        style: TextStyle(fontSize: 15, height: 1.1),
       ),
     );
   }
