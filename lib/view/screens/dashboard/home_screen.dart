@@ -21,7 +21,6 @@ import 'package:biblebookapp/view/widget/thanks_for_love_rating_dialog_content.d
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
-import 'package:biblebookapp/view/screens/bible_select_screen.dart';
 import 'package:biblebookapp/view/screens/books/books_screen.dart';
 import 'package:biblebookapp/view/screens/calendar_screen/view/calendar_screen.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
@@ -42,6 +41,7 @@ import 'package:biblebookapp/view/screens/dashboard/fActionButton.dart';
 import 'package:biblebookapp/view/screens/dashboard/remove_add-screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/setting_screen.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
+import 'package:biblebookapp/view/screens/multi_select_paywallscreen.dart';
 import 'package:biblebookapp/view/screens/more_apps/more_apps_screen.dart';
 import 'package:biblebookapp/view/screens/profile/view/profile_screen.dart';
 import 'package:biblebookapp/view/screens/quote_screen/quote_screen.dart';
@@ -82,6 +82,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../Model/verseBookContentModel.dart';
+import 'package:biblebookapp/utils/library_bible_guard.dart';
 import '../../constants/changeThemeButtun.dart';
 import 'package:html/parser.dart' show parse;
 import '../../constants/constant.dart';
@@ -2470,6 +2471,15 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildSaveButton(double screenWidth, DailyVerseList todayVerse) {
     return GestureDetector(
       onTap: () async {
+        // Same gate as Library → Read (different Bible toast).
+        final canRead = await LibraryBibleGuard.allowReadOrToast(
+          bookNum: dailyVerseBookNum(todayVerse.bookId),
+          chapterNum: dailyVerseUiChapter(todayVerse.chapter),
+          verseNum: dailyVerseUiVerse(todayVerse.verseNum),
+          savedContent: todayVerse.verse,
+        );
+        if (!canRead) return;
+
         Navigator.of(context).pop(); // Close the bottom sheet first
         await SharPreferences.setString(
             SharPreferences.selectedBook, todayVerse.book.toString());
@@ -3641,30 +3651,7 @@ class _HomeScreenState extends State<HomeScreen>
                       ],
                     ),
                     actions: [
-                      BibleInfo.folders.length != 1
-                          ? Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 4),
-                              child: InkWell(
-                                  onTap: () {
-                                          if (controller.adFree.value ==
-                                              false) {
-                                      controller.bannerAd?.dispose();
-                                      controller.bannerAd?.load();
-                                    }
-                                    Get.to(() => BibleVersionsScreen(
-                                          from: 'home',
-                                        ));
-                                  },
-                                  child: Image.asset(
-                                    "assets/biblebook.png",
-                                    height: screenWidth > 450 ? 30 : 24,
-                                    width: screenWidth > 450 ? 30 : 24,
-                                          color:
-                                              CommanColor.whiteBlack(context),
-                                  )),
-                            )
-                          : SizedBox(),
+                      // Bible Version moved to Settings (multi-bible only there).
                       Padding(
                         padding: const EdgeInsets.only(right: 4),
                         child: Row(
@@ -5504,12 +5491,26 @@ class _HomeScreenState extends State<HomeScreen>
           BibleInfo.oneYearPlanid;
       final lifeTimePlan = await SharPreferences.getString('lifeTimePlan') ??
           BibleInfo.lifeTimePlanid;
-      SubscriptionScreen.openPaywallStacked(
-        sixMonthPlan: sixMonthPlan,
-        oneYearPlan: oneYearPlan,
-        lifeTimePlan: lifeTimePlan,
-        checkad: 'theme',
-      );
+      // Multi-bible: MultiSelectPaywall. Single bible: existing SubscriptionScreen.
+      if (BibleInfo.folders.length > 1) {
+        Get.to(
+          () => MultiSelectPaywall(
+            sixMonthPlan: sixMonthPlan,
+            oneYearPlan: oneYearPlan,
+            lifeTimePlan: lifeTimePlan,
+            checkad: 'theme',
+          ),
+          transition: SubscriptionScreen.paywallRouteTransition,
+          duration: SubscriptionScreen.paywallRouteDuration,
+        );
+      } else {
+        SubscriptionScreen.openPaywallStacked(
+          sixMonthPlan: sixMonthPlan,
+          oneYearPlan: oneYearPlan,
+          lifeTimePlan: lifeTimePlan,
+          checkad: 'theme',
+        );
+      }
     }
 
     void showSubscriptionInfoSheet() {
@@ -6068,8 +6069,9 @@ class _HomeScreenState extends State<HomeScreen>
     final zeroBased =
         _lastVisibleChapterContent.any((v) => (v.chapterNum ?? -1) == 0);
     final stored = zeroBased ? safe - 1 : safe;
+    // Every verse must be this chapter (avoid ch N + ch N+1 merge on screen).
     return _lastVisibleChapterContent
-        .any((v) => v.chapterNum?.toInt() == stored);
+        .every((v) => v.chapterNum?.toInt() == stored);
   }
 
   bool _homeEntryRequiresContentReload() {
@@ -6349,22 +6351,28 @@ class _HomeScreenState extends State<HomeScreen>
           final chapter = int.tryParse(controller.selectedChapter.value) ?? 1;
           final safeChapter = chapter <= 0 ? 1 : chapter;
 
-          List<VerseBookContentModel> matches = downloadProvider.verseList
-              .where((v) => (v.bookNum ?? -999) == bookNum)
-              .where((v) =>
-                  (v.chapterNum ?? -999) == (safeChapter - 1) ||
-                  (v.chapterNum ?? -999) == safeChapter)
-              .toList();
+          // Pick ONE chapter basis (0- or 1-based) — never OR both, or
+          // chapter N and N+1 merge on the reader (e.g. Josué 15 then 16:1).
+          List<VerseBookContentModel> chapterMatchesForBook(int bNum) {
+            final bookVerses = downloadProvider.verseList
+                .where((v) => (v.bookNum ?? -999) == bNum)
+                .toList();
+            if (bookVerses.isEmpty) return [];
+            final zeroBased =
+                bookVerses.any((v) => (v.chapterNum ?? -1) == 0);
+            final stored = zeroBased ? safeChapter - 1 : safeChapter;
+            return bookVerses
+                .where((v) => (v.chapterNum ?? -999) == stored)
+                .toList();
+          }
+
+          List<VerseBookContentModel> matches =
+              chapterMatchesForBook(bookNum);
 
           // Legacy 1-based book_num fallback as well.
           if (matches.isEmpty && bookNum > 0) {
             final legacyBookNum = bookNum - 1;
-            matches = downloadProvider.verseList
-                .where((v) => (v.bookNum ?? -999) == legacyBookNum)
-                .where((v) =>
-                    (v.chapterNum ?? -999) == (safeChapter - 1) ||
-                    (v.chapterNum ?? -999) == safeChapter)
-                .toList();
+            matches = chapterMatchesForBook(legacyBookNum);
             if (matches.isNotEmpty) {
               controller.selectedBookNum.value = legacyBookNum.toString();
               SharPreferences.setString(
@@ -6374,12 +6382,7 @@ class _HomeScreenState extends State<HomeScreen>
           // Inverse: prefs 0-based but verse list uses 1-based book indices.
           if (matches.isEmpty) {
             final oneBasedBook = bookNum + 1;
-            matches = downloadProvider.verseList
-                .where((v) => (v.bookNum ?? -999) == oneBasedBook)
-                .where((v) =>
-                    (v.chapterNum ?? -999) == (safeChapter - 1) ||
-                    (v.chapterNum ?? -999) == safeChapter)
-                .toList();
+            matches = chapterMatchesForBook(oneBasedBook);
             if (matches.isNotEmpty) {
               controller.selectedBookNum.value = oneBasedBook.toString();
               SharPreferences.setString(

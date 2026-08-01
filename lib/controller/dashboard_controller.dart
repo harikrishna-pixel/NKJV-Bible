@@ -1028,7 +1028,10 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         : selectedBookContent;
     final zeroBased = _versesLookZeroBased(sample);
     final stored = _storedChapterNumForUi(safe, zeroBased: zeroBased);
-    return selectedBookContent.any((v) => v.chapterNum?.toInt() == stored);
+    // Require every verse to be this chapter — `.any` allowed merged chapters
+    // (e.g. ch15+ch16) to skip reload and stay on screen.
+    return selectedBookContent
+        .every((v) => v.chapterNum?.toInt() == stored);
   }
 
   /// Additive: skip/reload must also match book — chapter-only match keeps the
@@ -1132,6 +1135,15 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     }
     if (chapterContent.isEmpty) return false;
     if (loadId != _chapterLoadGeneration) return false;
+    // Guard: never paint two chapters in one list (merge display bug).
+    final chapters = chapterContent
+        .map((v) => v.chapterNum?.toInt())
+        .whereType<int>()
+        .toSet();
+    if (chapters.length > 1) {
+      chapterContent = _filterChapterFromVerses(chapterContent, safeChapter);
+      if (chapterContent.isEmpty) return false;
+    }
     selectedBookContent.value = chapterContent;
 
     selectedBookNum.value = bookNum.toString();

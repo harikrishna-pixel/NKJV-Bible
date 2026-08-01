@@ -53,6 +53,10 @@ class SubscriptionScreen extends StatefulWidget {
   /// Transparent host: runs IAP (e.g. milestone Unlock) without showing paywall UI.
   final bool invisiblePurchaseHost;
 
+  /// Transparent host: auto-run Restore (same `_restorePurchases` path) without
+  /// showing the single-version paywall UI (MultiSelect Restore).
+  final bool autoStartRestore;
+
   const SubscriptionScreen({
     super.key,
     required this.sixMonthPlan,
@@ -63,6 +67,7 @@ class SubscriptionScreen extends StatefulWidget {
     this.initialSelectedPlanIndex,
     this.autoStartSelectedPlanPurchase = false,
     this.invisiblePurchaseHost = false,
+    this.autoStartRestore = false,
   });
 
   /// iOS-style slide used for paywall push/pop so back matches forward.
@@ -161,6 +166,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   String? _pendingRestoreProductId; // Store product ID for pending restore
   Timer? _loadingTimeoutTimer; // Timer for 6-second loading timeout
   bool _autoPurchaseTriggered = false;
+  bool _autoRestoreTriggered = false;
   Set<String> _lastQueriedProductIds = {};
   Set<String> _lastStoreNotFoundIds = {};
   /// Additive: highest restore tier applied in the current Restore session
@@ -558,7 +564,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     _restoreCollecting = false;
     if (best == null) {
       EasyLoading.dismiss();
-      Constants.showToast('No active subscription available');
+      Constants.showToast('No purchases available to restore.');
+      if (widget.invisiblePurchaseHost) {
+        _popInvisiblePurchaseHost(false);
+      }
       return;
     }
     debugPrint(
@@ -668,6 +677,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     await SharPreferences.setString('OpenAd', '1');
     await SharPreferences.setBoolean('startpurches', true);
     _buyProduct(_products[idx]);
+  }
+
+  /// Same restore path as the Restore button — for invisible MultiSelect host only.
+  Future<void> _autoStartRestoreIfNeeded() async {
+    if (!widget.autoStartRestore || _autoRestoreTriggered) return;
+    if (!widget.invisiblePurchaseHost) return;
+    _autoRestoreTriggered = true;
+    await SharPreferences.setString('OpenAd', '1');
+    await SharPreferences.setBoolean('restorepurches', true);
+    await SharPreferences.setBoolean('startpurches', false);
+    await _restorePurchases(controller);
   }
 
   Future<void> _addLifetimeWalletBonus() async {
@@ -2442,6 +2462,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     _logPaywallData(source: 'initialize');
 
     await _autoStartPurchaseIfNeeded();
+    await _autoStartRestoreIfNeeded();
 
     if (widget.fromHomeExitOffer && mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -3034,6 +3055,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     if (!hasInternet) {
       _restoreCollecting = false;
       Constants.showToast("No Internet Connection");
+      if (widget.invisiblePurchaseHost) {
+        _popInvisiblePurchaseHost(false);
+      }
       return; // Return early - don't show loader or proceed
     }
 
@@ -3070,7 +3094,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       _restoreCollecting = false;
       EasyLoading.dismiss();
       DebugConsole.log("restore No active subscription available error - $e");
-      Constants.showToast('No active subscription available');
+      Constants.showToast('No purchases available to restore.');
+      if (widget.invisiblePurchaseHost) {
+        _popInvisiblePurchaseHost(false);
+      }
     }
   }
 

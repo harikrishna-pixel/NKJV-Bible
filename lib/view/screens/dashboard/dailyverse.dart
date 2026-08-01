@@ -29,6 +29,7 @@ import '../../constants/images.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:biblebookapp/services/analytics/analytics_service.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
+import 'package:biblebookapp/utils/library_bible_guard.dart';
 
 String _normalizeDailyVerseRef(String s) =>
     s
@@ -468,6 +469,16 @@ class _DailyVerseState extends State<DailyVerse> {
                               int.parse(data.verseNum.toString());
                           final verseText =
                               parse(data.verse).body?.text.toString() ?? '';
+
+                          // Same gate as Library → Read (different Bible toast).
+                          final canRead =
+                              await LibraryBibleGuard.allowReadOrToast(
+                            bookNum: bookNum,
+                            chapterNum: chapter,
+                            verseNum: dailyVerseUiVerse(data.verseNum),
+                            savedContent: data.verse,
+                          );
+                          if (!canRead) return;
 
                           Navigator.of(sheetContext).pop();
                           await Future<void>.delayed(

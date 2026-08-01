@@ -8,14 +8,11 @@ import 'package:biblebookapp/core/library_backup_upload_service.dart';
 import 'package:biblebookapp/services/analytics/analytics_service.dart';
 import 'package:biblebookapp/streak_flow/leave_rating_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
-import 'package:biblebookapp/view/screens/free_trail_screen.dart';
-import 'package:biblebookapp/view/screens/multi_select_paywallscreen.dart';
 import 'package:biblebookapp/view/screens/welcome_screen.dart';
 
 import 'package:biblebookapp/view/widget/adhelper.dart';
 import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
-import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/live_activity/live_activity_queue.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';

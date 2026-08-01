@@ -16,6 +16,7 @@ import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/streak_flow/streak_flow_screens.dart' hide SharPreferences;
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
+import 'package:biblebookapp/view/screens/free_trail_screen.dart';
 import 'package:biblebookapp/view/screens/onboard_faith_screen.dart';
 import 'package:biblebookapp/services/paywall_preload_service.dart';
 import 'package:flutter/foundation.dart';
@@ -1578,18 +1579,34 @@ class FaithJourneyDialog {
                             'Error checking connection speed in onboarding: $e');
                       }
 
-                      // Proceed to SubscriptionScreen when internet + product data exist.
+                      // Proceed to paywall when internet + product data exist.
+                      // Multi-bible: Free Trial Intro → MultiSelectPaywall.
+                      // Single bible: existing SubscriptionScreen (unchanged).
                       final sixMonthPlan = BibleInfo.sixMonthPlanid;
                       final oneYearPlan = BibleInfo.oneYearPlanid;
                       final lifeTimePlan = BibleInfo.lifeTimePlanid;
-                      Get.offAll(() => SubscriptionScreen(
-                        sixMonthPlan: sixMonthPlan,
-                        oneYearPlan: oneYearPlan,
-                        lifeTimePlan: lifeTimePlan,
-                        checkad: 'onboard',
-                      ),
+                      if (BibleInfo.folders.length > 1) {
+                        Get.offAll(
+                          () => FreeTrialIntroScreen(
+                            sixMonthPlan: sixMonthPlan,
+                            oneYearPlan: oneYearPlan,
+                            lifeTimePlan: lifeTimePlan,
+                          ),
                           transition: SubscriptionScreen.paywallRouteTransition,
-                          duration: SubscriptionScreen.paywallRouteDuration);
+                          duration: SubscriptionScreen.paywallRouteDuration,
+                        );
+                      } else {
+                        Get.offAll(
+                          () => SubscriptionScreen(
+                            sixMonthPlan: sixMonthPlan,
+                            oneYearPlan: oneYearPlan,
+                            lifeTimePlan: lifeTimePlan,
+                            checkad: 'onboard',
+                          ),
+                          transition: SubscriptionScreen.paywallRouteTransition,
+                          duration: SubscriptionScreen.paywallRouteDuration,
+                        );
+                      }
                     } else {
                       await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
                     }

@@ -99,7 +99,8 @@ class BibleInfo {
 
 // add folder names here  assets/zipped/
   static List<String> folders = [
-    "NKJV"
+    "NKJV",
+    "catholic",
   ];
 
   static String emailVerify = "0";

@@ -755,11 +755,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   void _startListening() async {
     // Check if user has enough credits before starting voice input
-    final chatCost = await WalletService.getChatCost();
-    final hasCredits = await WalletService.getCredits() >= chatCost;
-    if (!hasCredits) {
-      await _showInsufficientCreditsDialog();
-      return;
+    // AI Premium auto-renew (silver/gold) = unlimited; skip coin gate only.
+    if (!await _hasAutoRenewUnlimitedAi()) {
+      final chatCost = await WalletService.getChatCost();
+      final hasCredits = await WalletService.getCredits() >= chatCost;
+      if (!hasCredits) {
+        await _showInsufficientCreditsDialog();
+        return;
+      }
     }
 
     if (_speech == null) {
@@ -1448,7 +1451,23 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// MultiSelect AI Premium auto-renew plans only (not lifetime/platinum).
+  Future<bool> _hasAutoRenewUnlimitedAi() async {
+    if (!mounted) return false;
+    try {
+      final downloadProvider =
+          Provider.of<DownloadProvider>(context, listen: false);
+      final plan = await downloadProvider.getSubscriptionPlan();
+      final p = plan?.toLowerCase() ?? '';
+      return p == 'silver' || p == 'gold';
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> _checkChatLimit() async {
+    // AI Premium auto-renew = unlimited AI; existing credit math unchanged otherwise.
+    if (await _hasAutoRenewUnlimitedAi()) return true;
     // Check if user has enough credits (cost depends on selected answer length)
     final chatCost = await WalletService.getChatCost();
     final credits = await WalletService.getCredits();
@@ -1456,6 +1475,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _deductChatCredits() async {
+    // Auto-renew Unlimited AI: do not deduct coins.
+    if (await _hasAutoRenewUnlimitedAi()) return;
     // Deduct credits for chat (cost depends on selected answer length)
     final chatCost = await WalletService.getChatCost();
     final success = await WalletService.deductCredits(chatCost);
@@ -1753,11 +1774,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
 
     // Check if user has enough credits before sending (cost depends on selected answer length)
-    final chatCost = await WalletService.getChatCost();
-    final hasCredits = await WalletService.getCredits() >= chatCost;
-    if (!hasCredits) {
-      await _showInsufficientCreditsDialog();
-      return;
+    // AI Premium auto-renew (silver/gold) = unlimited; skip coin gate only.
+    if (!await _hasAutoRenewUnlimitedAi()) {
+      final chatCost = await WalletService.getChatCost();
+      final hasCredits = await WalletService.getCredits() >= chatCost;
+      if (!hasCredits) {
+        await _showInsufficientCreditsDialog();
+        return;
+      }
     }
 
     // Add user message to UI first

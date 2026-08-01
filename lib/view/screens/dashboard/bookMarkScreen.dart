@@ -22,6 +22,7 @@ import '../../constants/colors.dart';
 import '../../constants/constant.dart';
 import '../../constants/share_preferences.dart';
 import 'package:biblebookapp/view/widget/library_list_ads_helper.dart';
+import 'package:biblebookapp/utils/library_bible_guard.dart';
 
 class BookMarkScreen extends StatefulWidget {
   const BookMarkScreen({super.key});
@@ -298,6 +299,19 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                     InkWell(
                                                       onTap: () async {
                                                         await _libraryAds.runCountedAction(() async {
+                                                        final canRead =
+                                                            await LibraryBibleGuard
+                                                                .allowReadOrToast(
+                                                          bookNum: data.bookNum,
+                                                          chapterNum:
+                                                              data.chapterNum,
+                                                          verseNum:
+                                                              data.verseNum,
+                                                          savedContent:
+                                                              data.content ??
+                                                                  data.plaincontent,
+                                                        );
+                                                        if (!canRead) return;
                                                         // Navigator.push(context, MaterialPageRoute(builder: (context) => );
                                                         await SharPreferences
                                                             .setString(
@@ -1008,6 +1022,18 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                 InkWell(
                                                   onTap: () async {
                                                     await _libraryAds.runCountedAction(() async {
+                                                    final canRead =
+                                                        await LibraryBibleGuard
+                                                            .allowReadOrToast(
+                                                      bookNum: data.bookNum,
+                                                      chapterNum:
+                                                          data.chapterNum,
+                                                      verseNum: data.verseNum,
+                                                      savedContent:
+                                                          data.content ??
+                                                              data.plaincontent,
+                                                    );
+                                                    if (!canRead) return;
                                                     await SharPreferences
                                                         .setString(
                                                             SharPreferences

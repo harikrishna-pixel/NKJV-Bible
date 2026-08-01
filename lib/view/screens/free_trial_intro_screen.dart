@@ -326,7 +326,7 @@ class _TimelineSection extends StatelessWidget {
                   label: 'DAY 3',
                   title: 'Only then does your plan begin',
                   body:
-                      '\$59.99/yr, and only if you keep it. Cancel \ngitanytime in one tap.',
+                      '\$59.99/yr, and only if you keep it. Cancel \nanytime in one tap.',
                 ),
               ],
             ),

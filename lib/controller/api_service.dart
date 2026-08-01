@@ -822,14 +822,15 @@ Map<String, String> _referralApplyLoginBody({
   required String referralCode,
 }) {
   final code = referralCode.trim();
-  // Only referred_by — referral_code is the user's OWN invite code field.
-  // Sending the friend's code as referral_code confuses apply / is ignored.
+  // Pass the filled invite on both keys — login builds differ on which
+  // field applies the friend's code into user.referred_by.
   return {
     'email': email,
     'password': password,
     'app_id': BibleInfo.appID.toString(),
     'device_type': Platform.isIOS ? 'iOS' : 'Android',
     'referred_by': code,
+    'referral_code': code,
   };
 }
 
@@ -846,7 +847,9 @@ Future<Map<String, dynamic>?> _fetchLoginProfile({
     'device_type': Platform.isIOS ? 'iOS' : 'Android',
   };
   if (referralCode != null && referralCode.trim().isNotEmpty) {
-    body['referral_code'] = referralCode.trim();
+    final code = referralCode.trim();
+    body['referred_by'] = code;
+    body['referral_code'] = code;
   }
   final resp =
       await http.post(Uri.parse(Api.login), headers: <String, String>{
@@ -1050,8 +1053,10 @@ Future<UserModel> loginUser(
       "device_type": Platform.isIOS ? "iOS" : "Android",
     };
     if (referralCode != null && referralCode.trim().isNotEmpty) {
-      // Apply invite via referred_by only (referral_code is own invite id).
-      body['referred_by'] = referralCode.trim();
+      // Pass filled invite on both keys (same as applyReferralViaLogin).
+      final code = referralCode.trim();
+      body['referred_by'] = code;
+      body['referral_code'] = code;
     }
     final resp =
         await http.post(Uri.parse(Api.login), headers: <String, String>{

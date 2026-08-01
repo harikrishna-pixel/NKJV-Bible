@@ -446,12 +446,14 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
       return;
     }
 
-    // Credits check (same as Chat)
+    // Credits check (same as Chat). AI Premium auto-renew = unlimited; skip coin gate only.
     final chatCost = await WalletService.getChatCost();
-    final hasCredits = await WalletService.getCredits() >= chatCost;
-    if (!hasCredits) {
-      _showInsufficientCreditsDialog();
-      return;
+    if (!await _hasAutoRenewUnlimitedAi()) {
+      final hasCredits = await WalletService.getCredits() >= chatCost;
+      if (!hasCredits) {
+        _showInsufficientCreditsDialog();
+        return;
+      }
     }
 
     final category = _categories[categoryIndex];
@@ -710,21 +712,24 @@ ${category.prompt}
       });
 
       // Deduct credits only if we got a non-error response (same behavior as chat)
+      // Auto-renew Unlimited AI: skip deduct only.
       final isErrorResponse =
           responseText.toLowerCase().contains('sorry, i could not generate') ||
               responseText.toLowerCase().startsWith('error:');
       if (!isErrorResponse) {
-        await WalletService.deductCredits(chatCost);
-        if (mounted && requestId == _prayerRequestGeneration) {
-          final prefs = await SharedPreferences.getInstance();
-          final creditDebitShown =
-              prefs.getBool('prayer_credit_debit_shown') ?? false;
-          if (!creditDebitShown) {
-            Constants.showToast(
-                'Used $chatCost credits for this response', 1500);
-            await prefs.setBool('prayer_credit_debit_shown', true);
+        if (!await _hasAutoRenewUnlimitedAi()) {
+          await WalletService.deductCredits(chatCost);
+          if (mounted && requestId == _prayerRequestGeneration) {
+            final prefs = await SharedPreferences.getInstance();
+            final creditDebitShown =
+                prefs.getBool('prayer_credit_debit_shown') ?? false;
+            if (!creditDebitShown) {
+              Constants.showToast(
+                  'Used $chatCost credits for this response', 1500);
+              await prefs.setBool('prayer_credit_debit_shown', true);
+            }
+            _loadCreditsFromLocal();
           }
-          _loadCreditsFromLocal();
         }
         if (requestId == _prayerRequestGeneration) {
         await updateBiblePrayerWidget(prayerText: responseText);
@@ -871,12 +876,14 @@ ${category.prompt}
       return;
     }
 
-    // Credits check (same as Chat)
+    // Credits check (same as Chat). AI Premium auto-renew = unlimited; skip coin gate only.
     final chatCost = await WalletService.getChatCost();
-    final hasCredits = await WalletService.getCredits() >= chatCost;
-    if (!hasCredits) {
-      _showInsufficientCreditsDialog();
-      return;
+    if (!await _hasAutoRenewUnlimitedAi()) {
+      final hasCredits = await WalletService.getCredits() >= chatCost;
+      if (!hasCredits) {
+        _showInsufficientCreditsDialog();
+        return;
+      }
     }
 
     final requestId = ++_prayerRequestGeneration;
@@ -1138,21 +1145,24 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
       });
 
       // Deduct credits only if we got a non-error response (same behavior as chat)
+      // Auto-renew Unlimited AI: skip deduct only.
       final isErrorResponse =
           responseText.toLowerCase().contains('sorry, i could not generate') ||
               responseText.toLowerCase().startsWith('error:');
       if (!isErrorResponse) {
-        await WalletService.deductCredits(chatCost);
-        if (mounted && requestId == _prayerRequestGeneration) {
-          final prefs = await SharedPreferences.getInstance();
-          final creditDebitShown =
-              prefs.getBool('prayer_credit_debit_shown') ?? false;
-          if (!creditDebitShown) {
-            Constants.showToast(
-                'Used $chatCost credits for this response', 1500);
-            await prefs.setBool('prayer_credit_debit_shown', true);
+        if (!await _hasAutoRenewUnlimitedAi()) {
+          await WalletService.deductCredits(chatCost);
+          if (mounted && requestId == _prayerRequestGeneration) {
+            final prefs = await SharedPreferences.getInstance();
+            final creditDebitShown =
+                prefs.getBool('prayer_credit_debit_shown') ?? false;
+            if (!creditDebitShown) {
+              Constants.showToast(
+                  'Used $chatCost credits for this response', 1500);
+              await prefs.setBool('prayer_credit_debit_shown', true);
+            }
+            _loadCreditsFromLocal();
           }
-          _loadCreditsFromLocal();
         }
         if (requestId == _prayerRequestGeneration) {
         await updateBiblePrayerWidget(prayerText: responseText);
@@ -1674,6 +1684,20 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
       }
     } catch (e) {
       debugPrint('redits load error: $e');
+    }
+  }
+
+  /// MultiSelect AI Premium auto-renew plans only (not lifetime/platinum).
+  Future<bool> _hasAutoRenewUnlimitedAi() async {
+    if (!mounted) return false;
+    try {
+      final downloadProvider =
+          Provider.of<DownloadProvider>(context, listen: false);
+      final plan = await downloadProvider.getSubscriptionPlan();
+      final p = plan?.toLowerCase() ?? '';
+      return p == 'silver' || p == 'gold';
+    } catch (_) {
+      return false;
     }
   }
 

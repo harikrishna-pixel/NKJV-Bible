@@ -23,6 +23,7 @@ import '../../widget/country.dart';
 import '../../widget/laguage.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../controller/dashboard_controller.dart';
 import '../../../controller/dpProvider.dart';
 
@@ -244,8 +245,7 @@ class floatingButtonState extends State<floatingButton>
 
       if (audioChapterNum < effectiveLastChapter) {
         audioChapterNum++;
-        audioBaseUrl =
-            "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$audioChapterNum.mp3";
+        audioBaseUrl = await _buildVersionAudioUrl();
         if (mounted) {
           _mp3UiSetState(() {});
         }
@@ -336,8 +336,7 @@ class floatingButtonState extends State<floatingButton>
           audioChapterNum = 1;
           currentBookChapterCount =
               nextBookChapterCount; // Update chapter count for new book
-          audioBaseUrl =
-              "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$audioChapterNum.mp3";
+          audioBaseUrl = await _buildVersionAudioUrl();
           if (mounted) {
             _mp3UiSetState(() {});
           }
@@ -561,6 +560,93 @@ class floatingButtonState extends State<floatingButton>
     /// Listen to audio position
   }
 
+  /// Active bible folder from Version selection (`buttonStates`).
+  String? _cachedActiveBibleFolder;
+
+  Future<String?> _activeBibleFolder() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getStringList('buttonStates') ?? [];
+      for (final entry in saved) {
+        final parts = entry.split(':');
+        if (parts.length == 2 &&
+            parts[1].contains('DownloadButtonState.active')) {
+          _cachedActiveBibleFolder = parts[0];
+          return parts[0];
+        }
+      }
+      if (BibleInfo.folders.length == 1) {
+        _cachedActiveBibleFolder = BibleInfo.folders.first;
+        return BibleInfo.folders.first;
+      }
+    } catch (_) {}
+    return _cachedActiveBibleFolder;
+  }
+
+  bool _folderIsPortuguese(String? folder) {
+    final f = (folder ?? '').toLowerCase();
+    return f == 'catholic' ||
+        f.contains('portug') ||
+        f == 'pt' ||
+        f.contains('almeida');
+  }
+
+  /// MP3 base path matched to the selected bible version (not API English default).
+  String _audioBasePathForFolder(String? folder) {
+    const pt =
+        'https://bibleoffice.com/BibleReplications/dev/v1/uploads/bible_audio/Portuguese';
+    const en =
+        'https://bibleoffice.com/BibleReplications/dev/v1/uploads/bible_audio/English';
+    final api = widget.audioData?.data?.bibleAudioInfo?.audioBasepath;
+    if (_folderIsPortuguese(folder)) {
+      if (api != null && api.toLowerCase().contains('portuguese')) {
+        return api.replaceAll(RegExp(r'/+$'), '');
+      }
+      final fallback = BibleInfo.audioBasePath.replaceAll(RegExp(r'/+$'), '');
+      if (fallback.toLowerCase().contains('portuguese')) return fallback;
+      return pt;
+    }
+    if (api != null && api.toLowerCase().contains('english')) {
+      return api.replaceAll(RegExp(r'/+$'), '');
+    }
+    if (api != null && !api.toLowerCase().contains('portuguese')) {
+      return api.replaceAll(RegExp(r'/+$'), '');
+    }
+    return en;
+  }
+
+  Future<String> _resolvedAudioBasePath() async {
+    final folder = await _activeBibleFolder();
+    return _audioBasePathForFolder(folder);
+  }
+
+  Future<String> _buildVersionAudioUrl({int? bookNum, int? chapterNum}) async {
+    final base = await _resolvedAudioBasePath();
+    return '$base/${bookNum ?? audioBookNum}/${chapterNum ?? audioChapterNum}.mp3';
+  }
+
+  /// TTS language matched to Version selection (catholic → pt-BR, else API/English).
+  Future<void> _applyTtsLanguageForActiveBible() async {
+    if (!_isTtsInitialized) return;
+    final folder = await _activeBibleFolder();
+    final String lang;
+    if (_folderIsPortuguese(folder)) {
+      lang = 'pt-BR';
+    } else {
+      lang = widget.audioData?.data?.bibleAudioInfo
+              ?.textToSpeechLanguageCodeIos ??
+          BibleInfo.textToSpeechLanguageCodeIos;
+    }
+    if (lang.isEmpty) return;
+    try {
+      language = lang;
+      await flutterTts.setLanguage(lang);
+      debugPrint('TTS language for folder "$folder": $lang');
+    } catch (e) {
+      debugPrint('TTS setLanguage error: $e');
+    }
+  }
+
   Future setAudio() async {
     // Stop TTS if it's playing before starting audio
     if (isSpeech && _isTtsInitialized) {
@@ -573,9 +659,8 @@ class floatingButtonState extends State<floatingButton>
     }
 
     // Set release mode based on repeat flag - default to release (no loop)
-    String? audioBasePath =
-        widget.audioData?.data?.bibleAudioInfo?.audioBasepath;
-    audioBaseUrl = "$audioBasePath/$audioBookNum/$audioChapterNum.mp3";
+    // Use version-matched path (Portuguese for catholic, English for NKJV).
+    audioBaseUrl = await _buildVersionAudioUrl();
     log('Audio Base Url:$audioBaseUrl');
 
     // Slow networks (2G): stop + reset, then retry setSourceUrl once on failure.
@@ -672,6 +757,7 @@ class floatingButtonState extends State<floatingButton>
     _isTtsInitialized = true;
 
     _setAwaitOptions();
+    await _applyTtsLanguageForActiveBible();
     await Future.delayed(Duration(milliseconds: 2000));
 
     if (!mounted) return;
@@ -1074,6 +1160,7 @@ class floatingButtonState extends State<floatingButton>
 
       // TTS works offline, no need to check internet connection
       // But handle any TTS errors gracefully
+      await _applyTtsLanguageForActiveBible();
       await flutterTts.setVolume(volume);
       await flutterTts.setSpeechRate(rate);
       await flutterTts.setPitch(pitch);
@@ -2172,10 +2259,10 @@ class floatingButtonState extends State<floatingButton>
                       ),
                       onPressed: () async {
                         if (audioChapterNum > 1) {
+                          audioChapterNum--;
+                          final url = await _buildVersionAudioUrl();
                           setState(() {
-                            audioChapterNum--;
-                            audioBaseUrl =
-                                "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$audioChapterNum.mp3";
+                            audioBaseUrl = url;
                             isAudioPlaying = false;
                           });
                           // Update reading screen to match audio chapter
@@ -2366,11 +2453,11 @@ class floatingButtonState extends State<floatingButton>
                             int.tryParse(widget.chapterCount) ??
                                 currentBookChapterCount;
                         if (audioChapterNum < lastChapter) {
+                          audioChapterNum++;
+                          final url = await _buildVersionAudioUrl();
                           setState(() {
                             isAudioPlaying = false;
-                            audioChapterNum++;
-                            audioBaseUrl =
-                                "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$audioChapterNum.mp3";
+                            audioBaseUrl = url;
                           });
                           // Update reading screen to match audio chapter
                           await updateReadingScreenChapter(audioChapterNum);

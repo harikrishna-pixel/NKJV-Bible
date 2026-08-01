@@ -272,6 +272,22 @@ class ProfileUpdateApi {
           'user_id': userId,
           'app_id': appId,
         },
+        // Some builds accept the filled invite under referral_code.
+        {
+          'action': '1',
+          'user_id': userId,
+          'app_id': appId,
+          'referral_code': code,
+          'referred_by': code,
+        },
+        {
+          'action': '1',
+          'key': 'referral_code',
+          'value': code,
+          'user_id': userId,
+          'app_id': appId,
+          'referred_by': code,
+        },
       ];
 
       for (var i = 0; i < profileAttempts.length; i++) {

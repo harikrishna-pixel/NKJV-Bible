@@ -1176,6 +1176,18 @@ class DownloadProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Drop in-memory bible rows so Home reloads from DB after a Bible switch.
+  /// Does not change DB / download / preference logic.
+  void clearInMemoryBibleCaches() {
+    verseList = [];
+    otVerseList = [];
+    ntVerseList = [];
+    bookList = [];
+    otBookList = [];
+    ntBookList = [];
+    notifyListeners();
+  }
+
   /// Loads verse/book rows from SQLite into memory when cache is empty.
   Future<bool> preloadBibleDataFromDatabaseIfNeeded() async {
     if (verseList.isNotEmpty) return true;

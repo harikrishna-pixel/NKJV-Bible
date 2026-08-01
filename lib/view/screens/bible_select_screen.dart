@@ -5,6 +5,7 @@ import 'package:archive/archive.dart';
 import 'package:biblebookapp/Model/dailyVersesMainListModel.dart';
 import 'package:biblebookapp/Model/mainBookListModel.dart';
 import 'package:biblebookapp/Model/verseBookContentModel.dart';
+import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/core/bible_extract_paths.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
@@ -528,8 +529,10 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                                 ),
                               ),
                               onPressed: () async {
+                              if (isloading == true) return;
                               setState(() {
                                 isloading = true;
+                                _progress = 0;
                               });
                               // await showClearDatabaseDialog(context);
                               if (foldername != null &&
@@ -549,28 +552,9 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                                         ));
                                   });
                                 } else {
-                                  await showClearDatabaseDialog(context);
-                                  // await extractFromFolder(
-                                  //     folderName: foldername.toString(),
-                                  //     password: "Mtech2023",
-                                  //     from: "home");
-                                  // await loadBookContent(foldername);
-                                  // await loadBookList(foldername);
-                                  // await loadDailyVerseData();
-                                  // await loadLocal();
-                                  // await deleteFiles(foldername);
-                                  // // return Get.back();
-                                  // setState(() {
-                                  //   isloading = false;
-                                  // });
-                                  // return Get.offAll(() => HomeScreen(
-                                  //       From: "splash",
-                                  //       selectedVerseNumForRead: "",
-                                  //       selectedBookForRead: "",
-                                  //       selectedChapterForRead: "",
-                                  //       selectedBookNameForRead: "",
-                                  //       selectedVerseForRead: "",
-                                  //     ));
+                                  // Same switch flow as before — no confirm popup.
+                                  await _saveButtonStates();
+                                  await _runHomeBibleSwitchFlow();
                                 }
                               } else {
                                 setState(() {
@@ -579,8 +563,10 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                                 Constants.showToast("Click Set as Default");
                               }
                             },
-                              child: Text(
-                                isloading == false ? "Continue" : "loading...",
+                              child: isloading == true
+                                  ? _bibleSwitchProgressBar(isTablet)
+                                  : Text(
+                                "Continue",
                                 style: TextStyle(
                                   fontFamily: 'Georgia',
                                   fontSize: isTablet ? 20 : 16,
@@ -598,6 +584,185 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
         ),
       ),
     );
+  }
+
+  /// Splash-style percentage bar for bible switch (UI only).
+  Widget _bibleSwitchProgressBar(bool isTablet) {
+    final progress01 = (_progress.clamp(0, 100) / 100.0);
+    final percent = _progress.clamp(0, 100).round();
+    final barHeight = isTablet ? 28.0 : 24.0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Container(
+        height: barHeight,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(barHeight / 2),
+          color: const Color(0xFFE8D9C4).withValues(alpha: 0.88),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FractionallySizedBox(
+                widthFactor: progress01 <= 0 ? 0.02 : progress01,
+                heightFactor: 1,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(barHeight / 2),
+                    gradient: const LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        Color(0xFFD4A04A),
+                        Color(0xFFC59434),
+                        Color(0xFF9A6B2F),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Text(
+              '$percent%',
+              style: TextStyle(
+                fontFamily: 'Georgia',
+                fontSize: isTablet ? 13 : 12,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                height: 1,
+                shadows: const [
+                  Shadow(
+                    color: Color(0x66000000),
+                    blurRadius: 2,
+                    offset: Offset(0, 1),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Existing home bible-switch steps (extract/load/clear) — unchanged sequence.
+  Future<void> _runHomeBibleSwitchFlow() async {
+    if (!mounted) return;
+    setState(() {
+      _progress = 5;
+    });
+    await extractFromFolder(
+      folderName: foldername.toString(),
+      password: dotenv.env[AssetsConstants.holybibleKey].toString(),
+      from: "home",
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _progress = 15;
+    });
+    await loadBookContent(foldername);
+
+    if (!mounted) return;
+    setState(() {
+      _progress = 27;
+    });
+    await loadBookList(foldername);
+
+    if (!mounted) return;
+    setState(() {
+      _progress = 43;
+    });
+    _savePreferences();
+
+    if (!mounted) return;
+    setState(() {
+      _progress = 54;
+    });
+    await loadLocal();
+
+    if (!mounted) return;
+    setState(() {
+      _progress = 67;
+    });
+    await DBHelper().db.then((db) async {
+      if (db != null) {
+        final result = await db.rawQuery(
+          "SELECT * FROM book WHERE book_num = ?",
+          [int.parse("0")],
+        );
+
+        if (result.isNotEmpty && result[0]["title"] != null) {
+          final title = result[0]["title"].toString();
+          await SharPreferences.setString(
+            SharPreferences.selectedBook,
+            title,
+          );
+        } else {
+          debugPrint("testapp No book found with book_num = 0");
+        }
+      } else {
+        debugPrint("testapp Database instance is null");
+      }
+    });
+
+    if (!mounted) return;
+    setState(() {
+      _progress = 73;
+    });
+    await deleteFiles(foldername);
+
+    if (!mounted) return;
+    setState(() {
+      _progress = 89;
+    });
+    // Keep library data (bookmarks / highlights / notes / images) across
+    // Bible switches. Read is gated when item text doesn't match current Bible.
+    // await clearAllData();
+
+    if (!mounted) return;
+    setState(() {
+      _progress = 97;
+    });
+    Constants.showToast("Updated Successfully");
+    setState(() {
+      isloading = false;
+      isbtnloading = false;
+    });
+
+    // Home keeps DashBoardController (autoRemove: false) + DownloadProvider
+    // verse cache. Clear them so the first switch reloads from the new DB.
+    await _invalidateHomeBibleMemoryCaches();
+
+    Get.offAll(() => HomeScreen(
+          From: "splash",
+          selectedVerseNumForRead: "",
+          selectedBookForRead: "",
+          selectedChapterForRead: "",
+          selectedBookNameForRead: "",
+          selectedVerseForRead: "",
+        ));
+  }
+
+  /// UI/cache only — forces Home to load the newly switched Bible on first open.
+  Future<void> _invalidateHomeBibleMemoryCaches() async {
+    try {
+      if (Get.isRegistered<DashBoardController>()) {
+        final c = Get.find<DashBoardController>();
+        c.selectedBookContent.clear();
+        c.selectedVersesContent.clear();
+        c.isFetchContent.value = true;
+        c.loadTextToSpeech.value = true;
+      }
+    } catch (_) {}
+    if (!mounted) return;
+    try {
+      Provider.of<DownloadProvider>(context, listen: false)
+          .clearInMemoryBibleCaches();
+    } catch (_) {}
   }
 
   String _bibleDisplayName(String folder) {
@@ -1024,7 +1189,8 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                       setState(() {
                         _progress = 89;
                       });
-                      await clearAllData(); // clear DB
+                      // Keep library data across Bible switches.
+                      // await clearAllData(); // clear DB
 
                       setState(() {
                         _progress = 97;
@@ -1035,6 +1201,8 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                         isloading = false;
                         isbtnloading = false;
                       });
+
+                      await _invalidateHomeBibleMemoryCaches();
 
                       return Get.offAll(() => HomeScreen(
                             From: "splash",
