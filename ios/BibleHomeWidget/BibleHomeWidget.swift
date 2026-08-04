@@ -269,61 +269,58 @@ struct VerseOfTheDayView: View {
   var entry: VerseOfTheDayEntry
   @Environment(\.widgetFamily) private var family
 
+  private var isLarge: Bool { family == .systemLarge }
+  private var isSmall: Bool { family == .systemSmall }
+
+  private var verseContent: some View {
+    let verse = plainVerseTextForWidget(entry.verseText)
+    // Verse For You only — larger type + full-width text so small tile isn’t sparse.
+    return VStack(spacing: isLarge ? 10 : (isSmall ? 4 : 6)) {
+      if !isSmall {
+        Text("Verse For You")
+          .font(.system(size: isLarge ? 12 : 11, weight: .semibold, design: .serif))
+          .foregroundColor(oldPaperText)
+          .lineLimit(1)
+          .frame(maxWidth: .infinity)
+      }
+      Text(verse.isEmpty ? defaultVerseText : verse)
+        .font(.system(
+          size: isLarge ? 17 : (isSmall ? 15 : 15),
+          weight: .bold,
+          design: .serif
+        ))
+        .foregroundColor(oldPaperText)
+        .multilineTextAlignment(isSmall ? .leading : .center)
+        .lineLimit(isLarge ? 7 : (isSmall ? 6 : 5))
+        .minimumScaleFactor(0.7)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: isSmall ? .topLeading : .center)
+      Text(entry.verseReference.isEmpty ? defaultVerseRef : entry.verseReference)
+        .font(.system(
+          size: isLarge ? 13 : (isSmall ? 12 : 12),
+          weight: .medium,
+          design: .serif
+        ))
+        .foregroundColor(oldPaperSecondary)
+        .multilineTextAlignment(isSmall ? .leading : .center)
+        .lineLimit(2)
+        .frame(maxWidth: .infinity, alignment: isSmall ? .leading : .center)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .padding(isLarge ? 14 : (isSmall ? 8 : 12))
+  }
+
   var body: some View {
-    widgetWithBackground(.parchment, largeImage: "widget_path_bg") {
-      Group {
-        if family == .systemLarge {
-          VStack(spacing: 10) {
-            Spacer(minLength: 0)
-            OldPaperTitleRow(title: "Daily Verse")
-            Text(plainVerseTextForWidget(entry.verseText))
-              .font(.system(size: 16, weight: .bold, design: .serif))
-              .foregroundStyle(oldPaperText)
-              .widgetFullColorContent()
-              .multilineTextAlignment(.center)
-              .lineLimit(6)
-              .minimumScaleFactor(0.82)
-              .padding(.horizontal, 8)
-            Text(entry.verseReference)
-              .font(.system(size: 12, weight: .medium, design: .serif))
-              .foregroundStyle(oldPaperSecondary)
-              .widgetFullColorContent()
-              .multilineTextAlignment(.center)
-            WidgetFlourish()
-            Spacer(minLength: 0)
-          }
-        } else {
-          VStack(spacing: 5) {
-            ZStack {
-              Image(systemName: "book.closed.fill")
-                .font(.system(size: 12))
-                .foregroundColor(oldPaperText)
-              Image(systemName: "plus")
-                .font(.system(size: 5, weight: .bold))
-                .foregroundColor(oldPaperText)
-                .offset(y: -1)
-            }
-            OldPaperTitleRow(title: "Daily Verse")
-            Text(plainVerseTextForWidget(entry.verseText))
-              .font(.system(size: 13, weight: .bold, design: .serif))
-              .foregroundStyle(oldPaperText)
-              .widgetFullColorContent()
-              .multilineTextAlignment(.center)
-              .lineLimit(4)
-              .minimumScaleFactor(0.82)
-              .padding(.horizontal, 2)
-            Spacer(minLength: 0)
-            Text(entry.verseReference)
-              .font(.system(size: 10, weight: .medium, design: .serif))
-              .foregroundStyle(oldPaperSecondary)
-              .widgetFullColorContent()
-              .multilineTextAlignment(.center)
-            WidgetFlourish()
-          }
+    // Crash-safe layout: solid color bg + plain Text only (no photo / chrome).
+    Group {
+      if #available(iOSApplicationExtension 17.0, *) {
+        verseContent
+          .containerBackground(oldPaperBackground, for: .widget)
+      } else {
+        ZStack {
+          oldPaperBackground
+          verseContent
         }
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .padding(family == .systemLarge ? 16 : 10)
     }
     .widgetURL(URL(string: "biblebookapp://verse?homeWidget"))
   }
@@ -336,8 +333,9 @@ struct VerseOfTheDayWidget: Widget {
     StaticConfiguration(kind: kind, provider: VerseOfTheDayProvider()) { entry in
       VerseOfTheDayView(entry: entry)
     }
-    .configurationDisplayName("Daily Verse")
+    .configurationDisplayName("Verse For You")
     .description("Today's Bible verse on your home screen.")
+    .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
   }
 }
 
@@ -792,7 +790,7 @@ struct ContinueReadingView: View {
         }
       }
     }
-    .widgetURL(URL(string: "biblebookapp://verse?homeWidget"))
+    .widgetURL(URL(string: "biblebookapp://reading?homeWidget"))
   }
 }
 
@@ -1305,7 +1303,7 @@ struct RandomBibleVerseView: View {
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .padding(family == .systemLarge ? 16 : 10)
     }
-    .widgetURL(URL(string: "biblebookapp://verse?homeWidget"))
+    .widgetURL(URL(string: "biblebookapp://random?homeWidget"))
   }
 }
 
