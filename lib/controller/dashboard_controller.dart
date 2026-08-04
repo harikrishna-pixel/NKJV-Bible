@@ -859,9 +859,69 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     return verses.any((v) => (v.chapterNum ?? -1) == 0);
   }
 
+  /// When a list already contains both UI chapter and next (merge), prefer
+  /// 0-based storage even if chapter 0 is not present in this slice.
+  bool _zeroBasedForUiChapterFilter(
+    List<VerseBookContentModel> verses,
+    int safeUiChapter,
+  ) {
+    final chapters = verses
+        .map((v) => v.chapterNum?.toInt())
+        .whereType<int>()
+        .toSet();
+    final stored0 = safeUiChapter - 1;
+    final stored1 = safeUiChapter;
+    if (chapters.contains(stored0) && chapters.contains(stored1)) {
+      return true;
+    }
+    if (_versesLookZeroBased(verses)) return true;
+    final bookNum = verses.isNotEmpty ? verses.first.bookNum?.toInt() : null;
+    if (bookNum != null && _zeroBasedChapterByBook.containsKey(bookNum)) {
+      return _zeroBasedChapterByBook[bookNum]!;
+    }
+    return false;
+  }
+
   int _storedChapterNumForUi(int uiChapter, {required bool zeroBased}) {
     final safe = uiChapter <= 0 ? 1 : uiChapter;
     return zeroBased ? safe - 1 : safe;
+  }
+
+  /// Display-only: keep exactly one chapter_num for the UI chapter.
+  /// Strips classic merges (UI N + N+1) without changing load algorithms.
+  List<VerseBookContentModel> versesForUiChapterOnly(
+    List<VerseBookContentModel> verses,
+    int uiChapter,
+  ) {
+    if (verses.isEmpty) return verses;
+    final safe = uiChapter <= 0 ? 1 : uiChapter;
+    final chapters = verses
+        .map((v) => v.chapterNum?.toInt())
+        .whereType<int>()
+        .toSet();
+    if (chapters.length <= 1) {
+      return filterContent(verses.toSet().toList());
+    }
+
+    final stored0 = safe - 1;
+    final stored1 = safe;
+    late final int keep;
+    if (chapters.contains(stored0) && chapters.contains(stored1)) {
+      // 0-based merge: UI N (stored0) + UI N+1 (stored1).
+      keep = stored0;
+    } else if (chapters.contains(stored1) && chapters.contains(stored1 + 1)) {
+      // 1-based merge: UI N + UI N+1.
+      keep = stored1;
+    } else if (chapters.contains(stored0)) {
+      keep = stored0;
+    } else if (chapters.contains(stored1)) {
+      keep = stored1;
+    } else {
+      keep = chapters.first;
+    }
+    return filterContent(
+      verses.where((v) => v.chapterNum?.toInt() == keep).toList(),
+    );
   }
 
   /// Tries exact DB chapter_num for the UI chapter (0- vs 1-based aware).
@@ -938,6 +998,14 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
       );
       if (result.isEmpty) continue;
       final item = result[0];
+      // Display sync: always prefer DB title for this book_num when present
+      // (prefs may still say Genesis after a Bible version switch).
+      final title = item['title']?.toString().trim() ?? '';
+      if (title.isNotEmpty) {
+        selectedBook.value = title;
+        await SharPreferences.setString(
+            SharPreferences.selectedBook, title);
+      }
       if (item['chapter_count'] != null &&
           item['read_per'] != null &&
           item['id'] != null) {
@@ -953,6 +1021,30 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     debugPrint('testapp No book found with book_num = $bookNum');
   }
 
+  /// Display-only: header book name from [selectedBookNum] (same as Mark as Read).
+  Future<void> syncSelectedBookTitleFromDb() async {
+    final bookNum = int.tryParse(selectedBookNum.value.trim());
+    if (bookNum == null) return;
+    try {
+      final db = await DBHelper().db;
+      if (db == null) return;
+      final rows = await db.rawQuery(
+        'SELECT title FROM book WHERE book_num = ? LIMIT 1',
+        [bookNum],
+      );
+      if (rows.isEmpty) return;
+      final title = rows.first['title']?.toString().trim() ?? '';
+      if (title.isEmpty) return;
+      if (selectedBook.value != title) {
+        selectedBook.value = title;
+        await SharPreferences.setString(
+            SharPreferences.selectedBook, title);
+      }
+    } catch (e) {
+      debugPrint('syncSelectedBookTitleFromDb: $e');
+    }
+  }
+
   /// Sync id / chapter_count / read_per for [selectedBookNum] before progress writes.
   Future<bool> syncSelectedBookProgressMetadata() async {
     final bookNum = int.tryParse(selectedBookNum.value.trim());
@@ -960,7 +1052,7 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     final db = await DBHelper().db;
     if (db == null) return false;
     final rows = await db.rawQuery(
-      'SELECT id, chapter_count, read_per FROM book WHERE book_num = ? LIMIT 1',
+      'SELECT id, chapter_count, read_per, title FROM book WHERE book_num = ? LIMIT 1',
       [bookNum],
     );
     if (rows.isEmpty) return false;
@@ -973,6 +1065,11 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     }
     if (row['read_per'] != null) {
       bookReadPer.value = row['read_per'].toString();
+    }
+    final title = row['title']?.toString().trim() ?? '';
+    if (title.isNotEmpty && selectedBook.value != title) {
+      selectedBook.value = title;
+      await SharPreferences.setString(SharPreferences.selectedBook, title);
     }
     return selectedBookId.value.trim().isNotEmpty;
   }
@@ -1023,13 +1120,17 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
   bool _displayedContentMatchesUiChapter(int uiChapter) {
     if (selectedBookContent.isEmpty) return false;
     final safe = uiChapter <= 0 ? 1 : uiChapter;
+    // Reject multi-chapter merges immediately (display must be one chapter).
+    final chapterNums = selectedBookContent
+        .map((v) => v.chapterNum?.toInt())
+        .whereType<int>()
+        .toSet();
+    if (chapterNums.length > 1) return false;
     final sample = selectedVersesContent.isNotEmpty
         ? selectedVersesContent
         : selectedBookContent;
-    final zeroBased = _versesLookZeroBased(sample);
+    final zeroBased = _zeroBasedForUiChapterFilter(sample, safe);
     final stored = _storedChapterNumForUi(safe, zeroBased: zeroBased);
-    // Require every verse to be this chapter — `.any` allowed merged chapters
-    // (e.g. ch15+ch16) to skip reload and stay on screen.
     return selectedBookContent
         .every((v) => v.chapterNum?.toInt() == stored);
   }
@@ -1090,11 +1191,13 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
   ) {
     if (verses.isEmpty) return [];
     final safe = uiChapter <= 0 ? 1 : uiChapter;
-    final zeroBased = _versesLookZeroBased(verses);
+    final zeroBased = _zeroBasedForUiChapterFilter(verses, safe);
     final stored = _storedChapterNumForUi(safe, zeroBased: zeroBased);
     final list =
         verses.where((v) => v.chapterNum?.toInt() == stored).toList();
-    if (list.isEmpty) return [];
+    if (list.isEmpty) {
+      return versesForUiChapterOnly(verses, safe);
+    }
     return filterContent(list.toSet().toList());
   }
 
@@ -1136,14 +1239,8 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     if (chapterContent.isEmpty) return false;
     if (loadId != _chapterLoadGeneration) return false;
     // Guard: never paint two chapters in one list (merge display bug).
-    final chapters = chapterContent
-        .map((v) => v.chapterNum?.toInt())
-        .whereType<int>()
-        .toSet();
-    if (chapters.length > 1) {
-      chapterContent = _filterChapterFromVerses(chapterContent, safeChapter);
-      if (chapterContent.isEmpty) return false;
-    }
+    chapterContent = versesForUiChapterOnly(chapterContent, safeChapter);
+    if (chapterContent.isEmpty) return false;
     selectedBookContent.value = chapterContent;
 
     selectedBookNum.value = bookNum.toString();
@@ -1185,7 +1282,10 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     }
     final verses = selectedVersesContent;
     if (verses.isEmpty) return;
-    final chapterContent = _filterChapterFromVerses(verses, uiChapter);
+    final chapterContent = versesForUiChapterOnly(
+      _filterChapterFromVerses(verses, uiChapter),
+      safe,
+    );
     if (chapterContent.isNotEmpty) {
       selectedBookContent.value = chapterContent;
     }
@@ -1320,6 +1420,9 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         chapterContent =
             _filterChapterFromVerses(verses, parsedChapterForRead);
       }
+      // Display-only: strip any accidental chapter merge before paint.
+      chapterContent =
+          versesForUiChapterOnly(chapterContent, parsedChapterForRead);
       if (chapterContent.isNotEmpty) {
         selectedBookContent.value = chapterContent;
       }
@@ -1344,6 +1447,13 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         selectedBookChapterCount.value = rows[0]["chapter_count"].toString();
         bookReadPer.value = rows[0]["read_per"].toString();
         selectedBookId.value = rows[0]["id"].toString();
+        // Display sync only: keep app-bar book name aligned with loaded book.
+        final title = rows[0]["title"]?.toString().trim() ?? '';
+        if (title.isNotEmpty) {
+          selectedBook.value = title;
+          await SharPreferences.setString(
+              SharPreferences.selectedBook, title);
+        }
       }
     } catch (e, st) {
       log('Error: $e,$st');
@@ -1359,6 +1469,8 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
 
   Future<void> getSelectedChapterAndBook() async {
     if (_canSkipChapterReloadSync()) {
+      // Still sync header title (may be Genesis after Bible switch).
+      await syncSelectedBookTitleFromDb();
       return;
     }
 
@@ -1384,6 +1496,7 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         targetChapter == (int.tryParse(selectedChapter.value) ?? 1) &&
         _displayedContentMatchesSelectedBook() &&
         _displayedContentMatchesUiChapter(targetChapter)) {
+      await syncSelectedBookTitleFromDb();
       return;
     }
 
@@ -1424,8 +1537,10 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
           int.tryParse(selectedBookNum.value) ?? parsedStoredBookNum ?? 1;
       if (selectedVersesContent.isNotEmpty &&
           _versesCacheMatchesBook(parsedBookNumEarly)) {
-        final quickChapter =
-            _filterChapterFromVerses(selectedVersesContent, safeChapter);
+        final quickChapter = versesForUiChapterOnly(
+          _filterChapterFromVerses(selectedVersesContent, safeChapter),
+          safeChapter,
+        );
         if (quickChapter.isNotEmpty) {
           selectedBookContent.value = quickChapter;
         }

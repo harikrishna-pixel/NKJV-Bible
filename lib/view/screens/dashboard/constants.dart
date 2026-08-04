@@ -60,6 +60,13 @@ class BibleInfo {
   // AD Enable - Set to true to enable ads, false to disable
   static bool enableAds = true;
 
+  /// Unity LevelPlay (IronSource) — Chat back interstitial.
+  /// App key from LevelPlay dashboard. Interstitial Ad Unit IDs are also
+  /// required (Setup → Ad Units); leave blank to keep existing AdMob path.
+  static const String ironSourceAppKey = '2771bee45';
+  static const String ironSourceInterstitialAdUnitIdAndroid = '';
+  static const String ironSourceInterstitialAdUnitIdIos = '';
+
   // Ads IDs - Android
   static String adsGoogleBannerIdAndroid = "";
   static String adsGoogleBannerId_2Android = "";

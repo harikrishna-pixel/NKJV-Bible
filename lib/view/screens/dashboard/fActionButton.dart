@@ -1435,8 +1435,11 @@ class floatingButtonState extends State<floatingButton>
 
         // New list instance so GetX/Home ListView cannot keep a stale identity.
         if (controller.selectedBookContent.isNotEmpty) {
-          controller.selectedBookContent.value =
-              List.from(controller.selectedBookContent);
+          final uiCh = int.tryParse(controller.selectedChapter.value) ??
+              chapterNum;
+          controller.selectedBookContent.value = controller
+              .versesForUiChapterOnly(
+                  List.from(controller.selectedBookContent), uiCh);
         }
 
         final scrollCtrl = controller.autoScrollController.value;

@@ -7,6 +7,7 @@ import 'package:biblebookapp/Model/verseBookContentModel.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
+import 'package:biblebookapp/utils/bible_book_resolve.dart';
 import 'package:biblebookapp/utils/custom_alert.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
@@ -450,22 +451,28 @@ class DownloadProvider with ChangeNotifier {
         continue;
       }
 
-      final lookup = _verseTableIndicesFromMainListRow(
-        bookId: bookId,
-        chapter: chapter,
+      final lookupChapterVerse = BibleBookResolve.dailyVerseDbChapterVerse(
+        chapter1Based: chapter,
         verseRaw: verseStr,
+      );
+      final bookNum = await BibleBookResolve.bookNumForDailyVerse(
+        bookName: row['Book']?.toString(),
+        bookId: bookId,
+        db: dbClient,
       );
 
       final verseResult = await dbClient.rawQuery(
         "SELECT * FROM verse WHERE book_num = ? AND chapter_num = ? AND verse_num = ?",
-        [lookup.$1, lookup.$2, lookup.$3],
+        [bookNum, lookupChapterVerse.$1, lookupChapterVerse.$2],
       );
 
       if (verseResult.isNotEmpty) {
+        final localizedTitle =
+            await BibleBookResolve.titleForBookNum(bookNum, db: dbClient);
         final insertData = {
           "Category_Name": row["Category_Name"],
           "Category_Id": row["Category_Id"],
-          "Book": row["Book"],
+          "Book": localizedTitle ?? row["Book"],
           "Book_Id": bookId,
           "Chapter": chapter,
           "Verse": verseResult[0]["content"],
@@ -927,6 +934,57 @@ class DownloadProvider with ChangeNotifier {
   bool isLoadingDailyVerse = false;
   List<DailyVerseList> dailyVerseList = [];
 
+  /// Display + content sync to active Bible: resolve book by English name /
+  /// Book_Id (not Protestant index alone), refresh title + verse text.
+  /// Does not change schedule dates, categories, or Book_Id.
+  Future<void> _syncDailyVerseDisplayBookTitles() async {
+    if (dailyVerseList.isEmpty) return;
+    try {
+      final dbClient = await DBHelper().db;
+      if (dbClient == null) return;
+      BibleBookResolve.clearCache();
+      var changed = false;
+      final synced = <DailyVerseList>[];
+      for (final verse in dailyVerseList) {
+        final bookIdStored = verse.bookId?.toInt() ?? 0;
+        final chapter1 = (verse.chapter ?? 0).toInt();
+        final verse1 = (verse.verseNum ?? 0).toInt();
+        final bookNum = await BibleBookResolve.bookNumForDailyVerse(
+          bookName: verse.book,
+          bookId: bookIdStored,
+          db: dbClient,
+        );
+        final localized =
+            await BibleBookResolve.titleForBookNum(bookNum, db: dbClient);
+        String? content = verse.verse;
+        if (chapter1 > 0 && verse1 > 0) {
+          final chDb = chapter1 - 1;
+          final vDb = verse1 - 1;
+          final rows = await dbClient.rawQuery(
+            'SELECT content FROM verse WHERE book_num = ? AND chapter_num = ? AND verse_num = ? LIMIT 1',
+            [bookNum, chDb, vDb],
+          );
+          if (rows.isNotEmpty) {
+            final c = rows.first['content']?.toString();
+            if (c != null && c.isNotEmpty) content = c;
+          }
+        }
+        final nextBook = localized ?? verse.book;
+        if (nextBook != verse.book || content != verse.verse) {
+          changed = true;
+          synced.add(verse.copyWith(book: nextBook, verse: content));
+        } else {
+          synced.add(verse);
+        }
+      }
+      if (changed) {
+        dailyVerseList = synced;
+      }
+    } catch (e) {
+      debugPrint('syncDailyVerseDisplayBookTitles error: $e');
+    }
+  }
+
   Future<void> loadDailyVerses() async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -935,6 +993,7 @@ class DownloadProvider with ChangeNotifier {
 
     // Already in memory from splash/home/preference preload.
     if (!dataIsChanged && dailyVerseList.isNotEmpty) {
+      await _syncDailyVerseDisplayBookTitles();
       isLoadingDailyVerse = false;
       notifyListeners();
       return;
@@ -945,6 +1004,7 @@ class DownloadProvider with ChangeNotifier {
         cachedJson != null &&
         cachedJson.isNotEmpty &&
         await _hydrateDailyVersesFromPrefsJson(cachedJson)) {
+      await _syncDailyVerseDisplayBookTitles();
       isLoadingDailyVerse = false;
       notifyListeners();
       return;
@@ -974,6 +1034,7 @@ class DownloadProvider with ChangeNotifier {
                 .map((e) => DailyVerseList.fromJson(e as Map<String, dynamic>))
                 .toSet()
                 .toList();
+            await _syncDailyVerseDisplayBookTitles();
             debugPrint("dailyVerseList is ${dailyVerseList.length}");
             isLoadingDailyVerse = false;
             notifyListeners();
@@ -986,6 +1047,7 @@ class DownloadProvider with ChangeNotifier {
             .map((e) => DailyVerseList.fromJson(e as Map<String, dynamic>))
             .toSet()
             .toList();
+        await _syncDailyVerseDisplayBookTitles();
         debugPrint("dailyVerseList is ${dailyVerseList.length}");
         isLoadingDailyVerse = false;
         notifyListeners();
@@ -1047,13 +1109,33 @@ class DownloadProvider with ChangeNotifier {
 
     for (var verse in verseRows) {
       final bookIdStored = int.parse(verse['Book_Id'].toString());
-      final bookNum = bookIdStored > 0 ? bookIdStored - 1 : bookIdStored;
       final storedBook = verse['Book']?.toString().trim() ?? '';
-      final bookName = storedBook.isNotEmpty
-          ? storedBook
-          : (_resolveDailyVerseBookTitle(bookTitleByNum, bookNum) ??
-              _resolveDailyVerseBookTitle(bookTitleByNum, bookIdStored) ??
-              'Unknown');
+      // Name-based book_num (Catholic-safe); fall back to Protestant index.
+      final bookNum = await BibleBookResolve.bookNumForDailyVerse(
+        bookName: storedBook,
+        bookId: bookIdStored,
+        db: dbClient,
+      );
+      final bookName = await BibleBookResolve.titleForBookNum(
+            bookNum,
+            db: dbClient,
+          ) ??
+          _resolveDailyVerseBookTitle(bookTitleByNum, bookNum) ??
+          (storedBook.isNotEmpty ? storedBook : 'Unknown');
+
+      var content = verse['Verse']?.toString() ?? '';
+      final chapter1 = int.tryParse(verse['Chapter'].toString()) ?? 0;
+      final verse1 = int.tryParse(verse['Verse_Num'].toString()) ?? 0;
+      if (chapter1 > 0 && verse1 > 0) {
+        final rows = await dbClient.rawQuery(
+          'SELECT content FROM verse WHERE book_num = ? AND chapter_num = ? AND verse_num = ? LIMIT 1',
+          [bookNum, chapter1 - 1, verse1 - 1],
+        );
+        if (rows.isNotEmpty) {
+          final c = rows.first['content']?.toString();
+          if (c != null && c.isNotEmpty) content = c;
+        }
+      }
 
       enrichedList.add(DailyVerseList(
         categoryName: verse['Category_Name'],
@@ -1061,7 +1143,7 @@ class DownloadProvider with ChangeNotifier {
         book: bookName,
         bookId: int.parse(verse['Book_Id'].toString()),
         chapter: int.parse(verse['Chapter'].toString()),
-        verse: verse['Verse'],
+        verse: content,
         date: verse['Date'],
         verseNum: int.parse(verse['Verse_Num'].toString()),
       ));
@@ -1185,6 +1267,7 @@ class DownloadProvider with ChangeNotifier {
     bookList = [];
     otBookList = [];
     ntBookList = [];
+    BibleBookResolve.clearCache();
     notifyListeners();
   }
 
@@ -1283,6 +1366,7 @@ class DownloadProvider with ChangeNotifier {
           .map((e) => DailyVerseList.fromJson(e as Map<String, dynamic>))
           .toSet()
           .toList();
+      await _syncDailyVerseDisplayBookTitles();
       return dailyVerseList.isNotEmpty;
     } catch (e) {
       debugPrint('hydrateDailyVersesFromPrefsJson error: $e');
@@ -1334,19 +1418,6 @@ List<Map<String, dynamic>> _interleaveDailyVersesByCategory(
     round++;
   }
   return result;
-}
-
-/// Maps dailyVersesMainList 1-based ids to 0-based verse table columns
-/// (same convention as splash [loadDailyVerseData]).
-(int, int, int) _verseTableIndicesFromMainListRow({
-  required int bookId,
-  required int chapter,
-  required String verseRaw,
-}) {
-  final verseNum = verseRaw.length == 2
-      ? int.parse(verseRaw) - 1
-      : int.parse(verseRaw.split('-').first) - 1;
-  return (bookId - 1, chapter - 1, verseNum);
 }
 
 // Background selectedCategories

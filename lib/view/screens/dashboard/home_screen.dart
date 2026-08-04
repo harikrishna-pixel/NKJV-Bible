@@ -13,9 +13,12 @@ import 'package:biblebookapp/core/notifiers/auth/auth.notifier.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/main.dart';
+import 'package:biblebookapp/utils/bible_book_resolve.dart';
+import 'package:biblebookapp/utils/bible_ui_labels.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
 import 'package:biblebookapp/utils/emoji_text_style.dart';
 import 'package:biblebookapp/utils/internet_speed_checker.dart';
+import 'package:biblebookapp/utils/library_bible_guard.dart';
 import 'package:biblebookapp/utils/network_error_message.dart';
 import 'package:biblebookapp/view/widget/thanks_for_love_rating_dialog_content.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
@@ -40,6 +43,7 @@ import 'package:biblebookapp/view/screens/dashboard/dailyverse.dart';
 import 'package:biblebookapp/view/screens/dashboard/fActionButton.dart';
 import 'package:biblebookapp/view/screens/dashboard/remove_add-screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/setting_screen.dart';
+import 'package:biblebookapp/view/screens/bible_select_screen.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 import 'package:biblebookapp/view/screens/multi_select_paywallscreen.dart';
 import 'package:biblebookapp/view/screens/more_apps/more_apps_screen.dart';
@@ -82,7 +86,6 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../Model/verseBookContentModel.dart';
-import 'package:biblebookapp/utils/library_bible_guard.dart';
 import '../../constants/changeThemeButtun.dart';
 import 'package:html/parser.dart' show parse;
 import '../../constants/constant.dart';
@@ -1161,6 +1164,8 @@ class _HomeScreenState extends State<HomeScreen>
 //   }
 
   // Keys
+
+
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final GlobalKey _verseContainerKey = GlobalKey();
 
@@ -1888,6 +1893,8 @@ class _HomeScreenState extends State<HomeScreen>
   // User and preferences methods
   Future<void> _loadFontSize() async {
     final prefs = await SharedPreferences.getInstance();
+    // Display-only: Chapter vs Capítulo from active Bible version.
+    await BibleUiLabels.refreshFromPrefs();
     final value = prefs.getString(SharPreferences.selectedFontSize);
     var data = await SharPreferences.getString(
           SharPreferences.selectedBook,
@@ -2471,9 +2478,16 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildSaveButton(double screenWidth, DailyVerseList todayVerse) {
     return GestureDetector(
       onTap: () async {
+        final bookNum = await BibleBookResolve.bookNumForDailyVerse(
+          bookName: todayVerse.book,
+          bookId: todayVerse.bookId,
+        );
+        final bookName =
+            await BibleBookResolve.titleForBookNum(bookNum) ??
+                todayVerse.book.toString();
         // Same gate as Library → Read (different Bible toast).
         final canRead = await LibraryBibleGuard.allowReadOrToast(
-          bookNum: dailyVerseBookNum(todayVerse.bookId),
+          bookNum: bookNum,
           chapterNum: dailyVerseUiChapter(todayVerse.chapter),
           verseNum: dailyVerseUiVerse(todayVerse.verseNum),
           savedContent: todayVerse.verse,
@@ -2482,18 +2496,18 @@ class _HomeScreenState extends State<HomeScreen>
 
         Navigator.of(context).pop(); // Close the bottom sheet first
         await SharPreferences.setString(
-            SharPreferences.selectedBook, todayVerse.book.toString());
+            SharPreferences.selectedBook, bookName);
         await SharPreferences.setString(SharPreferences.selectedChapter,
             "${dailyVerseUiChapter(todayVerse.chapter)}");
-        await SharPreferences.setString(SharPreferences.selectedBookNum,
-            "${dailyVerseBookNum(todayVerse.bookId)}");
+        await SharPreferences.setString(
+            SharPreferences.selectedBookNum, "$bookNum");
         Get.offAll(
           () => HomeScreen(
             From: "Daily",
-            selectedBookForRead: dailyVerseBookNum(todayVerse.bookId),
+            selectedBookForRead: bookNum,
             selectedChapterForRead: dailyVerseUiChapter(todayVerse.chapter),
             selectedVerseNumForRead: int.parse(todayVerse.verseNum.toString()),
-            selectedBookNameForRead: todayVerse.book.toString(),
+            selectedBookNameForRead: bookName,
             selectedVerseForRead:
                 parse(todayVerse.verse.toString()).body?.text.toString() ?? '',
           ),
@@ -3479,12 +3493,29 @@ class _HomeScreenState extends State<HomeScreen>
             _lastVisibleChapterContent = [];
             _lastContentSource = null;
           }
-          final readerVerses = controller.selectedBookContent.isNotEmpty
+          final rawReaderVerses = controller.selectedBookContent.isNotEmpty
               ? controller.selectedBookContent
               : (_lastVisibleChapterContent.isNotEmpty &&
                       _staleContentMatchesChapter(controller)
                   ? _lastVisibleChapterContent
                   : controller.selectedBookContent);
+          // Display-only: never paint two chapters for one chapter header.
+          final uiChapter =
+              int.tryParse(controller.selectedChapter.value) ?? 1;
+          final readerVerses =
+              controller.versesForUiChapterOnly(rawReaderVerses, uiChapter);
+          // Heal in-memory list if a merge slipped through (keeps match checks in sync).
+          if (readerVerses.isNotEmpty &&
+              readerVerses.length < rawReaderVerses.length &&
+              identical(rawReaderVerses, controller.selectedBookContent)) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              if (controller.selectedBookContent.length >
+                  readerVerses.length) {
+                controller.selectedBookContent.value = readerVerses;
+              }
+            });
+          }
           final themeProvider = p.Provider.of<ThemeProvider>(context);
           final isVintage =
               themeProvider.currentCustomTheme == AppCustomTheme.vintage;
@@ -3783,7 +3814,12 @@ class _HomeScreenState extends State<HomeScreen>
                                 controller.selectedChapter.value == ""
                                     ? const SizedBox()
                                     : Text(
-                                        "Chapter - ${int.parse(controller.selectedChapter.value)}",
+                                        BibleUiLabels.chapterBarLabel(
+                                          chapterNum:
+                                              '${int.parse(controller.selectedChapter.value)}',
+                                          bookTitle:
+                                              controller.selectedBook.value,
+                                        ),
                                               style: CommanStyle.bw14500(
                                                       context)
                                             .copyWith(
@@ -4131,7 +4167,9 @@ class _HomeScreenState extends State<HomeScreen>
                       // the old chapter does not flash/flicker.
                       : (controller.selectedChapter.value.isNotEmpty &&
                               readerVerses.isNotEmpty &&
-                              !controller.displayedContentMatchesSelection())
+                              !controller.displayedContentMatchesSelection() &&
+                              !_readerListMatchesUiChapter(
+                                  readerVerses, uiChapter, controller))
                           ? ColoredBox(
                               color: scaffoldBg,
                               child: const Center(child: Loader()),
@@ -4141,14 +4179,12 @@ class _HomeScreenState extends State<HomeScreen>
                           ? _buildEmptyContentWithChapters(controller)
                           : NotificationListener<ScrollNotification>(
                               onNotification: (notification) {
-                                final scrollController =
-                                    controller.autoScrollController.value;
-                                if (!scrollController.hasClients) {
-                                  return false;
-                                }
+                                // Use notification metrics — do not read
+                                // ScrollController.position (can be attached to
+                                // multiple views during rebuild / chapter swap).
                                 _handleReaderScrollForAppBar(
                                   notification,
-                                  scrollController.position.pixels,
+                                  notification.metrics.pixels,
                                 );
                                 return false;
                               },
@@ -5601,6 +5637,7 @@ class _HomeScreenState extends State<HomeScreen>
         showAskAnything: BibleInfo.chat == 1,
         showBooks: controller.bookAdsStatus.value == 1,
         showEProducts: BibleInfo.enableEShop == true,
+        showBibleVersion: BibleInfo.folders.length > 1,
         onAccountTap: () {
           Future.microtask(() {
             Get.to(
@@ -5830,6 +5867,14 @@ class _HomeScreenState extends State<HomeScreen>
               });
             });
           });
+        },
+        onBibleVersionTap: () {
+          // Same screen as Settings → Bible Version (UI entry only).
+          Get.to(
+            () => const BibleVersionsScreen(from: 'home'),
+            transition: Transition.cupertinoDialog,
+            duration: const Duration(milliseconds: 300),
+          );
         },
         onBooksTap: () async {
           await SharPreferences.setString('OpenAd', '1');
@@ -6066,12 +6111,33 @@ class _HomeScreenState extends State<HomeScreen>
     }
     final ch = int.tryParse(controller.selectedChapter.value) ?? 1;
     final safe = ch <= 0 ? 1 : ch;
-    final zeroBased =
-        _lastVisibleChapterContent.any((v) => (v.chapterNum ?? -1) == 0);
-    final stored = zeroBased ? safe - 1 : safe;
-    // Every verse must be this chapter (avoid ch N + ch N+1 merge on screen).
-    return _lastVisibleChapterContent
-        .every((v) => v.chapterNum?.toInt() == stored);
+    return _readerListMatchesUiChapter(
+        _lastVisibleChapterContent, safe, controller);
+  }
+
+  /// True when every verse belongs to the UI chapter (0- or 1-based storage).
+  bool _readerListMatchesUiChapter(
+    List<VerseBookContentModel> verses,
+    int uiChapter, [
+    DashBoardController? controller,
+  ]) {
+    if (verses.isEmpty) return false;
+    final safe = uiChapter <= 0 ? 1 : uiChapter;
+    final chapters = verses
+        .map((v) => v.chapterNum?.toInt())
+        .whereType<int>()
+        .toSet();
+    if (chapters.length != 1) return false;
+    final c = chapters.first;
+    // Prefer full-book sample so zero-based detection is reliable.
+    final sample = (controller != null &&
+            controller.selectedVersesContent.isNotEmpty)
+        ? controller.selectedVersesContent
+        : verses;
+    final zeroBased = sample.any((v) => (v.chapterNum ?? -1) == 0) ||
+        (chapters.contains(safe - 1) && !chapters.contains(safe));
+    final expected = zeroBased ? safe - 1 : safe;
+    return c == expected;
   }
 
   bool _homeEntryRequiresContentReload() {
@@ -6391,9 +6457,15 @@ class _HomeScreenState extends State<HomeScreen>
           }
 
           if (matches.isNotEmpty) {
-            controller.selectedBookContent.value = matches.toSet().toList();
-            controller.isFetchContent.value = false;
-            if (mounted) setState(() {});
+            final uiCh =
+                int.tryParse(controller.selectedChapter.value) ?? safeChapter;
+            final clamped =
+                controller.versesForUiChapterOnly(matches, uiCh);
+            if (clamped.isNotEmpty) {
+              controller.selectedBookContent.value = clamped;
+              controller.isFetchContent.value = false;
+              if (mounted) setState(() {});
+            }
           }
         } catch (e) {
           debugPrint('testapp Provider fallback failed: $e');

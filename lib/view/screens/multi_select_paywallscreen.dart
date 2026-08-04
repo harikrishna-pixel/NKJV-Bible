@@ -522,14 +522,19 @@ height: 1.1,
 ),
 ),
 const SizedBox(height: 2),
-Text(
-sub,
-textAlign: TextAlign.center,
-style: const TextStyle(
-fontSize: 8.5,
-color: _inkSoft,
-height: 1.15,
-),
+FittedBox(
+  fit: BoxFit.scaleDown,
+  child: Text(
+    sub,
+    maxLines: 1,
+    softWrap: false,
+    textAlign: TextAlign.center,
+    style: const TextStyle(
+      fontSize: 8.5,
+      color: _inkSoft,
+      height: 1.15,
+    ),
+  ),
 ),
 ],
 ),
@@ -992,8 +997,7 @@ label,
 style: const TextStyle(
 fontSize: 11,
 color: _inkSoft,
-decoration: TextDecoration.underline,
-decorationColor: _inkSoft,
+decoration: TextDecoration.none,
 ),
 ),
 );
@@ -1088,8 +1092,7 @@ child: const Text(
 style: TextStyle(
 fontSize: 13,
 color: Color(0xFF9A866A),
-decoration: TextDecoration.underline,
-decorationColor: Color(0xFF9A866A),
+decoration: TextDecoration.none,
 ),
 ),
 ),

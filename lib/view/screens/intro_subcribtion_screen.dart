@@ -181,6 +181,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   /// Additive: when applying the one chosen Restore product, ignore prior stored
   /// plan tier (e.g. stale platinum) so the collected best can overwrite it.
   bool _forceApplyCollectedRestoreBest = false;
+  /// UI-only: suppress the late "No purchases…" toast after Restore Successful.
+  bool _restoreSuccessToastShown = false;
 
   /// Bundle prefix shared by 6M/1Y plans (e.g. com.balaklrapps.bibliasagradacatolica).
   String get _planBundlePrefix {
@@ -419,6 +421,39 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     _resetRestoreSessionSelection();
     _restoreCollectedProducts.clear();
     _restoreCollecting = true;
+    _restoreSuccessToastShown = false;
+  }
+
+  /// UI-only toast gate: never show failure after this session already restored,
+  /// and skip if premium is already active (avoids double toast on Reading).
+  void _showNoPurchasesToRestoreToast([DashBoardController? controller]) {
+    if (_restoreSuccessToastShown) {
+      debugPrint(
+        'Restore toast skipped: success already shown this session',
+      );
+      return;
+    }
+    try {
+      final c = controller ??
+          (Get.isRegistered<DashBoardController>()
+              ? Get.find<DashBoardController>()
+              : null);
+      if (c != null && c.adFree.value == true) {
+        debugPrint(
+          'Restore toast skipped: premium already active',
+        );
+        return;
+      }
+    } catch (_) {}
+    Constants.showToast('No purchases available to restore.');
+  }
+
+  /// UI-only: mark restore success so a late failure toast is suppressed.
+  void _showRestoreOrPurchaseSuccessToast(String message) {
+    if (message == 'Restore Successful') {
+      _restoreSuccessToastShown = true;
+    }
+    Constants.showToast(message);
   }
 
   void _queueRestoreProduct(String productId, String date) {
@@ -564,7 +599,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     _restoreCollecting = false;
     if (best == null) {
       EasyLoading.dismiss();
-      Constants.showToast('No purchases available to restore.');
+      _showNoPurchasesToRestoreToast(controller);
       if (widget.invisiblePurchaseHost) {
         _popInvisiblePurchaseHost(false);
       }
@@ -1960,7 +1995,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         if (startFlag == true) {
           await _addLifetimeWalletBonusOnce();
         }
-        Constants.showToast(successToastMessage);
+        _showRestoreOrPurchaseSuccessToast(successToastMessage);
         await SharPreferences.setBoolean('closead', true);
         await _completePaywallSubscriptionNavigation(
           startFlag: startFlag == true,
@@ -1987,7 +2022,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         }
         await Future.delayed(Duration(seconds: 1));
         EasyLoading.dismiss();
-        Constants.showToast(successToastMessage);
+        _showRestoreOrPurchaseSuccessToast(successToastMessage);
         await SharPreferences.setBoolean('closead', true);
         await _completePaywallSubscriptionNavigation(
           startFlag: startFlag == true,
@@ -2013,7 +2048,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         }
         await Future.delayed(Duration(seconds: 1));
         EasyLoading.dismiss();
-        Constants.showToast(successToastMessage);
+        _showRestoreOrPurchaseSuccessToast(successToastMessage);
         await SharPreferences.setBoolean('closead', true);
         await _completePaywallSubscriptionNavigation(
           startFlag: startFlag == true,
@@ -2036,7 +2071,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         }
         await Future.delayed(Duration(seconds: 1));
         EasyLoading.dismiss();
-        Constants.showToast(successToastMessage);
+        _showRestoreOrPurchaseSuccessToast(successToastMessage);
         await SharPreferences.setBoolean('closead', true);
         await _completePaywallSubscriptionNavigation(
           startFlag: startFlag == true,
@@ -3094,7 +3129,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       _restoreCollecting = false;
       EasyLoading.dismiss();
       DebugConsole.log("restore No active subscription available error - $e");
-      Constants.showToast('No purchases available to restore.');
+      _showNoPurchasesToRestoreToast(controller);
       if (widget.invisiblePurchaseHost) {
         _popInvisiblePurchaseHost(false);
       }

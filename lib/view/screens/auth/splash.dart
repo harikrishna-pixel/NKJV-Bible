@@ -5,6 +5,7 @@ import 'dart:io';
 import 'dart:math' hide log;
 
 import 'package:app_tracking_transparency/app_tracking_transparency.dart';
+import 'package:biblebookapp/utils/bible_book_resolve.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/view/screens/onboard_faith_screen.dart';
 import 'package:biblebookapp/view/screens/welcome_screen.dart';
@@ -1173,24 +1174,29 @@ class _SplashScreenState extends State<SplashScreen>
       for (var i = 0; i < 20 && i < newMainList.length; i++) {
         final m = newMainList[i];
 
-        final int verseNum = m["Verse"].toString().length == 2
-            ? int.parse(m["Verse"].toString()) - 1
-            : int.parse(m["Verse"].toString().split("-").first) - 1;
-
-        final selectedVerse = await db.rawQuery(
-          "SELECT * FROM verse WHERE book_num ='${int.parse(m["Book_Id"].toString()) - 1}' AND "
-              "chapter_num ='${int.parse(m["Chapter"].toString()) - 1}' "
-              "AND verse_num ='$verseNum'",
+        final selectedVerse = await BibleBookResolve.lookupVerseRowsForDailyMain(
+          db: db,
+          bookName: m["Book"]?.toString(),
+          bookId: int.parse(m["Book_Id"].toString()),
+          chapter1Based: int.parse(m["Chapter"].toString()),
+          verseRaw: m["Verse"].toString(),
         );
 
         if (selectedVerse.isNotEmpty) {
+          final bookNum = await BibleBookResolve.bookNumForDailyVerse(
+            bookName: m["Book"]?.toString(),
+            bookId: int.parse(m["Book_Id"].toString()),
+            db: db,
+          );
+          final localizedTitle =
+              await BibleBookResolve.titleForBookNum(bookNum, db: db);
           await db.transaction((txn) async {
             final batch = txn.batch();
             final date = DateTime.now().subtract(Duration(days: saveDay));
             batch.insert('dailyVerses', {
               "Category_Name": m["Category_Name"],
               "Category_Id": m["Category_Id"],
-              "Book": m["Book"],
+              "Book": localizedTitle ?? m["Book"],
               "Book_Id": m["Book_Id"],
               "Chapter": m["Chapter"],
               "Verse": selectedVerse[0]["content"],
@@ -1231,24 +1237,30 @@ class _SplashScreenState extends State<SplashScreen>
 
           final m = mainList[idx];
 
-          final int verseNum = m["Verse"].toString().length == 2
-              ? int.parse(m["Verse"].toString()) - 1
-              : int.parse(m["Verse"].toString().split("-").first) - 1;
-
-          final selectedVerse = await db.rawQuery(
-            "SELECT * FROM verse WHERE book_num ='${int.parse(m["Book_Id"].toString()) - 1}' AND "
-                "chapter_num ='${int.parse(m["Chapter"].toString()) - 1}' "
-                "AND verse_num ='$verseNum'",
+          final selectedVerse =
+              await BibleBookResolve.lookupVerseRowsForDailyMain(
+            db: db,
+            bookName: m["Book"]?.toString(),
+            bookId: int.parse(m["Book_Id"].toString()),
+            chapter1Based: int.parse(m["Chapter"].toString()),
+            verseRaw: m["Verse"].toString(),
           );
 
           if (selectedVerse.isNotEmpty) {
+            final bookNum = await BibleBookResolve.bookNumForDailyVerse(
+              bookName: m["Book"]?.toString(),
+              bookId: int.parse(m["Book_Id"].toString()),
+              db: db,
+            );
+            final localizedTitle =
+                await BibleBookResolve.titleForBookNum(bookNum, db: db);
             await db.transaction((txn) async {
               final batch = txn.batch();
               final date = DateTime.now();
               batch.insert('dailyVerses', {
                 "Category_Name": m["Category_Name"],
                 "Category_Id": m["Category_Id"],
-                "Book": m["Book"],
+                "Book": localizedTitle ?? m["Book"],
                 "Book_Id": m["Book_Id"],
                 "Chapter": m["Chapter"],
                 "Verse": selectedVerse[0]["content"],

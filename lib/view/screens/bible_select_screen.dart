@@ -10,7 +10,9 @@ import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/core/bible_extract_paths.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/main.dart';
+import 'package:biblebookapp/utils/bible_book_resolve.dart';
 import 'package:biblebookapp/utils/emoji_text_style.dart';
+import 'package:biblebookapp/utils/library_verse_flags_sync.dart';
 import 'package:biblebookapp/view/widget/thanks_for_love_rating_dialog_content.dart';
 import 'package:biblebookapp/view/constants/assets_constants.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
@@ -461,14 +463,8 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                                           );
                                         },
                                         onOpen: () async {
-                                          final prefs = await SharedPreferences
-                                              .getInstance();
-                                          final data =
-                                              prefs.getString("appreview1") ??
-                                                  "1";
-                                          if (data == '1') {
-                                            await _requestReview();
-                                          }
+                                          // Rating prompt removed here — first
+                                          // streak completion already shows it.
                                           setState(() {
                                             // Step 1: Reset all active folders to "open"
                                             buttonStates.updateAll((key, value) {
@@ -502,80 +498,90 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
                           isTablet ? size.width * 0.14 : 18,
                           isTablet ? 20 : 14,
                         ),
-                        child: SizedBox(
-                          width: double.infinity,
-                          height: isTablet ? 64 : 54,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xFF763201),
-                                  Color(0xFFD5821F),
-                                  Color(0xFF763201),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.transparent,
-                                shadowColor: Colors.transparent,
-                                elevation: 0,
-                                padding: EdgeInsets.symmetric(
-                                  vertical: isTablet ? 18 : 14,
-                                ),
-                                shape: RoundedRectangleBorder(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Loader above Continue CTA (not inside the button).
+                            if (isloading == true) ...[
+                              _bibleSwitchProgressBar(isTablet),
+                              SizedBox(height: isTablet ? 12 : 8),
+                            ],
+                            SizedBox(
+                              width: double.infinity,
+                              height: isTablet ? 64 : 54,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFF763201),
+                                      Color(0xFFD5821F),
+                                      Color(0xFF763201),
+                                    ],
+                                  ),
                                   borderRadius: BorderRadius.circular(14),
                                 ),
-                              ),
-                              onPressed: () async {
-                              if (isloading == true) return;
-                              setState(() {
-                                isloading = true;
-                                _progress = 0;
-                              });
-                              // await showClearDatabaseDialog(context);
-                              if (foldername != null &&
-                                  foldername!.isNotEmpty) {
-                                // 🔹 Save state after change
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.transparent,
+                                    shadowColor: Colors.transparent,
+                                    elevation: 0,
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: isTablet ? 18 : 14,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                  ),
+                                  onPressed: () async {
+                                    if (isloading == true) return;
+                                    setState(() {
+                                      isloading = true;
+                                      _progress = 0;
+                                    });
+                                    // await showClearDatabaseDialog(context);
+                                    if (foldername != null &&
+                                        foldername!.isNotEmpty) {
+                                      // 🔹 Save state after change
 
-                                // Navigate next
-                                if (widget.from == 'onboard') {
-                                  setState(() {
-                                    isloading = false;
-                                  });
-                                  await _saveButtonStates();
-                                  CustomAlertBox.show(context, () {
-                                    Get.to(() => PreferenceSelectionScreen(
-                                          isSetting: false,
-                                          selectedbible: foldername.toString(),
-                                        ));
-                                  });
-                                } else {
-                                  // Same switch flow as before — no confirm popup.
-                                  await _saveButtonStates();
-                                  await _runHomeBibleSwitchFlow();
-                                }
-                              } else {
-                                setState(() {
-                                  isloading = false;
-                                });
-                                Constants.showToast("Click Set as Default");
-                              }
-                            },
-                              child: isloading == true
-                                  ? _bibleSwitchProgressBar(isTablet)
-                                  : Text(
-                                "Continue",
-                                style: TextStyle(
-                                  fontFamily: 'Georgia',
-                                  fontSize: isTablet ? 20 : 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
+                                      // Navigate next
+                                      if (widget.from == 'onboard') {
+                                        setState(() {
+                                          isloading = false;
+                                        });
+                                        await _saveButtonStates();
+                                        CustomAlertBox.show(context, () {
+                                          Get.to(() => PreferenceSelectionScreen(
+                                                isSetting: false,
+                                                selectedbible:
+                                                    foldername.toString(),
+                                              ));
+                                        });
+                                      } else {
+                                        // Same switch flow as before — no confirm popup.
+                                        await _saveButtonStates();
+                                        await _runHomeBibleSwitchFlow();
+                                      }
+                                    } else {
+                                      setState(() {
+                                        isloading = false;
+                                      });
+                                      Constants.showToast(
+                                          "Click Set as Default");
+                                    }
+                                  },
+                                  child: Text(
+                                    "Continue",
+                                    style: TextStyle(
+                                      fontFamily: 'Georgia',
+                                      fontSize: isTablet ? 20 : 16,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
+                          ],
                         ),
                       ),
                     ],
@@ -1597,6 +1603,9 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
 
       // Step 6: Save flag in SharedPreferences
       await SharPreferences.setBoolean(SharPreferences.isLoadBookContent, true);
+
+      // Re-stamp My Library marks onto the fresh verse table (splash-style).
+      await LibraryVerseFlagsSync.reapplyToVerseTable();
     } catch (e, st) {
       debugPrint("testapp: Error loading verse content → $e\n$st");
     }
@@ -1725,24 +1734,29 @@ class BibleVersionsScreenState extends State<BibleVersionsScreen> {
     for (var i = 0; i < 20 && i < newMainList!.length; i++) {
       final m = newMainList[i];
 
-      final int verseNum = m["Verse"].toString().length == 2
-          ? int.parse(m["Verse"].toString()) - 1
-          : int.parse(m["Verse"].toString().split("-").first) - 1;
-
-      final selectedVerse = await db?.rawQuery(
-        "SELECT * FROM verse WHERE book_num ='${int.parse(m["Book_Id"].toString()) - 1}' "
-        "AND chapter_num ='${int.parse(m["Chapter"].toString()) - 1}' "
-        "AND verse_num ='$verseNum'",
+      final selectedVerse = await BibleBookResolve.lookupVerseRowsForDailyMain(
+        db: db,
+        bookName: m["Book"]?.toString(),
+        bookId: int.parse(m["Book_Id"].toString()),
+        chapter1Based: int.parse(m["Chapter"].toString()),
+        verseRaw: m["Verse"].toString(),
       );
 
-      if (selectedVerse!.isNotEmpty) {
+      if (selectedVerse.isNotEmpty) {
+        final bookNum = await BibleBookResolve.bookNumForDailyVerse(
+          bookName: m["Book"]?.toString(),
+          bookId: int.parse(m["Book_Id"].toString()),
+          db: db,
+        );
+        final localizedTitle =
+            await BibleBookResolve.titleForBookNum(bookNum, db: db);
         await db?.transaction((txn) async {
           final batch = txn.batch();
           final date = DateTime.now().subtract(Duration(days: saveDay));
           batch.insert('dailyVerses', {
             "Category_Name": m["Category_Name"],
             "Category_Id": m["Category_Id"],
-            "Book": m["Book"],
+            "Book": localizedTitle ?? m["Book"],
             "Book_Id": m["Book_Id"],
             "Chapter": m["Chapter"],
             "Verse": selectedVerse[0]
@@ -1910,103 +1924,10 @@ Future<List<VerseBookContentModel>> _parseVerseContent(
 }
 
 class CustomAlertBox {
+  /// UI only: skip the "A Beautiful Step Forward!" dialog and run the same
+  /// next-step callback that Next used to trigger. Call sites / selection logic unchanged.
   static void show(BuildContext context, onPressed) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600; // iPad vs iPhone
-    final screenWidth = MediaQuery.of(context).size.width;
-    showDialog(
-      context: context,
-      barrierDismissible: false, // must tap Next
-      builder: (context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          insetPadding: EdgeInsets.symmetric(
-            horizontal: isTablet ? size.width * 0.2 : 24,
-            vertical: isTablet ? size.height * 0.2 : 24,
-          ),
-          child: Padding(
-            padding: EdgeInsets.all(isTablet ? 32 : 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Bible Image/Icon
-                Image.asset(
-                  Images.appIcon1024, // replace with your Bible icon
-                  height: isTablet ? 100 : 70,
-                  fit: BoxFit.contain,
-                ),
-                const SizedBox(height: 20),
-
-                // Title
-                Text(
-                  "A Beautiful Step Forward!",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontSize: isTablet ? 24 : 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
-                      fontStyle: FontStyle.italic),
-                ),
-                const SizedBox(height: 12),
-
-                // Description
-                Text(
-                  "You've chosen a version that speaks\n to your heart!\n\n"
-                  "Let's take the next step together and\n find words meant just for you..",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: screenWidth < 380
-                        ? 14
-                        : isTablet
-                            ? 18
-                            : 16,
-                    height: 1.5,
-                    color: Colors.black,
-                  ),
-                ),
-                const SizedBox(height: 28),
-
-                // Next Button
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 45),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF7B5C3D),
-                        padding: EdgeInsets.symmetric(
-                          vertical: isTablet ? 18 : 14,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      onPressed: onPressed
-                      // () {
-                      //   Navigator.of(context).pop();
-                      //    // close alert
-                      //   // Navigate to next screen if needed
-                      // }
-                      ,
-                      child: Text(
-                        "Next",
-                        style: TextStyle(
-                          fontSize: isTablet ? 20 : 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                )
-              ],
-            ),
-          ),
-        );
-      },
-    );
+    onPressed();
   }
 }
 

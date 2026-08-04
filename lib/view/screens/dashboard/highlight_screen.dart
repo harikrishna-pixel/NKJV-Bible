@@ -23,6 +23,7 @@ import '../../constants/constant.dart';
 import '../../constants/share_preferences.dart';
 import 'package:biblebookapp/view/widget/library_list_ads_helper.dart';
 import 'package:biblebookapp/utils/library_bible_guard.dart';
+import 'package:biblebookapp/utils/library_bible_version_tag.dart';
 
 class HighLightScreen extends StatefulWidget {
   const HighLightScreen({super.key});
@@ -235,17 +236,20 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                                     height: 10,
                                                   ),
                                                   Row(
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment.end,
-                                                    children: [
-                                                      Text(
-                                                          "${data.bookName} ${data.chapterNum}:${data.verseNum}",
-                                                          textAlign:
-                                                              TextAlign.right,
-                                                          style: CommanStyle
-                                                              .black15400),
-                                                    ],
-                                                  ),
+                                                  children: [
+                                                    LibraryBibleVersionChip(
+                                                      bookName: data.bookName,
+                                                      content: data.content,
+                                                    ),
+                                                    const Spacer(),
+                                                    Text(
+                                                        "${data.bookName} ${data.chapterNum}:${data.verseNum}",
+                                                        textAlign:
+                                                            TextAlign.right,
+                                                        style: CommanStyle
+                                                            .black15400),
+                                                  ],
+                                                ),
                                                   const SizedBox(
                                                     height: 35,
                                                   ),
@@ -817,9 +821,22 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                   const SizedBox(
                                     height: 8,
                                   ),
-                                  Text(
-                                      "${data.bookName} ${data.chapterNum}:${data.verseNum}",
-                                      style: CommanStyle.bw14500(context)),
+                                  Row(
+                                    children: [
+                                      LibraryBibleVersionChip(
+                                        bookName: data.bookName,
+                                        content: data.content,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          "${data.bookName} ${data.chapterNum}:${data.verseNum}",
+                                          textAlign: TextAlign.right,
+                                          style: CommanStyle.bw14500(context),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                   const SizedBox(
                                     height: 8,
                                   ),
@@ -884,9 +901,12 @@ class _HighLightScreenState extends State<HighLightScreen> {
                                               height: 10,
                                             ),
                                             Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.end,
                                               children: [
+                                                LibraryBibleVersionChip(
+                                                  bookName: data.bookName,
+                                                  content: data.content,
+                                                ),
+                                                const Spacer(),
                                                 Text(
                                                     "${data.bookName} ${data.chapterNum}:${data.verseNum}",
                                                     textAlign: TextAlign.right,

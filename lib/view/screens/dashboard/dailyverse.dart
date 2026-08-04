@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:biblebookapp/constant/size_config.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
+import 'package:biblebookapp/utils/bible_book_resolve.dart';
 import 'package:biblebookapp/utils/custom_share.dart';
+import 'package:biblebookapp/utils/library_bible_guard.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
@@ -29,7 +31,6 @@ import '../../constants/images.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:biblebookapp/services/analytics/analytics_service.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
-import 'package:biblebookapp/utils/library_bible_guard.dart';
 
 String _normalizeDailyVerseRef(String s) =>
     s
@@ -461,9 +462,15 @@ class _DailyVerseState extends State<DailyVerse> {
                       InkWell(
                         onTap: () async {
                           final sheetContext = context;
-                          final bookName = data.book.toString();
+                          final bookNameStored = data.book.toString();
                           final bookId = int.parse(data.bookId.toString());
-                          final bookNum = dailyVerseBookNum(bookId);
+                          final bookNum = await BibleBookResolve.bookNumForDailyVerse(
+                            bookName: bookNameStored,
+                            bookId: bookId,
+                          );
+                          final bookName =
+                              await BibleBookResolve.titleForBookNum(bookNum) ??
+                                  bookNameStored;
                           final chapter = dailyVerseUiChapter(data.chapter);
                           final verseNum =
                               int.parse(data.verseNum.toString());

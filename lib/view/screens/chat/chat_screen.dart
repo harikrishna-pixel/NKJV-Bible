@@ -38,6 +38,7 @@ import 'package:biblebookapp/view/widget/ai_gemini_privacy_banner.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:biblebookapp/utils/levelplay_ads.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -121,6 +122,152 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   // UI labels that should not follow chat response language.
   String _tUi(String key) => ChatTranslations.get(key, _uiLang);
 
+  /// Existing chat language codes (same set used by Prayer/Chat AI prompts).
+  static const List<Map<String, String>> _chatLanguageOptions = [
+    {'code': 'EN', 'name': 'English'},
+    {'code': 'HI', 'name': 'Hindi'},
+    {'code': 'TN', 'name': 'Tamil'},
+    {'code': 'PT', 'name': 'Portuguese'},
+    {'code': 'SQ', 'name': 'Albanian'},
+    {'code': 'AM', 'name': 'Amharic'},
+    {'code': 'AR', 'name': 'Arabic'},
+    {'code': 'BN', 'name': 'Bengali'},
+    {'code': 'ZH', 'name': 'Chinese'},
+    {'code': 'FR', 'name': 'French'},
+    {'code': 'DE', 'name': 'German'},
+    {'code': 'EL', 'name': 'Greek'},
+    {'code': 'HE', 'name': 'Hebrew'},
+    {'code': 'IG', 'name': 'Igbo'},
+    {'code': 'ID', 'name': 'Indonesian'},
+    {'code': 'IT', 'name': 'Italian'},
+    {'code': 'JA', 'name': 'Japanese'},
+    {'code': 'KI', 'name': 'Kikuyu'},
+    {'code': 'RW', 'name': 'Kinyarwanda'},
+    {'code': 'KO', 'name': 'Korean'},
+    {'code': 'ML', 'name': 'Malayalam'},
+    {'code': 'MY', 'name': 'Burmese'},
+    {'code': 'NE', 'name': 'Nepali'},
+    {'code': 'ES', 'name': 'Spanish'},
+    {'code': 'PA', 'name': 'Punjabi'},
+    {'code': 'RO', 'name': 'Romanian'},
+    {'code': 'RU', 'name': 'Russian'},
+    {'code': 'SW', 'name': 'Swahili'},
+    {'code': 'SV', 'name': 'Swedish'},
+    {'code': 'TL', 'name': 'Tagalog'},
+    {'code': 'TE', 'name': 'Telugu'},
+    {'code': 'TW', 'name': 'Twi'},
+    {'code': 'UK', 'name': 'Ukrainian'},
+    {'code': 'UR', 'name': 'Urdu'},
+    {'code': 'VI', 'name': 'Vietnamese'},
+    {'code': 'YO', 'name': 'Yoruba'},
+    {'code': 'ZU', 'name': 'Zulu'},
+  ];
+
+  String get _selectedChatLanguageCode =>
+      AppApiConstant.chatLanguage.isNotEmpty
+          ? AppApiConstant.chatLanguage
+          : 'EN';
+
+  Future<void> _setChatLanguage(String code) async {
+    AppApiConstant.chatLanguage = code;
+    await SharPreferences.setString(SharPreferences.chatLanguage, code);
+    if (mounted) setState(() {});
+  }
+
+  void _showChangeLanguageSheet() {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDark = themeProvider.themeMode == ThemeMode.dark;
+    final selected = AppApiConstant.chatLanguage;
+    final bg = isDark ? CommanColor.darkPrimaryColor : const Color(0xFFF6F1E9);
+    final ink = isDark ? Colors.white : const Color(0xFF8D6E63);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Container(
+            height: MediaQuery.of(sheetContext).size.height * 0.62,
+            margin: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          ChatTranslations.get('select_language', _uiLang),
+                          style: TextStyle(
+                            color: ink,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        icon: Icon(Icons.close, color: ink),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _chatLanguageOptions.length,
+                    itemBuilder: (context, index) {
+                      final opt = _chatLanguageOptions[index];
+                      final code = opt['code']!;
+                      final name = opt['name']!;
+                      final isSelected = code == selected;
+                      return InkWell(
+                        onTap: () async {
+                          Navigator.pop(sheetContext);
+                          await _setChatLanguage(code);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  name,
+                                  style: TextStyle(
+                                    color: ink,
+                                    fontSize: 15,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    decoration: TextDecoration.none,
+                                  ),
+                                ),
+                              ),
+                              if (isSelected)
+                                Icon(Icons.check_circle, color: ink, size: 22),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -159,9 +306,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     });
 
     // Load interstitial for back-button ad (one ad when leaving Chat for unsubscribed).
+    // Prefer Unity LevelPlay (IronSource); keep existing AdMob preload as fallback.
     // Respect dashboard ads-disabled (same shouldLoadAd gate as Home).
     SharPreferences.shouldLoadAd().then((shouldLoad) {
       if (!shouldLoad || !mounted) return;
+      LevelPlayAds.instance.preloadChatInterstitial();
       _chatBackAdService.loadInterstitialAd(() {});
     });
   }
@@ -1151,7 +1300,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   /// Show interstitial and wait for dismiss (for back-button ad). One ad only for unsubscribed when leaving after activity.
+  /// Tries Unity LevelPlay (IronSource) first; falls back to existing AdMob path.
   Future<void> _showChatBackInterstitialAndWait() async {
+    final shownLevelPlay =
+        await LevelPlayAds.instance.showChatInterstitialAndWait();
+    if (shownLevelPlay) return;
+
     final completer = Completer<void>();
     final ad = _chatBackAdService.interstitialAd;
     if (ad == null) {
@@ -2806,7 +2960,42 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 4),
+                            // Change language (AI response language only).
+                            Tooltip(
+                              message: ChatTranslations.get(
+                                  'select_language', _uiLang),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(18),
+                                onTap: _showChangeLanguageSheet,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 4),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.translate_rounded,
+                                        size: screenWidth > 450 ? 22 : 20,
+                                        color: isDark
+                                            ? Colors.white
+                                            : const Color(0xFF8D6E63),
+                                      ),
+                                      Text(
+                                        _selectedChatLanguageCode,
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w700,
+                                          color: isDark
+                                              ? Colors.white
+                                              : const Color(0xFF8D6E63),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
                             // IconButton(
                             //   icon: Image.asset(
                             //     "assets/message-time.png",

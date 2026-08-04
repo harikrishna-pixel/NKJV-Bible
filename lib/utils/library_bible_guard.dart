@@ -80,21 +80,13 @@ class LibraryBibleGuard {
   }
 
   /// Shows toast and returns false when item is from another Bible.
+  /// UI gate disabled: always allow navigation (same as pre-guard behavior).
   static Future<bool> allowReadOrToast({
     required num? bookNum,
     required num? chapterNum,
     required num? verseNum,
     String? savedContent,
   }) async {
-    final ok = await matchesCurrentBible(
-      bookNum: bookNum,
-      chapterNum: chapterNum,
-      verseNum: verseNum,
-      savedContent: savedContent,
-    );
-    if (!ok) {
-      Constants.showToast(differentBibleMessage, 2500);
-    }
-    return ok;
+    return true;
   }
 }

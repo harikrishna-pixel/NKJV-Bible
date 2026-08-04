@@ -23,6 +23,7 @@ import '../../constants/constant.dart';
 import '../../constants/share_preferences.dart';
 import 'package:biblebookapp/view/widget/library_list_ads_helper.dart';
 import 'package:biblebookapp/utils/library_bible_guard.dart';
+import 'package:biblebookapp/utils/library_bible_version_tag.dart';
 
 class BookMarkScreen extends StatefulWidget {
   const BookMarkScreen({super.key});
@@ -224,9 +225,13 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                                   height: 10,
                                                 ),
                                                 Row(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment.end,
                                                   children: [
+                                                    LibraryBibleVersionChip(
+                                                      bookName: data.bookName,
+                                                      content: data.content ??
+                                                          data.plaincontent,
+                                                    ),
+                                                    const Spacer(),
                                                     Text(
                                                         "${data.bookName} ${data.chapterNum}:${data.verseNum}",
                                                         textAlign:
@@ -885,9 +890,22 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                   const SizedBox(
                                     height: 8,
                                   ),
-                                  Text(
-                                    "${data.bookName} ${data.chapterNum}:${data.verseNum}",
-                                    style: CommanStyle.bw14500(context),
+                                  Row(
+                                    children: [
+                                      LibraryBibleVersionChip(
+                                        bookName: data.bookName,
+                                        content:
+                                            data.content ?? data.plaincontent,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          "${data.bookName} ${data.chapterNum}:${data.verseNum}",
+                                          textAlign: TextAlign.right,
+                                          style: CommanStyle.bw14500(context),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                   const SizedBox(
                                     height: 8,
@@ -952,9 +970,13 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                                               height: 10,
                                             ),
                                             Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.end,
                                               children: [
+                                                LibraryBibleVersionChip(
+                                                  bookName: data.bookName,
+                                                  content: data.content ??
+                                                      data.plaincontent,
+                                                ),
+                                                const Spacer(),
                                                 Text(
                                                     "${data.bookName} ${data.chapterNum}:${data.verseNum}",
                                                     textAlign: TextAlign.right,
