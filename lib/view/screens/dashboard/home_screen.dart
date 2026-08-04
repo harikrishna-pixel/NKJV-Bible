@@ -19,6 +19,9 @@ import 'package:biblebookapp/utils/debugprint.dart';
 import 'package:biblebookapp/utils/emoji_text_style.dart';
 import 'package:biblebookapp/utils/internet_speed_checker.dart';
 import 'package:biblebookapp/utils/library_bible_guard.dart';
+import 'package:biblebookapp/utils/levelplay_ad_gate.dart';
+import 'package:biblebookapp/utils/levelplay_banner_native_widgets.dart';
+import 'package:biblebookapp/utils/levelplay_placements.dart';
 import 'package:biblebookapp/utils/network_error_message.dart';
 import 'package:biblebookapp/view/widget/thanks_for_love_rating_dialog_content.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
@@ -1824,8 +1827,13 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   // Helper method to show interstitial ad and wait for dismissal (for good internet)
-  // This ensures ad shows FIRST, then content shows AFTER ad is dismissed
-  Future<void> _showInterstitialAdAndWait() async {
+  // LevelPlay first (placement), then existing AdMob path.
+  Future<void> _showInterstitialAdAndWait({
+    String placement = LevelPlayPlacements.readingClickCountInterstitial,
+  }) async {
+    final levelPlayShown = await LevelPlayAdGate.tryInterstitial(placement);
+    if (levelPlayShown) return;
+
     final completer = Completer<void>();
 
     // Check if ad is available
@@ -1875,7 +1883,9 @@ class _HomeScreenState extends State<HomeScreen>
     final fab = _readerAudioFabKey.currentState;
     await fab?.pausePlaybackForAd();
     try {
-      await _showInterstitialAdAndWait();
+      await _showInterstitialAdAndWait(
+        placement: LevelPlayPlacements.chapterEndInterstitial,
+      );
     } finally {
       await fab?.resumePlaybackAfterAd();
     }
@@ -4087,11 +4097,18 @@ class _HomeScreenState extends State<HomeScreen>
                       debugPrint(
                           "now Chapter and count is $swipeCount $_swipeThreshold");
                       await Future.delayed(Duration(milliseconds: 500));
-                      if (_adService.interstitialAd != null &&
-                          controller.adFree.value == false) {
+                      if (controller.adFree.value == false) {
                         EasyLoading.showInfo('Please wait...');
                         await SharPreferences.setString('OpenAd', '1');
-                        _adService.showInterstitialAd();
+                        await LevelPlayAdGate.interstitialOrFallback(
+                          placementName:
+                              LevelPlayPlacements.chapterBetweenInterstitial,
+                          admobFallback: () async {
+                            if (_adService.interstitialAd != null) {
+                              _adService.showInterstitialAd();
+                            }
+                          },
+                        );
                       }
                     }
                     debugPrint(
@@ -4119,11 +4136,18 @@ class _HomeScreenState extends State<HomeScreen>
                       debugPrint(
                           "now Chapter and count is $swipeCount $_swipeThreshold");
                       await Future.delayed(Duration(milliseconds: 600));
-                      if (_adService.interstitialAd != null &&
-                          controller.adFree.value == false) {
+                      if (controller.adFree.value == false) {
                         EasyLoading.showInfo('Please wait...');
                         await SharPreferences.setString('OpenAd', '1');
-                        _adService.showInterstitialAd();
+                        await LevelPlayAdGate.interstitialOrFallback(
+                          placementName:
+                              LevelPlayPlacements.chapterBetweenInterstitial,
+                          admobFallback: () async {
+                            if (_adService.interstitialAd != null) {
+                              _adService.showInterstitialAd();
+                            }
+                          },
+                        );
                       }
                     }
                     debugPrint(
@@ -4450,9 +4474,7 @@ class _HomeScreenState extends State<HomeScreen>
                                                                 }
 
                                                                 // Only show ad if online with good connection
-                                                                      if (_adService.interstitialAd !=
-                                                                        null &&
-                                                                          controller.adFree.value ==
+                                                                      if (controller.adFree.value ==
                                                                         false) {
                                                                   // Check if 3 minutes have passed since last ad
                                                                   final canShowAd =
@@ -4750,7 +4772,7 @@ class _HomeScreenState extends State<HomeScreen>
                                                                           }
 
                                                                           // Only show ad if online with good connection
-                                                                                if (_adService.interstitialAd != null && controller.adFree.value == false) {
+                                                                                if (controller.adFree.value == false) {
                                                                             // Check if 3 minutes have passed since last ad
                                                                                   final canShowAd = await _canShowMarkAsReadAd();
                                                                             if (canShowAd) {
@@ -4881,7 +4903,13 @@ class _HomeScreenState extends State<HomeScreen>
                                                                           bottom:
                                                                               40),
                                                                   child:
-                                                                      SizedBox(
+                                                                      LevelPlayBannerSlot(
+                                                                    height: ad
+                                                                        .size
+                                                                        .height
+                                                                        .toDouble(),
+                                                                    fallback:
+                                                                        SizedBox(
                                                                     height: ad
                                                                         .size
                                                                         .height
@@ -4893,6 +4921,7 @@ class _HomeScreenState extends State<HomeScreen>
                                                                           child:
                                                                               AdWidget(ad: ad),
                                                                   ),
+                                                                      ),
                                                                 );
                                                               }
                                                             } catch (e) {

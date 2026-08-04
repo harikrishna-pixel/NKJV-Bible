@@ -60,12 +60,8 @@ class BibleInfo {
   // AD Enable - Set to true to enable ads, false to disable
   static bool enableAds = true;
 
-  /// Unity LevelPlay (IronSource) — Chat back interstitial.
-  /// App key from LevelPlay dashboard. Interstitial Ad Unit IDs are also
-  /// required (Setup → Ad Units); leave blank to keep existing AdMob path.
-  static const String ironSourceAppKey = '2771bee45';
-  static const String ironSourceInterstitialAdUnitIdAndroid = '';
-  static const String ironSourceInterstitialAdUnitIdIos = '';
+  // LevelPlay App Key + Ad Unit IDs: fetched from API Network-1 fields
+  // (see LevelPlayConfig). Do not hardcode here.
 
   // Ads IDs - Android
   static String adsGoogleBannerIdAndroid = "";
@@ -241,4 +237,25 @@ class BibleInfo {
       },
     ];
   }
+}
+
+/// Unity LevelPlay placement names (must match dashboard exactly).
+class AdPlacements {
+  AdPlacements._();
+
+  // Interstitial
+  static const String chapterEndInterstitial = 'chapter_end_interstitial';
+  static const String chapterBetweenInterstitial =
+      'chapter_between_interstitial';
+  static const String readingClickCountInterstitial =
+      'reading_clickcount_interstitial';
+  static const String wallpaperBetweenInterstitial =
+      'wallpaper_between_interstitial';
+  static const String wallpaperDownloadInterstitial =
+      'wallpaper_download_interstitial';
+
+  // Rewarded
+  static const String wallpaperDownloadRewarded =
+      'wallpaper_download_rewarded';
+  static const String walletCreditRewarded = 'wallet_credit_rewarded';
 }

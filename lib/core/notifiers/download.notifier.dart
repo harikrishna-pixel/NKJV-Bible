@@ -10,6 +10,8 @@ import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/utils/bible_book_resolve.dart';
 import 'package:biblebookapp/utils/custom_alert.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
+import 'package:biblebookapp/utils/levelplay_ad_gate.dart';
+import 'package:biblebookapp/utils/levelplay_placements.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
@@ -812,7 +814,12 @@ class DownloadProvider with ChangeNotifier {
       EasyLoading.showInfo('Please wait...');
       await Future.delayed(const Duration(seconds: 2));
       if (context.mounted) {
-        _loadAndShowInterstitialAd(context);
+        await LevelPlayAdGate.interstitialOrFallback(
+          placementName: LevelPlayPlacements.readingClickCountInterstitial,
+          admobFallback: () async {
+            _loadAndShowInterstitialAd(context);
+          },
+        );
       }
       EasyLoading.dismiss();
       // Reset counter after showing ad

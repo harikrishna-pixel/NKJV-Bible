@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'package:biblebookapp/Model/category_model.dart';
+import 'package:biblebookapp/utils/levelplay_banner_native_widgets.dart';
 import 'package:biblebookapp/utils/network_error_message.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/images.dart';
@@ -215,7 +216,10 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                                     crossAxisCellCount:
                                         screenWidth > 450 ? 3 : 2,
                                     mainAxisCellCount: 1.9,
-                                    child: AdWidget(ad: nativeAds[adIndex]),
+                                    child: LevelPlayNativeSlot(
+                                      height: 280,
+                                      fallback: AdWidget(ad: nativeAds[adIndex]),
+                                    ),
                                   );
                                 } else {
                                   loadAds(); // Load more ads if needed

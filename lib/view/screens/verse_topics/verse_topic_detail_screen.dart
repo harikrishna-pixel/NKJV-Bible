@@ -6,6 +6,9 @@ import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/utils/custom_share.dart';
+import 'package:biblebookapp/utils/levelplay_ad_gate.dart';
+import 'package:biblebookapp/utils/levelplay_banner_native_widgets.dart';
+import 'package:biblebookapp/utils/levelplay_placements.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
@@ -178,7 +181,10 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
     if (_actionTapCount % 10 == 0) {
       final shouldLoad = await SharPreferences.shouldLoadAd();
       if (shouldLoad && mounted) {
-        await _adService.showInterstitialAdAndWait();
+        await LevelPlayAdGate.interstitialOrFallback(
+          placementName: LevelPlayPlacements.readingClickCountInterstitial,
+          admobFallback: () => _adService.showInterstitialAdAndWait(),
+        );
       }
     }
     if (!mounted) return;
@@ -187,17 +193,23 @@ class _VerseTopicDetailScreenState extends State<VerseTopicDetailScreen>
 
   Widget _buildInlineBanner(int slotIndex) {
     final ad = _bannerAds[slotIndex];
-    if (ad == null) {
-      return const SizedBox(height: 12);
-    }
+    final admob = ad == null
+        ? const SizedBox(height: 12)
+        : Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Center(
+              child: SizedBox(
+                width: ad.size.width.toDouble(),
+                height: ad.size.height.toDouble(),
+                child: AdWidget(key: ValueKey('topic-banner-$slotIndex'), ad: ad),
+              ),
+            ),
+          );
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
-      child: Center(
-        child: SizedBox(
-          width: ad.size.width.toDouble(),
-          height: ad.size.height.toDouble(),
-          child: AdWidget(key: ValueKey('topic-banner-$slotIndex'), ad: ad),
-        ),
+      child: LevelPlayBannerSlot(
+        height: ad?.size.height.toDouble() ?? 50,
+        fallback: admob,
       ),
     );
   }

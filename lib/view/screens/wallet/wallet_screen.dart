@@ -21,6 +21,9 @@ import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:biblebookapp/utils/internet_speed_checker.dart';
+import 'package:biblebookapp/utils/levelplay_ad_gate.dart';
+import 'package:biblebookapp/utils/levelplay_ads.dart';
+import 'package:biblebookapp/utils/levelplay_placements.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 
 class WalletScreen extends StatefulWidget {
@@ -982,11 +985,47 @@ class _WalletScreenState extends State<WalletScreen> {
       // Capture remaining before showing ad to avoid off-by-one toast
       await _refreshRemainingAdsToday();
 
+      await SharPreferences.setString('OpenAd', '1');
+
+      // LevelPlay first (does not require AdMob to be loaded).
+      final levelPlayResult = await LevelPlayAdGate.tryRewarded(
+        LevelPlayPlacements.walletCreditRewarded,
+      );
+      if (levelPlayResult != null) {
+        if (levelPlayResult == true) {
+          try {
+            final newBalance = await WalletService.watchAdForCredits();
+            if (newBalance != null) {
+              if (_cachedPrefs != null) {
+                await _cachedPrefs!.setInt('user_wallet_credits', newBalance);
+              }
+              await _loadCredits();
+              await _refreshRemainingAdsToday();
+              await _checkMaxAdsWatched();
+              Constants.showToast(
+                  'Watched ad! Received 50 credits.', _walletToastMs);
+            } else {
+              await _refreshRemainingAdsToday();
+              Constants.showToast(
+                  'You have already watched 2 ads today', _walletToastMs);
+            }
+          } catch (e) {
+            debugPrint(
+                'WalletScreen: Error giving credits after LevelPlay: $e');
+            Constants.showToast(
+                'Error processing credits. Please try again.', _walletToastMs);
+          }
+        }
+        LevelPlayAds.instance.preloadRewarded();
+        return;
+      }
+
       // Check if ad is loaded
       if (!_isRewardedAdLoaded || _rewardedAd == null) {
         Constants.showToast(
             'Ad is loading. Please try again in a moment.', _walletToastMs);
         _loadRewardedAd(); // Try to load ad
+        LevelPlayAds.instance.preloadRewarded();
         return;
       }
 
@@ -1015,9 +1054,6 @@ class _WalletScreenState extends State<WalletScreen> {
           _loadRewardedAd();
         },
       );
-
-      // Prevent app open ad from showing immediately after rewarded watch flow
-      await SharPreferences.setString('OpenAd', '1');
 
       adToShow.show(
         onUserEarnedReward: (AdWithoutView ad, RewardItem reward) async {

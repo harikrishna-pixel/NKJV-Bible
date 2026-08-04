@@ -7,6 +7,8 @@ import 'package:biblebookapp/constant/size_config.dart';
 import 'package:biblebookapp/services/background_api_service.dart';
 import 'package:biblebookapp/utils/book_apps_helper.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
+import 'package:biblebookapp/utils/levelplay_ads.dart';
+import 'package:biblebookapp/utils/levelplay_config.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
@@ -350,6 +352,17 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
 
     // Save all ad-related preferences
     await _saveAdPreferences(adIds, value);
+
+    // LevelPlay (IronSource): API Network-1 → cache → init (AdMob unchanged)
+    try {
+      final levelPlayIds = await LevelPlayConfig.saveFromApi(value.data);
+      await LevelPlayAds.instance.applyIds(levelPlayIds);
+      if (!isAdsDisabled && levelPlayIds.hasAppKey) {
+        unawaited(LevelPlayAds.instance.bootstrapFromConfig());
+      }
+    } catch (e) {
+      debugPrint('LevelPlay config save/init error: $e');
+    }
 
     // Initialize ads if not disabled
     if (!isAdsDisabled) {

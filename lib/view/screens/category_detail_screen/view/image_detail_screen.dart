@@ -6,6 +6,9 @@ import 'package:biblebookapp/Model/image_model.dart';
 import 'package:biblebookapp/constant/size_config.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
+import 'package:biblebookapp/utils/levelplay_ad_gate.dart';
+import 'package:biblebookapp/utils/levelplay_banner_native_widgets.dart';
+import 'package:biblebookapp/utils/levelplay_placements.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/images.dart';
@@ -633,49 +636,63 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
                                       ConnectivityResult.wifi ||
                                   connectivityResult.first ==
                                       ConnectivityResult.mobile) {
-                                RewardedAdService.loadAd(
-                                    onAdLoaded: () {
-                                      if (context.mounted) {
-                                        setState(() => isAdReady = true);
-                                      }
-                                    },
-                                    onAdFailed: () async {
-                                      setState(
-                                        () {
-                                          clickCount = 3;
+                                await LevelPlayAdGate.rewardedOrFallback(
+                                  placementName: LevelPlayPlacements
+                                      .wallpaperDownloadRewarded,
+                                  onRewardEarned: () async {
+                                    _handleReward();
+                                    await SharPreferences.setBoolean(
+                                        "downloadreward", true);
+                                    Constants.showToast(
+                                        "Reward unlocked! Download 3 more images for free",
+                                        6000);
+                                  },
+                                  admobFallback: () async {
+                                    RewardedAdService.loadAd(
+                                        onAdLoaded: () {
+                                          if (context.mounted) {
+                                            setState(() => isAdReady = true);
+                                          }
                                         },
-                                      );
-                                      Constants.showToast(
-                                          "Ad not available image1", 6000);
-                                      await SharPreferences.setInt(
-                                          "downloadrewardcount", 3);
-                                    },
-                                    data: "imaged");
-                                if (isAdReady) {
-                                  await SharPreferences.setString(
-                                      'OpenAd', '1');
-                                  RewardedAdService.showAd(
-                                      onRewardEarned: _handleReward,
-                                      onAdDismissed: () async {
-                                        // setState(() => isAdReady = false);
-                                        await SharPreferences.setBoolean(
-                                            "downloadreward", true);
-                                        Constants.showToast(
-                                            "Reward unlocked! Download 3 more images for free",
-                                            6000);
-                                        RewardedAdService.loadAd(
-                                            onAdLoaded: () {
-                                              setState(() => isAdReady = true);
+                                        onAdFailed: () async {
+                                          setState(
+                                            () {
+                                              clickCount = 3;
                                             },
-                                            onAdFailed: () {
-                                              Constants.showToast(
-                                                  "Ad not available. image 2",
-                                                  6000);
-                                            },
-                                            data: "imaged");
-                                      },
-                                      data: "image d");
-                                }
+                                          );
+                                          Constants.showToast(
+                                              "Ad not available image1", 6000);
+                                          await SharPreferences.setInt(
+                                              "downloadrewardcount", 3);
+                                        },
+                                        data: "imaged");
+                                    if (isAdReady) {
+                                      await SharPreferences.setString(
+                                          'OpenAd', '1');
+                                      RewardedAdService.showAd(
+                                          onRewardEarned: _handleReward,
+                                          onAdDismissed: () async {
+                                            await SharPreferences.setBoolean(
+                                                "downloadreward", true);
+                                            Constants.showToast(
+                                                "Reward unlocked! Download 3 more images for free",
+                                                6000);
+                                            RewardedAdService.loadAd(
+                                                onAdLoaded: () {
+                                                  setState(
+                                                      () => isAdReady = true);
+                                                },
+                                                onAdFailed: () {
+                                                  Constants.showToast(
+                                                      "Ad not available. image 2",
+                                                      6000);
+                                                },
+                                                data: "imaged");
+                                          },
+                                          data: "image d");
+                                    }
+                                  },
+                                );
                               } else {
                                 Constants.showToast(
                                     'No Internet Connection', 6000);
@@ -928,19 +945,28 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
 
   void openAd(ImageModel imageModel, bool isDownloadImage) async {
     final shouldLoadAd = await SharPreferences.shouldLoadAd();
-    if (shouldLoadAd) {
-      if (_adService.rewardedInterstitialAd != null) {
-        _adService.rewardedInterstitialAd?.show(
-            onUserEarnedReward: (AdWithoutView ad, RewardItem rewardItem) {
-          downloadImage(imageModel, isDownloadImage: isDownloadImage);
-          _adService.loadRewardedInterstitialAds(() {});
-          SharPreferences.setString(
-              SharPreferences.lastInterstitialRewardedAdPlayedTime,
-              DateTime.now().toString());
-        });
-      } else {
+    if (!shouldLoadAd) {
+      downloadImage(imageModel, isDownloadImage: isDownloadImage);
+      return;
+    }
+
+    final shownLevelPlay = await LevelPlayAdGate.tryInterstitial(
+      LevelPlayPlacements.wallpaperDownloadInterstitial,
+    );
+    if (shownLevelPlay) {
+      downloadImage(imageModel, isDownloadImage: isDownloadImage);
+      return;
+    }
+
+    if (_adService.rewardedInterstitialAd != null) {
+      _adService.rewardedInterstitialAd?.show(
+          onUserEarnedReward: (AdWithoutView ad, RewardItem rewardItem) {
         downloadImage(imageModel, isDownloadImage: isDownloadImage);
-      }
+        _adService.loadRewardedInterstitialAds(() {});
+        SharPreferences.setString(
+            SharPreferences.lastInterstitialRewardedAdPlayedTime,
+            DateTime.now().toString());
+      });
     } else {
       downloadImage(imageModel, isDownloadImage: isDownloadImage);
     }
@@ -1102,17 +1128,19 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
                         }
                         if (val > 0 &&
                             val % adcountview == 0 &&
-                            shouldLoadAd &&
-                            _adService._interstitialAd != null) {
-                          if (_adService._isInterstitialAdLoaded) {
-                            EasyLoading.showInfo('Please wait...');
-                            await SharPreferences.setString('OpenAd', '1');
-                            _adService.showInterstitialAd();
-
-                            // Future.delayed(Duration.zero, () {
-                            //   showAd.value = false;
-                            // });
-                          }
+                            shouldLoadAd) {
+                          EasyLoading.showInfo('Please wait...');
+                          await SharPreferences.setString('OpenAd', '1');
+                          await LevelPlayAdGate.interstitialOrFallback(
+                            placementName: LevelPlayPlacements
+                                .wallpaperBetweenInterstitial,
+                            admobFallback: () async {
+                              if (_adService._interstitialAd != null &&
+                                  _adService._isInterstitialAdLoaded) {
+                                _adService.showInterstitialAd();
+                              }
+                            },
+                          );
                         }
                         if (context.mounted) {
                           setState(() {
@@ -1260,13 +1288,21 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
               const SizedBox(
                 height: 6,
               ),
-              (!showAd.value && _adService.bannerAd != null)
+              (!showAd.value)
                   ? Padding(
                       padding: const EdgeInsets.only(top: 15),
-                      child: SizedBox(
-                        height: _adService.bannerAd!.size.height.toDouble(),
-                        width: _adService.bannerAd!.size.width.toDouble(),
-                        child: AdWidget(ad: _adService.bannerAd!),
+                      child: LevelPlayBannerSlot(
+                        height: (_adService.bannerAd?.size.height.toDouble() ??
+                            50),
+                        fallback: (_adService.bannerAd != null)
+                            ? SizedBox(
+                                height:
+                                    _adService.bannerAd!.size.height.toDouble(),
+                                width:
+                                    _adService.bannerAd!.size.width.toDouble(),
+                                child: AdWidget(ad: _adService.bannerAd!),
+                              )
+                            : const SizedBox(height: 12),
                       ),
                     )
                   : const SizedBox(height: 12),

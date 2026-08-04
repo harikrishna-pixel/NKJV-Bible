@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import 'package:biblebookapp/utils/levelplay_ad_gate.dart';
+import 'package:biblebookapp/utils/levelplay_banner_native_widgets.dart';
+import 'package:biblebookapp/utils/levelplay_placements.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
@@ -122,17 +125,23 @@ class LibraryListAdsHelper {
   Widget buildInlineBanner(int zeroBasedIndex, {required String keyPrefix}) {
     final slot = _slotForIndex(zeroBasedIndex);
     final ad = _bannerAds[slot];
-    if (ad == null) {
-      return const SizedBox(height: 12);
-    }
+    final admob = ad == null
+        ? const SizedBox(height: 12)
+        : Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 14),
+            child: Center(
+              child: SizedBox(
+                width: ad.size.width.toDouble(),
+                height: ad.size.height.toDouble(),
+                child: AdWidget(key: ValueKey('$keyPrefix-banner-$slot'), ad: ad),
+              ),
+            ),
+          );
     return Padding(
       padding: const EdgeInsets.only(top: 8, bottom: 14),
-      child: Center(
-        child: SizedBox(
-          width: ad.size.width.toDouble(),
-          height: ad.size.height.toDouble(),
-          child: AdWidget(key: ValueKey('$keyPrefix-banner-$slot'), ad: ad),
-        ),
+      child: LevelPlayBannerSlot(
+        height: ad?.size.height.toDouble() ?? 50,
+        fallback: admob,
       ),
     );
   }
@@ -143,7 +152,10 @@ class LibraryListAdsHelper {
     if (actionTapCount % 10 == 0) {
       final shouldLoad = await SharPreferences.shouldLoadAd();
       if (shouldLoad) {
-        await _adService.showInterstitialAdAndWait();
+        await LevelPlayAdGate.interstitialOrFallback(
+          placementName: LevelPlayPlacements.readingClickCountInterstitial,
+          admobFallback: () => _adService.showInterstitialAdAndWait(),
+        );
       }
     }
     await action();

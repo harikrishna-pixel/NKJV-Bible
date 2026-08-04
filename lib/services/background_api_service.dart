@@ -7,6 +7,8 @@ import 'package:biblebookapp/Model/get_audio_model.dart';
 import 'package:biblebookapp/services/paywall_preload_service.dart';
 import 'package:biblebookapp/utils/book_apps_helper.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
+import 'package:biblebookapp/utils/levelplay_ads.dart';
+import 'package:biblebookapp/utils/levelplay_config.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -152,6 +154,17 @@ class BackgroundApiService {
       } else {
         // We can't access BibleInfo here, so we'll let the controller handle it
         isAdsDisabled = false;
+      }
+
+      // LevelPlay (IronSource): API Network-1 → cache (AdMob unchanged)
+      try {
+        final levelPlayIds = await LevelPlayConfig.saveFromApi(value.data);
+        await LevelPlayAds.instance.applyIds(levelPlayIds);
+        if (!isAdsDisabled && levelPlayIds.hasAppKey) {
+          unawaited(LevelPlayAds.instance.bootstrapFromConfig());
+        }
+      } catch (e) {
+        debugPrint('Background API: LevelPlay config error: $e');
       }
 
       // Update ads status in preferences
