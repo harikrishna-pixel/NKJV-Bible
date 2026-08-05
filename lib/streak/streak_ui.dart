@@ -124,9 +124,10 @@ class StreakIconButton extends StatelessWidget {
         final showNotificationDot = state?.showNotificationDot ?? false;
 
         final todayComplete = state?.todayComplete ?? false;
-        // Not completed today: outlined badge + red dart (screenshot style).
-        // Completed today: full orange filled badge (old style), no dart.
+        // Has streak but not done today: gray outlined badge + red dart.
+        // Completed today: full orange filled badge, no dart.
         final showOutlinedPending = showCountBadge && !todayComplete;
+        const pendingGray = Color(0xFF9E9E9E);
 
         return InkWell(
           onTap: () => Get.to(() => const DailyJourneyScreen()),
@@ -149,8 +150,7 @@ class StreakIconButton extends StatelessWidget {
                           borderRadius: BorderRadius.circular(20),
                           border: showOutlinedPending
                               ? Border.all(
-                                  color: const Color(0xFFE65100)
-                                      .withOpacity(0.55),
+                                  color: pendingGray.withOpacity(0.65),
                                   width: 1.4,
                                 )
                               : null,
@@ -172,7 +172,7 @@ class StreakIconButton extends StatelessWidget {
                               Icons.local_fire_department_rounded,
                               size: iconSize * 0.85,
                               color: showOutlinedPending
-                                  ? const Color(0xFFE65100)
+                                  ? pendingGray
                                   : Colors.white,
                             ),
                             SizedBox(width: iconSize * 0.15),
@@ -182,7 +182,7 @@ class StreakIconButton extends StatelessWidget {
                                 fontSize: iconSize * 0.7,
                                 fontWeight: FontWeight.w700,
                                 color: showOutlinedPending
-                                    ? const Color(0xFFE65100)
+                                    ? pendingGray
                                     : Colors.white,
                                 height: 1,
                               ),

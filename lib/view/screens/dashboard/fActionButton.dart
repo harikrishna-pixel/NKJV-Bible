@@ -81,6 +81,8 @@ class floatingButtonState extends State<floatingButton>
   bool _wasAudioPlayingBeforeClose = false;
   // Store book name to preserve it when reopening
   String? _storedBookName;
+  // Only newest audio→reader sync may apply (rapid next/prev race).
+  int _readingChapterSyncGeneration = 0;
 
   // Add this for background audio
   late AudioHandler _audioHandler;
@@ -243,14 +245,19 @@ class floatingButtonState extends State<floatingButton>
           : lastChapter;
 
       if (audioChapterNum < effectiveLastChapter) {
-        audioChapterNum++;
+        // Reader first, then audio — prevents player showing N while header stays behind.
+        final nextChapter = audioChapterNum + 1;
+        await updateReadingScreenChapter(nextChapter);
+        if (!mounted) {
+          releaseAdvanceGuard(delayMs: 0);
+          return;
+        }
+        audioChapterNum = nextChapter;
         audioBaseUrl =
             "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$audioChapterNum.mp3";
         if (mounted) {
           _mp3UiSetState(() {});
         }
-        // Update reading screen to match audio chapter - do this before loading audio
-        await updateReadingScreenChapter(audioChapterNum);
 
         // Stop TTS if it's playing
         if (isSpeech && _isTtsInitialized) {
@@ -1277,21 +1284,26 @@ class floatingButtonState extends State<floatingButton>
 
   // Helper method to update reading screen when audio chapter changes
   Future<void> updateReadingScreenChapter(int chapterNum) async {
+    // Newest sync wins — older in-flight syncs must not overwrite the reader.
+    final syncId = ++_readingChapterSyncGeneration;
     try {
-      // Update shared preferences first
+      // Update reader chapter first so header cannot stay behind audio UI.
+      if (Get.isRegistered<DashBoardController>()) {
+        final controller = Get.find<DashBoardController>();
+        controller.selectedChapter.value = chapterNum.toString();
+        controller.selectedChapterForRead.value = chapterNum.toString();
+        controller.selectChapterChange.value = chapterNum;
+      }
+
       await SharPreferences.setString(
           SharPreferences.selectedChapter, chapterNum.toString());
 
-      // Small delay to ensure SharedPreferences is fully written
-      await Future.delayed(const Duration(milliseconds: 150));
+      if (syncId != _readingChapterSyncGeneration || !mounted) return;
 
-      // Update local selectedChapter to keep in sync
-      if (mounted) {
-        setState(() {
-          selectedChapter = chapterNum;
-          audioChapterNum = chapterNum;
-        });
-      }
+      setState(() {
+        selectedChapter = chapterNum;
+        audioChapterNum = chapterNum;
+      });
 
       // Update the reading screen via controller
       try {
@@ -1304,9 +1316,7 @@ class floatingButtonState extends State<floatingButton>
         final liveChapterCount =
             controller.selectedBookChapterCount.value.trim();
 
-        // Sync in-memory chapter BEFORE reload. Leaving the old value made
-        // getSelectedChapterAndBook() prefer memory over prefs and skip-reload,
-        // so Next Chapter kept showing the previous chapter on the reader.
+        // Re-assert chapter before reload (another sync may have started).
         controller.selectedChapter.value = chapterNum.toString();
         controller.selectedChapterForRead.value = chapterNum.toString();
         controller.selectChapterChange.value = chapterNum;
@@ -1332,8 +1342,12 @@ class floatingButtonState extends State<floatingButton>
               int.tryParse(liveChapterCount) ?? currentBookChapterCount;
         }
 
+        if (syncId != _readingChapterSyncGeneration || !mounted) return;
+
         // Force a fresh chapter load (clears skip/early-return cache).
         await controller.forceReloadSelectedChapter();
+
+        if (syncId != _readingChapterSyncGeneration || !mounted) return;
 
         // Only call getBookContentForRead when the reader still doesn't match —
         // calling it always can re-apply stale ForRead and undo the reload.
@@ -1341,10 +1355,21 @@ class floatingButtonState extends State<floatingButton>
           await controller.getBookContentForRead();
         }
 
+        if (syncId != _readingChapterSyncGeneration || !mounted) return;
+
         // Ensure the in-memory selected chapter matches what we just loaded.
         controller.selectedChapter.value = chapterNum.toString();
         controller.selectedChapterForRead.value = chapterNum.toString();
         controller.selectChapterChange.value = chapterNum;
+
+        // One retry if verses still don't match the audio chapter.
+        if (!controller.displayedContentMatchesSelection()) {
+          await controller.forceReloadSelectedChapter();
+          if (syncId != _readingChapterSyncGeneration || !mounted) return;
+          controller.selectedChapter.value = chapterNum.toString();
+          controller.selectedChapterForRead.value = chapterNum.toString();
+          controller.selectChapterChange.value = chapterNum;
+        }
 
         // New list instance so GetX/Home ListView cannot keep a stale identity.
         if (controller.selectedBookContent.isNotEmpty) {
@@ -1361,9 +1386,12 @@ class floatingButtonState extends State<floatingButton>
         final updatedBookName = controller.selectedBook.value.isNotEmpty
             ? controller.selectedBook.value
             : await SharPreferences.getString(SharPreferences.selectedBook);
-        if (updatedBookName != null && updatedBookName.isNotEmpty && mounted) {
+        if (syncId != _readingChapterSyncGeneration || !mounted) return;
+        if (updatedBookName != null && updatedBookName.isNotEmpty) {
           setState(() {
             _storedBookName = updatedBookName;
+            audioChapterNum = chapterNum;
+            selectedChapter = chapterNum;
           });
         }
       } catch (e) {
@@ -2172,14 +2200,21 @@ class floatingButtonState extends State<floatingButton>
                       ),
                       onPressed: () async {
                         if (audioChapterNum > 1) {
+                          // Reader first, then audio UI/file.
+                          final prevChapter = audioChapterNum - 1;
+                          if (mounted) {
+                            setState(() {
+                              isAudioPlaying = false;
+                            });
+                          }
+                          await updateReadingScreenChapter(prevChapter);
+                          if (!mounted || !context.mounted) return;
+                          final nextUrl =
+                              "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$prevChapter.mp3";
                           setState(() {
-                            audioChapterNum--;
-                            audioBaseUrl =
-                                "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$audioChapterNum.mp3";
-                            isAudioPlaying = false;
+                            audioChapterNum = prevChapter;
+                            audioBaseUrl = nextUrl;
                           });
-                          // Update reading screen to match audio chapter
-                          await updateReadingScreenChapter(audioChapterNum);
                           // Refresh book name after chapter update
                           try {
                             if (Get.isRegistered<DashBoardController>()) {
@@ -2366,14 +2401,21 @@ class floatingButtonState extends State<floatingButton>
                             int.tryParse(widget.chapterCount) ??
                                 currentBookChapterCount;
                         if (audioChapterNum < lastChapter) {
+                          // Reader first, then audio UI/file.
+                          final nextChapter = audioChapterNum + 1;
+                          if (mounted) {
+                            setState(() {
+                              isAudioPlaying = false;
+                            });
+                          }
+                          await updateReadingScreenChapter(nextChapter);
+                          if (!mounted || !context.mounted) return;
+                          final nextUrl =
+                              "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$nextChapter.mp3";
                           setState(() {
-                            isAudioPlaying = false;
-                            audioChapterNum++;
-                            audioBaseUrl =
-                                "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$audioChapterNum.mp3";
+                            audioChapterNum = nextChapter;
+                            audioBaseUrl = nextUrl;
                           });
-                          // Update reading screen to match audio chapter
-                          await updateReadingScreenChapter(audioChapterNum);
                           // Refresh book name after chapter update
                           try {
                             if (Get.isRegistered<DashBoardController>()) {

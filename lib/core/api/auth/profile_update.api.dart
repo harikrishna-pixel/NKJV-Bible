@@ -144,13 +144,26 @@ class ProfileUpdateApi {
     try {
       final parsed = jsonDecode(body) as Map<String, dynamic>;
       final status = parsed['status'];
-      if (status == true || status == 1 || status == '1' || status == 'true') {
-        return true;
+      final statusTrue =
+          status == true || status == 1 || status == '1' || status == 'true';
+      // Require explicit success — status_code 200 alone can appear on invalid referral.
+      if (!statusTrue) return false;
+      final message = parsed['message']?.toString().toLowerCase() ?? '';
+      if (message.contains('invalid') &&
+          (message.contains('referral') || message.contains('referred'))) {
+        return false;
       }
-      final statusCode = parsed['status_code'];
-      if (statusCode == 200 && status != false && status != 'false') {
-        return true;
+      final errors = parsed['errors'];
+      if (errors is Map) {
+        for (final key in ['referral_code', 'referred_by', 'referral']) {
+          final fieldErrors = errors[key];
+          if (fieldErrors is List && fieldErrors.isNotEmpty) return false;
+          if (fieldErrors is String && fieldErrors.trim().isNotEmpty) {
+            return false;
+          }
+        }
       }
+      return true;
     } catch (_) {}
     return false;
   }

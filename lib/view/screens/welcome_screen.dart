@@ -109,7 +109,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                               ),
                               SizedBox(height: isTablet ? 18 : 14),
                               Text(
-                                'Welcome to the',
+                                'Welcome to',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: isTablet ? 24 : 20,

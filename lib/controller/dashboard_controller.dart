@@ -1028,7 +1028,23 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         : selectedBookContent;
     final zeroBased = _versesLookZeroBased(sample);
     final stored = _storedChapterNumForUi(safe, zeroBased: zeroBased);
-    return selectedBookContent.any((v) => v.chapterNum?.toInt() == stored);
+    // Require EVERY verse to belong to this chapter — `.any()` let a mixed
+    // list (current + next chapter) skip reload after rapid Mark as Read.
+    return selectedBookContent.every((v) => v.chapterNum?.toInt() == stored);
+  }
+
+  /// Keeps only verses for [uiChapter] when the in-memory list was poisoned
+  /// with the next chapter (display/cache hygiene only).
+  void _sanitizeSelectedBookContentToUiChapter(int uiChapter) {
+    if (selectedBookContent.isEmpty) return;
+    if (_displayedContentMatchesUiChapter(uiChapter)) return;
+    final source = selectedVersesContent.isNotEmpty
+        ? selectedVersesContent
+        : selectedBookContent.toList();
+    final cleaned = _filterChapterFromVerses(source, uiChapter);
+    if (cleaned.isNotEmpty) {
+      selectedBookContent.value = cleaned;
+    }
   }
 
   /// Additive: skip/reload must also match book — chapter-only match keeps the
@@ -1336,6 +1352,8 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     } catch (e, st) {
       log('Error: $e,$st');
     } finally {
+      final uiCh = int.tryParse(selectedChapter.value) ?? 1;
+      _sanitizeSelectedBookContentToUiChapter(uiCh <= 0 ? 1 : uiCh);
       if (loadTextToSpeech.value) {
         loadTextToSpeech.value = false;
       }
@@ -1389,6 +1407,8 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
       selectedBook.value =
           await SharPreferences.getString(SharPreferences.selectedBook) ?? "";
 
+      if (loadId != _chapterLoadGeneration) return;
+
       if (selectedBookValue == null ||
           selectedBookValue.trim().isEmpty ||
           parsedStoredBookNum == null) {
@@ -1398,7 +1418,14 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         selectedBookNum.value = selectedBookValue.toString();
       }
 
-      final safeChapter = targetChapter <= 0 ? 1 : targetChapter;
+      var safeChapter = targetChapter <= 0 ? 1 : targetChapter;
+      // After awaits, a newer audio/reader sync may have moved the chapter.
+      // Follow the live chapter instead of aborting (abort left content blank
+      // after forceReload cleared selectedBookContent).
+      final liveChapter = int.tryParse(selectedChapter.value) ?? 0;
+      if (liveChapter > 0 && liveChapter != safeChapter) {
+        safeChapter = liveChapter;
+      }
       if (safeChapter.toString() != selectedChapter.value) {
         selectedChapter.value = safeChapter.toString();
       }
@@ -1470,6 +1497,9 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
       debugPrint(" error on getSelectedChapterAndBook - $e ");
     } finally {
       if (loadId != _chapterLoadGeneration) return;
+      // Drop any leftover next-chapter verses before showing the reader.
+      final uiCh = int.tryParse(selectedChapter.value) ?? 1;
+      _sanitizeSelectedBookContentToUiChapter(uiCh <= 0 ? 1 : uiCh);
       if (loadTextToSpeech.value) {
         loadTextToSpeech.value = false;
       }

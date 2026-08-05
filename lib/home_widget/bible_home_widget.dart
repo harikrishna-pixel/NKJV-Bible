@@ -14,16 +14,18 @@ import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
 
 /// Route to open when user taps a home widget. App should navigate to the matching screen.
-enum BibleWidgetRoute { verse, prayer, chat, streak, none }
+enum BibleWidgetRoute { verse, reading, prayer, chat, streak, random, none }
 
 /// Parses a widget launch URI (e.g. biblebookapp://prayer?homeWidget) and returns the route.
 BibleWidgetRoute getBibleWidgetRouteFromUri(Uri? uri) {
   if (uri == null) return BibleWidgetRoute.none;
   final host = uri.host.toLowerCase();
   if (host == kWidgetRouteVerse) return BibleWidgetRoute.verse;
+  if (host == kWidgetRouteReading) return BibleWidgetRoute.reading;
   if (host == kWidgetRoutePrayer) return BibleWidgetRoute.prayer;
   if (host == kWidgetRouteChat) return BibleWidgetRoute.chat;
   if (host == kWidgetRouteStreak) return BibleWidgetRoute.streak;
+  if (host == kWidgetRouteRandom) return BibleWidgetRoute.random;
   return BibleWidgetRoute.none;
 }
 
@@ -49,6 +51,11 @@ const String _kVerseReferenceKey = 'widget_verse_reference';
 /// Keys exposed so app can read widget verse when opening from widget tap.
 const String kWidgetVerseTextKey = _kVerseTextKey;
 const String kWidgetVerseReferenceKey = _kVerseReferenceKey;
+/// Exact reader location for Verse-of-the-Day widget taps (additive).
+const String _kVerseBookNumKey = 'widget_verse_book_num';
+const String _kVerseChapterKey = 'widget_verse_chapter';
+const String _kVerseVerseNumKey = 'widget_verse_verse_num';
+const String _kVerseBookNameKey = 'widget_verse_book_name';
 const String _kBiblePrayerTitleKey = 'widget_bible_prayer_title';
 const String _kPrayerTextKey = 'widget_prayer_text';
 const String _kChatQuestionKey = 'widget_chat_question';
@@ -59,6 +66,10 @@ const String _kFavoriteVerseTextKey = 'widget_favorite_verse_text';
 const String _kFavoriteVerseReferenceKey = 'widget_favorite_verse_reference';
 const String _kRandomVerseTextKey = 'widget_random_verse_text';
 const String _kRandomVerseReferenceKey = 'widget_random_verse_reference';
+const String _kRandomVerseBookNumKey = 'widget_random_verse_book_num';
+const String _kRandomVerseChapterKey = 'widget_random_verse_chapter';
+const String _kRandomVerseVerseNumKey = 'widget_random_verse_verse_num';
+const String _kRandomVerseBookNameKey = 'widget_random_verse_book_name';
 const String _kHourlyVerseTextKey = 'widget_hourly_verse_text';
 const String _kHourlyVerseReferenceKey = 'widget_hourly_verse_reference';
 const String _kHourlyNextLabelKey = 'widget_hourly_next_label';
@@ -68,15 +79,22 @@ const String _kContinueBookChapterKey = 'widget_continue_book_chapter';
 const String _kContinueSubtitleKey = 'widget_continue_subtitle';
 const String _kContinueProgressKey = 'widget_continue_progress';
 const String _kContinueProgressLabelKey = 'widget_continue_progress_label';
+const String _kContinueBookNumKey = 'widget_continue_book_num';
+const String _kContinueChapterKey = 'widget_continue_chapter';
+const String _kContinueBookNameKey = 'widget_continue_book_name';
 const String _kWeeklyStreakStatusKey = 'widget_weekly_streak_status';
 const String _kWeeklyStreakCountKey = 'widget_weekly_streak_count';
 const String _kWeeklyStreakCountStrKey = 'widget_weekly_streak_count_str';
 
 /// Deep-link host names when user taps a widget (must match widgetURL in Swift).
 const String kWidgetRouteVerse = 'verse';
+/// Continue Reading widget / Live Activity (last-read) — separate from Daily Verse.
+const String kWidgetRouteReading = 'reading';
 const String kWidgetRoutePrayer = 'prayer';
 const String kWidgetRouteChat = 'chat';
 const String kWidgetRouteStreak = 'streak';
+/// Random Bible Verse widget — must not share Verse For You location keys.
+const String kWidgetRouteRandom = 'random';
 
 /// Returns the verse text and reference currently shown on the Verse of the Day widget.
 /// Use when opening Daily Verse from widget tap so the same verse is displayed.
@@ -88,6 +106,126 @@ Future<Map<String, String?>> getVerseOfTheDayWidgetData() async {
     return {'text': text, 'reference': ref};
   } catch (e) {
     debugPrint('BibleHomeWidget: getVerseOfTheDayWidgetData failed: $e');
+    return {};
+  }
+}
+
+/// Exact book/chapter/verse for Verse-of-the-Day widget open (additive; display sync only).
+Future<Map<String, String>> getDailyVerseWidgetLocation() async {
+  if (!Platform.isIOS) return {};
+  try {
+    final bookNum =
+        (await HomeWidget.getWidgetData<String>(_kVerseBookNumKey))?.trim() ??
+            '';
+    final chapter =
+        (await HomeWidget.getWidgetData<String>(_kVerseChapterKey))?.trim() ??
+            '';
+    final verseNum =
+        (await HomeWidget.getWidgetData<String>(_kVerseVerseNumKey))?.trim() ??
+            '';
+    final bookName =
+        (await HomeWidget.getWidgetData<String>(_kVerseBookNameKey))?.trim() ??
+            '';
+    final text =
+        (await HomeWidget.getWidgetData<String>(_kVerseTextKey))?.trim() ?? '';
+    if (bookNum.isEmpty || chapter.isEmpty || verseNum.isEmpty) return {};
+    return {
+      'bookNum': bookNum,
+      'chapter': chapter,
+      'verseNum': verseNum,
+      'bookName': bookName,
+      'text': text,
+    };
+  } catch (e) {
+    debugPrint('BibleHomeWidget: getDailyVerseWidgetLocation failed: $e');
+    return {};
+  }
+}
+
+Future<void> _saveDailyVerseWidgetLocation(DailyVerseList verse) async {
+  final bookNum = dailyVerseBookNum(verse.bookId);
+  final chapter = dailyVerseUiChapter(verse.chapter);
+  final verseNum = dailyVerseUiVerse(verse.verseNum);
+  final bookName = (verse.book ?? '').toString().trim();
+  await HomeWidget.saveWidgetData<String>(_kVerseBookNumKey, '$bookNum');
+  await HomeWidget.saveWidgetData<String>(_kVerseChapterKey, '$chapter');
+  await HomeWidget.saveWidgetData<String>(_kVerseVerseNumKey, '$verseNum');
+  await HomeWidget.saveWidgetData<String>(_kVerseBookNameKey, bookName);
+}
+
+Future<void> _saveRandomVerseWidgetLocation(DailyVerseList verse) async {
+  final bookNum = dailyVerseBookNum(verse.bookId);
+  final chapter = dailyVerseUiChapter(verse.chapter);
+  final verseNum = dailyVerseUiVerse(verse.verseNum);
+  final bookName = (verse.book ?? '').toString().trim();
+  await HomeWidget.saveWidgetData<String>(_kRandomVerseBookNumKey, '$bookNum');
+  await HomeWidget.saveWidgetData<String>(_kRandomVerseChapterKey, '$chapter');
+  await HomeWidget.saveWidgetData<String>(_kRandomVerseVerseNumKey, '$verseNum');
+  await HomeWidget.saveWidgetData<String>(_kRandomVerseBookNameKey, bookName);
+}
+
+/// Exact book/chapter/verse for Random Verse widget open (separate from Verse For You).
+Future<Map<String, String>> getRandomVerseWidgetLocation() async {
+  if (!Platform.isIOS) return {};
+  try {
+    final bookNum =
+        (await HomeWidget.getWidgetData<String>(_kRandomVerseBookNumKey))
+                ?.trim() ??
+            '';
+    final chapter =
+        (await HomeWidget.getWidgetData<String>(_kRandomVerseChapterKey))
+                ?.trim() ??
+            '';
+    final verseNum =
+        (await HomeWidget.getWidgetData<String>(_kRandomVerseVerseNumKey))
+                ?.trim() ??
+            '';
+    final bookName =
+        (await HomeWidget.getWidgetData<String>(_kRandomVerseBookNameKey))
+                ?.trim() ??
+            '';
+    final text =
+        (await HomeWidget.getWidgetData<String>(_kRandomVerseTextKey))
+                ?.trim() ??
+            '';
+    if (bookNum.isEmpty || chapter.isEmpty || verseNum.isEmpty) return {};
+    return {
+      'bookNum': bookNum,
+      'chapter': chapter,
+      'verseNum': verseNum,
+      'bookName': bookName,
+      'text': text,
+    };
+  } catch (e) {
+    debugPrint('BibleHomeWidget: getRandomVerseWidgetLocation failed: $e');
+    return {};
+  }
+}
+
+/// Exact book/chapter for Continue Reading widget open (matches what the tile shows).
+Future<Map<String, String>> getContinueReadingWidgetLocation() async {
+  if (!Platform.isIOS) return {};
+  try {
+    final bookNum =
+        (await HomeWidget.getWidgetData<String>(_kContinueBookNumKey))
+                ?.trim() ??
+            '';
+    final chapter =
+        (await HomeWidget.getWidgetData<String>(_kContinueChapterKey))
+                ?.trim() ??
+            '';
+    final bookName =
+        (await HomeWidget.getWidgetData<String>(_kContinueBookNameKey))
+                ?.trim() ??
+            '';
+    if (bookNum.isEmpty || chapter.isEmpty) return {};
+    return {
+      'bookNum': bookNum,
+      'chapter': chapter,
+      'bookName': bookName,
+    };
+  } catch (e) {
+    debugPrint('BibleHomeWidget: getContinueReadingWidgetLocation failed: $e');
     return {};
   }
 }
@@ -192,6 +330,8 @@ Future<void> syncVerseFamilyWidgetsFromDailyList(
     final daily = dailyVerseList.first;
     final dailyText = _widgetVerseTextFromDaily(daily);
     final dailyRef = _formatDailyVerseReference(daily);
+    // Additive: exact location for widget → reader open (does not change reading prefs).
+    await _saveDailyVerseWidgetLocation(daily);
 
     // Favorite: latest bookmark when available, otherwise second daily verse or first.
     var favoriteText = dailyText;
@@ -240,6 +380,7 @@ Future<void> syncVerseFamilyWidgetsFromDailyList(
       _kRandomVerseReferenceKey,
       _formatDailyVerseReference(randomVerse),
     );
+    await _saveRandomVerseWidgetLocation(randomVerse);
     await HomeWidget.saveWidgetData<String>(
       _kHourlyVerseTextKey,
       _widgetVerseTextFromDaily(hourlyVerse),
@@ -312,6 +453,12 @@ Future<void> syncContinueReadingWidget() async {
         _kContinueProgressKey, progressValue.toStringAsFixed(3));
     await HomeWidget.saveWidgetData<String>(
         _kContinueProgressLabelKey, '$progressLabel%');
+    // Exact tap target (same snapshot as the tile) — separate from Daily prefs writes.
+    await HomeWidget.saveWidgetData<String>(_kContinueBookNumKey, bookNumStr);
+    await HomeWidget.saveWidgetData<String>(
+        _kContinueChapterKey, chapter.isNotEmpty ? chapter : '1');
+    await HomeWidget.saveWidgetData<String>(
+        _kContinueBookNameKey, book.isNotEmpty ? book : 'Genesis');
     await HomeWidget.updateWidget(iOSName: _kContinueReadingKind);
     // Display-only: refresh Live Activity queue + streak widget mirrors.
     await LiveActivityQueue.sync();
@@ -355,6 +502,10 @@ Future<void> _mirrorStreakDaysForPrayerWidget() async {
 Future<void> updateVerseOfTheDayWidget({
   required String verseText,
   required String reference,
+  int? bookNum,
+  int? chapter,
+  int? verseNum,
+  String? bookName,
 }) async {
   if (!Platform.isIOS) return;
   try {
@@ -364,6 +515,13 @@ Future<void> updateVerseOfTheDayWidget({
     final ref = reference.trim().isEmpty ? _kDefaultVerseRef : reference;
     await HomeWidget.saveWidgetData<String>(_kVerseTextKey, text);
     await HomeWidget.saveWidgetData<String>(_kVerseReferenceKey, ref);
+    if (bookNum != null && chapter != null && verseNum != null) {
+      await HomeWidget.saveWidgetData<String>(_kVerseBookNumKey, '$bookNum');
+      await HomeWidget.saveWidgetData<String>(_kVerseChapterKey, '$chapter');
+      await HomeWidget.saveWidgetData<String>(_kVerseVerseNumKey, '$verseNum');
+      await HomeWidget.saveWidgetData<String>(
+          _kVerseBookNameKey, (bookName ?? '').trim());
+    }
     await HomeWidget.updateWidget(iOSName: _kVerseOfTheDayKind);
     // Display-only: refresh Live Activity queue + streak widget mirrors.
     await LiveActivityQueue.sync();

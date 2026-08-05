@@ -747,6 +747,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       await _addLifetimeWalletBonusOnce();
     }
     if (widget.invisiblePurchaseHost) {
+      // Same refresh as full paywall success — keep home drawer in sync.
+      if (Get.isRegistered<DashBoardController>()) {
+        await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
+      }
       _popInvisiblePurchaseHost(invisiblePopSuccess);
       return;
     }
@@ -1012,14 +1016,18 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             userTap = true;
           });
         }
-        EasyLoading.show();
+        // UI only: keep Processing...... until purchase stream finishes
+        // (success / error / cancel) — do not leave a blank gap.
+        EasyLoading.show(status: 'Processing......');
 
         // Start 6-second timeout timer for loading
         _loadingTimeoutTimer?.cancel(); // Cancel any existing timer
         _loadingTimeoutTimer = Timer(const Duration(seconds: 6), () {
           if (mounted) {
-            debugPrint('IAP Loading timeout - dismissing after 6 seconds');
-            EasyLoading.dismiss();
+            // UI only: allow another tap; do NOT dismiss Processing...... —
+            // Apple sheet often outlives 6s; stream will dismiss the loader.
+            debugPrint(
+                'IAP Loading timeout - keep Processing...... until stream result');
             setState(() {
               userTap = false;
             });
@@ -1859,6 +1867,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     // Additive: claim/skip before the existing delay so parallel restores
     // keep the newest transaction (and tier only as a same-date tiebreaker).
     if (dataEarly == true || startFlagEarly == true) {
+      // UI only: cover the restore/buy delay before success toast.
+      if (startFlagEarly == true) {
+        EasyLoading.show(status: 'Processing......');
+      }
       if (await _shouldSkipRestoreDowngrade(
         productId,
         downloadProviderEarly,
@@ -2052,6 +2064,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       debugPrint("Purchase State: ${purchaseDetails.status}");
       await SharPreferences.setString('OpenAd', '1');
       if (purchaseDetails.status == PurchaseStatus.pending) {
+        // UI only: keep Processing...... while store payment is pending.
+        EasyLoading.show(status: 'Processing......');
       } else {
         // Cancel loading timeout timer when purchase completes (success or error)
         _loadingTimeoutTimer?.cancel();
@@ -2073,6 +2087,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             final data1 = await SharPreferences.getBoolean('startpurches');
             debugPrint("purchase data 5 is $data1");
             if (data1 == true) {
+              // Keep UI busy until "Purchase Successful" — payment sheet
+              // can leave a gap after the buy-tap loader times out.
+              _loadingTimeoutTimer?.cancel();
+              EasyLoading.show(status: 'Processing......');
               if (Platform.isIOS) {
                 //  var response =
                 http.post(
@@ -2278,13 +2296,18 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               }
             }
           } else if (purchaseDetails.status == PurchaseStatus.restored) {
-            // Additive: keep Restoring… loader while collecting StoreKit products.
-            if (!_restoreCollecting) {
-              EasyLoading.dismiss();
-            }
             final restoreFlag =
                 await SharPreferences.getBoolean('restorepurches');
             final startFlag = await SharPreferences.getBoolean('startpurches');
+            // UI only: Buy flow often returns "restored" on iOS — keep
+            // Processing...... until Purchase Successful (don't clear gap).
+            if (startFlag == true) {
+              _loadingTimeoutTimer?.cancel();
+              EasyLoading.show(status: 'Processing......');
+            } else if (!_restoreCollecting) {
+              // Additive: keep Restoring… loader while collecting StoreKit products.
+              EasyLoading.dismiss();
+            }
             debugPrint("restore data 5 is $restoreFlag");
 
             // If Apple reports "restored" during a Buy flow (already subscribed),

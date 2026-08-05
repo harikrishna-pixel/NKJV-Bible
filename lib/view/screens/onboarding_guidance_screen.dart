@@ -40,42 +40,35 @@ class OnboardingGuidanceScreen extends StatelessWidget {
                   ),
                   child: SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: onContinue,
-                      style: ElevatedButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        backgroundColor: Colors.transparent,
-                        shadowColor: Colors.transparent,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                    height: isTablet ? 64 : 56,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFF763201),
+                            Color(0xFFD5821F),
+                            Color(0xFF763201),
+                          ],
                         ),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      child: Ink(
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Color(0xFFB4842E),
-                              Color(0xFFC9A35A),
-                              Color(0xFFA9791F),
-                            ],
-                            stops: [0.0, 0.55, 1.0],
+                      child: ElevatedButton(
+                        onPressed: onContinue,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          disabledBackgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
                           ),
-                          borderRadius: BorderRadius.circular(14),
                         ),
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            vertical: isTablet ? 18 : 15,
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            'Continue',
-                            style: TextStyle(
-                              fontSize: isTablet ? 18 : 16,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
+                        child: Text(
+                          'Continue',
+                          style: TextStyle(
+                            fontSize: isTablet ? 20 : 18,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
                           ),
                         ),
                       ),
@@ -511,33 +504,17 @@ class _ValueChatBodyState extends State<_ValueChatBody> {
     final isSelected = _selectedChipKey == chip.key;
     return GestureDetector(
       onTap: () => _onChipTap(chip),
+      behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 140),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(
-          color: isSelected ? null : _paper,
-          gradient: isSelected
-              ? const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0xFFFDF7E8), Color(0xFFF7EDD5)],
-                )
-              : null,
+          color: _paper,
           border: Border.all(
             color: isSelected ? _gold : _line,
             width: 1.5,
           ),
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: isSelected
-                  ? const Color(0xFF96712E).withOpacity(0.5)
-                  : const Color(0xFF503C19).withOpacity(0.4),
-              blurRadius: isSelected ? 10 : 12,
-              offset: const Offset(0, 5),
-              spreadRadius: isSelected ? -6 : -12,
-            ),
-          ],
         ),
         child: Row(
           children: [

@@ -1085,6 +1085,10 @@ class DownloadProvider with ChangeNotifier {
       updateVerseOfTheDayWidget(
         verseText: v.verse ?? '',
         reference: ref.isEmpty ? 'Daily Verse' : ref,
+        bookNum: dailyVerseBookNum(v.bookId),
+        chapter: dailyVerseUiChapter(v.chapter),
+        verseNum: dailyVerseUiVerse(v.verseNum),
+        bookName: v.book?.toString() ?? '',
       );
       syncVerseFamilyWidgetsFromDailyList(dailyVerseList);
     }

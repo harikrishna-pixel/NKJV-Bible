@@ -44,6 +44,10 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
   static const Duration _kPresentationRecheckDelay =
       Duration(milliseconds: 200);
 
+  /// True while an update is pending presentation or the Update Alert is open.
+  /// Home uses this so Continue Journey waits until the update flow finishes.
+  static bool updateAlertPendingOrVisible = false;
+
   Timer? _presentationRecheckTimer;
 
   @override
@@ -166,12 +170,20 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
   }
 
   Future<void> _checkVersionPhased(BuildContext context) async {
-    if (!widget.upgrader.shouldDisplayUpgrade()) return;
+    if (!widget.upgrader.shouldDisplayUpgrade()) {
+      updateAlertPendingOrVisible = false;
+      return;
+    }
+
+    updateAlertPendingOrVisible = true;
 
     final permanentlyDismissed = await SharPreferences.getBoolean(
             SharPreferences.upgradeAlertDismissedPermanently) ??
         false;
-    if (permanentlyDismissed) return;
+    if (permanentlyDismissed) {
+      updateAlertPendingOrVisible = false;
+      return;
+    }
 
     final checkContext = widget.navigatorKey != null &&
             widget.navigatorKey!.currentContext != null
@@ -191,6 +203,7 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
       if (remindedAt != null) {
         final elapsed = DateTime.now().difference(remindedAt);
         if (elapsed < _kIntroRemindLaterDelay) {
+          updateAlertPendingOrVisible = false;
           return;
         }
       }
@@ -223,40 +236,44 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
     }
 
     unawaited(widget.upgrader.saveLastAlerted());
-    showGeneralDialog(
-      barrierDismissible: widget.barrierDismissible,
-      barrierLabel: 'Dismiss',
-      barrierColor: Colors.black54,
-      transitionDuration: const Duration(milliseconds: 280),
-      context: checkContext,
-      pageBuilder: (dialogContext, animation, secondaryAnimation) {
-        return PopScope(
-          canPop: onCanPop(),
-          child: alertDialog(
-            widget.dialogKey ?? const Key('upgrader_alert_dialog'),
-            title,
-            message,
-            releaseNotes,
-            dialogContext,
-            false,
-            appMessages,
-          ),
-        );
-      },
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        final curved = CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeInCubic,
-        );
-        return FadeTransition(
-          opacity: curved,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.96, end: 1.0).animate(curved),
-            child: child,
-          ),
-        );
-      },
+    unawaited(
+      showGeneralDialog(
+        barrierDismissible: widget.barrierDismissible,
+        barrierLabel: 'Dismiss',
+        barrierColor: Colors.black54,
+        transitionDuration: const Duration(milliseconds: 280),
+        context: checkContext,
+        pageBuilder: (dialogContext, animation, secondaryAnimation) {
+          return PopScope(
+            canPop: onCanPop(),
+            child: alertDialog(
+              widget.dialogKey ?? const Key('upgrader_alert_dialog'),
+              title,
+              message,
+              releaseNotes,
+              dialogContext,
+              false,
+              appMessages,
+            ),
+          );
+        },
+        transitionBuilder: (context, animation, secondaryAnimation, child) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          );
+          return FadeTransition(
+            opacity: curved,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.96, end: 1.0).animate(curved),
+              child: child,
+            ),
+          );
+        },
+      ).whenComplete(() {
+        updateAlertPendingOrVisible = false;
+      }),
     );
   }
 
@@ -270,39 +287,43 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
   }) {
     unawaited(widget.upgrader.saveLastAlerted());
 
-    showGeneralDialog(
-      barrierDismissible: widget.barrierDismissible,
-      barrierLabel: 'Dismiss',
-      barrierColor: Colors.black54,
-      transitionDuration: const Duration(milliseconds: 280),
-      context: context,
-      pageBuilder: (dialogContext, animation, secondaryAnimation) {
-        return PopScope(
-          canPop: onCanPop(),
-          child: _buildIntroAlertDialog(
-            key,
-            title,
-            message,
-            releaseNotes,
-            dialogContext,
-            messages,
-          ),
-        );
-      },
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        final curved = CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeInCubic,
-        );
-        return FadeTransition(
-          opacity: curved,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.96, end: 1.0).animate(curved),
-            child: child,
-          ),
-        );
-      },
+    unawaited(
+      showGeneralDialog(
+        barrierDismissible: widget.barrierDismissible,
+        barrierLabel: 'Dismiss',
+        barrierColor: Colors.black54,
+        transitionDuration: const Duration(milliseconds: 280),
+        context: context,
+        pageBuilder: (dialogContext, animation, secondaryAnimation) {
+          return PopScope(
+            canPop: onCanPop(),
+            child: _buildIntroAlertDialog(
+              key,
+              title,
+              message,
+              releaseNotes,
+              dialogContext,
+              messages,
+            ),
+          );
+        },
+        transitionBuilder: (context, animation, secondaryAnimation, child) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          );
+          return FadeTransition(
+            opacity: curved,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.96, end: 1.0).animate(curved),
+              child: child,
+            ),
+          );
+        },
+      ).whenComplete(() {
+        updateAlertPendingOrVisible = false;
+      }),
     );
   }
 

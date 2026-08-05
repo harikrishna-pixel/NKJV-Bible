@@ -84,7 +84,7 @@ class _VerseTopicsScreenState extends State<VerseTopicsScreen> {
                       ),
                       Expanded(
                         child: Text(
-                          'Categories',
+                          'Topics',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontFamily: 'Georgia',

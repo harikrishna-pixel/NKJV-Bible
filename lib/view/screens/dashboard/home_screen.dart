@@ -21,6 +21,7 @@ import 'package:biblebookapp/view/widget/thanks_for_love_rating_dialog_content.d
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
+import 'package:biblebookapp/view/widget/bible_upgrade_alert.dart';
 import 'package:biblebookapp/view/screens/bible_select_screen.dart';
 import 'package:biblebookapp/view/screens/books/books_screen.dart';
 import 'package:biblebookapp/view/screens/calendar_screen/view/calendar_screen.dart';
@@ -226,6 +227,11 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen>
     with WidgetsBindingObserver, RouteAware {
+  /// Survives [Get.offAll] Home rebuilds so widget cold-start is handled once.
+  static String? _sessionWidgetNavKey;
+  static DateTime? _sessionWidgetNavAt;
+  static bool _sessionWidgetLaunchHandled = false;
+
   bool isOpenChat = false;
   bool _attemptedProviderChapterFallback = false;
   bool _hasDisplayedChapterContent = false;
@@ -1234,15 +1240,218 @@ class _HomeScreenState extends State<HomeScreen>
   bool _deferUpgradeAfterStreakRating = false;
   bool _streakRatingSawLifecyclePause = false;
   bool _continueJourneySheetShown = false;
+  /// After onboarding LT purchase, hold journey sheet until Premium Unlocked closes.
+  bool _awaitingPremiumWelcomeBeforeJourney = false;
   Timer? _deferUpgradeAfterStreakRatingFallbackTimer;
   int _ratingUiDialogDepth = 0;
   static const Duration _kUpgradeAfterStreakRatingDelay =
       Duration(milliseconds: 300);
   StreamSubscription<Uri?>? _widgetClickSubscription;
+  bool _widgetNavInFlight = false;
+  /// Plain verse text for VerseItemWidget initState match (widget taps only).
+  String _pendingWidgetVerseText = '';
+  /// Bumped so verse rows recreate and re-run temp highlight after widget nav.
+  int _widgetHighlightEpoch = 0;
+
+  String get _effectiveSelectedVerseForRead {
+    final pending = _pendingWidgetVerseText.trim();
+    if (pending.isNotEmpty) return pending;
+    return widget.selectedVerseForRead?.toString() ?? '';
+  }
+
+  bool _shouldSkipDuplicateWidgetNav(String key) {
+    if (_widgetNavInFlight) return true;
+    if (_sessionWidgetNavKey == key &&
+        _sessionWidgetNavAt != null &&
+        DateTime.now().difference(_sessionWidgetNavAt!) <
+            const Duration(seconds: 2)) {
+      return true;
+    }
+    return false;
+  }
+
+  void _markWidgetNavHandled(String key) {
+    _sessionWidgetNavKey = key;
+    _sessionWidgetNavAt = DateTime.now();
+    _sessionWidgetLaunchHandled = true;
+  }
+
+  bool _canNavigateWidgetReaderInPlace() {
+    if (!mounted) return false;
+    final route = ModalRoute.of(context);
+    if (route?.isCurrent != true) return false;
+    return Get.isRegistered<DashBoardController>();
+  }
+
+  void _resetReaderContentCacheForWidgetNav() {
+    _hasDisplayedChapterContent = false;
+    _lastVisibleChapterContent = [];
+    _lastContentSource = null;
+  }
+
+  void _ensureWidgetReaderScrollController(DashBoardController controller) {
+    final scrollController = controller.autoScrollController.value;
+    if (scrollController.hasClients) return;
+    controller.autoScrollController.value = AutoScrollController(
+      viewportBoundaryGetter: () =>
+          Rect.fromLTRB(0, 0, 0, MediaQuery.of(context).padding.bottom),
+      axis: controller.scrollDirection,
+    );
+  }
+
+  void _scheduleClearPendingWidgetVerseText() {
+    Future.delayed(const Duration(seconds: 6), () {
+      if (!mounted) return;
+      if (_pendingWidgetVerseText.isEmpty) return;
+      setState(() {
+        _pendingWidgetVerseText = '';
+      });
+    });
+  }
+
+  Future<bool> _applyWidgetReaderInPlace({
+    required String from,
+    required int bookNum,
+    required int chapter,
+    required int verseNum,
+    required String bookName,
+    String verseText = '',
+  }) async {
+    if (!_canNavigateWidgetReaderInPlace()) return false;
+
+    final controller = Get.find<DashBoardController>();
+    final navKey = '$from:$bookNum:$chapter:$verseNum';
+    if (_shouldSkipDuplicateWidgetNav(navKey)) return true;
+
+    _widgetNavInFlight = true;
+    try {
+      final targetBookName = bookName.isNotEmpty ? bookName : 'Genesis';
+
+      await SharPreferences.setString(
+        SharPreferences.selectedBook,
+        targetBookName,
+      );
+      await SharPreferences.setString(
+        SharPreferences.selectedChapter,
+        '$chapter',
+      );
+      await SharPreferences.setString(
+        SharPreferences.selectedBookNum,
+        '$bookNum',
+      );
+      if (!mounted) return true;
+
+      // Hint text for index resolve; final highlight text is set from DB row
+      // after load so VerseItemWidget's exact initState match succeeds.
+      final plainVerseHint = verseText.trim();
+
+      controller.selectedBookNumForRead.value = '$bookNum';
+      controller.selectedChapterForRead.value = '$chapter';
+      controller.selectedVerseForRead.value = '$verseNum';
+      controller.selectedBookNameForRead.value = targetBookName;
+      // Also set live selection up front so force-reload paths use the target.
+      controller.selectedBookNum.value = '$bookNum';
+      controller.selectedChapter.value = '$chapter';
+      controller.selectedBook.value = targetBookName;
+      controller.selectChapterChange.value = chapter;
+      controller.readHighlight.value = true;
+
+      // Always drop previous chapter verses before widget load — otherwise
+      // getBookContentForRead can keep old content when the new query is empty.
+      _resetReaderContentCacheForWidgetNav();
+      controller.selectedBookContent.clear();
+      controller.selectedVersesContent.clear();
+      controller.isFetchContent.value = true;
+      controller.loadTextToSpeech.value = true;
+
+      await controller.getBookContentForRead();
+      if (!mounted) return true;
+
+      // Hard guarantee: if still not on the widget chapter, force DB reload.
+      final atTargetChapter =
+          controller.selectedChapter.value.trim() == '$chapter' &&
+              controller.selectedBookNum.value.trim() == '$bookNum' &&
+              controller.selectedBookContent.isNotEmpty &&
+              controller.displayedContentMatchesSelection();
+      if (!atTargetChapter) {
+        controller.selectedBookNum.value = '$bookNum';
+        controller.selectedChapter.value = '$chapter';
+        controller.selectedBook.value = targetBookName;
+        controller.selectedBookNumForRead.value = '$bookNum';
+        controller.selectedChapterForRead.value = '$chapter';
+        controller.selectedBookNameForRead.value = targetBookName;
+        await controller.forceReloadSelectedChapter();
+        if (!mounted) return true;
+      }
+
+      // In-place path skips _loadInitialData — still load saved reading font.
+      await controller.getFont();
+      if (!mounted) return true;
+
+      _ensureWidgetReaderScrollController(controller);
+      _markWidgetNavHandled(navKey);
+
+      if (from == 'Daily' &&
+          verseNum > 0 &&
+          controller.selectedBookContent.isNotEmpty) {
+        final listIndex = resolveDailyVerseListIndex(
+          verseNum,
+          controller.selectedBookContent,
+          versePlainText:
+              plainVerseHint.isNotEmpty ? plainVerseHint : null,
+        );
+        final safeIndex =
+            listIndex.clamp(0, controller.selectedBookContent.length - 1);
+        final matchedText = parseVerseContent(
+            controller.selectedBookContent[safeIndex].content);
+        if (matchedText.isNotEmpty) {
+          _pendingWidgetVerseText = matchedText;
+          _widgetHighlightEpoch++;
+        } else if (plainVerseHint.isNotEmpty) {
+          _pendingWidgetVerseText = plainVerseHint;
+          _widgetHighlightEpoch++;
+        }
+      } else if (plainVerseHint.isNotEmpty) {
+        _pendingWidgetVerseText = plainVerseHint;
+        _widgetHighlightEpoch++;
+      }
+
+      if (mounted) setState(() {});
+
+      // Wait for ListView / AutoScrollTags before scroll + index highlight.
+      if (verseNum > 0) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          Future.delayed(const Duration(milliseconds: 350), () {
+            if (!mounted) return;
+            _waitForDataAndHighlightController(
+              controller,
+              verseNum,
+              from: from,
+              versePlainText: _pendingWidgetVerseText.isNotEmpty
+                  ? _pendingWidgetVerseText
+                  : (plainVerseHint.isNotEmpty ? plainVerseHint : null),
+            );
+          });
+        });
+      }
+
+      if (_pendingWidgetVerseText.isNotEmpty) {
+        _scheduleClearPendingWidgetVerseText();
+      }
+      return true;
+    } finally {
+      _widgetNavInFlight = false;
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    // Hold Continue Journey until Premium Unlocked is dismissed (onboarding LT).
+    if (widget.From.toString() == 'premium') {
+      _awaitingPremiumWelcomeBeforeJourney = true;
+    }
     WidgetsBinding.instance.addObserver(this);
     _initializeApp();
     // Track Home Screen event
@@ -1341,10 +1550,12 @@ class _HomeScreenState extends State<HomeScreen>
       }
     if (!mounted) return;
 
-      final initialUri = await HomeWidget.initiallyLaunchedFromHomeWidget();
-      if (!mounted) return;
-      _navigateForWidgetRoute(getBibleWidgetRouteFromUri(initialUri));
-      if (!mounted) return;
+      if (!_sessionWidgetLaunchHandled) {
+        final initialUri = await HomeWidget.initiallyLaunchedFromHomeWidget();
+        if (!mounted) return;
+        _navigateForWidgetRoute(getBibleWidgetRouteFromUri(initialUri));
+        if (!mounted) return;
+      }
     _widgetClickSubscription ??= HomeWidget.widgetClicked.listen((uri) {
         if (!mounted) return;
         _navigateForWidgetRoute(getBibleWidgetRouteFromUri(uri));
@@ -1353,12 +1564,40 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _maybeShowContinueJourneySheet() async {
     if (_continueJourneySheetShown || !mounted) return;
+    // Don't stack under Premium Unlocked after onboarding purchase.
+    if (_awaitingPremiumWelcomeBeforeJourney) return;
+    // Finish Update Alert first, then Continue Journey / streak prompt.
+    await _waitForUpdateAlertFlowBeforeJourney();
+    if (!mounted || _continueJourneySheetShown) return;
+    if (_awaitingPremiumWelcomeBeforeJourney) return;
     if (!await StreakFlowNavigation.shouldShowContinueJourneyPrompt()) return;
     if (!mounted) return;
     _continueJourneySheetShown = true;
     await Future.delayed(const Duration(milliseconds: 350));
     if (!mounted) return;
     await StreakFlowNavigation.showContinueJourneyBottomSheet(context);
+  }
+
+  /// Waits until Update Alert is done (or won't show) so it doesn't overlap
+  /// Continue Today's Journey. Does not change upgrade or streak logic.
+  Future<void> _waitForUpdateAlertFlowBeforeJourney() async {
+    // Head start so BibleUpgradeAlert can mark pending / present first.
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (!mounted) return;
+
+    for (var attempt = 0; attempt < 75; attempt++) {
+      if (!mounted) return;
+      final pendingOrVisible =
+          BibleUpgradeAlertState.updateAlertPendingOrVisible;
+      final overlayOpen =
+          Navigator.of(context, rootNavigator: true).canPop();
+
+      if (!pendingOrVisible && !overlayOpen) {
+        return;
+      }
+      // Update alert still pending or open — wait for it to finish.
+      await Future.delayed(const Duration(milliseconds: 400));
+    }
   }
 
   Future<void> _showStreakCompleteCelebrationIfNeeded() async {
@@ -1549,7 +1788,14 @@ class _HomeScreenState extends State<HomeScreen>
   void _navigateForWidgetRoute(BibleWidgetRoute route) {
     if (route == BibleWidgetRoute.none) return;
     if (route == BibleWidgetRoute.verse) {
-      Get.to(() => const DailyVerse(fromWidget: true));
+      // Verse For You → exact book + chapter + verse from VOTD location keys.
+      unawaited(_navigateToDailyVerseLocationFromWidget());
+    } else if (route == BibleWidgetRoute.random) {
+      // Random Verse → its own location keys (not Verse For You).
+      unawaited(_navigateToRandomVerseLocationFromWidget());
+    } else if (route == BibleWidgetRoute.reading) {
+      // Continue Reading widget → location shown on the tile (widget keys, prefs fallback).
+      unawaited(_navigateToContinueReadingFromWidget());
     } else if (route == BibleWidgetRoute.prayer) {
       Get.to(() => const PrayerGuidanceScreen());
     } else if (route == BibleWidgetRoute.chat) {
@@ -1560,6 +1806,161 @@ class _HomeScreenState extends State<HomeScreen>
       unawaited(SharPreferences.setString(
           SharPreferences.pendingNotificationAction, ''));
       Get.to(() => const DailyJourneyScreen());
+    }
+  }
+
+  /// Opens the Verse-of-the-Day widget location in the reader (same Daily path).
+  /// Falls back to Daily Verse list if location is missing.
+  /// Returns true when navigation was applied in-place (no full Home rebuild).
+  Future<bool> _navigateToDailyVerseLocationFromWidget() async {
+    if (!mounted) return false;
+    final loc = await getDailyVerseWidgetLocation();
+    if (!mounted) return false;
+    return _openDailyStyleWidgetLocation(loc,
+        fallbackToDailyList: true, navPrefix: 'Daily');
+  }
+
+  /// Opens the Random Verse widget location (separate keys from Verse For You).
+  Future<bool> _navigateToRandomVerseLocationFromWidget() async {
+    if (!mounted) return false;
+    var loc = await getRandomVerseWidgetLocation();
+    if (!mounted) return false;
+    // Older installs may not have random location keys yet — fall back to VOTD keys.
+    if (loc.isEmpty) {
+      loc = await getDailyVerseWidgetLocation();
+      if (!mounted) return false;
+    }
+    return _openDailyStyleWidgetLocation(loc,
+        fallbackToDailyList: true, navPrefix: 'Random');
+  }
+
+  Future<bool> _openDailyStyleWidgetLocation(
+    Map<String, String> loc, {
+    required bool fallbackToDailyList,
+    String navPrefix = 'Daily',
+  }) async {
+    final bookNum = int.tryParse(loc['bookNum'] ?? '');
+    final chapter = int.tryParse(loc['chapter'] ?? '');
+    final verseNum = int.tryParse(loc['verseNum'] ?? '');
+    final bookName = (loc['bookName'] ?? '').trim();
+    final verseText = (loc['text'] ?? '').trim();
+
+    if (bookNum == null || chapter == null || verseNum == null) {
+      if (fallbackToDailyList) {
+        _sessionWidgetLaunchHandled = true;
+        Get.to(() => const DailyVerse(fromWidget: true));
+      }
+      return false;
+    }
+
+    final navKey = '$navPrefix:$bookNum:$chapter:$verseNum';
+    if (_shouldSkipDuplicateWidgetNav(navKey)) return true;
+
+    final appliedInPlace = await _applyWidgetReaderInPlace(
+      from: 'Daily',
+      bookNum: bookNum,
+      chapter: chapter,
+      verseNum: verseNum,
+      bookName: bookName.isNotEmpty ? bookName : 'Genesis',
+      verseText: verseText,
+    );
+    if (appliedInPlace) return true;
+    if (!mounted) return false;
+
+    // Fallback when Home is not the current route (e.g. another screen on top).
+    _widgetNavInFlight = true;
+    try {
+      await SharPreferences.setString(
+          SharPreferences.selectedBook,
+          bookName.isNotEmpty ? bookName : 'Genesis');
+      await SharPreferences.setString(
+          SharPreferences.selectedChapter, '$chapter');
+      await SharPreferences.setString(
+          SharPreferences.selectedBookNum, '$bookNum');
+      if (!mounted) return false;
+
+      Get.offAll(
+        () => HomeScreen(
+          From: 'Daily',
+          selectedBookForRead: bookNum,
+          selectedChapterForRead: chapter,
+          selectedVerseNumForRead: verseNum,
+          selectedBookNameForRead:
+              bookName.isNotEmpty ? bookName : 'Genesis',
+          selectedVerseForRead: verseText,
+        ),
+        transition: Transition.cupertino,
+        duration: const Duration(milliseconds: 350),
+      );
+      _markWidgetNavHandled(navKey);
+      return false;
+    } finally {
+      _widgetNavInFlight = false;
+    }
+  }
+
+  /// Continue Reading widget: open the chapter shown on the tile.
+  /// Prefers widget-stored snapshot; falls back to last-read prefs.
+  /// Returns true when navigation was applied in-place (no full Home rebuild).
+  Future<bool> _navigateToContinueReadingFromWidget() async {
+    if (!mounted) return false;
+
+    final widgetLoc = await getContinueReadingWidgetLocation();
+    if (!mounted) return false;
+
+    String bookName = (widgetLoc['bookName'] ?? '').trim();
+    String chapterStr = (widgetLoc['chapter'] ?? '').trim();
+    String bookNumStr = (widgetLoc['bookNum'] ?? '').trim();
+
+    if (bookNumStr.isEmpty || chapterStr.isEmpty) {
+      bookName =
+          (await SharPreferences.getString(SharPreferences.selectedBook))
+                  ?.trim() ??
+              '';
+      chapterStr =
+          (await SharPreferences.getString(SharPreferences.selectedChapter))
+                  ?.trim() ??
+              '1';
+      bookNumStr =
+          (await SharPreferences.getString(SharPreferences.selectedBookNum))
+                  ?.trim() ??
+              '0';
+      if (!mounted) return false;
+    }
+
+    final bookNum = int.tryParse(bookNumStr) ?? 0;
+    final chapter = int.tryParse(chapterStr) ?? 1;
+    final navKey = 'Read:$bookNum:$chapter:0';
+    if (_shouldSkipDuplicateWidgetNav(navKey)) return true;
+
+    final appliedInPlace = await _applyWidgetReaderInPlace(
+      from: 'Read',
+      bookNum: bookNum,
+      chapter: chapter,
+      verseNum: 0,
+      bookName: bookName.isNotEmpty ? bookName : 'Genesis',
+    );
+    if (appliedInPlace) return true;
+    if (!mounted) return false;
+
+    _widgetNavInFlight = true;
+    try {
+      Get.offAll(
+        () => HomeScreen(
+          From: 'Read',
+          selectedBookForRead: bookNum,
+          selectedChapterForRead: chapter,
+          selectedVerseNumForRead: 1,
+          selectedBookNameForRead: bookName.isNotEmpty ? bookName : 'Genesis',
+          selectedVerseForRead: '',
+        ),
+        transition: Transition.cupertino,
+        duration: const Duration(milliseconds: 350),
+      );
+      _markWidgetNavHandled(navKey);
+      return false;
+    } finally {
+      _widgetNavInFlight = false;
     }
   }
 
@@ -3028,6 +3429,8 @@ class _HomeScreenState extends State<HomeScreen>
     var bibleName = BibleInfo.bible_shortName;
     return UpgradeCheckWrapper(
       check: "home",
+      // Home was open-ad only; enable update alert so "Update App?" can show.
+      showUpgradeAlert: true,
       child: GetX<DashBoardController>(
         init: DashBoardController(),
         autoRemove: false,
@@ -3424,16 +3827,40 @@ class _HomeScreenState extends State<HomeScreen>
           //     }
           //   },
           // );
-          _initializeControllerState(state);
+          var widgetReaderHandledEarly = false;
+          if (Platform.isIOS && !_sessionWidgetLaunchHandled) {
+            final initialUri =
+                await HomeWidget.initiallyLaunchedFromHomeWidget();
+            final route = getBibleWidgetRouteFromUri(initialUri);
+            if (route == BibleWidgetRoute.verse ||
+                route == BibleWidgetRoute.random ||
+                route == BibleWidgetRoute.reading) {
+              _initializeControllerState(state);
+              if (route == BibleWidgetRoute.verse) {
+                widgetReaderHandledEarly =
+                    await _navigateToDailyVerseLocationFromWidget();
+              } else if (route == BibleWidgetRoute.random) {
+                widgetReaderHandledEarly =
+                    await _navigateToRandomVerseLocationFromWidget();
+              } else {
+                widgetReaderHandledEarly =
+                    await _navigateToContinueReadingFromWidget();
+              }
+            }
+          }
+          if (!widgetReaderHandledEarly) {
+            _initializeControllerState(state);
+          }
           final cachedController = state.controller;
           final hasCachedContent = cachedController != null &&
               cachedController.selectedBookContent.isNotEmpty;
           final skipReloadPath =
               hasCachedContent && !_homeEntryRequiresContentReload();
-          if (!hasCachedContent || _homeEntryRequiresContentReload()) {
+          if (!widgetReaderHandledEarly &&
+              (!hasCachedContent || _homeEntryRequiresContentReload())) {
           _loadInitialData(state);
           }
-          if (hasCachedContent) {
+          if (hasCachedContent && !widgetReaderHandledEarly) {
             cachedController.isFetchContent.value = false;
             _hasDisplayedChapterContent = true;
             if (skipReloadPath) {
@@ -3450,6 +3877,11 @@ class _HomeScreenState extends State<HomeScreen>
             } else {
               await SharPreferences.setBoolean(
                   SharPreferences.deferUpgradeAlert, false);
+            }
+            // Reading screen is ready and Premium Unlocked is done — now journey.
+            _awaitingPremiumWelcomeBeforeJourney = false;
+            if (mounted) {
+              await _maybeShowContinueJourneySheet();
             }
           }
         },
@@ -3469,12 +3901,15 @@ class _HomeScreenState extends State<HomeScreen>
             _lastVisibleChapterContent = [];
             _lastContentSource = null;
           }
-          final readerVerses = controller.selectedBookContent.isNotEmpty
+          final readerVersesRaw = controller.selectedBookContent.isNotEmpty
               ? controller.selectedBookContent
               : (_lastVisibleChapterContent.isNotEmpty &&
                       _staleContentMatchesChapter(controller)
                   ? _lastVisibleChapterContent
                   : controller.selectedBookContent);
+          // Never paint current+next chapter together after rapid Mark as Read.
+          final readerVerses =
+              _readerVersesForSelectedChapter(controller, readerVersesRaw);
           final themeProvider = p.Provider.of<ThemeProvider>(context);
           final isVintage =
               themeProvider.currentCustomTheme == AppCustomTheme.vintage;
@@ -3561,7 +3996,11 @@ class _HomeScreenState extends State<HomeScreen>
                                 ),
                               )
                             : GestureDetector(
-                                onTap: () {
+                                onTap: () async {
+                                  // Sync premium from prefs so drawer updates
+                                  // right after purchase (no app restart).
+                                  await controller
+                                      .refreshPremiumStatusFromPrefs();
                                   _scaffoldKey.currentState?.openDrawer();
                                 },
                                 child: Icon(
@@ -3998,16 +4437,21 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                     ),
                   ),
-            drawer: controller.isFetchContent.value &&
-                    controller.selectedBookContent.isEmpty &&
-                    !_hasDisplayedChapterContent
-                ? const SizedBox()
-                    : _buildIosHomeDrawer(
-                              context: context,
-                        controller: controller,
-                        bibleName: bibleName,
-                        screenWidth: screenWidth,
-                  ),
+            // Obx: rebuild drawer when adFree flips after purchase.
+            drawer: Obx(() {
+              final _ = controller.adFree.value;
+              if (controller.isFetchContent.value &&
+                  controller.selectedBookContent.isEmpty &&
+                  !_hasDisplayedChapterContent) {
+                return const SizedBox();
+              }
+              return _buildIosHomeDrawer(
+                context: context,
+                controller: controller,
+                bibleName: bibleName,
+                screenWidth: screenWidth,
+              );
+            }),
             bottomNavigationBar: const SizedBox(
               height: 1,
             ),
@@ -4191,7 +4635,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 var data = readerVerses[index];
                                 return AutoScrollTag(
                                   key: ValueKey(
-                                      '${controller.selectedChapter.value}_$index'),
+                                      '${controller.selectedChapter.value}_${index}_$_widgetHighlightEpoch'),
                                         controller: controller
                                             .autoScrollController.value,
                                   index: index,
@@ -4264,9 +4708,8 @@ class _HomeScreenState extends State<HomeScreen>
                                                       .selectedIndex.value,
                                             controller: controller,
                                             data: data,
-                                            selectedVerseForRead: widget
-                                                .selectedVerseForRead
-                                                .toString(),
+                                            selectedVerseForRead:
+                                                _effectiveSelectedVerseForRead,
                                             selectedColor:
                                                 selectedcolor.toString(),
                                           ),
@@ -5504,12 +5947,14 @@ class _HomeScreenState extends State<HomeScreen>
           BibleInfo.oneYearPlanid;
       final lifeTimePlan = await SharPreferences.getString('lifeTimePlan') ??
           BibleInfo.lifeTimePlanid;
-      SubscriptionScreen.openPaywallStacked(
+      await SubscriptionScreen.openPaywallStacked(
         sixMonthPlan: sixMonthPlan,
         oneYearPlan: oneYearPlan,
         lifeTimePlan: lifeTimePlan,
         checkad: 'theme',
       );
+      // Paywall may pop back onto this Home — refresh so Free Plan / banner update.
+      await controller.refreshPremiumStatusFromPrefs();
     }
 
     void showSubscriptionInfoSheet() {
@@ -5590,6 +6035,8 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     return Drawer(
+      // Force new drawer instance when premium status changes.
+      key: ValueKey('ios_home_drawer_$isPremium'),
       backgroundColor: IosStyleAppDrawer.backgroundOf(context),
       width: MediaQuery.of(context).size.width * 0.82,
       child: IosStyleAppDrawer(
@@ -6068,8 +6515,35 @@ class _HomeScreenState extends State<HomeScreen>
     final zeroBased =
         _lastVisibleChapterContent.any((v) => (v.chapterNum ?? -1) == 0);
     final stored = zeroBased ? safe - 1 : safe;
+    // Reject mixed lists (current + next chapter) left after rapid Mark as Read.
     return _lastVisibleChapterContent
-        .any((v) => v.chapterNum?.toInt() == stored);
+        .every((v) => v.chapterNum?.toInt() == stored);
+  }
+
+  /// Display-only: one chapter's verses for the reader list.
+  List<VerseBookContentModel> _readerVersesForSelectedChapter(
+    DashBoardController controller,
+    List<VerseBookContentModel> source,
+  ) {
+    if (source.isEmpty) return source;
+    final ch = int.tryParse(controller.selectedChapter.value) ?? 1;
+    final safe = ch <= 0 ? 1 : ch;
+    // Prefer full-book sample — a single chapter slice often has no chapter 0,
+    // so zero-based books were mis-detected and filtered to an empty list.
+    final sample = controller.selectedVersesContent.isNotEmpty
+        ? controller.selectedVersesContent
+        : source;
+    final zeroBased = sample.any((v) => (v.chapterNum ?? -1) == 0);
+    final stored = zeroBased ? safe - 1 : safe;
+    final only = source.where((v) => v.chapterNum?.toInt() == stored).toList();
+    if (only.isNotEmpty) return only;
+    final alt = zeroBased ? safe : safe - 1;
+    if (alt >= 0 && alt != stored) {
+      final altOnly =
+          source.where((v) => v.chapterNum?.toInt() == alt).toList();
+      if (altOnly.isNotEmpty) return altOnly;
+    }
+    return source;
   }
 
   bool _homeEntryRequiresContentReload() {
@@ -6306,25 +6780,62 @@ class _HomeScreenState extends State<HomeScreen>
   void _waitForDataAndHighlight(
       GetXState<DashBoardController> state, int verseIndex,
       {int retryCount = 0}) {
-    // Maximum retries to prevent infinite loop
+    final controller = state.controller;
+    if (controller == null) return;
+    _waitForDataAndHighlightController(
+      controller,
+      verseIndex,
+      from: widget.From.toString(),
+      versePlainText: widget.selectedVerseForRead?.toString(),
+      retryCount: retryCount,
+    );
+  }
+
+  void _waitForDataAndHighlightController(
+    DashBoardController controller,
+    int verseIndex, {
+    required String from,
+    String? versePlainText,
+    int retryCount = 0,
+  }) {
     if (retryCount > 20) {
       debugPrint('Timeout waiting for data to load for verse highlighting');
       return;
     }
+    if (!mounted) return;
 
-    // Check if data is loaded
-    if (!state.controller!.isFetchContent.value) {
-      // Data loading is complete
-      if (state.controller!.selectedBookContent.isNotEmpty) {
-        // Data is ready, scroll and highlight
-        _scrollAndHighlightVerse(state, verseIndex);
+    if (!controller.isFetchContent.value) {
+      if (controller.selectedBookContent.isNotEmpty) {
+        _scrollAndHighlightVerseController(
+          controller,
+          verseIndex,
+          from: from,
+          versePlainText: versePlainText,
+        );
+      } else {
+        // Content not ready yet (empty + not fetching) — retry instead of abort.
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            _waitForDataAndHighlightController(
+              controller,
+              verseIndex,
+              from: from,
+              versePlainText: versePlainText,
+              retryCount: retryCount + 1,
+            );
+          }
+        });
       }
     } else {
-      // Wait a bit and retry
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
-          _waitForDataAndHighlight(state, verseIndex,
-              retryCount: retryCount + 1);
+          _waitForDataAndHighlightController(
+            controller,
+            verseIndex,
+            from: from,
+            versePlainText: versePlainText,
+            retryCount: retryCount + 1,
+          );
         }
       });
     }
@@ -6349,22 +6860,27 @@ class _HomeScreenState extends State<HomeScreen>
           final chapter = int.tryParse(controller.selectedChapter.value) ?? 1;
           final safeChapter = chapter <= 0 ? 1 : chapter;
 
-          List<VerseBookContentModel> matches = downloadProvider.verseList
-              .where((v) => (v.bookNum ?? -999) == bookNum)
-              .where((v) =>
-                  (v.chapterNum ?? -999) == (safeChapter - 1) ||
-                  (v.chapterNum ?? -999) == safeChapter)
-              .toList();
+          // Pick one chapter basis only — OR-ing (safe-1 || safe) merged the
+          // next chapter into the reader after rapid Mark as Read.
+          List<VerseBookContentModel> matchesForBook(int bNum) {
+            final bookVerses = downloadProvider.verseList
+                .where((v) => (v.bookNum ?? -999) == bNum)
+                .toList();
+            if (bookVerses.isEmpty) return [];
+            final zeroBased =
+                bookVerses.any((v) => (v.chapterNum ?? -1) == 0);
+            final stored = zeroBased ? safeChapter - 1 : safeChapter;
+            return bookVerses
+                .where((v) => (v.chapterNum ?? -999) == stored)
+                .toList();
+          }
+
+          List<VerseBookContentModel> matches = matchesForBook(bookNum);
 
           // Legacy 1-based book_num fallback as well.
           if (matches.isEmpty && bookNum > 0) {
             final legacyBookNum = bookNum - 1;
-            matches = downloadProvider.verseList
-                .where((v) => (v.bookNum ?? -999) == legacyBookNum)
-                .where((v) =>
-                    (v.chapterNum ?? -999) == (safeChapter - 1) ||
-                    (v.chapterNum ?? -999) == safeChapter)
-                .toList();
+            matches = matchesForBook(legacyBookNum);
             if (matches.isNotEmpty) {
               controller.selectedBookNum.value = legacyBookNum.toString();
               SharPreferences.setString(
@@ -6374,12 +6890,7 @@ class _HomeScreenState extends State<HomeScreen>
           // Inverse: prefs 0-based but verse list uses 1-based book indices.
           if (matches.isEmpty) {
             final oneBasedBook = bookNum + 1;
-            matches = downloadProvider.verseList
-                .where((v) => (v.bookNum ?? -999) == oneBasedBook)
-                .where((v) =>
-                    (v.chapterNum ?? -999) == (safeChapter - 1) ||
-                    (v.chapterNum ?? -999) == safeChapter)
-                .toList();
+            matches = matchesForBook(oneBasedBook);
             if (matches.isNotEmpty) {
               controller.selectedBookNum.value = oneBasedBook.toString();
               SharPreferences.setString(
@@ -6448,43 +6959,56 @@ class _HomeScreenState extends State<HomeScreen>
   // Helper method to scroll to verse and highlight it
   void _scrollAndHighlightVerse(
       GetXState<DashBoardController> state, int verseIndex) {
+    final controller = state.controller;
+    if (controller == null) return;
+    _scrollAndHighlightVerseController(
+      controller,
+      verseIndex,
+      from: widget.From.toString(),
+      versePlainText: widget.selectedVerseForRead?.toString(),
+    );
+  }
+
+  void _scrollAndHighlightVerseController(
+    DashBoardController controller,
+    int verseIndex, {
+    required String from,
+    String? versePlainText,
+  }) {
     try {
-      final contentLen = state.controller!.selectedBookContent.length;
+      final contentLen = controller.selectedBookContent.length;
       if (contentLen == 0) return;
 
-      // Daily Verse_Num is 1-based; match by verse text then verse_num.
-      final listIndex = widget.From.toString() == "Daily"
+      final listIndex = from == "Daily"
           ? resolveDailyVerseListIndex(
               verseIndex,
-              state.controller!.selectedBookContent,
-              versePlainText: widget.selectedVerseForRead?.toString(),
+              controller.selectedBookContent,
+              versePlainText: versePlainText,
             )
-          : widget.From.toString() == "chat"
+          : from == "chat"
               ? verseIndex - 1
               : verseIndex;
       final safeIndex = listIndex.clamp(0, contentLen - 1);
 
-      state.controller!.scrollToIndex(safeIndex);
+      controller.scrollToIndex(safeIndex);
 
-      if (widget.From.toString() == "chat" ||
-          widget.From.toString() == "Daily" ||
-          widget.From.toString() == "Read") {
-        state.controller!.selectedIndex.value = safeIndex;
-          state.controller!.readHighlight.value = true;
+      if (from == "chat" || from == "Daily" || from == "Read") {
+        controller.selectedIndex.value = safeIndex;
+        controller.readHighlight.value = true;
 
         Future.delayed(
-            Duration(seconds: widget.From.toString() == "chat" ? 10 : 6), () {
-            if (mounted) {
-              state.controller?.readHighlight.value = false;
-              state.controller?.selectedIndex.value = -1;
-            }
-          });
+            Duration(seconds: from == "chat" ? 10 : 6), () {
+          if (mounted) {
+            controller.readHighlight.value = false;
+            controller.selectedIndex.value = -1;
+          }
+        });
       } else {
-        state.controller?.selectedIndex.value = -1;
+        controller.selectedIndex.value = -1;
       }
     } catch (e) {
       debugPrint('Error scrolling to verse: $e');
-      state.controller?.selectedIndex.value = -1;
+      controller.selectedIndex.value = -1;
     }
   }
 

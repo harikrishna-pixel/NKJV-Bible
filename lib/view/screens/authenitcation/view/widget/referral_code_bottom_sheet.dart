@@ -207,42 +207,60 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
       if (!mounted) return;
       _dismissKeyboard();
       Navigator.of(context).pop();
-      Constants.showToast('You received 100 free coins!');
+      Constants.showToast(
+        'Referral code applied successfully! You received 100 free coins!',
+      );
     } catch (e) {
-      final message = e is String ? e : e.toString();
-      final lower = message.toLowerCase();
-      final loggedInFallback =
-          'Unable to apply referral code. Please check the code and try again.';
-      final invalidFallback = 'Invalid Referral code';
-      // Post-registration sheet: always validate on this screen — never
-      // tell the user to enter the code on Sign Up instead.
-      if (lower.contains('enter this referral') &&
-          lower.contains('sign up')) {
-        Constants.showToast(
-          widget.useLoggedInSession ? loggedInFallback : invalidFallback,
-        );
-      } else if (lower.contains('invalid referral') ||
-          lower.contains('own referral') ||
-          lower.contains('already applied') ||
-          lower.contains('please enter') ||
-          lower.contains('unable to apply') ||
-          lower.contains('sign out and sign in') ||
-          lower.contains('no internet') ||
-          lower.contains('something went wrong') ||
-          lower.contains('does not exist') ||
-          lower.contains('check the code') ||
-          lower.contains('not found')) {
-        Constants.showToast(message);
-      } else if (widget.useLoggedInSession) {
-        Constants.showToast(loggedInFallback);
-      } else {
-        Constants.showToast(invalidFallback);
-      }
+      Constants.showToast(_referralApplyToastMessage(e));
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
       }
     }
+  }
+
+  /// Maps apply-referral errors to a clear valid/invalid toast for the user.
+  String _referralApplyToastMessage(Object e) {
+    var message = e is String ? e : e.toString();
+    if (message.startsWith('Exception: ')) {
+      message = message.substring('Exception: '.length);
+    }
+    final lower = message.toLowerCase();
+
+    if (lower.contains('already applied') || lower.contains('already used')) {
+      return 'Referral code already applied';
+    }
+    if (lower.contains('own referral') ||
+        (lower.contains('own') && lower.contains('referral'))) {
+      return 'You cannot use your own referral code';
+    }
+    if (lower.contains('no internet') ||
+        lower.contains('socketexception') ||
+        lower.contains('timed out') ||
+        lower.contains('timeout')) {
+      return 'No Internet Connection';
+    }
+    if (lower.contains('please enter a referral') ||
+        lower.contains('please enter')) {
+      return 'Please enter a referral code';
+    }
+    if (lower.contains('invalid') ||
+        lower.contains('not found') ||
+        lower.contains('does not exist') ||
+        lower.contains('unable to apply') ||
+        lower.contains('enter this referral') ||
+        lower.contains('referred') ||
+        lower.contains('check the code') ||
+        lower.contains('sign out and sign in') ||
+        lower.contains('something went wrong')) {
+      return 'Invalid Referral code';
+    }
+    if (message.trim().isNotEmpty &&
+        !lower.contains('exception') &&
+        !lower.startsWith('error')) {
+      return message.trim();
+    }
+    return 'Invalid Referral code';
   }
 
   @override

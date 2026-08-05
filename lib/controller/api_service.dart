@@ -712,17 +712,21 @@ bool _profileUpdateSucceeded(String? body) {
   try {
     final parsed = jsonDecode(body) as Map<String, dynamic>;
     final status = parsed['status'];
-    if (status == true || status == 1 || status == '1' || status == 'true') {
-      return true;
+    final statusTrue =
+        status == true || status == 1 || status == '1' || status == 'true';
+    // Require an explicit success status — status_code 200 alone is not enough
+    // (invalid referral responses often still return 200).
+    if (!statusTrue) return false;
+    if (_hasReferralErrorInResponse(parsed)) return false;
+    final message = parsed['message']?.toString().toLowerCase() ?? '';
+    if (message.contains('invalid') &&
+        (message.contains('referral') || message.contains('referred'))) {
+      return false;
     }
-    final statusCode = parsed['status_code'];
-    if (statusCode == 200 && status != false && status != 'false') {
-      return true;
-    }
+    return true;
   } catch (_) {
     return false;
   }
-  return false;
 }
 
 bool _isMisleadingLoginSuccessMessage(String? message) {
@@ -738,21 +742,28 @@ String _referralApplyFailureMessage(
 }) {
   final profileError = _profileUpdateErrorMessage(profileResult);
   final signUpFallback = 'Enter this referral code on the Sign Up screen';
-  final loggedInFallback =
-      'Unable to apply referral code. Please check the code and try again.';
+  final invalidFallback = 'Invalid Referral code';
   final genericFallback =
-      forLoggedInSession ? loggedInFallback : signUpFallback;
+      forLoggedInSession ? invalidFallback : signUpFallback;
 
   if (profileError == null || profileError.isEmpty) {
     return genericFallback;
   }
   final lower = profileError.toLowerCase();
-  if (lower.contains('referral') ||
-      lower.contains('already applied') ||
-      lower.contains('already used') ||
+  if (lower.contains('already applied') ||
+      lower.contains('already used')) {
+    return 'Referral code already applied';
+  }
+  if (lower.contains('own referral') ||
+      (lower.contains('own') && lower.contains('referral'))) {
+    return 'You cannot use your own referral code';
+  }
+  if (lower.contains('invalid') ||
+      lower.contains('not found') ||
       lower.contains('does not exist') ||
-      lower.contains('expired')) {
-    return profileError;
+      lower.contains('referred') ||
+      lower.contains('referral')) {
+    return invalidFallback;
   }
   if (lower.contains('email already exists') ||
       lower.contains('validation failed') ||
@@ -762,7 +773,7 @@ String _referralApplyFailureMessage(
       lower.contains('the name field')) {
     return genericFallback;
   }
-  return profileError;
+  return forLoggedInSession ? invalidFallback : profileError;
 }
 
 String? _profileUpdateErrorMessage(String? body) {
