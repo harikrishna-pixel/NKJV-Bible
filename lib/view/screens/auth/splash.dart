@@ -292,7 +292,7 @@ class _SplashScreenState extends State<SplashScreen>
         // Preload Paywall Screen data in background (non-blocking)
         PaywallPreloadService.preloadPaywallData();
 
-        // Essential: Check app count and load daily verses
+        // Essential: Check app count (launch counters / open-ad flag only).
         await checkappcount();
 
         // Essential: Load local data (books, verses from DB)
@@ -304,6 +304,11 @@ class _SplashScreenState extends State<SplashScreen>
         // flags and JSON caches so daily verse + home never trust stale state.
         await reconcilePersistedBibleStateWithDatabase();
         await loadDailyVerseData();
+        // Load Verse for You only after daily-verse tables are seeded (first install).
+        if (mounted) {
+          await Provider.of<DownloadProvider>(context, listen: false)
+              .loadDailyVerses();
+        }
         await loadLocal();
 
         // Essential: Set default book if not set + preserve legacy user data
@@ -489,8 +494,8 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   checkappcount() async {
-    await Provider.of<DownloadProvider>(context, listen: false)
-        .loadDailyVerses();
+    // Daily verses load after loadDailyVerseData() on splash — not here —
+    // so first install does not cache an empty Verse for You list.
 
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();

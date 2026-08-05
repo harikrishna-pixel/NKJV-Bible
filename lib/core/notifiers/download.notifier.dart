@@ -957,8 +957,8 @@ class DownloadProvider with ChangeNotifier {
       final selectedForCache =
           prefs.getStringList('selected_categories') ?? [];
       final List<dynamic> decodedCache = jsonDecode(cachedJson);
-      final staleEmptyCache =
-          selectedForCache.isNotEmpty && decodedCache.isEmpty;
+      // Never treat an empty cache as ready — first install used to stick here.
+      final staleEmptyCache = decodedCache.isEmpty;
 
       if (!staleEmptyCache) {
       if (selectedForCache.isNotEmpty) {
@@ -982,14 +982,16 @@ class DownloadProvider with ChangeNotifier {
         }
       } else {
         final List<dynamic> decoded = jsonDecode(cachedJson);
-        dailyVerseList = decoded
-            .map((e) => DailyVerseList.fromJson(e as Map<String, dynamic>))
-            .toSet()
-            .toList();
-        debugPrint("dailyVerseList is ${dailyVerseList.length}");
-        isLoadingDailyVerse = false;
-        notifyListeners();
-        return;
+        if (decoded.isNotEmpty) {
+          dailyVerseList = decoded
+              .map((e) => DailyVerseList.fromJson(e as Map<String, dynamic>))
+              .toSet()
+              .toList();
+          debugPrint("dailyVerseList is ${dailyVerseList.length}");
+          isLoadingDailyVerse = false;
+          notifyListeners();
+          return;
+        }
       }
       }
     }
@@ -1069,11 +1071,16 @@ class DownloadProvider with ChangeNotifier {
 
     dailyVerseList = enrichedList;
     debugPrint("dailyVerseList new is ${dailyVerseList.length}");
-    // Cache in SharedPreferences
-    final String jsonList =
-        jsonEncode(dailyVerseList.map((e) => e.toJson()).toSet().toList());
-    await prefs.setString('cachedDailyVerseList_v2', jsonList);
-    await prefs.setBool('dataIsChanged', false); // Reset the flag
+    // Cache only when we actually have verses — empty first-install loads must
+    // not mark dataIsChanged=false or Verse for You stays stuck on empty cache.
+    if (enrichedList.isNotEmpty) {
+      final String jsonList =
+          jsonEncode(dailyVerseList.map((e) => e.toJson()).toSet().toList());
+      await prefs.setString('cachedDailyVerseList_v2', jsonList);
+      await prefs.setBool('dataIsChanged', false);
+    } else {
+      await prefs.setBool('dataIsChanged', true);
+    }
 
     isLoadingDailyVerse = false;
     notifyListeners();
@@ -1081,13 +1088,17 @@ class DownloadProvider with ChangeNotifier {
     // iOS Home Screen Widget: update Verse of the day (same format as Daily Verse screen)
     if (dailyVerseList.isNotEmpty) {
       final v = dailyVerseList.first;
-      final ref = '${v.book ?? ''} ${(v.chapter ?? 0) + 1}:${(v.verseNum ?? 0) + 1}'.trim();
+      // Same chapter/verse helpers as widget location keys + Daily Verse UI
+      // (do not +1 again — that made the widget show one ahead of tap open).
+      final chapter = dailyVerseUiChapter(v.chapter);
+      final verseNum = dailyVerseUiVerse(v.verseNum);
+      final ref = '${v.book ?? ''} $chapter:$verseNum'.trim();
       updateVerseOfTheDayWidget(
         verseText: v.verse ?? '',
         reference: ref.isEmpty ? 'Daily Verse' : ref,
         bookNum: dailyVerseBookNum(v.bookId),
-        chapter: dailyVerseUiChapter(v.chapter),
-        verseNum: dailyVerseUiVerse(v.verseNum),
+        chapter: chapter,
+        verseNum: verseNum,
         bookName: v.book?.toString() ?? '',
       );
       syncVerseFamilyWidgetsFromDailyList(dailyVerseList);

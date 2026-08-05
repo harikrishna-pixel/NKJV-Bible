@@ -1581,23 +1581,7 @@ class _HomeScreenState extends State<HomeScreen>
   /// Waits until Update Alert is done (or won't show) so it doesn't overlap
   /// Continue Today's Journey. Does not change upgrade or streak logic.
   Future<void> _waitForUpdateAlertFlowBeforeJourney() async {
-    // Head start so BibleUpgradeAlert can mark pending / present first.
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (!mounted) return;
-
-    for (var attempt = 0; attempt < 75; attempt++) {
-      if (!mounted) return;
-      final pendingOrVisible =
-          BibleUpgradeAlertState.updateAlertPendingOrVisible;
-      final overlayOpen =
-          Navigator.of(context, rootNavigator: true).canPop();
-
-      if (!pendingOrVisible && !overlayOpen) {
-        return;
-      }
-      // Update alert still pending or open — wait for it to finish.
-      await Future.delayed(const Duration(milliseconds: 400));
-    }
+    await BibleUpgradeAlertState.waitForUpdateFlowBeforeContinueJourney();
   }
 
   Future<void> _showStreakCompleteCelebrationIfNeeded() async {

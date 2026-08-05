@@ -17,6 +17,7 @@ import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
+import 'package:biblebookapp/view/widget/bible_upgrade_alert.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/services/daily_slot_notification_helper.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
@@ -2185,9 +2186,10 @@ class StreakFlowNavigation {
   }
 
   static void openStreakConnectionFlow() {
+    // Keep update alert off during streak flow; Home shows it after completion.
     Get.to(
           () => const UpgradeCheckWrapper(
-        showUpgradeAlert: true,
+        showUpgradeAlert: false,
         child: StreakConnectionScreen(),
       ),
       transition: Transition.cupertino,
@@ -4730,6 +4732,10 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                                       .streakCompletedScreenShownDate,
                                   todayKey);
                             }
+                            // Defer Update Alert so it cannot overlay streak completion.
+                            await BibleUpgradeAlertState
+                                .holdDuringStreakCompletionFlow(context);
+                            if (!context.mounted) return;
                             Get.offAll(() => const StreakCompletedScreen());
                           },
                         ),
@@ -4851,8 +4857,12 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
       if (!mounted) return;
       setState(() => _streakDays = value ?? 0);
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) precacheStreakPhotoBackgrounds(context);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      // Keep Update Alert deferred while this screen is visible.
+      await BibleUpgradeAlertState.holdDuringStreakCompletionFlow(context);
+      if (!mounted) return;
+      precacheStreakPhotoBackgrounds(context);
     });
 // Top "Streak Completed!" should feel like a short toast, not a fixed header.
     _streakCompletedToastTimer = Timer(const Duration(milliseconds: 1600), () {

@@ -48,6 +48,66 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
   /// Home uses this so Continue Journey waits until the update flow finishes.
   static bool updateAlertPendingOrVisible = false;
 
+  static Completer<void>? _journeyGateCompleter;
+  static bool _journeyGateReleased = false;
+
+  /// Home awaits this so Continue Journey never overlaps the Update Alert.
+  static Future<void> waitForUpdateFlowBeforeContinueJourney() async {
+    for (var i = 0; i < 100; i++) {
+      if (_journeyGateCompleter != null || _journeyGateReleased) {
+        break;
+      }
+      await Future.delayed(const Duration(milliseconds: 50));
+    }
+    if (_journeyGateReleased) return;
+    final completer = _journeyGateCompleter;
+    if (completer == null) return;
+    try {
+      await completer.future.timeout(const Duration(seconds: 60));
+    } catch (_) {
+      _releaseJourneyGate();
+    }
+  }
+
+  static void _beginUpdateFlowCheck() {
+    // Fresh check cycle (e.g. Home after streak) so Continue Journey can wait again.
+    if (_journeyGateCompleter == null ||
+        _journeyGateCompleter!.isCompleted ||
+        _journeyGateReleased) {
+      _journeyGateCompleter = Completer<void>();
+      _journeyGateReleased = false;
+    }
+    updateAlertPendingOrVisible = true;
+  }
+
+  static void _releaseJourneyGate() {
+    updateAlertPendingOrVisible = false;
+    if (_journeyGateReleased) return;
+    _journeyGateReleased = true;
+    final completer = _journeyGateCompleter;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete();
+    }
+  }
+
+  /// Hold Update Alert while streak completion UI is showing. Uses existing
+  /// [SharPreferences.deferUpgradeAlert] — does not change upgrade rules.
+  /// If an Update dialog is already on top of a root streak screen, dismiss it
+  /// so it can be shown later on Home before Continue Journey.
+  static Future<void> holdDuringStreakCompletionFlow(
+      BuildContext? context) async {
+    await SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, true);
+    if (context == null || !context.mounted) return;
+    if (!updateAlertPendingOrVisible) return;
+    try {
+      final navigator = Navigator.of(context, rootNavigator: true);
+      // On Streak Completed as root, canPop is only true if Update dialog is open.
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+    } catch (_) {}
+  }
+
   Timer? _presentationRecheckTimer;
 
   @override
@@ -58,6 +118,7 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
 
   @override
   void checkVersion({required BuildContext context}) {
+    _beginUpdateFlowCheck();
     unawaited(_checkVersionPhased(context));
   }
 
@@ -171,17 +232,15 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
 
   Future<void> _checkVersionPhased(BuildContext context) async {
     if (!widget.upgrader.shouldDisplayUpgrade()) {
-      updateAlertPendingOrVisible = false;
+      _releaseJourneyGate();
       return;
     }
-
-    updateAlertPendingOrVisible = true;
 
     final permanentlyDismissed = await SharPreferences.getBoolean(
             SharPreferences.upgradeAlertDismissedPermanently) ??
         false;
     if (permanentlyDismissed) {
-      updateAlertPendingOrVisible = false;
+      _releaseJourneyGate();
       return;
     }
 
@@ -203,7 +262,7 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
       if (remindedAt != null) {
         final elapsed = DateTime.now().difference(remindedAt);
         if (elapsed < _kIntroRemindLaterDelay) {
-          updateAlertPendingOrVisible = false;
+          _releaseJourneyGate();
           return;
         }
       }
@@ -214,7 +273,12 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
       return;
     }
 
-    if (displayed) return;
+    if (displayed) {
+      if (!updateAlertPendingOrVisible) {
+        _releaseJourneyGate();
+      }
+      return;
+    }
     displayed = true;
 
     final appMessages = widget.upgrader.determineMessages(checkContext);
@@ -271,9 +335,7 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
             ),
           );
         },
-      ).whenComplete(() {
-        updateAlertPendingOrVisible = false;
-      }),
+      ).whenComplete(_releaseJourneyGate),
     );
   }
 
@@ -321,9 +383,7 @@ class BibleUpgradeAlertState extends UpgradeAlertState {
             ),
           );
         },
-      ).whenComplete(() {
-        updateAlertPendingOrVisible = false;
-      }),
+      ).whenComplete(_releaseJourneyGate),
     );
   }
 

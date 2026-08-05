@@ -332,6 +332,10 @@ Future<void> syncVerseFamilyWidgetsFromDailyList(
     final dailyRef = _formatDailyVerseReference(daily);
     // Additive: exact location for widget → reader open (does not change reading prefs).
     await _saveDailyVerseWidgetLocation(daily);
+    // Keep Verse For You text/ref aligned with the same helpers as location keys.
+    await HomeWidget.saveWidgetData<String>(_kVerseTextKey, dailyText);
+    await HomeWidget.saveWidgetData<String>(_kVerseReferenceKey, dailyRef);
+    await HomeWidget.updateWidget(iOSName: _kVerseOfTheDayKind);
 
     // Favorite: latest bookmark when available, otherwise second daily verse or first.
     var favoriteText = dailyText;
