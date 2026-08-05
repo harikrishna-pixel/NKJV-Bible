@@ -1028,6 +1028,16 @@ class DownloadProvider with ChangeNotifier {
       dailyVerses = await dbClient.rawQuery("SELECT * FROM $table");
     }
 
+    // First-open safety (display only): if the topics schedule is still empty
+    // (e.g. onboarding race before saveInBackground finishes), fall back to
+    // splash-seeded `dailyVerses` so Verse for You is not blank.
+    if (dailyVerses.isEmpty) {
+      final legacyRows = await dbClient.rawQuery('SELECT * FROM dailyVerses');
+      if (legacyRows.isNotEmpty) {
+        dailyVerses = legacyRows;
+      }
+    }
+
     final today = DateTime.now();
     final todayString = DateFormat('yyyy-MM-dd').format(today);
 
@@ -1298,6 +1308,18 @@ class DownloadProvider with ChangeNotifier {
     await preloadAndCacheBibleDataFromDatabase();
     if (dailyVerseList.isEmpty) {
       await loadDailyVerses();
+    }
+    // Same recovery as re-choosing topics when first open raced ahead of save.
+    if (dailyVerseList.isEmpty) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cats = prefs.getStringList('selected_categories') ?? [];
+        if (cats.isNotEmpty) {
+          await saveInBackground(selectedCategories: cats);
+        }
+      } catch (e) {
+        debugPrint('warmDataBeforeHomeScreen daily verse rebuild: $e');
+      }
     }
   }
 }

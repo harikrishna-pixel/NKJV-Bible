@@ -254,8 +254,9 @@ class _DailyVerseState extends State<DailyVerse> {
       final prefs = await SharedPreferences.getInstance();
       final cats = prefs.getStringList('selected_categories') ?? [];
       if (cats.isNotEmpty) {
+        // Same path as choosing topics again — rebuild schedule then show.
         await prefs.setBool('dataIsChanged', true);
-        await provider.loadDailyVerses();
+        await provider.saveInBackground(selectedCategories: cats);
         allVerses = provider.dailyVerseList;
       }
       if (allVerses.isEmpty) {
@@ -279,9 +280,17 @@ class _DailyVerseState extends State<DailyVerse> {
     var allVerses = provider.dailyVerseList;
     if (allVerses.isEmpty) {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('dataIsChanged', true);
-      await provider.loadDailyVerses();
-      allVerses = provider.dailyVerseList;
+      final cats = prefs.getStringList('selected_categories') ?? [];
+      if (cats.isNotEmpty) {
+        await prefs.setBool('dataIsChanged', true);
+        await provider.saveInBackground(selectedCategories: cats);
+        allVerses = provider.dailyVerseList;
+      }
+      if (allVerses.isEmpty) {
+        await prefs.setBool('dataIsChanged', true);
+        await provider.loadDailyVerses();
+        allVerses = provider.dailyVerseList;
+      }
     }
 
     if (allVerses.isEmpty) return;
