@@ -185,7 +185,7 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer> {
 
     final dailyChildren = <_DrawerSubItem>[
       _DrawerSubItem(
-        label: "Verse for You",
+        label: "Verse For You",
         icon: Icons.today_outlined,
         asset: 'assets/home icons/Daily verse.png',
         onTap: widget.onDailyVerseTap,

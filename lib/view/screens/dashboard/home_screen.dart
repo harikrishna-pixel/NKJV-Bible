@@ -3464,6 +3464,15 @@ class _HomeScreenState extends State<HomeScreen>
               cachedController.selectedBookContent.isNotEmpty;
           final skipReloadPath =
               hasCachedContent && !_homeEntryRequiresContentReload();
+          // Font before first paint — avoids small→normal size flash.
+          if (cachedController != null) {
+            await cachedController.getFont();
+            if (widget.fromSearch && mounted) {
+              cachedController.selectedFontFamily.value = 'Arial';
+              cachedController.fontSize.value =
+                  MediaQuery.of(context).size.width > 450 ? 25.0 : 19.0;
+            }
+          }
           if (!hasCachedContent || _homeEntryRequiresContentReload()) {
           _loadInitialData(state);
           }
@@ -6335,6 +6344,15 @@ class _HomeScreenState extends State<HomeScreen>
       // Set highlight for Read, Daily, or chat
       state.controller!.readHighlight.value = isReadOrDaily || isFromChat;
 
+      // Load font before chapter content so verses never paint at the wrong size.
+      await state.controller!.getFont();
+      if (widget.fromSearch) {
+        state.controller!.selectedFontFamily.value = 'Arial';
+        state.controller!.fontSize.value =
+            MediaQuery.of(context).size.width > 450 ? 25.0 : 19.0;
+      }
+      if (state.controller == null || !mounted) return;
+
       if (isReadOrDaily || isFromChat) {
         // Use getBookContentForRead for Read, Daily, and chat to properly load content
         await state.controller!.getBookContentForRead();
@@ -6345,13 +6363,6 @@ class _HomeScreenState extends State<HomeScreen>
       }
 
       if (state.controller == null || !mounted) return;
-      await state.controller!.getFont();
-      // When opened from Search, use default reading font instead of user-selected font
-      if (widget.fromSearch) {
-        state.controller!.selectedFontFamily.value = 'Arial';
-        state.controller!.fontSize.value =
-            MediaQuery.of(context).size.width > 450 ? 25.0 : 19.0;
-      }
     }();
 
     Future.delayed(const Duration(seconds: 6), () {

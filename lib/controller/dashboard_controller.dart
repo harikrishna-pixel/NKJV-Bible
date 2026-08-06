@@ -815,9 +815,22 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
   final selectedChapterForRead = "".obs;
   final selectedVerseForRead = "".obs;
 
-  final fontSize = Sizecf.scrnWidth! > 450 ? 25.0.obs : 15.0.obs;
+  /// Last loaded reading font — avoids small→normal flash after reopen /
+  /// Bible switch when DashBoardController is recreated.
+  static double? _persistedReadingFontSize;
+  static String? _persistedReadingFontFamily;
+
+  final fontSize = RxDouble(
+    _persistedReadingFontSize ??
+        (Sizecf.scrnWidth! > 450 ? 25.0 : 19.0),
+  );
   final fontSizeS = "".obs;
-  final selectedFontFamily = "".obs;
+  final selectedFontFamily = RxString(
+    (_persistedReadingFontFamily != null &&
+            _persistedReadingFontFamily!.isNotEmpty)
+        ? _persistedReadingFontFamily!
+        : 'Arial',
+  );
   final selectedVerseView = 1.obs;
 
   final isVeryFirstTime = false.obs;
@@ -1627,6 +1640,8 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     selectedFontFamily.value =
         await SharPreferences.getString(SharPreferences.selectedFontFamily) ??
             "Arial";
+    _persistedReadingFontSize = fontSize.value;
+    _persistedReadingFontFamily = selectedFontFamily.value;
   }
 
   final notesController = TextEditingController().obs;

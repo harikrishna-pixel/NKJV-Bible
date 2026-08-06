@@ -792,7 +792,7 @@ class _DailyVerseState extends State<DailyVerse> {
                     Padding(
                       padding: const EdgeInsets.only(right: 20.0),
                       child: Text(
-                        "Daily Verses",
+                        "Verse For You",
                         style: CommanStyle.appBarStyle(context).copyWith(
                             fontSize: screenWidth > 450
                                 ? BibleInfo.fontSizeScale * 30
