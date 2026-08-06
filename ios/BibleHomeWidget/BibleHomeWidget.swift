@@ -408,85 +408,72 @@ struct BiblePrayerView: View {
   @Environment(\.widgetFamily) private var family
 
   var body: some View {
-    // Full-bleed layout for Medium/Large. On iOS 17+ we use containerBackground
-    // with the same gradient to ensure edge-to-edge rendering inside widget bounds.
-    if family == .systemLarge || family == .systemMedium {
+    if family == .systemLarge {
+      biblePrayerExpandedLayout(showClock: true, useBackgroundImage: true)
+        .widgetURL(URL(string: "biblebookapp://prayer?homeWidget"))
+    } else if family == .systemMedium {
+      // Same Bible Prayer background image/color as Large; compact layout fits safe area.
       widgetWithBackground(.prayerGuidance, largeImage: "widget_prayer_guidance_bg") {
-        VStack(spacing: 0) {
-            HStack {
-              Spacer()
-              HStack(spacing: 6) {
-                Image(systemName: "flame.fill")
-                  .font(.caption)
-                Text("\(entry.streakDays) days")
-                  .font(.caption)
-                  .fontWeight(.semibold)
-              }
-              .foregroundStyle(.white)
-              .widgetFullColorContent()
-              .padding(.horizontal, 10)
-              .padding(.vertical, 4)
-              .background(Color.white.opacity(0.22))
-              .clipShape(Capsule())
-              Spacer()
-            }
-            .padding(.top, 8)
-
-            Text(entry.prayerTime)
-              .font(.system(size: family == .systemLarge ? 54 : 44, weight: .bold, design: .rounded))
-              .foregroundStyle(.white)
-              .widgetFullColorContent()
-              .padding(.top, 8)
-
-            Spacer(minLength: 10)
-
-            VStack(spacing: 8) {
-              Text(entry.title)
-                .font(.title3)
-                .fontWeight(.semibold)
-                .foregroundStyle(oldPaperText)
-                .widgetFullColorContent()
-                .multilineTextAlignment(.center)
-
-              Text(entry.prayerText)
-                .font(.body)
-                .foregroundStyle(oldPaperText)
-                .widgetFullColorContent()
-                .lineLimit(family == .systemLarge ? 4 : 3)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 8)
-
-              Text(entry.prayerReference)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundStyle(oldPaperSecondary)
-                .widgetFullColorContent()
-            }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 16)
-            .frame(maxWidth: .infinity)
-            .background(Color(red: 0.99, green: 0.96, blue: 0.90).opacity(0.92))
-            .overlay(
-              RoundedRectangle(cornerRadius: 18)
-                .stroke(Color(red: 0.88, green: 0.82, blue: 0.73), lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-            .padding(.horizontal, 18)
-
+        VStack(spacing: 6) {
+          HStack {
             Spacer()
+            HStack(spacing: 4) {
+              Image(systemName: "flame.fill")
+                .font(.system(size: 9, weight: .semibold))
+              Text("\(entry.streakDays) days")
+                .font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundStyle(.white)
+            .widgetFullColorContent()
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Color.white.opacity(0.22))
+            .clipShape(Capsule())
+            Spacer()
+          }
+
+          VStack(spacing: 5) {
+            Text(entry.title)
+              .font(.caption)
+              .fontWeight(.semibold)
+              .foregroundStyle(oldPaperText)
+              .widgetFullColorContent()
+              .multilineTextAlignment(.center)
+
+            Text(entry.prayerText)
+              .font(.caption2)
+              .foregroundStyle(oldPaperText)
+              .widgetFullColorContent()
+              .lineLimit(1)
+              .multilineTextAlignment(.center)
+
+            Text(entry.prayerReference)
+              .font(.system(size: 10, weight: .semibold))
+              .foregroundStyle(oldPaperSecondary)
+              .widgetFullColorContent()
 
             Text("Pray Now")
-              .font(.headline)
+              .font(.caption2)
               .fontWeight(.bold)
               .foregroundStyle(.white)
               .widgetFullColorContent()
               .frame(maxWidth: .infinity)
-              .padding(.vertical, 12)
+              .padding(.vertical, 6)
               .background(Color.orange)
               .clipShape(Capsule())
-              .padding(.horizontal, 48)
-              .padding(.bottom, 14)
+              .padding(.top, 2)
+          }
+          .padding(.horizontal, 10)
+          .padding(.vertical, 8)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .background(Color(red: 0.99, green: 0.96, blue: 0.90))
+          .overlay(
+            RoundedRectangle(cornerRadius: 12)
+              .stroke(Color(red: 0.88, green: 0.82, blue: 0.73), lineWidth: 1)
+          )
+          .clipShape(RoundedRectangle(cornerRadius: 12))
         }
+        .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
       .widgetURL(URL(string: "biblebookapp://prayer?homeWidget"))
@@ -513,6 +500,126 @@ struct BiblePrayerView: View {
       }
       .widgetURL(URL(string: "biblebookapp://prayer?homeWidget"))
     }
+  }
+
+  @ViewBuilder
+  private func biblePrayerExpandedLayout(
+    showClock: Bool,
+    useBackgroundImage: Bool
+  ) -> some View {
+    let isLarge = family == .systemLarge
+    let outerPadding: CGFloat = isLarge ? 14 : 12
+    let cardHPadding: CGFloat = isLarge ? 18 : 12
+    let prayNowHPadding: CGFloat = isLarge ? 48 : 28
+
+    Group {
+      if useBackgroundImage {
+        widgetWithBackground(.prayerGuidance, largeImage: "widget_prayer_guidance_bg") {
+          biblePrayerExpandedContent(
+            showClock: showClock,
+            isLarge: isLarge,
+            cardHPadding: cardHPadding,
+            prayNowHPadding: prayNowHPadding
+          )
+          .padding(outerPadding)
+        }
+      } else {
+        widgetWithBackground(.prayerGuidance) {
+          biblePrayerExpandedContent(
+            showClock: showClock,
+            isLarge: isLarge,
+            cardHPadding: cardHPadding,
+            prayNowHPadding: prayNowHPadding
+          )
+          .padding(outerPadding)
+        }
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func biblePrayerExpandedContent(
+    showClock: Bool,
+    isLarge: Bool,
+    cardHPadding: CGFloat,
+    prayNowHPadding: CGFloat
+  ) -> some View {
+    VStack(spacing: isLarge ? 0 : 6) {
+      HStack {
+        Spacer()
+        HStack(spacing: 6) {
+          Image(systemName: "flame.fill")
+            .font(.caption2)
+          Text("\(entry.streakDays) days")
+            .font(.caption2)
+            .fontWeight(.semibold)
+        }
+        .foregroundStyle(oldPaperAccent)
+        .widgetFullColorContent()
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Color.white.opacity(0.55))
+        .clipShape(Capsule())
+        Spacer()
+      }
+
+      if showClock {
+        Text(entry.prayerTime)
+          .font(.system(size: 54, weight: .bold, design: .rounded))
+          .foregroundStyle(oldPaperText)
+          .widgetFullColorContent()
+          .padding(.top, 6)
+      }
+
+      Spacer(minLength: isLarge ? 10 : 4)
+
+      VStack(spacing: isLarge ? 8 : 6) {
+        Text(entry.title)
+          .font(isLarge ? .title3 : .subheadline)
+          .fontWeight(.semibold)
+          .foregroundStyle(oldPaperText)
+          .widgetFullColorContent()
+          .multilineTextAlignment(.center)
+
+        Text(entry.prayerText)
+          .font(isLarge ? .body : .caption)
+          .foregroundStyle(oldPaperText)
+          .widgetFullColorContent()
+          .lineLimit(isLarge ? 4 : 2)
+          .multilineTextAlignment(.center)
+          .padding(.horizontal, 4)
+
+        Text(entry.prayerReference)
+          .font(isLarge ? .subheadline : .caption2)
+          .fontWeight(.semibold)
+          .foregroundStyle(oldPaperSecondary)
+          .widgetFullColorContent()
+      }
+      .padding(.horizontal, cardHPadding)
+      .padding(.vertical, isLarge ? 16 : 10)
+      .frame(maxWidth: .infinity)
+      .background(Color(red: 0.99, green: 0.96, blue: 0.90).opacity(0.92))
+      .overlay(
+        RoundedRectangle(cornerRadius: isLarge ? 18 : 14)
+          .stroke(Color(red: 0.88, green: 0.82, blue: 0.73), lineWidth: 1)
+      )
+      .clipShape(RoundedRectangle(cornerRadius: isLarge ? 18 : 14))
+      .padding(.horizontal, cardHPadding)
+
+      Spacer(minLength: isLarge ? 8 : 4)
+
+      Text("Pray Now")
+        .font(isLarge ? .headline : .subheadline)
+        .fontWeight(.bold)
+        .foregroundStyle(.white)
+        .widgetFullColorContent()
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, isLarge ? 12 : 8)
+        .background(Color.orange)
+        .clipShape(Capsule())
+        .padding(.horizontal, prayNowHPadding)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 }
 
