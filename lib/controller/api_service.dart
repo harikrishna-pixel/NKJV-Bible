@@ -611,56 +611,200 @@ UserModel? _userModelFromApiPayload(
   return null;
 }
 
-/// Additive: sync referrer wallet when [referral_count] grew (logged-in session).
+/// Additive: check referrer [referral_count] (logged-in session).
+/// Credits are claimed via Home popup — no silent credit here.
 Future<void> syncReferrerCreditsFromSession() async {
+  try {
+    final pending = await fetchPendingReferrerReward();
+    if (pending == null || pending.pendingCount <= 0) return;
+    debugPrint(
+        'syncReferrerCreditsFromSession: pending ${pending.pendingCount} '
+        'referral(s) → ${pending.credits} credits (claim on Home)');
+  } catch (e) {
+    debugPrint('syncReferrerCreditsFromSession: $e');
+  }
+}
+
+/// Pending referrer reward from backend [referral_count] vs local claim watermark.
+class PendingReferrerReward {
+  const PendingReferrerReward({
+    required this.userId,
+    required this.referralCount,
+    required this.alreadyCredited,
+  });
+
+  final String userId;
+  final int referralCount;
+  final int alreadyCredited;
+
+  static const rewardPerReferral = 100;
+
+  int get pendingCount =>
+      referralCount > alreadyCredited ? referralCount - alreadyCredited : 0;
+
+  int get credits => pendingCount * rewardPerReferral;
+
+  String get _prefsKey => 'local_referral_count_credited_$userId';
+}
+
+int? _parseReferralInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  return int.tryParse(value.toString());
+}
+
+/// Persist referral fields from login / auth (profile snapshot often omits them).
+Future<void> cacheReferralFieldsFromUser(UserModel user) async {
+  if (user.referralCount != null) {
+    await cacheNotifier.writeCache(
+        key: 'referral_count', value: '${user.referralCount}');
+  }
+  if (user.referralRewardClaimed != null) {
+    await cacheNotifier.writeCache(
+        key: 'referral_reward_claimed',
+        value: '${user.referralRewardClaimed}');
+  }
+  if (user.referredBy != null && user.referredBy!.trim().isNotEmpty) {
+    await cacheNotifier.writeCache(
+        key: 'referred_by', value: user.referredBy!.trim());
+  }
+}
+
+Future<PendingReferrerReward?> fetchPendingReferrerReward() async {
   try {
     final authtoken = await cacheNotifier.readCache(key: 'authtoken');
     final userid = await cacheNotifier.readCache(key: 'userid');
     if (authtoken == null ||
         authtoken.toString().trim().isEmpty ||
         userid == null) {
-      return;
+      debugPrint('fetchPendingReferrerReward: not logged in');
+      return null;
     }
 
+    final stableUserId = userid.toString();
+
+    // Existing snapshot (name+email required by API). Response may omit
+    // referral fields — Login cache is the fallback.
     final body =
         await ProfileUpdateApi().fetchLoggedInUserProfileSnapshot();
-    if (body == null || body.isEmpty) return;
 
-    final parsed = jsonDecode(body);
-    if (parsed is! Map<String, dynamic>) return;
+    int? apiCount;
+    int? apiClaimed;
+    if (body != null && body.isNotEmpty) {
+      final parsed = jsonDecode(body);
+      if (parsed is Map<String, dynamic>) {
+        final userMap = _userFromAuthResponse(parsed);
+        apiCount = _parseReferralInt(userMap?['referral_count']);
+        apiClaimed = _parseReferralInt(userMap?['referral_reward_claimed']);
+        debugPrint('fetchPendingReferrerReward API user keys → '
+            '${userMap?.keys.toList()}');
+        debugPrint('fetchPendingReferrerReward API referral_count → $apiCount');
+        debugPrint(
+            'fetchPendingReferrerReward API referral_reward_claimed → $apiClaimed');
+        if (apiCount != null) {
+          await cacheNotifier.writeCache(
+              key: 'referral_count', value: apiCount.toString());
+        }
+        if (apiClaimed != null) {
+          await cacheNotifier.writeCache(
+              key: 'referral_reward_claimed', value: apiClaimed.toString());
+        }
+      }
+    } else {
+      debugPrint('fetchPendingReferrerReward: empty snapshot body');
+    }
 
-    final user = _userModelFromApiPayload(
-      parsed,
-      authtoken.toString(),
+    final cachedCount = _parseReferralInt(
+        await cacheNotifier.readCache(key: 'referral_count'));
+    final cachedClaimed = _parseReferralInt(
+        await cacheNotifier.readCache(key: 'referral_reward_claimed'));
+
+    debugPrint(
+        'fetchPendingReferrerReward CACHE referral_count → $cachedCount');
+    debugPrint(
+        'fetchPendingReferrerReward CACHE referral_reward_claimed → $cachedClaimed');
+
+    var count = apiCount ?? cachedCount ?? 0;
+    // If only referral_reward_claimed looks like a small referral count, use it.
+    if (count <= 0) {
+      final claimedHint = apiClaimed ?? cachedClaimed ?? 0;
+      if (claimedHint > 0 && claimedHint < 100) {
+        count = claimedHint;
+      }
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final watermarkKey = 'local_referral_count_credited_$stableUserId';
+    final alreadyCredited = prefs.getInt(watermarkKey) ?? 0;
+
+    debugPrint(
+        'fetchPendingReferrerReward RESULT count=$count '
+        'alreadyCredited=$alreadyCredited '
+        'pending=${count > alreadyCredited ? count - alreadyCredited : 0}');
+
+    if (count <= 0 || count <= alreadyCredited) return null;
+
+    return PendingReferrerReward(
+      userId: stableUserId,
+      referralCount: count,
+      alreadyCredited: alreadyCredited,
     );
-    if (user == null) return;
-
-    debugPrint('syncReferrerCreditsFromSession referral_count → '
-        '${user.referralCount}');
-    await syncReferrerCreditsFromProfile(user);
   } catch (e) {
-    debugPrint('syncReferrerCreditsFromSession: $e');
+    debugPrint('fetchPendingReferrerReward: $e');
+    return null;
   }
 }
 
-/// Grant local wallet credits to the referrer when API [referral_count] increases.
-/// Wallet credits are device-local; without this, User 1 never sees referral rewards.
-Future<void> syncReferrerCreditsFromProfile(UserModel user) async {
+Future<PendingReferrerReward?> pendingReferrerRewardFromProfile(
+  UserModel user,
+) async {
+  await cacheReferralFieldsFromUser(user);
+
   final count = user.referralCount ?? 0;
-  if (count <= 0) return;
+  if (count <= 0) return null;
 
-  const rewardPerReferral = 100;
+  final userid = await cacheNotifier.readCache(key: 'userid');
+  final stableUserId = (userid ?? user.uid).toString();
+
   final prefs = await SharedPreferences.getInstance();
-  final key = 'local_referral_count_credited_${user.uid}';
+  final key = 'local_referral_count_credited_$stableUserId';
   final alreadyCredited = prefs.getInt(key) ?? 0;
-  if (count <= alreadyCredited) return;
+  if (count <= alreadyCredited) return null;
 
-  final delta = count - alreadyCredited;
-  await WalletService.addCredits(delta * rewardPerReferral);
-  await prefs.setInt(key, count);
+  return PendingReferrerReward(
+    userId: stableUserId,
+    referralCount: count,
+    alreadyCredited: alreadyCredited,
+  );
+}
+
+/// Grant local wallet credits for unclaimed [referral_count] growth (100 each).
+Future<bool> claimPendingReferrerReward(PendingReferrerReward pending) async {
+  if (pending.pendingCount <= 0) return false;
+
+  final prefs = await SharedPreferences.getInstance();
+  final key = pending._prefsKey;
+  final alreadyCredited = prefs.getInt(key) ?? 0;
+  if (pending.referralCount <= alreadyCredited) return false;
+
+  final delta = pending.referralCount - alreadyCredited;
+  final credits = delta * PendingReferrerReward.rewardPerReferral;
+  await WalletService.addCredits(credits);
+  await prefs.setInt(key, pending.referralCount);
   debugPrint(
-      'syncReferrerCreditsFromProfile: credited ${delta * rewardPerReferral} '
-      'for $delta new referral(s) (count=$count)');
+      'claimPendingReferrerReward: claimed $credits for $delta referral(s) '
+      '(count=${pending.referralCount})');
+  return true;
+}
+
+/// Note pending referrer credits for Home claim popup (no silent credit).
+Future<void> syncReferrerCreditsFromProfile(UserModel user) async {
+  await cacheReferralFieldsFromUser(user);
+  final pending = await pendingReferrerRewardFromProfile(user);
+  if (pending == null || pending.pendingCount <= 0) return;
+  debugPrint(
+      'syncReferrerCreditsFromProfile: pending ${pending.pendingCount} '
+      'referral(s) → ${pending.credits} credits (claim on Home)');
 }
 
 String? _referralCodeFromAuthResponse(dynamic response) {
@@ -1112,7 +1256,8 @@ Future<UserModel> loginUser(
       debugPrint('  referral_count           → ${user.referralCount}');
       debugPrint(
           '  referral_reward_claimed  → ${user.referralRewardClaimed}');
-      // Additive: credit referrer locally when backend referral_count grew.
+      await cacheReferralFieldsFromUser(user);
+      // Pending credits claimed via Home popup (no silent credit).
       await syncReferrerCreditsFromProfile(user);
       return user;
     } else {
@@ -1322,6 +1467,8 @@ Future<void> applyReferralViaLogin({
         'confirming via profile apply-referral');
     final profileResult = await ProfileUpdateApi().updateReferredBy(
       referralCode: code,
+      email: email,
+      name: userMap['name']?.toString(),
     );
     if (_profileUpdateSucceeded(profileResult)) {
       debugPrint('applyReferralViaLogin: referral accepted by profile API');
@@ -1345,6 +1492,7 @@ Future<void> applyReferralViaLogin({
     debugPrint('  referral_count           → ${user.referralCount}');
     debugPrint(
         '  referral_reward_claimed  → ${user.referralRewardClaimed}');
+    await cacheReferralFieldsFromUser(user);
   } catch (e) {
     if (e is String) {
       throw e;

@@ -16,6 +16,28 @@ class ProfileUpdateApi {
 
   final CacheNotifier cacheNotifier = CacheNotifier();
 
+  /// Resolves cached display name / email for profile-update validation
+  /// (API requires both when action=1). Does not change call-site logic.
+  Future<({String name, String email})> _cachedNameAndEmail({
+    String? name,
+    String? email,
+  }) async {
+    var resolvedName = (name ?? '').trim();
+    var resolvedEmail = (email ?? '').trim();
+
+    if (resolvedName.isEmpty) {
+      final cachedName = await cacheNotifier.readCache(key: 'name');
+      resolvedName = cachedName?.toString().trim() ?? '';
+    }
+    if (resolvedEmail.isEmpty) {
+      final cachedEmail = await cacheNotifier.readCache(key: 'useremail') ??
+          await cacheNotifier.readCache(key: 'user');
+      resolvedEmail = cachedEmail?.toString().trim() ?? '';
+    }
+
+    return (name: resolvedName, email: resolvedEmail);
+  }
+
   Future updateprofile(
       {required email,
       required name,
@@ -84,6 +106,8 @@ class ProfileUpdateApi {
   Future<String?> updateReferralRewardClaimed({
     required int value,
     String? referredBy,
+    String? email,
+    String? name,
   }) async {
     final Uri uri =
         Uri.parse(AppApiConstant.baseurl + AppApiConstant.updateprofleapi);
@@ -93,12 +117,36 @@ class ProfileUpdateApi {
     try {
       final userId = userid.toString();
       final referredByCode = referredBy?.trim() ?? '';
+      final identity = await _cachedNameAndEmail(name: name, email: email);
 
-      final body = await _postProfileUpdate(
-        uri: uri,
-        authtoken: authtoken,
-        logLabel: 'referral_reward_claimed',
-        payload: {
+      // Prime with name+email only (satisfies validation). Do NOT send email
+      // on the key update — that returns 400 "Email already exists".
+      if (identity.email.isNotEmpty && identity.name.isNotEmpty) {
+        await _postProfileUpdate(
+          uri: uri,
+          authtoken: authtoken,
+          logLabel: 'referral_reward_claimed prime',
+          payload: {
+            'action': '1',
+            'email': identity.email,
+            'name': identity.name,
+            'user_id': userId,
+            'app_id': BibleInfo.appID,
+          },
+        );
+      }
+
+      final claimAttempts = <Map<String, String>>[
+        {
+          'action': '1',
+          'key': 'referral_reward_claimed',
+          'value': value.toString(),
+          'user_id': userId,
+          'app_id': BibleInfo.appID,
+          if (identity.name.isNotEmpty) 'name': identity.name,
+          if (referredByCode.isNotEmpty) 'referred_by': referredByCode,
+        },
+        {
           'action': '1',
           'key': 'referral_reward_claimed',
           'value': value.toString(),
@@ -106,10 +154,24 @@ class ProfileUpdateApi {
           'app_id': BibleInfo.appID,
           if (referredByCode.isNotEmpty) 'referred_by': referredByCode,
         },
-      );
+      ];
 
-      if (body != null && body.isNotEmpty) {
-        return body;
+      String? lastBody;
+      for (var i = 0; i < claimAttempts.length; i++) {
+        final body = await _postProfileUpdate(
+          uri: uri,
+          authtoken: authtoken,
+          logLabel: 'referral_reward_claimed attempt ${i + 1}',
+          payload: claimAttempts[i],
+        );
+        lastBody = body;
+        if (_profileResponseSucceeded(body)) {
+          return body;
+        }
+      }
+
+      if (lastBody != null && lastBody.isNotEmpty) {
+        return lastBody;
       }
       return null;
     } catch (e) {
@@ -127,12 +189,17 @@ class ProfileUpdateApi {
 
     if (userid == null || authtoken == null) return null;
 
+    final identity = await _cachedNameAndEmail();
+    if (identity.email.isEmpty || identity.name.isEmpty) return null;
+
     return _postProfileUpdate(
       uri: uri,
       authtoken: authtoken,
       logLabel: 'profile snapshot referral',
       payload: {
         'action': '1',
+        'email': identity.email,
+        'name': identity.name,
         'user_id': userid.toString(),
         'app_id': BibleInfo.appID,
       },
@@ -268,22 +335,45 @@ class ProfileUpdateApi {
       final code = referralCode.trim();
       final userId = userid.toString();
       final appId = BibleInfo.appID.toString();
+      final identity = await _cachedNameAndEmail(name: name, email: email);
 
       String? lastBody;
 
+      // Same pattern as referral_reward_claimed: prime with email+name, then
+      // set referred_by WITHOUT email. Sending email on that update returns
+      // 400 "Email already exists" (seen when applying after Login).
+      if (identity.email.isNotEmpty && identity.name.isNotEmpty) {
+        await _postProfileUpdate(
+          uri: uri,
+          authtoken: authtoken,
+          logLabel: 'referred_by prime',
+          payload: {
+            'action': '1',
+            'email': identity.email,
+            'name': identity.name,
+            'user_id': userId,
+            'app_id': appId,
+          },
+        );
+      }
+
+      // Do NOT send email / do NOT write key=referral_code (that is the user's
+      // own code). Only set referred_by to the invite code entered.
       final profileAttempts = <Map<String, String>>[
-        {
-          'action': '1',
-          'user_id': userId,
-          'app_id': appId,
-          'referred_by': code,
-        },
         {
           'action': '1',
           'key': 'referred_by',
           'value': code,
           'user_id': userId,
           'app_id': appId,
+          if (identity.name.isNotEmpty) 'name': identity.name,
+        },
+        {
+          'action': '1',
+          'user_id': userId,
+          'app_id': appId,
+          'referred_by': code,
+          if (identity.name.isNotEmpty) 'name': identity.name,
         },
       ];
 
@@ -300,6 +390,8 @@ class ProfileUpdateApi {
         }
       }
 
+      // apply-referral-code is not deployed on this backend (always 404) —
+      // do not call it; it only overwrote the real profile-update error.
       return lastBody;
     } catch (e) {
       devtools.log('profile update referred_by error: $e');

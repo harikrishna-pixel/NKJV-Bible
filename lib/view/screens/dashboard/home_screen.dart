@@ -9,6 +9,7 @@ import 'package:biblebookapp/Model/dailyVerseList.dart';
 import 'package:biblebookapp/constant/size_config.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
+import 'package:biblebookapp/controller/api_service.dart';
 import 'package:biblebookapp/core/notifiers/auth/auth.notifier.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
@@ -1539,6 +1540,9 @@ class _HomeScreenState extends State<HomeScreen>
     await _maybeShowContinueJourneySheet();
     if (!mounted) return;
 
+    await _maybeShowReferrerRewardClaimDialog();
+    if (!mounted) return;
+
       SmartNotificationHelper.recordAppOpen();
       SmartNotificationHelper.scheduleSmartNotificationIfNeeded();
       if (mounted) {
@@ -1560,6 +1564,117 @@ class _HomeScreenState extends State<HomeScreen>
         if (!mounted) return;
         _navigateForWidgetRoute(getBibleWidgetRouteFromUri(uri));
       });
+  }
+
+  /// When backend [referral_count] grew, show one claim popup (100 credits each).
+  Future<void> _maybeShowReferrerRewardClaimDialog() async {
+    try {
+      final pending = await fetchPendingReferrerReward();
+      debugPrint(
+          '_maybeShowReferrerRewardClaimDialog pending → '
+          'count=${pending?.referralCount} already=${pending?.alreadyCredited} '
+          'claimCredits=${pending?.credits}');
+      if (!mounted || pending == null || pending.pendingCount <= 0) return;
+
+      final pendingCount = pending.pendingCount;
+      final credits = pending.credits;
+      final referralLabel =
+          pendingCount == 1 ? '1 referral' : '$pendingCount referrals';
+
+      final claimed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialogContext) {
+          const ink = Color(0xFF2C2416);
+          const fill = Color(0xFFF8F4EB);
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(22, 24, 22, 18),
+              decoration: BoxDecoration(
+                color: fill,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.card_giftcard_rounded,
+                    size: 48,
+                    color: Color(0xFFB8860B),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Referral Rewards',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: ink,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'You have $referralLabel waiting.\n'
+                    'Claim $credits credits now '
+                    '(100 credits per referral).',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 15,
+                      height: 1.35,
+                      color: ink.withValues(alpha: 0.82),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () =>
+                          Navigator.of(dialogContext).pop(true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFB8860B),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text('Claim $credits Credits'),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () =>
+                        Navigator.of(dialogContext).pop(false),
+                    child: Text(
+                      'Later',
+                      style: TextStyle(
+                        color: ink.withValues(alpha: 0.65),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+
+      if (!mounted || claimed != true) return;
+
+      final ok = await claimPendingReferrerReward(pending);
+      if (!mounted) return;
+      if (ok) {
+        Constants.showToast(
+            'You claimed $credits credits for $referralLabel!');
+      } else {
+        Constants.showToast('Could not claim referral credits. Try again.');
+      }
+    } catch (e) {
+      debugPrint('_maybeShowReferrerRewardClaimDialog: $e');
+    }
   }
 
   Future<void> _maybeShowContinueJourneySheet() async {
