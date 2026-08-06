@@ -369,6 +369,9 @@ class DownloadProvider with ChangeNotifier {
           categories: categories,
           survivingRows: survivingRows,
         );
+      } else {
+        // Bible / content may have changed — refresh tomorrow+ text only.
+        await _refreshFutureDailyVerseContentFromActiveBible(dbClient);
       }
     } else {
       // First-time setup: build the full schedule from scratch.
@@ -525,8 +528,60 @@ class DownloadProvider with ChangeNotifier {
     return categories.any((c) => !represented.contains(c));
   }
 
-  /// Rebuilds today-and-future rows so every selected topic (including newly added)
-  /// shares the same round-robin rotation from today onward.
+  /// Updates only tomorrow+ rows' stored Verse/Book text from the active Bible.
+  /// Does not change Date, Book_Id, Chapter, Verse_Num, or category schedule.
+  Future<void> _refreshFutureDailyVerseContentFromActiveBible(
+      dynamic dbClient) async {
+    try {
+      final today = _dailyVerseDateOnly(DateTime.now());
+      final rows = await dbClient.rawQuery('SELECT * FROM dailyVersesnew');
+      for (final row in rows) {
+        DateTime? day;
+        try {
+          day = _dailyVerseDateOnly(DateTime.parse(row['Date'].toString()));
+        } catch (_) {
+          continue;
+        }
+        if (day == null || !day.isAfter(today)) continue;
+
+        final bookIdStored = int.tryParse(row['Book_Id'].toString()) ?? 0;
+        final storedBook = row['Book']?.toString().trim() ?? '';
+        final chapter1 = int.tryParse(row['Chapter'].toString()) ?? 0;
+        final verse1 = int.tryParse(row['Verse_Num'].toString()) ?? 0;
+        if (chapter1 <= 0 || verse1 <= 0) continue;
+
+        final bookNum = await BibleBookResolve.bookNumForDailyVerse(
+          bookName: storedBook,
+          bookId: bookIdStored,
+          db: dbClient,
+        );
+        final verseRows = await dbClient.rawQuery(
+          'SELECT content FROM verse WHERE book_num = ? AND chapter_num = ? AND verse_num = ? LIMIT 1',
+          [bookNum, chapter1 - 1, verse1 - 1],
+        );
+        if (verseRows.isEmpty) continue;
+        final content = verseRows.first['content']?.toString() ?? '';
+        if (content.isEmpty) continue;
+        final title = await BibleBookResolve.titleForBookNum(
+              bookNum,
+              db: dbClient,
+            ) ??
+            storedBook;
+        final id = row['id'];
+        if (id == null) continue;
+        await dbClient.rawUpdate(
+          'UPDATE dailyVersesnew SET Verse = ?, Book = ? WHERE id = ?',
+          [content, title, id],
+        );
+      }
+    } catch (e) {
+      debugPrint('_refreshFutureDailyVerseContentFromActiveBible error: $e');
+    }
+  }
+
+  /// Rebuilds tomorrow-and-future rows so every selected topic (including newly
+  /// added) shares the same round-robin rotation from tomorrow onward.
+  /// Today + past rows are kept so same-day language does not change mid-day.
   Future<void> _rebalanceFutureDailyVerseSchedule({
     required dynamic dbClient,
     required List<Map<String, dynamic>> filteredData,
@@ -534,13 +589,15 @@ class DownloadProvider with ChangeNotifier {
     required List<Map<String, dynamic>> survivingRows,
   }) async {
     final today = _dailyVerseDateOnly(DateTime.now());
+    final tomorrow = today.add(const Duration(days: 1));
     final idsToDelete = <int>[];
     final pastKeys = <String>{};
 
     for (final row in survivingRows) {
       try {
         final day = _dailyVerseDateOnly(DateTime.parse(row['Date'].toString()));
-        if (day.isBefore(today)) {
+        // Keep past + today (same-day content language locked).
+        if (!day.isAfter(today)) {
           pastKeys.add(_dailyVerseScheduleKeyFromInserted(row));
         } else {
           final id = row['id'];
@@ -566,7 +623,7 @@ class DownloadProvider with ChangeNotifier {
     await _insertDailyVersesFromMainList(
       dbClient: dbClient,
       data: toSchedule,
-      startDate: today,
+      startDate: tomorrow,
     );
   }
 
@@ -941,8 +998,8 @@ class DownloadProvider with ChangeNotifier {
   bool isLoadingDailyVerse = false;
   List<DailyVerseList> dailyVerseList = [];
 
-  /// Display + content sync to active Bible: resolve book by English name /
-  /// Book_Id (not Protestant index alone), refresh title + verse text.
+  /// Display sync for book titles. Past + today keep stored verse language;
+  /// only future dated rows refresh text from the active Bible.
   /// Does not change schedule dates, categories, or Book_Id.
   Future<void> _syncDailyVerseDisplayBookTitles() async {
     if (dailyVerseList.isEmpty) return;
@@ -950,9 +1007,21 @@ class DownloadProvider with ChangeNotifier {
       final dbClient = await DBHelper().db;
       if (dbClient == null) return;
       BibleBookResolve.clearCache();
+      final today = _dailyVerseDateOnly(DateTime.now());
       var changed = false;
       final synced = <DailyVerseList>[];
       for (final verse in dailyVerseList) {
+        DateTime? day;
+        try {
+          day = _dailyVerseDateOnly(DateTime.parse(verse.date.toString()));
+        } catch (_) {}
+        // Same-day / past: keep the language first stored for that day.
+        final isPastOrToday = day == null || !day.isAfter(today);
+        if (isPastOrToday) {
+          synced.add(verse);
+          continue;
+        }
+
         final bookIdStored = verse.bookId?.toInt() ?? 0;
         final chapter1 = (verse.chapter ?? 0).toInt();
         final verse1 = (verse.verseNum ?? 0).toInt();
@@ -1093,6 +1162,10 @@ class DownloadProvider with ChangeNotifier {
         survivingRows: dailyVerses,
       );
       dailyVerses = await dbClient.rawQuery("SELECT * FROM $table");
+    } else if (table == 'dailyVersesnew') {
+      // Keep today language; refresh tomorrow+ from active Bible if needed.
+      await _refreshFutureDailyVerseContentFromActiveBible(dbClient);
+      dailyVerses = await dbClient.rawQuery("SELECT * FROM $table");
     }
 
     final today = DateTime.now();
@@ -1113,6 +1186,7 @@ class DownloadProvider with ChangeNotifier {
     };
 
     final List<DailyVerseList> enrichedList = [];
+    final todayOnly = _dailyVerseDateOnly(DateTime.now());
 
     for (var verse in verseRows) {
       final bookIdStored = int.parse(verse['Book_Id'].toString());
@@ -1123,24 +1197,55 @@ class DownloadProvider with ChangeNotifier {
         bookId: bookIdStored,
         db: dbClient,
       );
-      final bookName = await BibleBookResolve.titleForBookNum(
-            bookNum,
-            db: dbClient,
-          ) ??
-          _resolveDailyVerseBookTitle(bookTitleByNum, bookNum) ??
-          (storedBook.isNotEmpty ? storedBook : 'Unknown');
+
+      DateTime? verseDay;
+      try {
+        verseDay =
+            _dailyVerseDateOnly(DateTime.parse(verse['Date'].toString()));
+      } catch (_) {}
+      // Past + today keep stored language; future may use active Bible text.
+      final isPastOrToday =
+          verseDay == null || !verseDay.isAfter(todayOnly);
 
       var content = verse['Verse']?.toString() ?? '';
       final chapter1 = int.tryParse(verse['Chapter'].toString()) ?? 0;
       final verse1 = int.tryParse(verse['Verse_Num'].toString()) ?? 0;
-      if (chapter1 > 0 && verse1 > 0) {
-        final rows = await dbClient.rawQuery(
-          'SELECT content FROM verse WHERE book_num = ? AND chapter_num = ? AND verse_num = ? LIMIT 1',
-          [bookNum, chapter1 - 1, verse1 - 1],
-        );
-        if (rows.isNotEmpty) {
-          final c = rows.first['content']?.toString();
-          if (c != null && c.isNotEmpty) content = c;
+
+      String bookName;
+      if (isPastOrToday) {
+        // Locked for the day: prefer stored book + content.
+        bookName = storedBook.isNotEmpty
+            ? storedBook
+            : (await BibleBookResolve.titleForBookNum(bookNum, db: dbClient) ??
+                _resolveDailyVerseBookTitle(bookTitleByNum, bookNum) ??
+                'Unknown');
+        // Only fill empty stored content (do not replace language mid-day).
+        if (content.isEmpty && chapter1 > 0 && verse1 > 0) {
+          final rows = await dbClient.rawQuery(
+            'SELECT content FROM verse WHERE book_num = ? AND chapter_num = ? AND verse_num = ? LIMIT 1',
+            [bookNum, chapter1 - 1, verse1 - 1],
+          );
+          if (rows.isNotEmpty) {
+            final c = rows.first['content']?.toString();
+            if (c != null && c.isNotEmpty) content = c;
+          }
+        }
+      } else {
+        bookName = await BibleBookResolve.titleForBookNum(
+              bookNum,
+              db: dbClient,
+            ) ??
+            _resolveDailyVerseBookTitle(bookTitleByNum, bookNum) ??
+            (storedBook.isNotEmpty ? storedBook : 'Unknown');
+        if (chapter1 > 0 && verse1 > 0) {
+          final rows = await dbClient.rawQuery(
+            'SELECT content FROM verse WHERE book_num = ? AND chapter_num = ? AND verse_num = ? LIMIT 1',
+            [bookNum, chapter1 - 1, verse1 - 1],
+          );
+          if (rows.isNotEmpty) {
+            final c = rows.first['content']?.toString();
+            if (c != null && c.isNotEmpty) content = c;
+          }
         }
       }
 

@@ -40,43 +40,48 @@ class OnboardingGuidanceScreen extends StatelessWidget {
                   ),
                   child: SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: onContinue,
-                      style: ElevatedButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        backgroundColor: Colors.transparent,
-                        shadowColor: Colors.transparent,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                    height: isTablet ? 56 : 52,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFF763201),
+                            Color(0xFFD5821F),
+                            Color(0xFF763201),
+                          ],
                         ),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      child: Ink(
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Color(0xFFB4842E),
-                              Color(0xFFC9A35A),
-                              Color(0xFFA9791F),
-                            ],
-                            stops: [0.0, 0.55, 1.0],
+                      child: ElevatedButton(
+                        onPressed: onContinue,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          elevation: 0,
+                          splashFactory: NoSplash.splashFactory,
+                          overlayColor: Colors.white.withValues(alpha: 0.12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
                           ),
-                          borderRadius: BorderRadius.circular(14),
                         ),
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            vertical: isTablet ? 18 : 15,
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            'Continue',
-                            style: TextStyle(
-                              fontSize: isTablet ? 18 : 16,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Continue',
+                              style: TextStyle(
+                                fontSize: isTablet ? 20 : 18,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 8),
+                            Icon(
+                              Icons.arrow_forward,
+                              color: Colors.white,
+                              size: isTablet ? 22 : 20,
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -268,10 +273,70 @@ class _ValueChatBodyState extends State<_ValueChatBody> {
             padding: const EdgeInsets.fromLTRB(20, 13, 20, 0),
             child: Column(
               children: [
-                _buildUserRow(),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 320),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) {
+                    final fade = CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOut,
+                    );
+                    final slide = Tween<Offset>(
+                      begin: const Offset(0, 0.06),
+                      end: Offset.zero,
+                    ).animate(fade);
+                    return FadeTransition(
+                      opacity: fade,
+                      child: SlideTransition(
+                        position: slide,
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: KeyedSubtree(
+                    key: ValueKey<String>(
+                      '${_selectedChipKey ?? 'default'}_${_content.question}',
+                    ),
+                    child: _buildUserRow(),
+                  ),
+                ),
                 const SizedBox(height: 12),
-                if (_showTyping) _buildTypingRow(),
-                if (_showAnswer) _buildAnswerRow(),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 380),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) {
+                    final fade = CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOut,
+                    );
+                    final slide = Tween<Offset>(
+                      begin: const Offset(0, 0.08),
+                      end: Offset.zero,
+                    ).animate(fade);
+                    return FadeTransition(
+                      opacity: fade,
+                      child: SlideTransition(
+                        position: slide,
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: _showTyping
+                      ? KeyedSubtree(
+                          key: const ValueKey('typing'),
+                          child: _buildTypingRow(),
+                        )
+                      : _showAnswer
+                          ? KeyedSubtree(
+                              key: ValueKey(
+                                'answer_${_selectedChipKey ?? 'default'}',
+                              ),
+                              child: _buildAnswerRow(),
+                            )
+                          : const SizedBox.shrink(key: ValueKey('empty')),
+                ),
               ],
             ),
           ),
@@ -511,8 +576,10 @@ class _ValueChatBodyState extends State<_ValueChatBody> {
     final isSelected = _selectedChipKey == chip.key;
     return GestureDetector(
       onTap: () => _onChipTap(chip),
+      behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 140),
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(
           color: isSelected ? null : _paper,
@@ -528,16 +595,6 @@ class _ValueChatBodyState extends State<_ValueChatBody> {
             width: 1.5,
           ),
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: isSelected
-                  ? const Color(0xFF96712E).withOpacity(0.5)
-                  : const Color(0xFF503C19).withOpacity(0.4),
-              blurRadius: isSelected ? 10 : 12,
-              offset: const Offset(0, 5),
-              spreadRadius: isSelected ? -6 : -12,
-            ),
-          ],
         ),
         child: Row(
           children: [
