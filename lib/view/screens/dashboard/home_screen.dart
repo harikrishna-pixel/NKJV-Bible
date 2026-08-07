@@ -107,9 +107,6 @@ import 'package:html/parser.dart' as html;
 const int _kSubscriptionLifetimeDisplayMinDays = 10000;
 const int _kSubscriptionTwoYearDisplayMinDays = 400;
 
-bool _isLifetimeSubscriptionDisplay(int diffDy) =>
-    diffDy > _kSubscriptionLifetimeDisplayMinDays;
-
 bool _isTwoYearSubscriptionDisplay(int diffDy) =>
     diffDy >= _kSubscriptionTwoYearDisplayMinDays &&
     diffDy <= _kSubscriptionLifetimeDisplayMinDays;
@@ -129,13 +126,13 @@ String _subscriptionRenewalDisplayText(int diffDy, [String? plan]) {
   }
   final planKey = plan?.toLowerCase() ?? '';
   final dayLabel = diffDy == 1 ? 'day' : 'days';
-  // Additive: silver/gold copy must not become "never expire" just because
-  // remaining days are huge (e.g. bad lifetime expiry overwrite).
+  // Display only: lifetime copy only when stored plan is platinum.
+  // Do not treat huge remaining days as lifetime (mislabels 6mo/1yr).
+  if (planKey == 'platinum') {
+    return 'Your subscription will never expire';
+  }
   if (planKey == 'silver' || planKey == 'gold') {
     return '$diffDy $dayLabel left for the renewal of the subscription.';
-  }
-  if (_isLifetimeSubscriptionDisplay(diffDy) || planKey == 'platinum') {
-    return 'Your subscription will never expire';
   }
   return '$diffDy $dayLabel left for the renewal of the subscription.';
 }
@@ -146,18 +143,17 @@ String _subscriptionPeriodDisplayText(
   DateTime expiryDate,
 ) {
   final planKey = plan?.toLowerCase() ?? '';
-  // Additive: trust stored plan key first so Restore info matches the plan
-  // that was applied (silver/gold), not a lifetime day-threshold fallback.
+  // Trust stored plan key for period label (IAP / unlock logic unchanged).
   if (planKey == 'silver') {
     return 'Your subscription period is 6 months';
   }
   if (planKey == 'gold') {
-  if (_isTwoYearSubscriptionDisplay(diffDy)) {
-    return 'Your subscription period is 2 years';
-  }
+    if (_isTwoYearSubscriptionDisplay(diffDy)) {
+      return 'Your subscription period is 2 years';
+    }
     return 'Your subscription period is 1 year';
   }
-  if (_isLifetimeSubscriptionDisplay(diffDy) || planKey == 'platinum') {
+  if (planKey == 'platinum') {
     return 'Your subscription period is lifetime';
   }
   if (_isTwoYearSubscriptionDisplay(diffDy)) {
