@@ -153,8 +153,10 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                 double.tryParse(result[0]["read_per"].toString()) ?? 0.0;
             if (mounted) {
               setState(() {
+                final pct = DashBoardController.displayBookReadPercent(
+                    result[0]["read_per"].toString());
                 _readingPercentage =
-                    readPer >= 99.9 ? "100" : readPer.toStringAsFixed(1);
+                    pct >= 100 ? "100" : (readPer <= 0 ? "0" : pct.toString());
               });
             }
           }

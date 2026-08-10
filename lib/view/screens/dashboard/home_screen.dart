@@ -1191,6 +1191,11 @@ class _HomeScreenState extends State<HomeScreen>
   bool isLoggedIn = false;
   int swipeCount = 0;
   int _swipeThreshold = 7;
+  /// Additive: ignore accidental pan-end chapter jumps (cooldown + edge check).
+  DateTime? _lastChapterSwipeAt;
+  static const Duration _chapterSwipeCooldown = Duration(milliseconds: 700);
+  static const double _chapterSwipeMinVelocity = 250;
+  static const double _chapterSwipeEdgePx = 140;
   int appLaunchCount = 0;
   int appLaunchCountoffer = 0;
   int clickCount = 0;
@@ -4593,8 +4598,31 @@ class _HomeScreenState extends State<HomeScreen>
                     return;
                   }
                   // Require a meaningful horizontal swipe velocity.
-                  if (vx.abs() < 250) {
+                  if (vx.abs() < _chapterSwipeMinVelocity) {
                     return;
+                  }
+                  // Additive cooldown: prevents double chapter jumps from one gesture.
+                  final now = DateTime.now();
+                  if (_lastChapterSwipeAt != null &&
+                      now.difference(_lastChapterSwipeAt!) <
+                          _chapterSwipeCooldown) {
+                    return;
+                  }
+                  // Additive edge guard: next only near bottom, prev only near top.
+                  // Short chapters (no scroll) still allow swipe (extent ~ 0).
+                  final scrollController =
+                      controller.autoScrollController.value;
+                  if (scrollController.hasClients) {
+                    final pos = scrollController.position;
+                    final nearBottom =
+                        pos.pixels >= pos.maxScrollExtent - _chapterSwipeEdgePx;
+                    final nearTop = pos.pixels <= _chapterSwipeEdgePx;
+                    if (vx < 0 && !nearBottom) {
+                      return;
+                    }
+                    if (vx > 0 && !nearTop) {
+                      return;
+                    }
                   }
                   // Show ad every 5 swipes
                   if (vx < 0) {
@@ -4618,6 +4646,7 @@ class _HomeScreenState extends State<HomeScreen>
                         "Next Chapter and count is $swipeCount $_swipeThreshold");
                     if (controller.selectChapterChange.value + 1 <=
                         int.parse(controller.selectedBookChapterCount.value)) {
+                      _lastChapterSwipeAt = DateTime.now();
                       controller.selectChapterChange.value++;
                       controller.selectedChapter.value =
                           controller.selectChapterChange.value.toString();
@@ -4649,6 +4678,7 @@ class _HomeScreenState extends State<HomeScreen>
                     debugPrint(
                         "Next Chapter and count is $swipeCount $_swipeThreshold");
                     debugPrint("Previous Chapter");
+                    _lastChapterSwipeAt = DateTime.now();
                     controller.selectChapterChange.value--;
                     controller.selectedChapter.value =
                         controller.selectChapterChange.value.toString();

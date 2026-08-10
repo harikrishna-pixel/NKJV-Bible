@@ -89,6 +89,10 @@ class _SplashScreenState extends State<SplashScreen>
   late final AnimationController _splashProgressController;
   bool _initComplete = false;
   bool _hasNavigated = false;
+  /// Additive: force-leave if init hangs after an update (does not alter init steps).
+  Timer? _splashSafetyTimer;
+  static const Duration _splashSafetyTimeout = Duration(seconds: 60);
+  static const Duration _splashHeavyStepTimeout = Duration(seconds: 30);
 
   // Platform messages are asynchronous, so we initialize in an async method.
 
@@ -153,6 +157,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
+    _splashSafetyTimer?.cancel();
     _splashProgressController.dispose();
     super.dispose();
   }
@@ -262,6 +267,14 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _initialize() async {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final password = dotenv.env[AssetsConstants.dbPasswordKey]!;
+      // Additive safety net only: same init sequence, but never hang forever.
+      _splashSafetyTimer?.cancel();
+      _splashSafetyTimer = Timer(_splashSafetyTimeout, () {
+        if (_initComplete || _hasNavigated || !mounted) return;
+        debugPrint(
+            'SPLASH safety timeout (${_splashSafetyTimeout.inSeconds}s) — leaving');
+        _markInitCompleteAndTryLeave();
+      });
       try {
         // Only do essential initialization that's required before navigation
         // APIs are already loading in background via BackgroundApiService
@@ -274,10 +287,14 @@ class _SplashScreenState extends State<SplashScreen>
         print('SPLASH before migrateToEncryptedDatabase');
         // Also log to system console (visible in Mac Console.app)
         debugPrint('SPLASH before migrateToEncryptedDatabase');
-        await Future.wait<void>([
-          DBMigrationHelper.migrateToEncryptedDatabase(password),
-          WalletService.initializeWallet(),
-        ]);
+        try {
+          await Future.wait<void>([
+            DBMigrationHelper.migrateToEncryptedDatabase(password),
+            WalletService.initializeWallet(),
+          ]).timeout(_splashHeavyStepTimeout);
+        } on TimeoutException {
+          debugPrint('SPLASH migration/wallet timed out — continuing');
+        }
         print('SPLASH after migrateToEncryptedDatabase');
         debugPrint('SPLASH after migrateToEncryptedDatabase');
 
@@ -309,7 +326,11 @@ class _SplashScreenState extends State<SplashScreen>
           await Provider.of<DownloadProvider>(context, listen: false)
               .loadDailyVerses();
         }
-        await loadLocal();
+        try {
+          await loadLocal().timeout(_splashHeavyStepTimeout);
+        } on TimeoutException {
+          debugPrint('SPLASH loadLocal timed out — continuing');
+        }
 
         // Essential: Set default book if not set + preserve legacy user data
         await Future.wait<void>([
@@ -343,10 +364,14 @@ class _SplashScreenState extends State<SplashScreen>
         ]);
 
         // Essential: Update local DB (sync verse flags with bookmarks/highlights)
-        await Future.wait<void>([
-          updateLocalDB(),
-          deleteFiles(),
-        ]);
+        try {
+          await Future.wait<void>([
+            updateLocalDB(),
+            deleteFiles(),
+          ]).timeout(_splashHeavyStepTimeout);
+        } on TimeoutException {
+          debugPrint('SPLASH updateLocalDB/deleteFiles timed out — continuing');
+        }
         print('SPLASH after copyUserDataFromLegacyIfNeeded');
         if (kDebugMode) {
           await DBHelper.debugPrintLibraryTableCounts();
@@ -358,6 +383,9 @@ class _SplashScreenState extends State<SplashScreen>
         print('SPLASH init error - $e');
         // Even if there's an error, try to navigate
         await _markInitCompleteAndTryLeave();
+      } finally {
+        _splashSafetyTimer?.cancel();
+        _splashSafetyTimer = null;
       }
     });
   }

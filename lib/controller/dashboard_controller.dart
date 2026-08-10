@@ -977,6 +977,31 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     return selectedBookId.value.trim().isNotEmpty;
   }
 
+  /// Display-only book % (avoids float truncation showing 49/99).
+  /// Does not change Mark-as-Read eligibility or ad/streak logic.
+  static int displayBookReadPercent(String? readPer) {
+    final raw = double.tryParse((readPer ?? '0').trim()) ?? 0.0;
+    if (raw <= 0) return 0;
+    if (raw >= 99.5) return 100;
+    return raw.round().clamp(0, 100);
+  }
+
+  /// Same +1 / −1 chapter semantics; avoids float drift from repeated toStringAsFixed.
+  String _storedReadPerFromChapterCount({
+    required double currentPer,
+    required double chapterCount,
+    required int deltaChapters,
+  }) {
+    final total = chapterCount.round().clamp(1, 9999);
+    final currentChapters =
+        (currentPer * total / 100.0).round().clamp(0, total);
+    final nextChapters =
+        (currentChapters + deltaChapters).clamp(0, total);
+    if (nextChapters <= 0) return '0';
+    if (nextChapters >= total) return '100';
+    return (nextChapters * 100.0 / total).toStringAsFixed(1);
+  }
+
   /// Persist +1 chapter toward this book's read_per. Always writes the row for
   /// [selectedBookNum] (not a stale previous book id).
   Future<void> persistMarkChapterReadProgress() async {
@@ -987,9 +1012,11 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     if (chapterCount <= 0 || bookId == null) return;
 
     final current = double.tryParse(bookReadPer.value.trim()) ?? 0.0;
-    final step = 100.0 / chapterCount;
-    final next = (current <= 0 ? step : current + step).clamp(0.0, 100.0);
-    final stored = next >= 99.9 ? '100' : next.toStringAsFixed(1);
+    final stored = _storedReadPerFromChapterCount(
+      currentPer: current,
+      chapterCount: chapterCount,
+      deltaChapters: 1,
+    );
     await DBHelper().updateBookData(bookId, 'read_per', stored);
     bookReadPer.value = stored;
   }
@@ -1004,9 +1031,11 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
 
     final current = double.tryParse(bookReadPer.value.trim()) ?? 0.0;
     if (current <= 0) return;
-    final step = 100.0 / chapterCount;
-    final next = (current - step).clamp(0.0, 100.0);
-    final stored = next <= 0 ? '0' : next.toStringAsFixed(1);
+    final stored = _storedReadPerFromChapterCount(
+      currentPer: current,
+      chapterCount: chapterCount,
+      deltaChapters: -1,
+    );
     await DBHelper().updateBookData(bookId, 'read_per', stored);
     bookReadPer.value = stored;
   }

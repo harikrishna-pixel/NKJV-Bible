@@ -13,6 +13,7 @@ import '../../constants/images.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../constants/share_preferences.dart';
+import '../../../controller/dashboard_controller.dart';
 
 class BookListScreen extends StatefulWidget {
   const BookListScreen({super.key});
@@ -468,8 +469,9 @@ class _BookListScreenState extends State<BookListScreen> {
     final raw = double.tryParse(readPer ?? '0') ?? 0.0;
     if (raw <= 0) return const SizedBox.shrink();
 
-    final displayPct = raw >= 99.9 ? 100 : raw.toInt();
-    final fraction = (raw / 100).clamp(0.0, 1.0);
+    // Display-only: round / snap near 100 (same read_per source; no eligibility change).
+    final displayPct = DashBoardController.displayBookReadPercent(readPer);
+    final fraction = (displayPct / 100).clamp(0.0, 1.0);
     final width = screenWidth > 450 ? 78.0 : 64.0;
     final height = screenWidth > 450 ? 28.0 : 22.0;
     final fillColor = CommanColor.progressFillColor(context);
