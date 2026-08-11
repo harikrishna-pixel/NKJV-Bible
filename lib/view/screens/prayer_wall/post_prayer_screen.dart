@@ -168,6 +168,16 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         // Always track prayers created by this device so Edit/Delete works even
         // for anonymous/community posts.
         await PrayerWallLocalStore.addMyPrayerId(prayerId);
+        // Exact timestamp for status prompt: postedAt + durationDays.
+        final postedAt = DateTime.tryParse(
+              (created['createdAt'] ?? created['created_at'] ?? '').toString(),
+            ) ??
+            DateTime.now();
+        await PrayerWallLocalStore.putPrayerDurationMeta(
+          prayerId: prayerId,
+          durationDays: _durationDays,
+          postedAt: postedAt,
+        );
         // Keep existing author map behavior for non-anonymous posts.
         if (!_isAnonymous && effectiveName.isNotEmpty) {
           await PrayerWallLocalStore.putPrayerAuthor(
@@ -252,12 +262,12 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
           children: [
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
               decoration: BoxDecoration(
                 color: brown,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
+                    color: Colors.black.withOpacity(0.12),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -270,17 +280,20 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                     onPressed: () => Navigator.of(context).pop(false),
                   ),
                   Expanded(
-                    child: Text(
-                      'Post a Prayer',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: 'Georgia',
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                    child: Center(
+                      child: Text(
+                        'Post a Prayer',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontFamily: 'Georgia',
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
+                  // Balance the close button so the title stays centered.
                   const SizedBox(width: 48),
                 ],
               ),
@@ -382,7 +395,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                     _label('Prayer Duration', brown, isDark),
                     const SizedBox(height: 4),
                     Text(
-                      'Select the duration for your prayer post ($_creditsPerDay credits per day)',
+                      'Select the duration for your prayer post',
                       style: TextStyle(
                         fontSize: 12,
                         color: isDark ? Colors.white60 : Colors.grey.shade700,

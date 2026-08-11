@@ -17,7 +17,6 @@ import 'package:biblebookapp/streak_flow/streak_flow_screens.dart' hide SharPref
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 import 'package:biblebookapp/view/screens/onboard_faith_screen.dart';
-import 'package:biblebookapp/services/paywall_preload_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -30,7 +29,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
-import 'package:biblebookapp/utils/internet_speed_checker.dart';
 
 class PreferenceSelectionScreen extends StatefulWidget {
   final bool isSetting;
@@ -536,6 +534,14 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
     final isTablet = screenWidth > 600;
     final iconOuter = isTablet ? 104.0 : 92.0;
     final iconInner = isTablet ? 82.0 : 72.0;
+    final isDark =
+        Provider.of<ThemeProvider>(context, listen: false).themeMode ==
+            ThemeMode.dark;
+    final titleColor =
+        isDark ? Colors.white : const Color(0xFF2D1E12);
+    // Subtitle must stay readable on dark parchment (was near-invisible).
+    final subtitleColor =
+        isDark ? Colors.white.withValues(alpha: 0.82) : const Color(0xFF554D44);
 
     return Column(
       children: [
@@ -573,7 +579,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
           'Which verses speak to you?',
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: const Color(0xFF2D1E12),
+            color: titleColor,
             fontSize: isTablet ? 28 : 24,
             fontWeight: FontWeight.bold,
             fontFamily: 'Georgia',
@@ -586,7 +592,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
             'We\'ll shape your daily verses around these.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: const Color(0xFF554D44),
+              color: subtitleColor,
               fontSize: isTablet ? 18 : 15,
               height: 1.4,
             ),
@@ -1331,16 +1337,6 @@ Future<List<VerseBookContentModel>> _parseVerseContent(
 }
 
 class FaithJourneyDialog {
-  static Widget _themedCompletionIcon({required bool isTablet}) {
-    final size = isTablet ? 108.0 : 92.0;
-    return Image.asset(
-      'assets/complete_image.png',
-      width: size,
-      height: size,
-      fit: BoxFit.contain,
-    );
-  }
-
   /// Show Loading Dialog
   static Future<void> showLoadingDialog(BuildContext context,
       {VoidCallback? onContinue}) async {
@@ -1469,173 +1465,274 @@ class FaithJourneyDialog {
     showDialog(
       context: context,
       barrierDismissible: false,
+      barrierColor: Colors.transparent,
       builder: (ctx) {
         final mq = MediaQuery.of(ctx).size;
         final isTablet = mq.width > 600;
-        final screenWidth = MediaQuery.of(context).size.width;
-        return Center(
-          child: Container(
-            width: isTablet ? mq.width * 0.42 : mq.width * 0.86,
-            padding: EdgeInsets.all(isTablet ? 28 : 20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFFFFFDF8),
-                  Color(0xFFF8F0E4),
-                ],
+        final isDark =
+            Provider.of<ThemeProvider>(ctx, listen: false).themeMode ==
+                ThemeMode.dark;
+        final titleColor =
+            isDark ? Colors.white : const Color(0xFF2C2118);
+        final bodyColor =
+            isDark ? Colors.white.withValues(alpha: 0.88) : const Color(0xFF5C4033);
+        // Sub-topics (Peace, Strength, Comfort…) — keep high contrast in dark mode.
+        final topicsColor =
+            isDark ? const Color(0xFFF3E4C0) : const Color(0xFF3D2914);
+        final footerColor =
+            isDark ? Colors.white.withValues(alpha: 0.65) : const Color(0xFF8A7460);
+        final crossColor =
+            isDark ? const Color(0xFFF3E4C0) : const Color(0xFF2C2118);
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.zero,
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              width: double.infinity,
+              height: double.infinity,
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage(Images.bgImage(ctx)),
+                  fit: BoxFit.fill,
+                ),
               ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFB08D6E).withValues(alpha: 0.45)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _themedCompletionIcon(isTablet: isTablet),
-                SizedBox(height: isTablet ? 20 : 16),
-                Text(
-                  "Your Bible Experience Is Ready!",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: isTablet ? 22 : 18,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF3D2914),
-                    fontFamily: 'Georgia',
-                  ),
+              child: SafeArea(
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTablet ? mq.width * 0.18 : 28,
                 ),
-                const SizedBox(height: 12),
-                Row(
+                child: Column(
                   children: [
-                    Expanded(
-                      child: Divider(
-                        color: const Color(0xFF7A5435).withValues(alpha: 0.25),
-                      ),
-                    ),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Text(
-                        '◆',
-                        style: TextStyle(
-                          color: Color(0xFF7A5435),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Divider(
-                        color: const Color(0xFF7A5435).withValues(alpha: 0.25),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  "We've personalized your experience with verses that reflect your spiritual journey.\n\nLet's begin this beautiful walk together in God's Word.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: screenWidth < 380
-                        ? 12.5
-                        : isTablet
-                        ? 16
-                        : 14.7,
-                    height: 1.45,
-                    color: const Color(0xFF3D2914),
-                  ),
-                ),
-                SizedBox(height: isTablet ? 24 : 20),
-                ElevatedButton(
-                  onPressed: () async {
-                    Navigator.of(ctx).pop(); // Close dialog
-                    if (isFromOnboarding) {
-                      // Mark onboarding complete only when user taps Start now (so
-                      // closing on preference/category screen reopens to onboarding).
-                      await SharPreferences.setBoolean(
-                          SharPreferences.onboarding, true);
-
-                      // Skip IAP when offline or paywall product data is unavailable.
-                      final shouldShowPaywall =
-                      await PaywallPreloadService.canShowOnboardingPaywall();
-                      if (!shouldShowPaywall) {
-                        await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
-                        return;
-                      }
-
-                      // Very slow networks: skip IAP and continue to home/streak.
-                      try {
-                        final connectionSpeed =
-                        await InternetSpeedChecker.checkSpeed(
-                          timeout: const Duration(seconds: 8),
-                        );
-                        final isVerySlowConnection = connectionSpeed != null &&
-                            connectionSpeed > 12000;
-                        if (isVerySlowConnection) {
-                          await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
-                          return;
-                        }
-                      } catch (e) {
-                        debugPrint(
-                            'Error checking connection speed in onboarding: $e');
-                      }
-
-                      // Proceed to SubscriptionScreen when internet + product data exist.
-                      final sixMonthPlan = BibleInfo.sixMonthPlanid;
-                      final oneYearPlan = BibleInfo.oneYearPlanid;
-                      final lifeTimePlan = BibleInfo.lifeTimePlanid;
-                      Get.offAll(() => SubscriptionScreen(
-                        sixMonthPlan: sixMonthPlan,
-                        oneYearPlan: oneYearPlan,
-                        lifeTimePlan: lifeTimePlan,
-                        checkad: 'onboard',
-                      ),
-                          transition: SubscriptionScreen.paywallRouteTransition,
-                          duration: SubscriptionScreen.paywallRouteDuration);
-                    } else {
-                      await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.zero, // REQUIRED
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                  child: Ink(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color(0xFF763201),
-                          Color(0xFFD5821F),
-                          Color(0xFF763201),
+                    const Spacer(flex: 2),
+                    // Soft glow + cross (matches ready-screen reference).
+                    SizedBox(
+                      width: isTablet ? 120 : 96,
+                      height: isTablet ? 120 : 96,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: isTablet ? 120 : 96,
+                            height: isTablet ? 120 : 96,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFFF3E4C0),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFE8D49A)
+                                      .withValues(alpha: 0.85),
+                                  blurRadius: 28,
+                                  spreadRadius: 6,
+                                ),
+                              ],
+                            ),
+                          ),
+                          CustomPaint(
+                            size: Size(
+                              isTablet ? 36 : 28,
+                              isTablet ? 48 : 38,
+                            ),
+                            painter: _CrossPainter(
+                              color: crossColor,
+                            ),
+                          ),
                         ],
                       ),
-                      borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isTablet ? 40 : 24,
-                        vertical: isTablet ? 16 : 12,
+                    SizedBox(height: isTablet ? 28 : 22),
+                    Text(
+                      'Your Bible experience is ready',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'Georgia',
+                        fontSize: isTablet ? 32 : 26,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                        color: titleColor,
                       ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        "Start now",
+                    ),
+                    SizedBox(height: isTablet ? 18 : 14),
+                    Text.rich(
+                      TextSpan(
                         style: TextStyle(
-                          fontSize: isTablet ? 18 : 14,
-                          color: Colors.white,
+                          fontFamily: 'Georgia',
+                          fontSize: isTablet ? 18 : 15.5,
+                          height: 1.45,
+                          color: bodyColor,
+                        ),
+                        children: [
+                          const TextSpan(
+                            text:
+                                "We've personalized your verses around ",
+                          ),
+                          TextSpan(
+                            text: 'Peace, Strength, Comfort & more.',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: topicsColor,
+                            ),
+                          ),
+                          const TextSpan(
+                            text:
+                                " Let's begin this walk together in God's Word.",
+                          ),
+                        ],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const Spacer(flex: 3),
+                    SizedBox(
+                      width: double.infinity,
+                      height: isTablet ? 60 : 54,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          // Keep parent route context — dialog ctx is invalid after pop.
+                          final navContext =
+                              context.mounted ? context : Get.context;
+                          Navigator.of(ctx).pop(); // Close dialog
+                          if (isFromOnboarding) {
+                            // Mark onboarding complete only when user taps Start now (so
+                            // closing on preference/category screen reopens to onboarding).
+                            await SharPreferences.setBoolean(
+                                SharPreferences.onboarding, true);
+
+                            // Honor dashboard IAP flag only — paywall screen loads products.
+                            final iapEnabled = await SharPreferences
+                                    .getBoolean('isSubscriptionEnabled') ??
+                                true;
+                            if (!iapEnabled) {
+                              if (navContext != null && navContext.mounted) {
+                                await StreakFlowNavigation
+                                    .navigateToStreakFlowOrHome(navContext);
+                              }
+                              return;
+                            }
+
+                            // Onboarding: open the classic SubscriptionScreen paywall.
+                            final sixMonthPlan = BibleInfo.sixMonthPlanid;
+                            final oneYearPlan = BibleInfo.oneYearPlanid;
+                            final lifeTimePlan = BibleInfo.lifeTimePlanid;
+                            Get.offAll(
+                                () => SubscriptionScreen(
+                                      sixMonthPlan: sixMonthPlan,
+                                      oneYearPlan: oneYearPlan,
+                                      lifeTimePlan: lifeTimePlan,
+                                      checkad: 'onboard',
+                                    ),
+                                transition:
+                                    SubscriptionScreen.paywallRouteTransition,
+                                duration:
+                                    SubscriptionScreen.paywallRouteDuration);
+                          } else {
+                            if (navContext != null && navContext.mounted) {
+                              await StreakFlowNavigation
+                                  .navigateToStreakFlowOrHome(navContext);
+                            }
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: Ink(
+                          decoration: BoxDecoration(
+                            // Same color as faith onboarding Continue button.
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0xFF763201),
+                                Color(0xFFD5821F),
+                                Color(0xFF763201),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Container(
+                            alignment: Alignment.center,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'Start now',
+                                  style: TextStyle(
+                                    fontSize: isTablet ? 20 : 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Icon(
+                                  Icons.arrow_forward,
+                                  color: Colors.white,
+                                  size: isTablet ? 22 : 20,
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                    SizedBox(height: isTablet ? 16 : 12),
+                    Text(
+                      'You can change topics anytime in Settings',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: isTablet ? 14 : 12.5,
+                        color: const Color(0xFF8A7460),
+                      ),
+                    ),
+                    SizedBox(height: isTablet ? 28 : 20),
+                  ],
                 ),
-              ],
+              ),
+            ),
             ),
           ),
         );
       },
     );
   }
+}
+
+class _CrossPainter extends CustomPainter {
+  const _CrossPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final barW = size.width * 0.28;
+    final vert = RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: Offset(size.width / 2, size.height / 2),
+        width: barW,
+        height: size.height,
+      ),
+      const Radius.circular(2),
+    );
+    final horiz = RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: Offset(size.width / 2, size.height * 0.38),
+        width: size.width,
+        height: barW,
+      ),
+      const Radius.circular(2),
+    );
+    canvas.drawRRect(vert, paint);
+    canvas.drawRRect(horiz, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CrossPainter oldDelegate) =>
+      oldDelegate.color != color;
 }
 
 class CustomLoadingIndicator extends StatefulWidget {

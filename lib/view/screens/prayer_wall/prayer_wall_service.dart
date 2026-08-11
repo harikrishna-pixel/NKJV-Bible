@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:biblebookapp/constant/prayer_wall_api_constant.dart';
+import 'package:biblebookapp/view/screens/dashboard/constants.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_models.dart';
 import 'package:http/http.dart' as http;
 
@@ -12,6 +14,15 @@ class PrayerWallService {
         'Content-Type': 'application/json',
         'Authorization': 'marberx@123tech',
       };
+
+  /// App identity fields for all Prayer Wall write payloads.
+  static Map<String, dynamic> get _appMeta => {
+        'app_id': BibleInfo.appID,
+        'app_name': BibleInfo.bible_shortName,
+      };
+
+  static String _encodeBody(Map<String, dynamic> body) =>
+      jsonEncode({...body, ..._appMeta});
 
   static String? _extractId(dynamic decoded) {
     if (decoded is! Map) return null;
@@ -52,7 +63,7 @@ class PrayerWallService {
     if (normalizedUserName != null && normalizedUserName.isNotEmpty) {
       bodyMap['user_name'] = normalizedUserName;
     }
-    final bodyJson = jsonEncode(bodyMap);
+    final bodyJson = _encodeBody(bodyMap);
     print('PrayerWallService.createPrayer request body: $bodyJson');
 
     final res = await http.post(
@@ -74,7 +85,7 @@ class PrayerWallService {
     required String prayerTitle,
     required String prayerDescription,
   }) async {
-    final body = jsonEncode({
+    final body = _encodeBody({
       // Support multiple backend shapes without changing UI logic.
       'prayerId': prayerId,
       '_id': prayerId,
@@ -113,7 +124,7 @@ class PrayerWallService {
   }
 
   static Future<void> deletePrayer(String prayerId) async {
-    final body = jsonEncode({
+    final body = _encodeBody({
       // Support multiple backend shapes without changing UI logic.
       'prayerId': prayerId,
       '_id': prayerId,
@@ -212,7 +223,7 @@ class PrayerWallService {
     final res = await http.post(
       Uri.parse(PrayerWallApiConstant.likes),
       headers: _jsonHeaders,
-      body: jsonEncode({'prayerId': prayerId}),
+      body: _encodeBody({'prayerId': prayerId}),
     );
     if (res.statusCode == 201) {
       try {
@@ -253,7 +264,7 @@ class PrayerWallService {
     final res = await http.delete(
       Uri.parse(PrayerWallApiConstant.likes),
       headers: _jsonHeaders,
-      body: jsonEncode(body),
+      body: _encodeBody(body),
     );
     if (res.statusCode >= 200 && res.statusCode < 300) return;
     throw Exception('Unlike failed (${res.statusCode}): ${res.body}');
@@ -304,7 +315,7 @@ class PrayerWallService {
     final res = await http.post(
       Uri.parse(PrayerWallApiConstant.comments),
       headers: _jsonHeaders,
-      body: jsonEncode({
+      body: _encodeBody({
         'prayerId': prayerId,
         'comment_text': commentText,
         'isAnonymous': isAnonymous,
@@ -326,7 +337,7 @@ class PrayerWallService {
     required String commentId,
     required String commentText,
   }) async {
-    final body = jsonEncode({
+    final body = _encodeBody({
       // Support multiple backend shapes without changing UI logic.
       'commentId': commentId,
       '_id': commentId,
@@ -366,7 +377,7 @@ class PrayerWallService {
   }
 
   static Future<void> deleteComment(String commentId) async {
-    final body = jsonEncode({
+    final body = _encodeBody({
       // Support multiple backend shapes without changing UI logic.
       'commentId': commentId,
       '_id': commentId,
@@ -392,5 +403,34 @@ class PrayerWallService {
     }
 
     throw Exception('Delete comment failed (${res.statusCode}): ${res.body}');
+  }
+
+  /// POST `/api/prayer-reports`
+  static Future<void> reportPrayer({
+    required String prayerId,
+    required String reporterId,
+    required String reportReason,
+  }) async {
+    final url = PrayerWallApiConstant.prayerReports;
+    final payload = {
+      'prayerId': prayerId,
+      'reporter_id': PrayerWallLocalStore.normalizeReporterId(reporterId),
+      'report_reason': reportReason,
+    };
+    final body = _encodeBody(payload);
+    print('PrayerWallService.reportPrayer URL: $url');
+    print('PrayerWallService.reportPrayer headers: $_jsonHeaders');
+    print('PrayerWallService.reportPrayer request body: $body');
+    final res = await http.post(
+      Uri.parse(url),
+      headers: _jsonHeaders,
+      body: body,
+    );
+    print(
+      'PrayerWallService.reportPrayer response: '
+      'status=${res.statusCode} body=${res.body}',
+    );
+    if (res.statusCode >= 200 && res.statusCode < 300) return;
+    throw Exception('Report prayer failed (${res.statusCode}): ${res.body}');
   }
 }
