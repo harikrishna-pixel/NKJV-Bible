@@ -241,6 +241,8 @@ await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
 Widget build(BuildContext context) {
 final w = MediaQuery.sizeOf(context).width;
 final isTablet = w > 600;
+// Tablet reference uses wider content (~8% inset); phone keeps 18.
+final hPad = isTablet ? (w * 0.08).clamp(36.0, 64.0) : 18.0;
 
 return Scaffold(
 backgroundColor: _cream,
@@ -253,12 +255,7 @@ child: Column(
 children: [
 _buildHero(isTablet),
 Padding(
-padding: EdgeInsets.fromLTRB(
-isTablet ? w * 0.14 : 18,
-12,
-isTablet ? w * 0.14 : 18,
-0,
-),
+padding: EdgeInsets.fromLTRB(hPad, isTablet ? 10 : 12, hPad, 0),
 child: Column(
 children: [
 _buildAiCard(isTablet),
@@ -266,11 +263,11 @@ _buildAiCard(isTablet),
 ],
 ),
 ),
-const SizedBox(height: 14),
-_buildTrustRow(),
-const SizedBox(height: 8),
-_buildLegalRow(),
-const SizedBox(height: 10),
+SizedBox(height: isTablet ? 18 : 14),
+_buildTrustRow(isTablet: isTablet),
+SizedBox(height: isTablet ? 10 : 8),
+_buildLegalRow(isTablet: isTablet),
+SizedBox(height: isTablet ? 12 : 10),
 ],
 ),
 ),
@@ -296,14 +293,24 @@ offset: Offset(0, 1),
 final size = MediaQuery.sizeOf(context);
 final topPadding = MediaQuery.paddingOf(context).top;
 final isCompactHeight = size.height < 750;
-final imageHeight = isCompactHeight
+// Tablet: taller hero so referral scenic bg shows fully; phone unchanged.
+// Background image stays assets/img.png on all devices.
+final imageHeight = isTablet
+? (size.height * 0.46).clamp(380.0, 520.0)
+    : isCompactHeight
 ? (size.height * 0.44).clamp(290.0, 340.0)
     : (size.height * 0.42).clamp(280.0, 340.0);
 // Same overlap pattern as intro subscription value card.
-const cardLayoutHeight = 118.0;
-final cardOverlap = isCompactHeight ? 72.0 : 94.0;
+final cardLayoutHeight = isTablet ? 136.0 : 118.0;
+final cardOverlap = isTablet
+? 98.0
+    : isCompactHeight
+? 72.0
+    : 94.0;
 final sectionHeight =
 imageHeight + (cardLayoutHeight - cardOverlap) + 12.0;
+final heroSidePad =
+isTablet ? (size.width * 0.08).clamp(36.0, 64.0) : 16.0;
 
 return SizedBox(
 width: double.infinity,
@@ -321,7 +328,22 @@ clipBehavior: Clip.none,
 fit: StackFit.expand,
 children: [
 Positioned.fill(
-child: ColorFiltered(
+child: ColoredBox(
+color: paywallCream,
+child: isTablet
+// Tablet: fitWidth keeps the full scenic image visible (no heavy crop).
+? Image.asset(
+'assets/img.png',
+fit: BoxFit.fitWidth,
+alignment: Alignment.topCenter,
+width: double.infinity,
+filterQuality: FilterQuality.high,
+gaplessPlayback: true,
+errorBuilder: (_, __, ___) => Container(
+color: const Color(0xFFE8D5C4),
+),
+)
+    : ColorFiltered(
 colorFilter: ColorFilter.mode(
 Colors.white.withOpacity(0.14),
 BlendMode.lighten,
@@ -338,13 +360,22 @@ color: const Color(0xFFE8D5C4),
 ),
 ),
 ),
+),
 Positioned.fill(
 child: DecoratedBox(
 decoration: BoxDecoration(
 gradient: LinearGradient(
 begin: Alignment.topCenter,
 end: Alignment.bottomCenter,
-colors: [
+// Tablet: much lighter wash so the bg photo stays visible.
+colors: isTablet
+? [
+paywallCream.withOpacity(0.0),
+paywallCream.withOpacity(0.04),
+paywallCream.withOpacity(0.35),
+paywallCream,
+]
+: [
 paywallCream.withOpacity(0.06),
 paywallCream.withOpacity(0.22),
 paywallCream.withOpacity(0.72),
@@ -360,14 +391,14 @@ top: topPadding + 40,
 left: 0,
 right: 0,
 child: Container(
-height: 180,
+height: isTablet ? 100 : 180,
 decoration: BoxDecoration(
 gradient: LinearGradient(
 begin: Alignment.centerLeft,
 end: Alignment.centerRight,
 colors: [
-paywallCream.withOpacity(0.26),
-paywallCream.withOpacity(0.14),
+paywallCream.withOpacity(isTablet ? 0.10 : 0.26),
+paywallCream.withOpacity(isTablet ? 0.04 : 0.14),
 paywallCream.withOpacity(0.03),
 paywallCream.withOpacity(0.0),
 ],
@@ -381,33 +412,33 @@ bottom: false,
 child: Align(
 alignment: Alignment.topLeft,
 child: Padding(
-padding: const EdgeInsets.only(left: 16, top: 6),
+padding: EdgeInsets.only(left: heroSidePad, top: isTablet ? 10 : 6),
 child: Row(
 children: [
 Image.asset(
 'assets/paywall_icons/premium.png',
-height: isTablet ? 58 : 52,
+height: isTablet ? 60 : 52,
 fit: BoxFit.contain,
 errorBuilder: (_, __, ___) =>
 const SizedBox.shrink(),
 ),
 const Spacer(),
 Padding(
-padding: const EdgeInsets.only(right: 12),
+padding: EdgeInsets.only(right: isTablet ? 16 : 12),
 child: Material(
 color: Colors.white.withOpacity(0.82),
 shape: const CircleBorder(),
 child: InkWell(
 customBorder: const CircleBorder(),
 onTap: _onClose,
-child: const SizedBox(
-width: 28,
-height: 28,
+child: SizedBox(
+width: isTablet ? 32 : 28,
+height: isTablet ? 32 : 28,
 child: Center(
 child: Icon(
 Icons.close,
-size: 16,
-color: Color(0xFF3A2B18),
+size: isTablet ? 17 : 16,
+color: const Color(0xFF3A2B18),
 ),
 ),
 ),
@@ -420,9 +451,9 @@ color: Color(0xFF3A2B18),
 ),
 ),
 Positioned(
-left: 16,
-right: 16,
-top: topPadding + 48,
+left: heroSidePad,
+right: heroSidePad,
+top: topPadding + (isTablet ? 54 : 48),
 child: Column(
 crossAxisAlignment: CrossAxisAlignment.start,
 mainAxisSize: MainAxisSize.min,
@@ -431,19 +462,21 @@ RichText(
 textAlign: TextAlign.left,
 text: TextSpan(
 style: TextStyle(
-fontSize: isTablet ? 38 : 34,
+fontFamily: isTablet ? 'Georgia' : null,
+fontSize: isTablet ? 40 : 34,
 fontWeight: FontWeight.w800,
 color: paywallInk,
 height: 1.12,
 letterSpacing: -0.3,
 shadows: heroShadows,
 ),
-children: const [
-TextSpan(text: 'Grow Closer\n'),
-TextSpan(text: 'to '),
+children: [
+const TextSpan(text: 'Grow Closer\n'),
+const TextSpan(text: 'to '),
 TextSpan(
 text: 'God',
 style: TextStyle(
+fontFamily: isTablet ? 'Georgia' : null,
 color: paywallTitleGold,
 fontWeight: FontWeight.w800,
 shadows: heroShadows,
@@ -452,6 +485,7 @@ shadows: heroShadows,
 TextSpan(
 text: ' Daily',
 style: TextStyle(
+fontFamily: isTablet ? 'Georgia' : null,
 color: paywallTitleGold,
 fontWeight: FontWeight.w800,
 shadows: heroShadows,
@@ -460,12 +494,12 @@ shadows: heroShadows,
 ],
 ),
 ),
-const SizedBox(height: 8),
+SizedBox(height: isTablet ? 10 : 8),
 Text(
 'Guidance, prayer, and encouragement\n whenever you need it.',
 textAlign: TextAlign.left,
 style: TextStyle(
-fontSize: isTablet ? 15 : 14,
+fontSize: isTablet ? 16.5 : 14,
 height: 1.4,
 color: paywallSubtitle,
 fontWeight: FontWeight.w500,
@@ -482,14 +516,14 @@ Positioned(
 left: 0,
 right: 0,
 top: imageHeight - cardOverlap,
-child: _buildBenefits(),
+child: _buildBenefits(isTablet),
 ),
 ],
 ),
 );
 }
 
-Widget _buildBenefits() {
+Widget _buildBenefits([bool isTablet = false]) {
 Widget cell({
 required IconData icon,
 required Color bg,
@@ -499,29 +533,29 @@ required String sub,
 }) {
 return Expanded(
 child: Padding(
-padding: const EdgeInsets.symmetric(horizontal: 4),
+padding: EdgeInsets.symmetric(horizontal: isTablet ? 8 : 4),
 child: Column(
 children: [
 Container(
-width: 30,
-height: 30,
+width: isTablet ? 36 : 30,
+height: isTablet ? 36 : 30,
 alignment: Alignment.center,
 decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-child: Icon(icon, size: 16, color: iconColor),
+child: Icon(icon, size: isTablet ? 18 : 16, color: iconColor),
 ),
-const SizedBox(height: 5),
+SizedBox(height: isTablet ? 7 : 5),
 Text(
 title,
 textAlign: TextAlign.center,
-style: const TextStyle(
+style: TextStyle(
 fontFamily: 'Georgia',
 fontWeight: FontWeight.w600,
-fontSize: 11,
+fontSize: isTablet ? 13 : 11,
 color: _ink,
 height: 1.1,
 ),
 ),
-const SizedBox(height: 2),
+SizedBox(height: isTablet ? 3 : 2),
 FittedBox(
   fit: BoxFit.scaleDown,
   child: Text(
@@ -529,8 +563,8 @@ FittedBox(
     maxLines: 1,
     softWrap: false,
     textAlign: TextAlign.center,
-    style: const TextStyle(
-      fontSize: 8.5,
+    style: TextStyle(
+      fontSize: isTablet ? 10.5 : 8.5,
       color: _inkSoft,
       height: 1.15,
     ),
@@ -542,12 +576,16 @@ FittedBox(
 );
 }
 
+final side = isTablet
+? (MediaQuery.sizeOf(context).width * 0.08).clamp(36.0, 64.0)
+    : 18.0;
 return Container(
-margin: const EdgeInsets.symmetric(horizontal: 18),
-padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 4),
+margin: EdgeInsets.symmetric(horizontal: side),
+padding: EdgeInsets.symmetric(
+vertical: isTablet ? 15 : 11, horizontal: isTablet ? 8 : 4),
 decoration: BoxDecoration(
 color: _paper,
-borderRadius: BorderRadius.circular(16),
+borderRadius: BorderRadius.circular(isTablet ? 18 : 16),
 border: Border.all(color: const Color(0xFFF0E6CF)),
 boxShadow: [
 BoxShadow(
@@ -596,9 +634,14 @@ return GestureDetector(
 onTap: () => setState(() => _sel = _PwCard.ai),
 child: AnimatedContainer(
 duration: const Duration(milliseconds: 160),
-padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+padding: EdgeInsets.fromLTRB(
+isTablet ? 20 : 14,
+isTablet ? 18 : 13,
+isTablet ? 20 : 14,
+isTablet ? 18 : 13,
+),
 decoration: BoxDecoration(
-borderRadius: BorderRadius.circular(16),
+borderRadius: BorderRadius.circular(isTablet ? 18 : 16),
 border: Border.all(
 color: selected ? _purple : _line,
 width: 2,
@@ -627,23 +670,23 @@ children: [
 Row(
 children: [
 _RadioDot(selected: selected, color: _purple),
-const SizedBox(width: 8),
-const Expanded(
+SizedBox(width: isTablet ? 10 : 8),
+Expanded(
 child: Row(
 children: [
 Icon(
 Icons.auto_awesome_rounded,
-size: 18,
-color: Color(0xFF6D51A3),
+size: isTablet ? 20 : 18,
+color: const Color(0xFF6D51A3),
 ),
-SizedBox(width: 6),
+SizedBox(width: isTablet ? 8 : 6),
 Flexible(
 child: Text(
 'AI Premium',
 style: TextStyle(
 fontFamily: 'Georgia',
 fontWeight: FontWeight.w700,
-fontSize: 17,
+fontSize: isTablet ? 21 : 17,
 color: _ink,
 ),
 ),
@@ -652,26 +695,27 @@ color: _ink,
 ),
 ),
 Container(
-padding:
-const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+padding: EdgeInsets.symmetric(
+horizontal: isTablet ? 10 : 8,
+vertical: isTablet ? 5 : 4),
 decoration: BoxDecoration(
 color: const Color(0xFFEEE7F8),
 borderRadius: BorderRadius.circular(8),
 ),
-child: const Text(
+child: Text(
 'Subscription',
 style: TextStyle(
-fontSize: 10,
+fontSize: isTablet ? 11 : 10,
 fontWeight: FontWeight.w700,
-color: Color(0xFF6D51A3),
+color: const Color(0xFF6D51A3),
 ),
 ),
 ),
 ],
 ),
-const SizedBox(height: 12),
+SizedBox(height: isTablet ? 16 : 12),
 _buildDurationRow(isTablet),
-const SizedBox(height: 12),
+SizedBox(height: isTablet ? 16 : 12),
 if (_loading)
 const SizedBox(
 height: 28,
@@ -692,7 +736,7 @@ _aiPrice,
 style: TextStyle(
 fontFamily: 'Georgia',
 fontWeight: FontWeight.w800,
-fontSize: isTablet ? 28 : 24,
+fontSize: isTablet ? 32 : 24,
 color: _ink,
 ),
 ),
@@ -700,8 +744,8 @@ Padding(
 padding: const EdgeInsets.only(bottom: 4, left: 2),
 child: Text(
 _aiPer,
-style: const TextStyle(
-fontSize: 14,
+style: TextStyle(
+fontSize: isTablet ? 16 : 14,
 fontWeight: FontWeight.w600,
 color: _inkSoft,
 ),
@@ -709,19 +753,20 @@ color: _inkSoft,
 ),
 ],
 ),
-const SizedBox(height: 4),
+SizedBox(height: isTablet ? 6 : 4),
 Text(
 _aiNote,
-style: const TextStyle(fontSize: 12, color: _inkSoft),
+style: TextStyle(fontSize: isTablet ? 13.5 : 12, color: _inkSoft),
 ),
-const SizedBox(height: 10),
+SizedBox(height: isTablet ? 14 : 10),
 _inclRow(
 rich: true,
 bold: 'Unlimited AI',
 rest: ' — chat, prayer & answers',
+isTablet: isTablet,
 ),
-const SizedBox(height: 6),
-_inclRow(text: 'Ad-free · all premium features'),
+SizedBox(height: isTablet ? 8 : 6),
+_inclRow(text: 'Ad-free · all premium features', isTablet: isTablet),
 ],
 ),
 ),
@@ -760,7 +805,7 @@ items.addAll(const [
 return Row(
 children: [
 for (var i = 0; i < items.length; i++) ...[
-if (i > 0) const SizedBox(width: 8),
+if (i > 0) SizedBox(width: isTablet ? 12 : 8),
 Expanded(
 child: _DurChip(
 selected: _dur == items[i].$1 && _sel == _PwCard.ai,
@@ -918,34 +963,36 @@ bool rich = false,
 String bold = '',
 String rest = '',
 String prefix = '',
+bool isTablet = false,
 }) {
+final fontSize = isTablet ? 14.0 : 12.5;
 return Row(
 crossAxisAlignment: CrossAxisAlignment.start,
 children: [
 Container(
-width: 16,
-height: 16,
+width: isTablet ? 18 : 16,
+height: isTablet ? 18 : 16,
 margin: const EdgeInsets.only(top: 1),
 alignment: Alignment.center,
 decoration: const BoxDecoration(
 color: Color(0xFFE7DBFB),
 shape: BoxShape.circle,
 ),
-child: const Text(
+child: Text(
 '✓',
 style: TextStyle(
-fontSize: 10,
+fontSize: isTablet ? 11 : 10,
 fontWeight: FontWeight.w800,
-color: Color(0xFF5E3FA0),
+color: const Color(0xFF5E3FA0),
 ),
 ),
 ),
-const SizedBox(width: 8),
+SizedBox(width: isTablet ? 10 : 8),
 Expanded(
 child: rich
 ? Text.rich(
 TextSpan(
-style: const TextStyle(fontSize: 12.5, color: _inkSoft),
+style: TextStyle(fontSize: fontSize, color: _inkSoft),
 children: [
 if (prefix.isNotEmpty) TextSpan(text: prefix),
 TextSpan(
@@ -961,41 +1008,45 @@ TextSpan(text: rest),
 )
     : Text(
 text ?? '',
-style: const TextStyle(fontSize: 12.5, color: _inkSoft),
+style: TextStyle(fontSize: fontSize, color: _inkSoft),
 ),
 ),
 ],
 );
 }
 
-Widget _buildTrustRow() {
-return const Padding(
-padding: EdgeInsets.symmetric(horizontal: 24),
+Widget _buildTrustRow({bool isTablet = false}) {
+return Padding(
+padding: EdgeInsets.symmetric(horizontal: isTablet ? 12 : 24),
 child: Row(
 mainAxisAlignment: MainAxisAlignment.center,
 children: [
-Icon(Icons.verified_user_outlined, size: 14, color: _inkSoft),
-SizedBox(width: 4),
+Icon(Icons.verified_user_outlined,
+size: isTablet ? 16 : 14, color: _inkSoft),
+SizedBox(width: isTablet ? 6 : 4),
 Text('Cancel anytime',
-style: TextStyle(fontSize: 12, color: _inkSoft)),
-SizedBox(width: 18),
-Icon(Icons.lock_outline_rounded, size: 14, color: _inkSoft),
-SizedBox(width: 4),
+style: TextStyle(
+fontSize: isTablet ? 13.5 : 12, color: _inkSoft)),
+SizedBox(width: isTablet ? 24 : 18),
+Icon(Icons.lock_outline_rounded,
+size: isTablet ? 16 : 14, color: _inkSoft),
+SizedBox(width: isTablet ? 6 : 4),
 Text('Secure & trusted',
-style: TextStyle(fontSize: 12, color: _inkSoft)),
+style: TextStyle(
+fontSize: isTablet ? 13.5 : 12, color: _inkSoft)),
 ],
 ),
 );
 }
 
-Widget _buildLegalRow() {
+Widget _buildLegalRow({bool isTablet = false}) {
 Widget link(String label, VoidCallback onTap) {
 return GestureDetector(
 onTap: onTap,
 child: Text(
 label,
-style: const TextStyle(
-fontSize: 11,
+style: TextStyle(
+fontSize: isTablet ? 12 : 11,
 color: _inkSoft,
 decoration: TextDecoration.none,
 ),
@@ -1004,7 +1055,7 @@ decoration: TextDecoration.none,
 }
 
 return Padding(
-padding: const EdgeInsets.symmetric(horizontal: 18),
+padding: EdgeInsets.symmetric(horizontal: isTablet ? 12 : 18),
 child: Wrap(
 alignment: WrapAlignment.center,
 crossAxisAlignment: WrapCrossAlignment.center,
@@ -1013,12 +1064,16 @@ link(
 'Terms of Use',
 () => _openLegal('https://bibleoffice.com/terms_conditions.html'),
 ),
-const Text(' · ', style: TextStyle(fontSize: 11, color: _inkSoft)),
+Text(' · ',
+style: TextStyle(
+fontSize: isTablet ? 12 : 11, color: _inkSoft)),
 link(
 'Privacy Policy',
 () => _openLegal('https://bibleoffice.com/privacy_policy.html'),
 ),
-const Text(' · ', style: TextStyle(fontSize: 11, color: _inkSoft)),
+Text(' · ',
+style: TextStyle(
+fontSize: isTablet ? 12 : 11, color: _inkSoft)),
 link('Restore Purchases', _restorePurchases),
 ],
 ),
@@ -1026,16 +1081,16 @@ link('Restore Purchases', _restorePurchases),
 }
 
 Widget _buildFooter(bool isTablet, double w) {
-final hPad = isTablet ? w * 0.14 : 18.0;
+final hPad = isTablet ? (w * 0.08).clamp(36.0, 64.0) : 18.0;
 return SafeArea(
 top: false,
 child: Padding(
-padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 12),
+padding: EdgeInsets.fromLTRB(hPad, isTablet ? 10 : 8, hPad, 12),
 child: Column(
 children: [
 SizedBox(
 width: double.infinity,
-height: isTablet ? 56 : 50,
+height: isTablet ? 58 : 50,
 child: DecoratedBox(
 decoration: BoxDecoration(
 gradient: const LinearGradient(
@@ -1045,7 +1100,7 @@ Color(0xFFC9A35A),
 Color(0xFFA9791F),
 ],
 ),
-borderRadius: BorderRadius.circular(14),
+borderRadius: BorderRadius.circular(isTablet ? 16 : 14),
 ),
 child: ElevatedButton(
 onPressed: _startPurchase,
@@ -1054,13 +1109,13 @@ backgroundColor: Colors.transparent,
 shadowColor: Colors.transparent,
 elevation: 0,
 shape: RoundedRectangleBorder(
-borderRadius: BorderRadius.circular(14),
+borderRadius: BorderRadius.circular(isTablet ? 16 : 14),
 ),
 ),
 child: Text(
 '$_ctaLabel ›',
 style: TextStyle(
-fontSize: isTablet ? 18 : 16,
+fontSize: isTablet ? 19 : 16,
 fontWeight: FontWeight.w700,
 color: Colors.white,
 ),
@@ -1072,8 +1127,8 @@ const SizedBox(height: 8),
 Text(
 _trustLine,
 textAlign: TextAlign.center,
-style: const TextStyle(
-fontSize: 12.5,
+style: TextStyle(
+fontSize: isTablet ? 13.5 : 12.5,
 fontWeight: FontWeight.w600,
 color: _ink,
 ),
@@ -1082,16 +1137,17 @@ const SizedBox(height: 4),
 Text(
 _micro,
 textAlign: TextAlign.center,
-style: const TextStyle(fontSize: 11.5, color: _inkSoft),
+style: TextStyle(
+fontSize: isTablet ? 12.5 : 11.5, color: _inkSoft),
 ),
-const SizedBox(height: 6),
+SizedBox(height: isTablet ? 8 : 6),
 GestureDetector(
 onTap: _continueLimited,
-child: const Text(
+child: Text(
 'Continue with Limited Access',
 style: TextStyle(
-fontSize: 13,
-color: Color(0xFF9A866A),
+fontSize: isTablet ? 14 : 13,
+color: const Color(0xFF9A866A),
 decoration: TextDecoration.none,
 ),
 ),
@@ -1155,6 +1211,7 @@ final VoidCallback onTap;
 
 @override
 Widget build(BuildContext context) {
+final isTablet = MediaQuery.sizeOf(context).width > 600;
 return GestureDetector(
 onTap: onTap,
 child: Stack(
@@ -1162,13 +1219,18 @@ clipBehavior: Clip.none,
 children: [
 Container(
 width: double.infinity,
-padding: const EdgeInsets.fromLTRB(6, 15, 6, 7),
+padding: EdgeInsets.fromLTRB(
+isTablet ? 10 : 6,
+isTablet ? 18 : 15,
+isTablet ? 10 : 6,
+isTablet ? 10 : 7,
+),
 decoration: BoxDecoration(
 color: selected ? const Color(0xFFF4EFFC) : Colors.white,
-borderRadius: BorderRadius.circular(11),
+borderRadius: BorderRadius.circular(isTablet ? 13 : 11),
 border: Border.all(
 color: selected ? const Color(0xFF6D51A3) : const Color(0xFFE2D3B4),
-width: 1.5,
+width: selected && isTablet ? 2.0 : 1.5,
 ),
 ),
 child: Column(
@@ -1177,19 +1239,19 @@ Text(
 label,
 textAlign: TextAlign.center,
 style: TextStyle(
-fontSize: 12,
+fontSize: isTablet ? 14 : 12,
 fontWeight: FontWeight.w800,
 color: selected
 ? const Color(0xFF6D51A3)
     : const Color(0xFF2B1F13),
 ),
 ),
-const SizedBox(height: 2),
+SizedBox(height: isTablet ? 4 : 2),
 Text(
 perMo,
 textAlign: TextAlign.center,
 style: TextStyle(
-fontSize: 11,
+fontSize: isTablet ? 13 : 11,
 fontWeight: FontWeight.w600,
 color: selected
 ? const Color(0xFF6D51A3)
@@ -1206,8 +1268,9 @@ left: 0,
 right: 0,
 child: Center(
 child: Container(
-padding:
-const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+padding: EdgeInsets.symmetric(
+horizontal: isTablet ? 8 : 6,
+vertical: isTablet ? 3.5 : 2.5),
 decoration: BoxDecoration(
 gradient: badge == 'POPULAR'
 ? const LinearGradient(
@@ -1226,9 +1289,9 @@ offset: const Offset(0, 1),
 ),
 child: Text(
 badge!,
-style: const TextStyle(
+style: TextStyle(
 color: Colors.white,
-fontSize: 8,
+fontSize: isTablet ? 9 : 8,
 fontWeight: FontWeight.w800,
 ),
 ),
