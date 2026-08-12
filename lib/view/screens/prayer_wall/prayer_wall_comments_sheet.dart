@@ -7,16 +7,23 @@ import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-/// Bottom sheet: list comments, add, edit (PATCH), delete — for comments this device created.
+/// Comments UI for a prayer — sheet/dialog or embedded inline in a card.
+/// Fetch / post / edit / delete logic is unchanged.
 class PrayerWallCommentsSheet extends StatefulWidget {
   const PrayerWallCommentsSheet({
     super.key,
     required this.prayerId,
     required this.titlePreview,
+    this.embedded = false,
+    this.onChanged,
   });
 
   final String prayerId;
   final String titlePreview;
+  /// When true, render compact inline UI (no dialog chrome).
+  final bool embedded;
+  /// Called after comments list changes (post/edit/delete).
+  final VoidCallback? onChanged;
 
   @override
   State<PrayerWallCommentsSheet> createState() => _PrayerWallCommentsSheetState();
@@ -56,6 +63,7 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
         _rows = list;
         _loading = false;
       });
+      widget.onChanged?.call();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -287,6 +295,11 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
     final isDark =
         themeProvider.themeMode == ThemeMode.dark && !usesLightCustom;
     final brown = const Color(0xFF5C4033);
+
+    if (widget.embedded) {
+      return _buildEmbedded(context, isDark: isDark, brown: brown);
+    }
+
     final cream = isDark
         ? CommanColor.darkPrimaryColor
         : (isVintage
@@ -686,6 +699,243 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildEmbedded(
+    BuildContext context, {
+    required bool isDark,
+    required Color brown,
+  }) {
+    final ink = isDark ? Colors.white : const Color(0xFF3D2914);
+    final muted = isDark ? Colors.white70 : const Color(0xFF6B5344);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 8),
+        Divider(
+          height: 1,
+          color: isDark ? Colors.white24 : const Color(0xFFE0D2C2),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Text(
+              'Comments',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: ink,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: brown.withValues(alpha: isDark ? 0.35 : 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '${_rows.length}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : brown,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(_error!, style: const TextStyle(color: Colors.redAccent)),
+          ),
+        if (_loading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          )
+        else if (_rows.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  size: 36,
+                  color: muted.withValues(alpha: 0.7),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Be the first to encourage this person.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    height: 1.3,
+                    color: muted,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          ..._rows.map((row) {
+            final id = _commentId(row);
+            final mine = id != null && _myIds.contains(id);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 14,
+                    backgroundColor: brown.withValues(alpha: 0.15),
+                    child: Icon(
+                      mine ? Icons.person : Icons.person_outline,
+                      size: 16,
+                      color: brown,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _commentText(row),
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            height: 1.35,
+                            color: ink,
+                          ),
+                        ),
+                        if (mine)
+                          Row(
+                            children: [
+                              TextButton(
+                                onPressed: () => _edit(row),
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: const Size(0, 28),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: Text(
+                                  'Edit',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: brown,
+                                  ),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () => _delete(row),
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: const Size(0, 28),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: const Text(
+                                  'Delete',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.redAccent,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        const SizedBox(height: 6),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _input,
+                maxLines: 3,
+                minLines: 1,
+                maxLength: 1000,
+                onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87,
+                  fontSize: 14,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Write an encouraging comment...',
+                  counterText: '',
+                  filled: true,
+                  fillColor: isDark
+                      ? Colors.white.withValues(alpha: 0.06)
+                      : const Color(0xFFF8F1E6),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: BorderSide(
+                      color: isDark ? Colors.white24 : const Color(0xFFD4C4B0),
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: BorderSide(
+                      color: isDark ? Colors.white24 : const Color(0xFFD4C4B0),
+                    ),
+                  ),
+                  hintStyle: TextStyle(
+                    color: isDark ? Colors.white54 : Colors.grey.shade600,
+                    fontSize: 13.5,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            _posting
+                ? const Padding(
+                    padding: EdgeInsets.all(10),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : Material(
+                    color: brown,
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: _send,
+                      child: const Padding(
+                        padding: EdgeInsets.all(10),
+                        child: Icon(
+                          Icons.send_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ),
+          ],
+        ),
+      ],
     );
   }
 }
