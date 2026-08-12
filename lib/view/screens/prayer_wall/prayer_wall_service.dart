@@ -433,4 +433,139 @@ class PrayerWallService {
     if (res.statusCode >= 200 && res.statusCode < 300) return;
     throw Exception('Report prayer failed (${res.statusCode}): ${res.body}');
   }
+
+  /// Same Gemini endpoint used by Chat / Prayer Guidance.
+  static const String _aiBaseUrl =
+      'https://my-backend-one-eta.vercel.app/api/gemini';
+
+  static const String _toastVulgar =
+      'Please keep your prayer respectful. Inappropriate language is not allowed.';
+  static const String _toastNotPrayer =
+      'Please share a genuine prayer request only.';
+
+  /// AI validation before publish. Returns [isValid]=true when content may post.
+  /// On AI/network failure returns valid=true so existing publish path still works.
+  static Future<PrayerWallValidationResult> validatePrayerContent({
+    required String prayerTitle,
+    required String prayerDescription,
+  }) async {
+    final prompt = '''
+You are a content moderator for a Christian Prayer Wall in a Bible app (${BibleInfo.bible_shortName}).
+Decide if the user's submission may be published.
+
+Reject as INVALID if ANY of these apply:
+1) Vulgar / profane / abusive / sexual / hateful / highly offensive language.
+2) Not a genuine prayer or prayer request (spam, ads, jokes, random chat, news, opinions, questions that are not prayerful).
+3) Anything beyond prayer — content that is not asking for prayer, giving thanks to God, seeking spiritual support, or sharing a blessing.
+
+Accept as VALID if it is a sincere prayer, prayer request, thanksgiving, or blessing — even if informal, short, or imperfect English.
+
+Respond with EXACTLY one line (no markdown, no extra explanation):
+VALID
+or
+INVALID|vulgar|$_toastVulgar
+or
+INVALID|not_prayer|$_toastNotPrayer
+
+Title: $prayerTitle
+Details: $prayerDescription
+''';
+
+    try {
+      final res = await http.post(
+        Uri.parse(_aiBaseUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'prompt': prompt}),
+      );
+      if (res.statusCode != 200) {
+        return const PrayerWallValidationResult(isValid: true);
+      }
+
+      final text = _extractAiText(res.body).trim();
+      if (text.isEmpty) {
+        return const PrayerWallValidationResult(isValid: true);
+      }
+
+      final upper = text.toUpperCase();
+      if (upper.startsWith('VALID') && !upper.startsWith('INVALID')) {
+        return const PrayerWallValidationResult(isValid: true);
+      }
+
+      if (upper.contains('INVALID')) {
+        final toast = _toastFromInvalidAiLine(text);
+        return PrayerWallValidationResult(isValid: false, toastMessage: toast);
+      }
+
+      // Unclear AI reply — allow existing publish path.
+      return const PrayerWallValidationResult(isValid: true);
+    } catch (_) {
+      return const PrayerWallValidationResult(isValid: true);
+    }
+  }
+
+  static String _toastFromInvalidAiLine(String text) {
+    final lower = text.toLowerCase();
+    if (lower.contains('vulgar') ||
+        lower.contains('profan') ||
+        lower.contains('inappropriate') ||
+        lower.contains('offensive')) {
+      return _toastVulgar;
+    }
+    if (lower.contains('not_prayer') ||
+        lower.contains('not a prayer') ||
+        lower.contains('beyond')) {
+      return _toastNotPrayer;
+    }
+    // Prefer AI-provided toast after second pipe, if present.
+    final parts = text.split('|');
+    if (parts.length >= 3) {
+      final custom = parts.sublist(2).join('|').trim();
+      if (custom.isNotEmpty && custom.length < 160) return custom;
+    }
+    return _toastNotPrayer;
+  }
+
+  static String _extractAiText(String body) {
+    try {
+      final responseData = jsonDecode(body);
+      if (responseData is! Map) return body;
+      if (responseData['output'] != null && responseData['output'] is Map) {
+        final output = responseData['output'] as Map;
+        if (output['candidates'] is List &&
+            (output['candidates'] as List).isNotEmpty) {
+          final candidate = (output['candidates'] as List)[0];
+          if (candidate is Map &&
+              candidate['content'] is Map &&
+              candidate['content']['parts'] is List &&
+              (candidate['content']['parts'] as List).isNotEmpty) {
+            final part = (candidate['content']['parts'] as List)[0];
+            if (part is Map && part['text'] != null) {
+              return part['text'].toString();
+            }
+          }
+        }
+      }
+      if (responseData['response'] != null) {
+        return responseData['response'].toString();
+      }
+      if (responseData['text'] != null) {
+        return responseData['text'].toString();
+      }
+      if (responseData['message'] != null) {
+        return responseData['message'].toString();
+      }
+    } catch (_) {}
+    return body;
+  }
+}
+
+/// Result of Prayer Wall AI content validation.
+class PrayerWallValidationResult {
+  const PrayerWallValidationResult({
+    required this.isValid,
+    this.toastMessage,
+  });
+
+  final bool isValid;
+  final String? toastMessage;
 }

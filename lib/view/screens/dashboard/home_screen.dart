@@ -30,6 +30,7 @@ import 'package:biblebookapp/view/screens/dashboard/add_widget_intro_screen.dart
 import 'package:biblebookapp/view/screens/dashboard/ios_style_app_drawer.dart';
 import 'package:biblebookapp/view/screens/dashboard/social_link_screen.dart';
 import 'package:biblebookapp/view/screens/verse_topics/verse_topics_screen.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_home_expiry_banner.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
@@ -4593,7 +4594,21 @@ class _HomeScreenState extends State<HomeScreen>
                                 );
                                 return false;
                               },
-                              child: ListView.builder(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  // Additive UI: prayer ends today / has ended banners.
+                                  Padding(
+                                    padding: EdgeInsets.only(
+                                      top: controller.selectedChapter.value
+                                              .isNotEmpty
+                                          ? readerContentTopPadding
+                                          : 0,
+                                    ),
+                                    child: const PrayerWallHomeExpiryBanner(),
+                                  ),
+                                  Expanded(
+                                    child: ListView.builder(
                               key: ValueKey(
                                   'reader_chapter_${controller.selectedChapter.value}'),
                               scrollDirection: controller.scrollDirection,
@@ -4610,11 +4625,8 @@ class _HomeScreenState extends State<HomeScreen>
                                   left: 15,
                                   right: 15,
                                   bottom: 20,
-                                  // Clear status bar + overlay app bar (extendBodyBehindAppBar).
-                                  top: controller.selectedChapter.value
-                                          .isNotEmpty
-                                      ? readerContentTopPadding
-                                      : 0),
+                                  // Banner already offsets below app bar.
+                                  top: 0),
                               itemBuilder: (context, index) {
                                 var data = readerVerses[index];
                                 return AutoScrollTag(
@@ -5345,6 +5357,9 @@ class _HomeScreenState extends State<HomeScreen>
                                 );
                               },
                             ),
+                                  ),
+                                ],
+                              ),
                 ),
               ),
             ),
