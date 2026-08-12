@@ -16,6 +16,7 @@ class PrayerWallLocalStore {
   static const _kPrayerDurationMeta = 'prayer_wall_duration_meta_v1';
   static const _kStatusSubmittedIds = 'prayer_wall_status_submitted_ids_v1';
   static const _kReporterId = 'prayer_wall_reporter_id_v1';
+  static const _kBannerDismissKeys = 'prayer_wall_home_banner_dismiss_v1';
 
   static Future<Map<String, String>> loadLikeMap() async {
     final p = await SharedPreferences.getInstance();
@@ -257,6 +258,29 @@ class PrayerWallLocalStore {
     final s = await loadStatusSubmittedIds();
     s.add(pid);
     await saveStatusSubmittedIds(s);
+  }
+
+  /// UI-only dismiss keys for home expiry banners (e.g. `ends_today:<id>:<ymd>`).
+  static Future<Set<String>> loadHomeBannerDismissKeys() async {
+    final p = await SharedPreferences.getInstance();
+    final s = p.getString(_kBannerDismissKeys);
+    if (s == null || s.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(s);
+      if (decoded is! List) return {};
+      return decoded.map((e) => e.toString()).toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> markHomeBannerDismissed(String key) async {
+    final k = key.trim();
+    if (k.isEmpty) return;
+    final p = await SharedPreferences.getInstance();
+    final set = await loadHomeBannerDismissKeys();
+    set.add(k);
+    await p.setString(_kBannerDismissKeys, jsonEncode(set.toList()));
   }
 
   /// Stable anonymous reporter id for `/api/prayer-reports` (max 128 chars).

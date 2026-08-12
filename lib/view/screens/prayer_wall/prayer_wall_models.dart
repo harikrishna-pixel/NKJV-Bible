@@ -11,6 +11,8 @@ class PrayerWallItem {
     this.authorName,
     this.authorUserId,
     this.createdAt,
+    this.expiresAt,
+    this.prayerDuration,
   });
 
   final String id;
@@ -21,6 +23,10 @@ class PrayerWallItem {
   final String? authorName;
   final String? authorUserId;
   final DateTime? createdAt;
+  /// From API `expiresAt` when present.
+  final DateTime? expiresAt;
+  /// From API `prayer_duration` when present.
+  final int? prayerDuration;
 
   static String? _cleanName(dynamic v) {
     if (v == null) return null;
@@ -119,6 +125,25 @@ class PrayerWallItem {
     if (ca != null) {
       created = DateTime.tryParse(ca.toString());
     }
+    DateTime? expires;
+    final ea = map['expiresAt'] ?? map['expires_at'];
+    if (ea != null) {
+      expires = DateTime.tryParse(ea.toString());
+    }
+    int? duration;
+    final pd = map['prayer_duration'] ?? map['prayerDuration'];
+    if (pd is int) {
+      duration = pd;
+    } else if (pd != null) {
+      duration = int.tryParse(pd.toString());
+    }
+    // Prefer API expiresAt; else createdAt + prayer_duration.
+    if (expires == null &&
+        created != null &&
+        duration != null &&
+        duration > 0) {
+      expires = created.add(Duration(days: duration));
+    }
     return PrayerWallItem(
       id: id,
       title: title,
@@ -128,6 +153,8 @@ class PrayerWallItem {
       authorName: authorName,
       authorUserId: authorUserId,
       createdAt: created,
+      expiresAt: expires,
+      prayerDuration: duration,
     );
   }
 

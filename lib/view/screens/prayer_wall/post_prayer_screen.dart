@@ -2,9 +2,10 @@ import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_guidelines_dialog.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
-import 'package:biblebookapp/view/screens/prayer_wall/prayer_added_success_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_verify_dialogs.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -130,6 +131,8 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
     }
 
     setState(() => _submitting = true);
+    final progress = PrayerVerifyProgressController();
+    var verifyingOpen = false;
     try {
       // NOTE: Prayer Wall posting should not deduct wallet credits.
       // final currentCredits = await WalletService.getCredits();
@@ -143,6 +146,37 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
       //   );
       //   return;
       // }
+
+      // Show verifying UI while AI reviews (replaces toast-only feedback).
+      verifyingOpen = true;
+      // ignore: unawaited_futures
+      PrayerWallVerifyDialogs.showVerifying(context, controller: progress);
+
+      // Animate early steps while AI runs.
+      final validationFuture = PrayerWallService.validatePrayerContent(
+        prayerTitle: title,
+        prayerDescription: details,
+      );
+      await progress.advanceTo(2);
+      final validation = await validationFuture;
+
+      if (!validation.isValid) {
+        if (mounted && verifyingOpen) {
+          Navigator.of(context, rootNavigator: true).pop();
+          verifyingOpen = false;
+        }
+        if (!mounted) return;
+        final action = await PrayerWallVerifyDialogs.showInappropriate(context);
+        if (!mounted) return;
+        if (action == 'cancel') {
+          Navigator.of(context).pop(false);
+        }
+        // 'edit' / dismiss → stay on form so user can revise.
+        return;
+      }
+
+      await progress.advanceTo(3);
+
       final enteredName = _nameCtrl.text.trim();
       final loginName =
           (await CacheNotifier().readCache(key: 'name') ?? '')
@@ -159,6 +193,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         prayerDuration: _durationDays,
         userName: effectiveName.isNotEmpty ? effectiveName : null,
       );
+      await progress.advanceTo(4);
       // await WalletService.deductCredits(_totalCredits);
       if (effectiveName.isNotEmpty) {
         await PrayerWallLocalStore.saveLastDisplayName(effectiveName);
@@ -186,15 +221,19 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
           );
         }
       }
+      if (mounted && verifyingOpen) {
+        Navigator.of(context, rootNavigator: true).pop();
+        verifyingOpen = false;
+      }
       if (!mounted) return;
-      final result = await Navigator.of(context).push<bool>(
-        MaterialPageRoute(
-          builder: (_) => PrayerAddedSuccessScreen(durationDays: _durationDays),
-        ),
-      );
+      final result = await PrayerWallVerifyDialogs.showVerified(context);
       if (!mounted) return;
-      Navigator.of(context).pop(result);
+      Navigator.of(context).pop(result == true);
     } catch (e) {
+      if (mounted && verifyingOpen) {
+        Navigator.of(context, rootNavigator: true).pop();
+        verifyingOpen = false;
+      }
       if (!mounted) return;
       final s = e.toString();
       final isOffline = s.contains('SocketException') ||
@@ -208,6 +247,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                 : 'Could not post. Please try again.')),
       );
     } finally {
+      progress.dispose();
       if (mounted) setState(() => _submitting = false);
     }
   }
@@ -459,7 +499,12 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                     //   ),
                     //   onChanged: (v) => setState(() => _isAnonymous = v),
                     // ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
+                    PrayerWallGuidelinesDialog.helpBanner(
+                      context,
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Expanded(

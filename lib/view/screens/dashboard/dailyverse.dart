@@ -39,6 +39,25 @@ String _normalizeDailyVerseRef(String s) =>
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
 
+/// List-card display only: force left alignment so mixed HTML `text-align` /
+/// `<center>` from verse payloads does not change card layout.
+String _dailyVerseListHtmlLeftAligned(String? html) {
+  var raw = html ?? '';
+  raw = raw.replaceAll(
+    RegExp(r'text-align\s*:\s*[^;"\s]+;?', caseSensitive: false),
+    '',
+  );
+  raw = raw.replaceAll(
+    RegExp(r'''\salign\s*=\s*["']?center["']?''', caseSensitive: false),
+    '',
+  );
+  raw = raw.replaceAll(
+    RegExp(r'</?center\b[^>]*>', caseSensitive: false),
+    '',
+  );
+  return '<div style="text-align:left">$raw</div>';
+}
+
 /// Finds the list index for the verse shown on the home widget (handles spacing / parsing).
 int _indexOfVerseMatchingWidgetRef(
     List<DailyVerseList> list, String widgetRef) {
@@ -1017,7 +1036,8 @@ class _DailyVerseState extends State<DailyVerse> {
                                               showModalBottomSheetDaily(data);
                                             },
                                             child: HtmlWidget(
-                                              data.verse ?? '',
+                                              _dailyVerseListHtmlLeftAligned(
+                                                  data.verse),
                                               textStyle:
                                                   CommanStyle.bwWithChangeFont(
                                                       context,
