@@ -18,6 +18,8 @@ import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/live_activity/live_activity_queue.dart';
+import 'package:biblebookapp/services/prayer_wall_activity_notifier.dart';
+import 'package:biblebookapp/services/prayer_wall_background.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -119,6 +121,13 @@ Future<void> main() async {
     await SharPreferences.getString(SharPreferences.theme);
   } catch (e) {
     debugPrint("main: theme preload failed: $e");
+  }
+
+  // Additive: background Prayer Wall GET poll (closed-app notifications).
+  try {
+    unawaited(PrayerWallBackgroundScheduler.ensureInitialized());
+  } catch (e) {
+    debugPrint("main: PrayerWall background scheduler failed: $e");
   }
 
   runApp(
@@ -230,6 +239,8 @@ class _LifecycleWrapperState extends State<LifecycleWrapper>
       case AppLifecycleState.paused:
         _isAppInBackground = true;
         _isAppInActive = false;
+        // Additive: schedule a background GET poll after the app is closed.
+        unawaited(PrayerWallBackgroundScheduler.scheduleSoonAfterClose());
         break;
       case AppLifecycleState.inactive:
         if (_isAppInBackground) {
@@ -240,6 +251,8 @@ class _LifecycleWrapperState extends State<LifecycleWrapper>
         // Display-only: one Live Activity + streak widget for current device date.
         unawaited(LiveActivityQueue.sync());
         unawaited(syncWeeklyStreakWidget());
+        // Additive: Prayer Wall activity poll (GET compare → local banner).
+        unawaited(PrayerWallActivityNotifier.checkAndNotify());
 
         final checkad = await SharPreferences.getString('OpenAd') ?? "1";
         final closead = await SharPreferences.getBoolean('closead') ?? true;

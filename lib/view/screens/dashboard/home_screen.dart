@@ -32,6 +32,7 @@ import 'package:biblebookapp/view/screens/dashboard/ios_style_app_drawer.dart';
 import 'package:biblebookapp/view/screens/dashboard/social_link_screen.dart';
 import 'package:biblebookapp/view/screens/verse_topics/verse_topics_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
+import 'package:biblebookapp/services/prayer_wall_activity_notifier.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/eproducts_screen.dart';
@@ -1542,6 +1543,9 @@ class _HomeScreenState extends State<HomeScreen>
     ]);
     if (!mounted) return;
 
+    // Additive: establish/compare Prayer Wall activity snapshot (no logic change).
+    unawaited(PrayerWallActivityNotifier.checkAndNotify());
+
     await _maybeShowContinueJourneySheet();
     if (!mounted) return;
 
@@ -1883,6 +1887,9 @@ class _HomeScreenState extends State<HomeScreen>
         break;
       case 'open_quiz':
         // Stay on Home; quiz screen can be added later
+        break;
+      case 'open_prayer_wall':
+        Get.to(() => const PrayerWallScreen());
         break;
       default:
         break;

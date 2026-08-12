@@ -41,6 +41,7 @@ dependencies:
   firebase_in_app_messaging: ^0.8.1+2
   firebase_messaging: ^15.2.2
   firebase_storage: ^12.4.2
+  workmanager: ^0.5.2
   flutter:
     sdk: flutter
   flutter_advanced_switch: ^3.0.1
