@@ -358,27 +358,11 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
     }
   }
 
-  Future<void> _openComments(PrayerWallItem item) async {
-    final allowed = await _ensureLoggedIn(
+  Future<bool> _ensureCanComment() {
+    return _ensureLoggedIn(
       message:
           'Please log in to support this prayer request and leave a comment.',
     );
-    if (!allowed || !mounted) return;
-
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => Dialog(
-        insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
-        backgroundColor: Colors.transparent,
-        child: PrayerWallCommentsSheet(
-          prayerId: item.id,
-          titlePreview:
-              item.title.isNotEmpty ? item.title : item.description,
-        ),
-      ),
-    );
-    await _refreshCommentCountsOnly();
   }
 
   Future<void> _openReport(PrayerWallItem item) async {
@@ -1182,7 +1166,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                                       onToggleLike: () => _toggleLike(item),
                                       commentCount:
                                           _commentCounts[item.id] ?? 0,
-                                      onComments: () => _openComments(item),
+                                      onEnsureCanComment: _ensureCanComment,
+                                      onCommentsChanged:
+                                          _refreshCommentCountsOnly,
                                     );
                                   },
                                 ),
@@ -1263,7 +1249,7 @@ Widget _metaChip({
   return Tooltip(message: tooltip, child: chip);
 }
 
-class _PrayerCard extends StatelessWidget {
+class _PrayerCard extends StatefulWidget {
   const _PrayerCard({
     required this.item,
     required this.brown,
@@ -1279,7 +1265,8 @@ class _PrayerCard extends StatelessWidget {
     required this.likeBusy,
     required this.onToggleLike,
     required this.commentCount,
-    required this.onComments,
+    required this.onEnsureCanComment,
+    required this.onCommentsChanged,
   });
 
   final PrayerWallItem item;
@@ -1296,7 +1283,17 @@ class _PrayerCard extends StatelessWidget {
   final bool likeBusy;
   final VoidCallback onToggleLike;
   final int commentCount;
-  final VoidCallback onComments;
+  final Future<bool> Function() onEnsureCanComment;
+  final Future<void> Function() onCommentsChanged;
+
+  @override
+  State<_PrayerCard> createState() => _PrayerCardState();
+}
+
+class _PrayerCardState extends State<_PrayerCard> {
+  bool _titleExpanded = false;
+  bool _descExpanded = false;
+  bool _commentsOpen = false;
 
   String _avatarInitials(String value) {
     final raw = value.trim().replaceAll(RegExp(r'\s+'), '');
@@ -1321,10 +1318,32 @@ class _PrayerCard extends StatelessWidget {
     return tp.didExceedMaxLines;
   }
 
+  Future<void> _toggleComments() async {
+    if (_commentsOpen) {
+      setState(() => _commentsOpen = false);
+      await widget.onCommentsChanged();
+      return;
+    }
+    final ok = await widget.onEnsureCanComment();
+    if (!ok || !mounted) return;
+    setState(() => _commentsOpen = true);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final item = widget.item;
+    final brown = widget.brown;
+    final isDark = widget.isDark;
+    final displayName = widget.displayName;
+    final timeLabel = widget.timeLabel;
+    final isMine = widget.isMine;
+    final likeCount = widget.likeCount;
+    final liked = widget.liked;
+    final likeBusy = widget.likeBusy;
+    final commentCount = widget.commentCount;
+
     return InkWell(
-      onTap: isMine ? onOpen : null,
+      onTap: isMine ? widget.onOpen : null,
       borderRadius: BorderRadius.circular(14),
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
@@ -1418,7 +1437,7 @@ class _PrayerCard extends StatelessWidget {
                     ),
                   ),
                   InkWell(
-                    onTap: onShare,
+                    onTap: widget.onShare,
                     borderRadius: BorderRadius.circular(20),
                     child: Padding(
                       padding: const EdgeInsets.all(6),
@@ -1430,7 +1449,7 @@ class _PrayerCard extends StatelessWidget {
                     ),
                   ),
                   InkWell(
-                    onTap: onReport,
+                    onTap: widget.onReport,
                     borderRadius: BorderRadius.circular(20),
                     child: Padding(
                       padding: const EdgeInsets.all(6),
@@ -1466,8 +1485,10 @@ class _PrayerCard extends StatelessWidget {
                     children: [
                       Text(
                         titleText,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
+                        maxLines: _titleExpanded ? null : 3,
+                        overflow: _titleExpanded
+                            ? TextOverflow.visible
+                            : TextOverflow.ellipsis,
                         style: titleStyle,
                       ),
                       if (overflow)
@@ -1479,41 +1500,11 @@ class _PrayerCard extends StatelessWidget {
                               minimumSize: const Size(0, 30),
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
-                            onPressed: () {
-                              showDialog<void>(
-                                context: context,
-                                builder: (dctx) => AlertDialog(
-                                  backgroundColor:
-                                      isDark ? CommanColor.darkPrimaryColor : null,
-                                  surfaceTintColor: Colors.transparent,
-                                  title: Text(
-                                    'Prayer',
-                                    style: TextStyle(
-                                      color: isDark ? Colors.white : brown,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  content: SingleChildScrollView(
-                                    child: Text(
-                                      titleText,
-                                      style: TextStyle(
-                                          color:
-                                              isDark ? Colors.white70 : Colors.black87),
-                                    ),
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(dctx),
-                                      child: Text('Close',
-                                          style: TextStyle(
-                                              color: isDark ? Colors.white : null)),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
+                            onPressed: () => setState(
+                              () => _titleExpanded = !_titleExpanded,
+                            ),
                             child: Text(
-                              'Read more',
+                              _titleExpanded ? 'Show less' : 'Read more',
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
                                 color: isDark
@@ -1550,8 +1541,10 @@ class _PrayerCard extends StatelessWidget {
                       children: [
                         Text(
                           item.description,
-                          maxLines: 4,
-                          overflow: TextOverflow.ellipsis,
+                          maxLines: _descExpanded ? null : 4,
+                          overflow: _descExpanded
+                              ? TextOverflow.visible
+                              : TextOverflow.ellipsis,
                           style: descStyle,
                         ),
                         if (overflow)
@@ -1564,45 +1557,11 @@ class _PrayerCard extends StatelessWidget {
                                 tapTargetSize:
                                     MaterialTapTargetSize.shrinkWrap,
                               ),
-                              onPressed: () {
-                                showDialog<void>(
-                                  context: context,
-                                  builder: (dctx) => AlertDialog(
-                                    backgroundColor:
-                                        isDark ? CommanColor.darkPrimaryColor : null,
-                                    surfaceTintColor: Colors.transparent,
-                                    title: Text(
-                                      item.title.isNotEmpty
-                                          ? item.title
-                                          : 'Prayer',
-                                      style: TextStyle(
-                                        color: isDark ? Colors.white : brown,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    content: SingleChildScrollView(
-                                      child: Text(
-                                        item.description,
-                                        style: TextStyle(
-                                            color: isDark
-                                                ? Colors.white70
-                                                : Colors.black87),
-                                      ),
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(dctx),
-                                        child: Text('Close',
-                                            style: TextStyle(
-                                                color:
-                                                    isDark ? Colors.white : null)),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
+                              onPressed: () => setState(
+                                () => _descExpanded = !_descExpanded,
+                              ),
                               child: Text(
-                                'Read more',
+                                _descExpanded ? 'Show less' : 'Read more',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   color: isDark
@@ -1627,7 +1586,7 @@ class _PrayerCard extends StatelessWidget {
                           : const Color(0xFFF0E4D4),
                       borderRadius: BorderRadius.circular(24),
                       child: InkWell(
-                        onTap: likeBusy ? null : onToggleLike,
+                        onTap: likeBusy ? null : widget.onToggleLike,
                         borderRadius: BorderRadius.circular(24),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
@@ -1680,7 +1639,7 @@ class _PrayerCard extends StatelessWidget {
                           : const Color(0xFFF0E4D4),
                       borderRadius: BorderRadius.circular(24),
                       child: InkWell(
-                        onTap: onComments,
+                        onTap: _toggleComments,
                         borderRadius: BorderRadius.circular(24),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
@@ -1688,8 +1647,11 @@ class _PrayerCard extends StatelessWidget {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.chat_bubble_outline,
-                                  color: isDark ? Colors.white : brown, size: 18),
+                              Icon(
+                                Icons.chat_bubble_outline,
+                                color: isDark ? Colors.white : brown,
+                                size: 18,
+                              ),
                               const SizedBox(width: 6),
                               Flexible(
                                 child: Text(
@@ -1709,10 +1671,21 @@ class _PrayerCard extends StatelessWidget {
                   ),
                 ],
               ),
+              if (_commentsOpen)
+                PrayerWallCommentsSheet(
+                  key: ValueKey('comments_${item.id}'),
+                  prayerId: item.id,
+                  titlePreview:
+                      item.title.isNotEmpty ? item.title : item.description,
+                  embedded: true,
+                  onChanged: () {
+                    widget.onCommentsChanged();
+                  },
+                ),
             ],
           ),
         ),
       ),
-        );
+    );
   }
 }
