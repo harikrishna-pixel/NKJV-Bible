@@ -69,6 +69,9 @@ class floatingButtonState extends State<floatingButton>
   // Duration position = Duration(minutes: 3);
   Duration duration = Duration.zero;
   Duration position = Duration.zero;
+  /// Position to restore if Play must reload after pause (source was cleared).
+  /// Cleared on new chapter / fresh load so existing start-from-zero logic stays.
+  Duration _audioResumePosition = Duration.zero;
   String audioBaseUrl = "";
   int audioBookNum = 1;
   int audioChapterNum = 1;
@@ -296,6 +299,7 @@ class floatingButtonState extends State<floatingButton>
               _mp3UiSetState(() {
                 isAudioPlaying = true;
                 position = Duration.zero; // Reset position for new chapter
+                _audioResumePosition = Duration.zero;
               });
             }
           } catch (e) {
@@ -568,7 +572,11 @@ class floatingButtonState extends State<floatingButton>
     /// Listen to audio position
   }
 
-  Future setAudio() async {
+  Future setAudio({Duration seekTo = Duration.zero}) async {
+    // Fresh chapter/file load still starts at zero; resume passes seekTo.
+    if (seekTo == Duration.zero) {
+      _audioResumePosition = Duration.zero;
+    }
     // Stop TTS if it's playing before starting audio
     if (isSpeech && _isTtsInitialized) {
       await _stop();
@@ -586,6 +594,7 @@ class floatingButtonState extends State<floatingButton>
     log('Audio Base Url:$audioBaseUrl');
 
     // Slow networks (2G): stop + reset, then retry setSourceUrl once on failure.
+    // Default [seekTo] is zero — same as before for all existing callers.
     Future<void> loadSource() async {
       await audioPlayer
           .setReleaseMode(repeat ? ReleaseMode.loop : ReleaseMode.release);
@@ -593,7 +602,7 @@ class floatingButtonState extends State<floatingButton>
         await audioPlayer.stop();
       } catch (_) {}
       await audioPlayer.setSourceUrl(audioBaseUrl);
-      await audioPlayer.seek(Duration.zero);
+      await audioPlayer.seek(seekTo);
     }
 
     try {
@@ -1774,6 +1783,12 @@ class floatingButtonState extends State<floatingButton>
                 }
               } else if (isAudioPlaying) {
                 // Additive: pause (not stop) so Play resumes from current position.
+                try {
+                  _audioResumePosition =
+                      await audioPlayer.getCurrentPosition() ?? position;
+                } catch (_) {
+                  _audioResumePosition = position;
+                }
                 await audioPlayer.pause();
                 setState(() {
                   isAudioPlaying = false;
@@ -1781,6 +1796,7 @@ class floatingButtonState extends State<floatingButton>
               } else if (audioPlayer.state == PlayerState.paused) {
                 // Additive: resume from paused position — do not reload/seek zero.
                 await audioPlayer.resume();
+                _audioResumePosition = Duration.zero;
                 if (mounted) {
                   setState(() {
                     isAudioPlaying = true;
@@ -2244,6 +2260,7 @@ class floatingButtonState extends State<floatingButton>
                           try {
                             await audioPlayer.setSourceUrl(audioBaseUrl);
                             await audioPlayer.seek(Duration.zero);
+                            _audioResumePosition = Duration.zero;
                             await audioPlayer.resume();
                             if (context.mounted) {
                               setState(() => isAudioPlaying = true);
@@ -2254,6 +2271,7 @@ class floatingButtonState extends State<floatingButton>
                         } else {
                           // at first chapter: maybe rewind to start
                           await audioPlayer.seek(Duration.zero);
+                          _audioResumePosition = Duration.zero;
                           // If audio was stopped previously the source may have been
                           // cleared by the player. Ensure the source is set before
                           // calling resume so audio actually starts.
@@ -2320,6 +2338,13 @@ class floatingButtonState extends State<floatingButton>
                     InkWell(
                       onTap: () async {
                         if (isAudioPlaying) {
+                          try {
+                            _audioResumePosition =
+                                await audioPlayer.getCurrentPosition() ??
+                                    position;
+                          } catch (_) {
+                            _audioResumePosition = position;
+                          }
                           await audioPlayer.pause();
                           if (context.mounted) {
                             setState(() => isAudioPlaying = false);
@@ -2342,12 +2367,24 @@ class floatingButtonState extends State<floatingButton>
                               });
                             }
                           }
-                          // After stop() the player has no source; re-set source then resume so Play works again
-                          if (audioPlayer.state == PlayerState.stopped &&
+                          // Resume from pause without reloading (keeps position).
+                          if (audioPlayer.state == PlayerState.paused) {
+                            await audioPlayer.resume();
+                          } else if (audioPlayer.state == PlayerState.stopped &&
                               audioBaseUrl.isNotEmpty) {
-                            await setAudio();
+                            // Source cleared after stop — reload, but restore
+                            // paused position when we have one (else start at 0).
+                            final resumeAt = _audioResumePosition > Duration.zero
+                                ? _audioResumePosition
+                                : (position > Duration.zero
+                                    ? position
+                                    : Duration.zero);
+                            await setAudio(seekTo: resumeAt);
+                            await audioPlayer.resume();
+                          } else {
+                            await audioPlayer.resume();
                           }
-                          await audioPlayer.resume();
+                          _audioResumePosition = Duration.zero;
                           if (context.mounted) {
                             setState(() => isAudioPlaying = true);
                           }
@@ -2445,6 +2482,7 @@ class floatingButtonState extends State<floatingButton>
                           try {
                             await audioPlayer.setSourceUrl(audioBaseUrl);
                             await audioPlayer.seek(Duration.zero);
+                            _audioResumePosition = Duration.zero;
                             await audioPlayer.resume();
                             if (context.mounted) {
                               setState(() => isAudioPlaying = true);
@@ -2465,6 +2503,8 @@ class floatingButtonState extends State<floatingButton>
                       child: InkWell(
                         onTap: () async {
                           await audioPlayer.stop();
+                          _audioResumePosition = Duration.zero;
+                          position = Duration.zero;
                           if (context.mounted) {
                             setState(() => isAudioPlaying = false);
                           }

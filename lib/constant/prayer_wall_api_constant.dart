@@ -11,6 +11,7 @@ class PrayerWallApiConstant {
   static String get prayers => _path('/api/prayers');
   static String get comments => _path('/api/comments');
   static String get likes => _path('/api/likes');
+  static String get prayerReports => _path('/api/prayer-reports');
 
   /// Optional query helpers (no path params on server).
   static String commentsForPrayer(String prayerId) =>

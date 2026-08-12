@@ -13,6 +13,9 @@ class PrayerWallLocalStore {
   static const _kLastDisplayName = 'prayer_wall_last_display_name_v1';
   static const _kMyPrayerIds = 'prayer_wall_my_prayer_ids_v1';
   static const _kSeenPrayerIds = 'prayer_wall_seen_prayer_ids_v1';
+  static const _kPrayerDurationMeta = 'prayer_wall_duration_meta_v1';
+  static const _kStatusSubmittedIds = 'prayer_wall_status_submitted_ids_v1';
+  static const _kReporterId = 'prayer_wall_reporter_id_v1';
 
   static Future<Map<String, String>> loadLikeMap() async {
     final p = await SharedPreferences.getInstance();
@@ -182,5 +185,139 @@ class PrayerWallLocalStore {
       if (seen.add(pid)) changed = true;
     }
     if (changed) await saveSeenPrayerIds(seen);
+  }
+
+  /// Maps prayerId → { durationDays, postedAtMs } for exact expiry prompts.
+  static Future<Map<String, PrayerWallDurationMeta>>
+      loadPrayerDurationMeta() async {
+    final p = await SharedPreferences.getInstance();
+    final s = p.getString(_kPrayerDurationMeta);
+    if (s == null || s.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(s);
+      if (decoded is! Map) return {};
+      final out = <String, PrayerWallDurationMeta>{};
+      decoded.forEach((k, v) {
+        if (v is! Map) return;
+        final meta = PrayerWallDurationMeta.fromMap(
+          Map<String, dynamic>.from(v),
+        );
+        if (meta != null) out[k.toString()] = meta;
+      });
+      return out;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> savePrayerDurationMeta(
+    Map<String, PrayerWallDurationMeta> map,
+  ) async {
+    final p = await SharedPreferences.getInstance();
+    final encoded = map.map((k, v) => MapEntry(k, v.toMap()));
+    await p.setString(_kPrayerDurationMeta, jsonEncode(encoded));
+  }
+
+  static Future<void> putPrayerDurationMeta({
+    required String prayerId,
+    required int durationDays,
+    required DateTime postedAt,
+  }) async {
+    final pid = prayerId.trim();
+    if (pid.isEmpty || durationDays <= 0) return;
+    final m = await loadPrayerDurationMeta();
+    m[pid] = PrayerWallDurationMeta(
+      durationDays: durationDays,
+      postedAt: postedAt,
+    );
+    await savePrayerDurationMeta(m);
+  }
+
+  static Future<Set<String>> loadStatusSubmittedIds() async {
+    final p = await SharedPreferences.getInstance();
+    final s = p.getString(_kStatusSubmittedIds);
+    if (s == null || s.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(s);
+      if (decoded is! List) return {};
+      return decoded.map((e) => e.toString()).toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> saveStatusSubmittedIds(Set<String> ids) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kStatusSubmittedIds, jsonEncode(ids.toList()));
+  }
+
+  static Future<void> markStatusSubmitted(String prayerId) async {
+    final pid = prayerId.trim();
+    if (pid.isEmpty) return;
+    final s = await loadStatusSubmittedIds();
+    s.add(pid);
+    await saveStatusSubmittedIds(s);
+  }
+
+  /// Stable anonymous reporter id for `/api/prayer-reports` (max 128 chars).
+  static const int reporterIdMaxLength = 128;
+
+  static String normalizeReporterId(String raw) {
+    final t = raw.trim();
+    if (t.isEmpty) return t;
+    if (t.length <= reporterIdMaxLength) return t;
+    return t.substring(0, reporterIdMaxLength);
+  }
+
+  static Future<String> getOrCreateReporterId() async {
+    final p = await SharedPreferences.getInstance();
+    final existing = normalizeReporterId(p.getString(_kReporterId) ?? '');
+    if (existing.isNotEmpty) {
+      // Keep a clipped id if an older oversized value was stored.
+      if (existing != (p.getString(_kReporterId) ?? '').trim()) {
+        await p.setString(_kReporterId, existing);
+      }
+      return existing;
+    }
+    final id = normalizeReporterId(
+      'device-${DateTime.now().millisecondsSinceEpoch}',
+    );
+    await p.setString(_kReporterId, id);
+    return id;
+  }
+}
+
+class PrayerWallDurationMeta {
+  PrayerWallDurationMeta({
+    required this.durationDays,
+    required this.postedAt,
+  });
+
+  final int durationDays;
+  final DateTime postedAt;
+
+  DateTime get expiresAt => postedAt.add(Duration(days: durationDays));
+
+  bool get isExpired => !DateTime.now().isBefore(expiresAt);
+
+  Map<String, dynamic> toMap() => {
+        'durationDays': durationDays,
+        'postedAtMs': postedAt.millisecondsSinceEpoch,
+      };
+
+  static PrayerWallDurationMeta? fromMap(Map<String, dynamic> map) {
+    final days = map['durationDays'];
+    final ms = map['postedAtMs'];
+    final durationDays = days is int
+        ? days
+        : int.tryParse(days?.toString() ?? '');
+    final postedAtMs = ms is int ? ms : int.tryParse(ms?.toString() ?? '');
+    if (durationDays == null || durationDays <= 0 || postedAtMs == null) {
+      return null;
+    }
+    return PrayerWallDurationMeta(
+      durationDays: durationDays,
+      postedAt: DateTime.fromMillisecondsSinceEpoch(postedAtMs),
+    );
   }
 }

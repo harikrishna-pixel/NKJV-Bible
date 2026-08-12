@@ -24,6 +24,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../Model/dailyVerseList.dart';
 import '../../../Model/verseBookContentModel.dart';
+import '../../../controller/dpProvider.dart';
 import '../../constants/constant.dart';
 import '../../constants/images.dart';
 import 'package:flutter/cupertino.dart';
@@ -469,7 +470,6 @@ class _DailyVerseState extends State<DailyVerse> {
                       InkWell(
                         onTap: () async {
                           final sheetContext = context;
-                          final bookName = data.book.toString();
                           final bookId = int.parse(data.bookId.toString());
                           final bookNum = dailyVerseBookNum(bookId);
                           final chapter = dailyVerseUiChapter(data.chapter);
@@ -477,6 +477,23 @@ class _DailyVerseState extends State<DailyVerse> {
                               int.parse(data.verseNum.toString());
                           final verseText =
                               parse(data.verse).body?.text.toString() ?? '';
+                          // Same source as Mark as Read: title from book_num.
+                          var bookName = data.book.toString();
+                          try {
+                            final db = await DBHelper().db;
+                            if (db != null) {
+                              final rows = await db.rawQuery(
+                                'SELECT title FROM book WHERE book_num = ? LIMIT 1',
+                                [bookNum],
+                              );
+                              final title = rows.isNotEmpty
+                                  ? rows.first['title']?.toString().trim()
+                                  : null;
+                              if (title != null && title.isNotEmpty) {
+                                bookName = title;
+                              }
+                            }
+                          } catch (_) {}
 
                           Navigator.of(sheetContext).pop();
                           await Future<void>.delayed(

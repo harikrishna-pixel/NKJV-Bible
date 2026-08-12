@@ -19,6 +19,8 @@ import 'package:biblebookapp/view/screens/authenitcation/widgets/text_form_field
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/profile/bloc/edit_profile_bloc.dart';
 import 'package:biblebookapp/view/screens/profile/bloc/user_bloc.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart';
 
 void confirmDeleteAccount(BuildContext context) {
   showDialog(
@@ -115,15 +117,170 @@ class EditProfileScreen extends StatefulWidget {
   State<EditProfileScreen> createState() => EditProfileScreenState();
 }
 
-class EditProfileScreenState extends State<EditProfileScreen> {
+class EditProfileScreenState extends State<EditProfileScreen>
+    with ImagePickerMixin {
   String? user1 = '';
   String? email = '';
+  String? photoUrl;
   bool isLoading = false;
+  XFile? pickedImage;
+  /// Local avatar asset preview only — API upload comes later.
+  String? selectedAvatarAsset;
+
+  static const List<String> _avatarAssets = [
+    'assets/avatar png/woman.png',
+    'assets/avatar png/man.png',
+    'assets/avatar png/cat.png',
+    'assets/avatar png/panda.png',
+    'assets/avatar png/bear.png',
+    'assets/avatar png/chicken.png',
+  ];
 
   late TextEditingController emailCon;
   late TextEditingController nameCon;
 // late TextEditingController phoneCon;
   late TextEditingController addressCon;
+
+  Future<void> _showProfilePhotoOptions() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: CommanColor.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                ListTile(
+                  leading: Icon(
+                    Icons.face_retouching_natural_outlined,
+                    color: CommanColor.lightDarkPrimary200(ctx),
+                  ),
+                  title: const Text('Avatar'),
+                  onTap: () => Navigator.of(ctx).pop('avatar'),
+                ),
+                ListTile(
+                  leading: Icon(
+                    Icons.photo_library_outlined,
+                    color: CommanColor.lightDarkPrimary200(ctx),
+                  ),
+                  title: const Text('Gallery'),
+                  onTap: () => Navigator.of(ctx).pop('gallery'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 'gallery') {
+      final profileImage = await getImageFiles();
+      if (profileImage != null && mounted) {
+        setState(() {
+          pickedImage = profileImage;
+          selectedAvatarAsset = null;
+        });
+      }
+      return;
+    }
+    if (choice == 'avatar') {
+      await _showAvatarPicker();
+    }
+  }
+
+  Future<void> _showAvatarPicker() async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: CommanColor.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Text(
+                  'Choose an avatar',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: CommanColor.Blackwhite(ctx),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _avatarAssets.length,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    mainAxisSpacing: 14,
+                    crossAxisSpacing: 14,
+                  ),
+                  itemBuilder: (_, index) {
+                    final asset = _avatarAssets[index];
+                    final isSelected = selectedAvatarAsset == asset;
+                    return GestureDetector(
+                      onTap: () => Navigator.of(ctx).pop(asset),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            width: isSelected ? 3 : 1.5,
+                            color: isSelected
+                                ? CommanColor.lightDarkPrimary200(ctx)
+                                : Colors.grey.shade300,
+                          ),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Image.asset(
+                          asset,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (!mounted || selected == null) return;
+    setState(() {
+      selectedAvatarAsset = selected;
+      // Preview only — keep gallery XFile path unused until avatar API is wired.
+      pickedImage = null;
+    });
+  }
 
   checkuserloggedin(context) async {
     setState(() {
@@ -136,6 +293,8 @@ class EditProfileScreenState extends State<EditProfileScreen> {
     debugPrint('name is $dataname');
     setState(() {
       isLoading = false;
+      // Existing Firebase photo (if any) — display only; upload path unchanged.
+      photoUrl = FirebaseAuth.instance.currentUser?.photoURL;
       if (dataname != null) {
         user1 = dataname;
         nameCon.text = user1.toString();
@@ -254,12 +413,7 @@ class EditProfileScreenState extends State<EditProfileScreen> {
                                 children: [
                                   GestureDetector(
                                     onTap: () async {
-                                      // final profileImage =
-                                      //     await getImageFiles();
-                                      // if (profileImage != null) {
-                                      //   editProfileState
-                                      //       .updateImage(profileImage);
-                                      // }
+                                      await _showProfilePhotoOptions();
                                     },
                                     child: Stack(
                                       clipBehavior: Clip.none,
@@ -281,7 +435,59 @@ class EditProfileScreenState extends State<EditProfileScreen> {
                                                   color: CommanColor
                                                       .lightDarkPrimary200(
                                                           context))),
-                                          child: user1 != null
+                                          child: pickedImage != null
+                                              ? Image.file(
+                                                  File(pickedImage!.path),
+                                                  height: 110,
+                                                  width: 110,
+                                                  fit: BoxFit.cover,
+                                                )
+                                              : selectedAvatarAsset != null
+                                                  ? Image.asset(
+                                                      selectedAvatarAsset!,
+                                                      height: 110,
+                                                      width: 110,
+                                                      fit: BoxFit.cover,
+                                                    )
+                                              : (photoUrl != null &&
+                                                      photoUrl!.trim().isNotEmpty)
+                                                  ? Image.network(
+                                                      photoUrl!,
+                                                      height: 110,
+                                                      width: 110,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder: (context,
+                                                              error,
+                                                              stackTrace) =>
+                                                          CircleAvatar(
+                                                        backgroundColor: CommanColor
+                                                                .lightDarkPrimary200(
+                                                                    context)
+                                                            .withValues(
+                                                                alpha: 0.4),
+                                                        radius: 50,
+                                                        child: Text(
+                                                          (user1 != null &&
+                                                                  user1!
+                                                                      .trim()
+                                                                      .isNotEmpty)
+                                                              ? (user1!.length >=
+                                                                      2
+                                                                  ? '${user1![0].toUpperCase()}${user1![1].toUpperCase()}'
+                                                                  : user1![0]
+                                                                      .toUpperCase())
+                                                              : '?',
+                                                          style: const TextStyle(
+                                                            fontSize: 32,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            color: Colors.black,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    )
+                                              : user1 != null &&
+                                                      user1!.trim().isNotEmpty
                                               ? CircleAvatar(
                                                   backgroundColor: CommanColor
                                                           .lightDarkPrimary200(
@@ -292,9 +498,10 @@ class EditProfileScreenState extends State<EditProfileScreen> {
                                                   radius:
                                                       50, // Adjust size as needed
                                                   child: Text(
-                                                    user1!.isNotEmpty
+                                                    user1!.length >= 2
                                                         ? '${user1![0].toUpperCase()}${user1![1].toUpperCase()}'
-                                                        : '?', // Get first letter
+                                                        : user1![0]
+                                                            .toUpperCase(),
                                                     style: TextStyle(
                                                       fontSize: 32,
                                                       fontWeight:
@@ -304,35 +511,6 @@ class EditProfileScreenState extends State<EditProfileScreen> {
                                                     ),
                                                   ),
                                                 )
-
-                                              //editProfileState.pickedImage ==
-                                              //         null
-                                              //     ? Image.network(
-                                              //         user?.photoURL ?? '',
-                                              //         height: 110,
-                                              //         width: 110,
-                                              //         fit: BoxFit.cover,
-                                              //         errorBuilder: (context, error,
-                                              //                 stackTrace) =>
-                                              //             SizedBox(
-                                              //           height: 110,
-                                              //           width: 110,
-                                              //           child: Center(
-                                              //             child: Text(
-                                              //               (user?.displayName ??
-                                              //                       'N A')
-                                              //                   .initials,
-                                              //               style: const TextStyle(
-                                              //                   letterSpacing:
-                                              //                       BibleInfo
-                                              //                           .letterSpacing,
-                                              //                   fontSize: BibleInfo
-                                              //                           .fontSizeScale *
-                                              //                       24),
-                                              //             ),
-                                              //           ),
-                                              //         ),
-                                              //       )
                                               : SizedBox(
                                                   height: 110,
                                                   width: 110,
@@ -350,25 +528,25 @@ class EditProfileScreenState extends State<EditProfileScreen> {
                                                   ),
                                                 ),
                                         ),
-                                        // Positioned(
-                                        //   bottom: -5,
-                                        //   right: 10,
-                                        //   child: Container(
-                                        //     clipBehavior: Clip.hardEdge,
-                                        //     padding: const EdgeInsets.all(4),
-                                        //     decoration: BoxDecoration(
-                                        //       shape: BoxShape.circle,
-                                        //       color: CommanColor
-                                        //           .lightDarkPrimary200(context),
-                                        //     ),
-                                        //     child: Icon(
-                                        //       Icons.camera_alt_outlined,
-                                        //       color: CommanColor.Blackwhite(
-                                        //           context),
-                                        //       size: 20,
-                                        //     ),
-                                        //   ),
-                                        // ),
+                                        Positioned(
+                                          bottom: -5,
+                                          right: 10,
+                                          child: Container(
+                                            clipBehavior: Clip.hardEdge,
+                                            padding: const EdgeInsets.all(4),
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: CommanColor
+                                                  .lightDarkPrimary200(context),
+                                            ),
+                                            child: Icon(
+                                              Icons.camera_alt_outlined,
+                                              color: CommanColor.Blackwhite(
+                                                  context),
+                                              size: 20,
+                                            ),
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -411,6 +589,20 @@ class EditProfileScreenState extends State<EditProfileScreen> {
                                   try {
                                     if (emailCon.text.isNotEmpty ||
                                         nameCon.text.isNotEmpty) {
+                                      // Existing upload path only — no new save logic.
+                                      // Runs before updateprofle (which navigates away).
+                                      if (pickedImage != null) {
+                                        final editBloc = ProviderScope
+                                            .containerOf(context)
+                                            .read(editProfileBloc);
+                                        editBloc.updateImage(pickedImage);
+                                        final firebaseUser =
+                                            FirebaseAuth.instance.currentUser;
+                                        if (firebaseUser != null) {
+                                          await editBloc
+                                              .uploadImage(firebaseUser);
+                                        }
+                                      }
                                       await authnotifier.updateprofle(
                                           email: emailCon.text.isNotEmpty
                                               ? emailCon.text

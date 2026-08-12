@@ -110,7 +110,7 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>We need access to save files to your device.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>We need access to your photo library to save images.</string>
+	<string>We need access to your photo library to select a profile photo and save images.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>This app needs access to speech recognition to convert your voice to text in the chat feature</string>
 	<key>NSUserNotificationUsageDescription</key>

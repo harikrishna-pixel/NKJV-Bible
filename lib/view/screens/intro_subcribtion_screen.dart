@@ -3145,10 +3145,23 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               padding: EdgeInsets.only(
                 bottom: MediaQuery.paddingOf(context).bottom + 24,
               ),
-              child: Column(
+              child: ConstrainedBox(
+                // Tablet only: fill viewport height so the page doesn't look sparse.
+                constraints: BoxConstraints(
+                  minHeight: _isPaywallTablet(context)
+                      ? size.height -
+                          (MediaQuery.paddingOf(context).bottom + 24)
+                      : 0,
+                ),
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildPaywallHeroWithCard(context, size),
+                  _wrapPaywallForTablet(
+                    context,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                   if (widget.checkad == 'image')
                     Padding(
                       padding: const EdgeInsets.only(left: 8),
@@ -3162,9 +3175,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       ),
                     ),
                   _buildPaywallSectionTitle(),
-                  const SizedBox(height: 8),
+                  SizedBox(height: _isPaywallTablet(context) ? 14 : 8),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: _isPaywallTablet(context) ? 4 : 12),
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 200),
                       child: isPurchaseLoading
@@ -3189,9 +3203,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     ),
                   ),
                   if (!isPurchaseLoading && _products.isNotEmpty) ...[
-                  const SizedBox(height: 20),
+                  SizedBox(height: _isPaywallTablet(context) ? 28 : 20),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: _isPaywallTablet(context) ? 4 : 20),
                     child: SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -3230,22 +3245,28 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                             ],
                           ),
                             child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            padding: EdgeInsets.symmetric(
+                                vertical:
+                                    _isPaywallTablet(context) ? 20 : 16),
                             alignment: Alignment.center,
-                            child: const Row(
+                            child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
                                   'Start Growing Today',
                                   style: TextStyle(
-                                    fontSize: 17,
+                                    fontSize:
+                                        _isPaywallTablet(context) ? 20 : 17,
                                     fontWeight: FontWeight.w700,
                                     color: Colors.white,
                                   ),
                                 ),
-                                SizedBox(width: 6),
+                                const SizedBox(width: 6),
                                 Icon(Icons.chevron_right,
-                                    color: Colors.white, size: 22),
+                                    color: Colors.white,
+                                    size: _isPaywallTablet(context)
+                                        ? 26
+                                        : 22),
                               ],
                             ),
                           ),
@@ -3254,7 +3275,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     ),
                   ),
                   ],
-                  const SizedBox(height: 12),
+                  SizedBox(height: _isPaywallTablet(context) ? 16 : 12),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Text.rich(
@@ -3276,7 +3297,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                             text:
                                 'Join thousands of believers growing closer to God every day',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize:
+                                  _isPaywallTablet(context) ? 14 : 12,
                               color: Colors.brown.shade400,
                               fontWeight: FontWeight.w500,
                               height: 1.35,
@@ -3286,21 +3308,21 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 18),
+                  SizedBox(height: _isPaywallTablet(context) ? 28 : 18),
                   _buildPaywallTrustRow(),
                   const SizedBox(height: 8),
                   TextButton(
                     onPressed: () async {
                       _navigateAwayFromPaywall();
                     },
-                    child: const Text(
+                    child: Text(
                       'Continue with Limited Access',
                       style: TextStyle(
-                        color: Color(0xFF757575),
-                        fontSize: 14,
+                        color: const Color(0xFF757575),
+                        fontSize: _isPaywallTablet(context) ? 15 : 14,
                         fontWeight: FontWeight.w500,
                         decoration: TextDecoration.underline,
-                        decorationColor: Color(0xFF757575),
+                        decorationColor: const Color(0xFF757575),
                       ),
                     ),
                   ),
@@ -3310,10 +3332,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       TextButton(
                         onPressed: () => _openLegalUrl(
                             'https://bibleoffice.com/terms_conditions.html'),
-                        child: const Text(
+                        child: Text(
                           'Terms of Use',
-                          style:
-                              TextStyle(fontSize: 11, color: Color(0xFF757575)),
+                          style: TextStyle(
+                              fontSize:
+                                  _isPaywallTablet(context) ? 12 : 11,
+                              color: const Color(0xFF757575)),
                         ),
                       ),
                       TextButton(
@@ -3322,25 +3346,33 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               'restorepurches', true);
                           await _restorePurchases(controller);
                         },
-                        child: const Text(
+                        child: Text(
                           'Restore',
-                          style:
-                              TextStyle(fontSize: 11, color: Color(0xFF757575)),
+                          style: TextStyle(
+                              fontSize:
+                                  _isPaywallTablet(context) ? 12 : 11,
+                              color: const Color(0xFF757575)),
                         ),
                       ),
                       TextButton(
                         onPressed: () => _openLegalUrl(
                             'https://bibleoffice.com/privacy_policy.html'),
-                        child: const Text(
+                        child: Text(
                           'Privacy Policy',
-                          style:
-                              TextStyle(fontSize: 11, color: Color(0xFF757575)),
+                          style: TextStyle(
+                              fontSize:
+                                  _isPaywallTablet(context) ? 12 : 11,
+                              color: const Color(0xFF757575)),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
+                      ],
+                    ),
+                  ),
                 ],
+              ),
               ),
             ),
             Positioned(
@@ -3348,10 +3380,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               right: 0,
               child: SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.all(8),
+                  padding: EdgeInsets.all(
+                      _isPaywallTablet(context) ? 12 : 8),
                   child: SizedBox(
-                    width: 28,
-                    height: 28,
+                    width: _isPaywallTablet(context) ? 34 : 28,
+                    height: _isPaywallTablet(context) ? 34 : 28,
                     child: Material(
                       color: Colors.white,
                       shape: const CircleBorder(),
@@ -3361,11 +3394,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         onTap: () async {
                           _navigateAwayFromPaywall();
                         },
-                        child: const Center(
+                        child: Center(
                           child: Icon(
                             Icons.close,
-                            size: 14,
-                            color: Color(0xFF5A5A5A),
+                            size: _isPaywallTablet(context) ? 16 : 14,
+                            color: const Color(0xFF5A5A5A),
                           ),
                         ),
                       ),
@@ -3436,20 +3469,50 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   static const double _kPlanBottomBannerHeight = 30;
   static const double _kPlanSubtitleBlockHeight = 33;
   static const double _kPlanPriceBlockHeight = 40;
+  /// Tablet-only side inset for full-bleed layout (phones unchanged).
+  static const double _kPaywallTabletSidePad = 20;
+
+  bool _isPaywallTablet(BuildContext context) {
+    return MediaQuery.sizeOf(context).shortestSide >= 600;
+  }
+
+  /// Full-width padding on tablet only. Mobile returns [child] unchanged.
+  Widget _wrapPaywallForTablet(BuildContext context, Widget child) {
+    if (!_isPaywallTablet(context)) return child;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: _kPaywallTabletSidePad),
+      child: child,
+    );
+  }
 
   Widget _buildPaywallHeroWithCard(BuildContext context, Size size) {
     final topPadding = MediaQuery.paddingOf(context).top;
+    final isTablet = size.shortestSide >= 600;
     final isCompactHeight = size.height < 750;
     // On smaller devices (e.g. iPhone SE), use a taller hero and less card overlap
     // so the subtitle stays fully visible above the value card.
-    final imageHeight = isCompactHeight
-        ? (size.height * 0.44).clamp(290.0, 340.0)
-        : (size.height * 0.42).clamp(280.0, 340.0);
-    final cardOverlap =
-        isCompactHeight ? 72.0 : _kPaywallCardOverlap;
+    // Tablet: use more of the screen height so the page feels full-bleed.
+    final imageHeight = isTablet
+        ? (size.height * 0.42).clamp(320.0, 460.0)
+        : isCompactHeight
+            ? (size.height * 0.44).clamp(290.0, 340.0)
+            : (size.height * 0.42).clamp(280.0, 340.0);
+    final cardOverlap = isTablet
+        ? 96.0
+        : isCompactHeight
+            ? 72.0
+            : _kPaywallCardOverlap;
     final sectionHeight = imageHeight +
-        (_kPaywallValueCardLayoutHeight - cardOverlap) +
+        ((isTablet ? 148.0 : _kPaywallValueCardLayoutHeight) - cardOverlap) +
         _kPaywallValueCardSectionGap;
+    final heroTitleStyle = isTablet
+        ? _paywallHeroTitleBaseStyle.copyWith(fontSize: 42)
+        : _paywallHeroTitleBaseStyle;
+    final heroHighlightStyle = isTablet
+        ? _paywallHeroHighlightStyle.copyWith(fontSize: 42)
+        : _paywallHeroHighlightStyle;
+    final heroSubtitleSize = isTablet ? 17.0 : 14.0;
+    final heroSidePad = isTablet ? _kPaywallTabletSidePad : 16.0;
 
     return SizedBox(
       height: sectionHeight,
@@ -3526,47 +3589,50 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 child: Align(
                   alignment: Alignment.topLeft,
                   child: Padding(
-                    padding: const EdgeInsets.only(left: 16, top: 6),
+                    padding: EdgeInsets.only(
+                        left: heroSidePad, top: isTablet ? 10 : 6),
                     child: Image.asset(
                       _paywallIconPremium,
-                      height: _kPaywallPremiumBadgeHeight,
+                      height: isTablet
+                          ? _kPaywallPremiumBadgeHeight + 6
+                          : _kPaywallPremiumBadgeHeight,
                       fit: BoxFit.contain,
                     ),
                   ),
                 ),
               ),
               Positioned(
-                left: 16,
-                right: 16,
-                top: topPadding + 48,
+                left: heroSidePad,
+                right: heroSidePad,
+                top: topPadding + (isTablet ? 56 : 48),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     RichText(
                       textAlign: TextAlign.left,
-                      text: const TextSpan(
-                        style: _paywallHeroTitleBaseStyle,
+                      text: TextSpan(
+                        style: heroTitleStyle,
                         children: [
-                          TextSpan(text: 'Grow Closer\n'),
-                          TextSpan(text: 'to '),
+                          const TextSpan(text: 'Grow Closer\n'),
+                          const TextSpan(text: 'to '),
                           TextSpan(
                             text: 'God',
-                            style: _paywallHeroHighlightStyle,
+                            style: heroHighlightStyle,
                           ),
                           TextSpan(
                             text: ' Daily',
-                            style: _paywallHeroHighlightStyle,
+                            style: heroHighlightStyle,
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
+                    SizedBox(height: isTablet ? 10 : 8),
+                    Text(
                       'Guidance, prayer, and encouragement\n whenever you need it.',
                       textAlign: TextAlign.left,
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: heroSubtitleSize,
                         height: 1.4,
                         color: _paywallSubtitle,
                         fontWeight: FontWeight.w500,
@@ -3580,8 +3646,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           ),
           ),
           Positioned(
-            left: 16,
-            right: 16,
+            left: heroSidePad,
+            right: heroSidePad,
             top: imageHeight - cardOverlap,
             child: _buildPaywallValueCard(context),
           ),
@@ -3591,8 +3657,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Widget _buildPaywallValueCard(BuildContext context) {
+    final isTablet = _isPaywallTablet(context);
     return Container(
-      padding: const EdgeInsets.fromLTRB(6, 8, 6, 10),
+      padding: EdgeInsets.fromLTRB(
+        isTablet ? 10 : 6,
+        isTablet ? 12 : 8,
+        isTablet ? 10 : 6,
+        isTablet ? 14 : 10,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -3693,8 +3765,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     String subtitle, {
     Color? iconCircleColor,
   }) {
+    final isTablet = _isPaywallTablet(context);
+    final titleSize = isTablet ? 13.0 : 11.0;
+    final subtitleSize = isTablet ? 11.0 : 9.0;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
+      padding: EdgeInsets.symmetric(horizontal: isTablet ? 6 : 2),
       child: Column(
         children: [
           if (iconCircleColor != null)
@@ -3710,25 +3785,25 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 fit: BoxFit.contain,
               ),
             ),
-          const SizedBox(height: 8),
+          SizedBox(height: isTablet ? 10 : 8),
           Text(
             title,
             textAlign: TextAlign.center,
             maxLines: 2,
-            style: const TextStyle(
-              fontSize: 11,
+            style: TextStyle(
+              fontSize: titleSize,
               fontWeight: FontWeight.w700,
               color: _paywallInk,
               height: 1.25,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: isTablet ? 8 : 8),
           Text(
             subtitle,
             textAlign: TextAlign.center,
             maxLines: 3,
             style: TextStyle(
-              fontSize: 9,
+              fontSize: subtitleSize,
               height: 1.3,
               color: Colors.grey.shade600,
             ),
@@ -3739,8 +3814,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Widget _buildPaywallSectionTitle() {
+    final isTablet = _isPaywallTablet(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+      padding: EdgeInsets.fromLTRB(
+          isTablet ? 4 : 20, 0, isTablet ? 4 : 20, 0),
       child: Row(
         children: [
           Expanded(
@@ -3752,13 +3829,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   Divider(color: Colors.grey.shade400),
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Text(
               'Choose How You Want to Grow',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 15,
+                fontSize: isTablet ? 17 : 15,
                 fontWeight: FontWeight.w700,
                 color: _paywallInk,
               ),
@@ -3785,6 +3862,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     if (_products.length == 1) {
       return _buildPlanCard(0, controller);
     }
+    final isTablet = _isPaywallTablet(context);
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: IntrinsicHeight(
@@ -3792,7 +3870,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             for (int i = 0; i < _products.length; i++) ...[
-              if (i > 0) const SizedBox(width: 8),
+              if (i > 0) SizedBox(width: isTablet ? 12 : 8),
               Expanded(child: _buildPlanCard(i, controller)),
             ],
           ],
@@ -3802,8 +3880,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Widget _buildPaywallTrustRow() {
+    final isTablet = _isPaywallTablet(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: EdgeInsets.symmetric(horizontal: isTablet ? 4 : 20),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -3834,25 +3913,28 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Widget _paywallTrustItem(IconData icon, String title, String subtitle) {
+    final isTablet = _isPaywallTablet(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: EdgeInsets.symmetric(horizontal: isTablet ? 8 : 4),
       child: Column(
         children: [
           SizedBox(
             height: _kPaywallTrustIconSize + 4,
             child: Icon(
               icon,
-              size: _kPaywallTrustIconSize,
+              size: isTablet
+                  ? _kPaywallTrustIconSize + 2
+                  : _kPaywallTrustIconSize,
               color: _paywallTrustIconColor,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: isTablet ? 10 : 8),
           Text(
             title,
             textAlign: TextAlign.center,
             maxLines: 2,
-            style: const TextStyle(
-              fontSize: 11,
+            style: TextStyle(
+              fontSize: isTablet ? 12 : 11,
               fontWeight: FontWeight.w700,
               color: _paywallInk,
               height: 1.2,
@@ -3864,7 +3946,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             textAlign: TextAlign.center,
             maxLines: 2,
             style: TextStyle(
-              fontSize: 9,
+              fontSize: isTablet ? 10 : 9,
               height: 1.25,
               color: Colors.grey.shade600,
             ),

@@ -927,6 +927,52 @@ class DownloadProvider with ChangeNotifier {
   bool isLoadingDailyVerse = false;
   List<DailyVerseList> dailyVerseList = [];
 
+  /// Aligns each item's display [DailyVerseList.book] with [Book_Id] → selected
+  /// Bible `book.title` (same mapping Read already uses for book_num).
+  /// Does not change Book_Id, chapter, verse, or content.
+  Future<void> _ensureDailyVerseBookNamesMatchBookId() async {
+    if (dailyVerseList.isEmpty) return;
+    final dbClient = await DBHelper().db;
+    if (dbClient == null) return;
+
+    final bookRows =
+        await dbClient.rawQuery('SELECT book_num, title FROM book');
+    if (bookRows.isEmpty) return;
+
+    final bookTitleByNum = <int, String>{
+      for (final row in bookRows)
+        int.parse(row['book_num'].toString()): row['title'] as String,
+    };
+
+    var changed = false;
+    final updated = <DailyVerseList>[];
+    for (final verse in dailyVerseList) {
+      final bookIdStored = (verse.bookId ?? 0).toInt();
+      final bookNum = bookIdStored > 0 ? bookIdStored - 1 : bookIdStored;
+      final localized =
+          _resolveDailyVerseBookTitle(bookTitleByNum, bookNum) ??
+              _resolveDailyVerseBookTitle(bookTitleByNum, bookIdStored);
+      final current = (verse.book ?? '').trim();
+      if (localized != null &&
+          localized.isNotEmpty &&
+          localized != current) {
+        changed = true;
+        updated.add(verse.copyWith(book: localized));
+      } else {
+        updated.add(verse);
+      }
+    }
+    if (!changed) return;
+
+    dailyVerseList = updated;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList =
+          jsonEncode(dailyVerseList.map((e) => e.toJson()).toSet().toList());
+      await prefs.setString('cachedDailyVerseList_v2', jsonList);
+    } catch (_) {}
+  }
+
   Future<void> loadDailyVerses() async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -935,6 +981,7 @@ class DownloadProvider with ChangeNotifier {
 
     // Already in memory from splash/home/preference preload.
     if (!dataIsChanged && dailyVerseList.isNotEmpty) {
+      await _ensureDailyVerseBookNamesMatchBookId();
       isLoadingDailyVerse = false;
       notifyListeners();
       return;
@@ -945,6 +992,7 @@ class DownloadProvider with ChangeNotifier {
         cachedJson != null &&
         cachedJson.isNotEmpty &&
         await _hydrateDailyVersesFromPrefsJson(cachedJson)) {
+      await _ensureDailyVerseBookNamesMatchBookId();
       isLoadingDailyVerse = false;
       notifyListeners();
       return;
@@ -974,6 +1022,7 @@ class DownloadProvider with ChangeNotifier {
                 .map((e) => DailyVerseList.fromJson(e as Map<String, dynamic>))
                 .toSet()
                 .toList();
+            await _ensureDailyVerseBookNamesMatchBookId();
             debugPrint("dailyVerseList is ${dailyVerseList.length}");
             isLoadingDailyVerse = false;
             notifyListeners();
@@ -987,6 +1036,7 @@ class DownloadProvider with ChangeNotifier {
               .map((e) => DailyVerseList.fromJson(e as Map<String, dynamic>))
               .toSet()
               .toList();
+          await _ensureDailyVerseBookNamesMatchBookId();
           debugPrint("dailyVerseList is ${dailyVerseList.length}");
           isLoadingDailyVerse = false;
           notifyListeners();
@@ -1061,11 +1111,12 @@ class DownloadProvider with ChangeNotifier {
       final bookIdStored = int.parse(verse['Book_Id'].toString());
       final bookNum = bookIdStored > 0 ? bookIdStored - 1 : bookIdStored;
       final storedBook = verse['Book']?.toString().trim() ?? '';
-      final bookName = storedBook.isNotEmpty
-          ? storedBook
-          : (_resolveDailyVerseBookTitle(bookTitleByNum, bookNum) ??
+      // Prefer selected Bible language title so reference matches verse text
+      // (e.g. Portuguese content → Filipenses, not English Philippians).
+      final bookName =
+          _resolveDailyVerseBookTitle(bookTitleByNum, bookNum) ??
               _resolveDailyVerseBookTitle(bookTitleByNum, bookIdStored) ??
-              'Unknown');
+              (storedBook.isNotEmpty ? storedBook : 'Unknown');
 
       enrichedList.add(DailyVerseList(
         categoryName: verse['Category_Name'],

@@ -2,15 +2,20 @@ import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
+import 'package:biblebookapp/view/screens/authenitcation/view/login_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/post_prayer_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_comments_sheet.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_login_required_dialog.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_models.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_share_screen.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_report_dialog.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_status_dialog.dart';
 import 'package:biblebookapp/utils/network_error_message.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:provider/provider.dart';
 
@@ -50,7 +55,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
   bool _isLoggedIn = false;
   String? _userName;
   String? _userId;
-  /// Name last saved when posting (no login required).
+  /// Name last saved when posting (fallback display).
   String? _localDisplayName;
   final CacheNotifier _cacheNotifier = CacheNotifier();
 
@@ -64,6 +69,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
   /// Maps prayer ObjectId → like document `_id` for unlike (persisted).
   Map<String, String> _likeIdByPrayerId = {};
   final Set<String> _likeToggleBusy = {};
+  bool _statusPromptShowing = false;
 
   bool _looksOffline(Object e) => isNetworkRelatedError(e);
 
@@ -196,6 +202,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
         _prayerAuthorMap = authorMap;
         _loading = false;
       });
+      await _maybeShowExpiredStatusPrompt();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -205,6 +212,43 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
     }
   }
 
+  /// UI-only: after exact `postedAt + durationDays`, ask for status.
+  Future<void> _maybeShowExpiredStatusPrompt() async {
+    if (!mounted || _statusPromptShowing) return;
+
+    final metaMap = await PrayerWallLocalStore.loadPrayerDurationMeta();
+    final submitted = await PrayerWallLocalStore.loadStatusSubmittedIds();
+    if (!mounted) return;
+
+    String? duePrayerId;
+    DateTime? dueAt;
+    for (final item in _all) {
+      if (!_isMyPrayer(item)) continue;
+      if (submitted.contains(item.id)) continue;
+      final meta = metaMap[item.id];
+      if (meta == null || !meta.isExpired) continue;
+      if (dueAt == null || meta.expiresAt.isBefore(dueAt)) {
+        dueAt = meta.expiresAt;
+        duePrayerId = item.id;
+      }
+    }
+    if (duePrayerId == null || !mounted) return;
+
+    _statusPromptShowing = true;
+    try {
+      final status = await PrayerWallStatusDialog.show(context);
+      if (!mounted) return;
+      if (status == null) return;
+      await PrayerWallLocalStore.markStatusSubmitted(duePrayerId);
+      if (!mounted) return;
+      Constants.showToast(
+        'Thank you for sharing. Keep trusting and praying🙏',
+        2200,
+      );
+    } finally {
+      _statusPromptShowing = false;
+    }
+  }
   List<PrayerWallItem> get _visible {
     final base = _filter == 'All'
         ? List<PrayerWallItem>.from(_all)
@@ -247,7 +291,30 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
     } catch (_) {}
   }
 
+  /// UI gate only: show Login Required, then open LoginScreen. No API changes.
+  Future<bool> _ensureLoggedIn({required String message}) async {
+    if (_isLoggedIn) return true;
+    final goLogin = await PrayerWallLoginRequiredDialog.show(
+      context,
+      message: message,
+    );
+    if (goLogin != true || !mounted) return false;
+
+    final result = await Get.to<dynamic>(
+      () => LoginScreen(hasSkip: false, popOnSuccess: true),
+    );
+    if (!mounted) return false;
+    await _loadAuthAndLocalName();
+    return _isLoggedIn || result == true;
+  }
+
   Future<void> _toggleLike(PrayerWallItem item) async {
+    final allowed = await _ensureLoggedIn(
+      message:
+          'Please log in to support this prayer request and leave a comment.',
+    );
+    if (!allowed || !mounted) return;
+
     final pid = item.id;
     if (_likeToggleBusy.contains(pid)) return;
     setState(() => _likeToggleBusy.add(pid));
@@ -292,6 +359,12 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
   }
 
   Future<void> _openComments(PrayerWallItem item) async {
+    final allowed = await _ensureLoggedIn(
+      message:
+          'Please log in to support this prayer request and leave a comment.',
+    );
+    if (!allowed || !mounted) return;
+
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -306,6 +379,38 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
       ),
     );
     await _refreshCommentCountsOnly();
+  }
+
+  Future<void> _openReport(PrayerWallItem item) async {
+    final reason = await PrayerWallReportDialog.show(context);
+    if (reason == null || reason.trim().isEmpty || !mounted) return;
+
+    try {
+      final rawReporterId = ((_userId ?? '').trim().isNotEmpty)
+          ? _userId!.trim()
+          : await PrayerWallLocalStore.getOrCreateReporterId();
+      final reporterId =
+          PrayerWallLocalStore.normalizeReporterId(rawReporterId);
+      print(
+        'PrayerWall _openReport data => '
+        'prayerId=${item.id}, reporter_id=$reporterId '
+        '(len=${reporterId.length}/128), '
+        'report_reason=${reason.trim()}',
+      );
+      await PrayerWallService.reportPrayer(
+        prayerId: item.id,
+        reporterId: reporterId,
+        reportReason: reason.trim(),
+      );
+      if (!mounted) return;
+      Constants.showToast('Report submitted successfully', 2000);
+    } catch (e) {
+      print('PrayerWall _openReport error: $e');
+      if (!mounted) return;
+      _showAppleToast(_looksOffline(e)
+          ? 'No internet connection. Please try again.'
+          : 'Could not submit report. Please try again.');
+    }
   }
 
   Future<void> _openPrayerActions(PrayerWallItem item) async {
@@ -577,24 +682,128 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
     if (action == 'delete') {
       final ok = await showDialog<bool>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: isDark ? CommanColor.darkPrimaryColor : null,
-          surfaceTintColor: Colors.transparent,
-          title: const Text('Delete post?'),
-          content: const Text('This post will be permanently deleted.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text('Cancel',
-                  style: TextStyle(color: isDark ? Colors.white70 : null)),
+        barrierDismissible: true,
+        builder: (ctx) {
+          const cream = Color(0xFFFFF9F3);
+          const ink = Color(0xFF4B3423);
+          const muted = Color(0xFF6B4E3D);
+          const deleteRed = Color(0xFFC62828);
+          final bg = isDark ? CommanColor.darkPrimaryColor : cream;
+          final titleColor = isDark ? Colors.white : ink;
+          final bodyColor = isDark ? Colors.white70 : muted;
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding:
+                const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+            child: Material(
+              color: bg,
+              borderRadius: BorderRadius.circular(22),
+              clipBehavior: Clip.antiAlias,
+              child: Stack(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Delete Prayer?',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'Georgia',
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            color: titleColor,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Are you sure you want to delete this prayer request? This action cannot be undone.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.4,
+                            fontWeight: FontWeight.w500,
+                            color: bodyColor,
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: SizedBox(
+                                height: 46,
+                                child: OutlinedButton(
+                                  onPressed: () =>
+                                      Navigator.pop(ctx, false),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: titleColor,
+                                    side: BorderSide(
+                                      color: titleColor.withValues(
+                                        alpha: isDark ? 0.55 : 0.75,
+                                      ),
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Cancel',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: SizedBox(
+                                height: 46,
+                                child: ElevatedButton(
+                                  onPressed: () =>
+                                      Navigator.pop(ctx, true),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: deleteRed,
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Delete',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: IconButton(
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => Navigator.pop(ctx, false),
+                      icon: Icon(
+                        Icons.close,
+                        color: bodyColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text('Delete',
-                  style: TextStyle(color: isDark ? Colors.white : null)),
-            ),
-          ],
-        ),
+          );
+        },
       );
       if (ok != true) return;
       try {
@@ -649,6 +858,12 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
   }
 
   Future<void> _openPostPrayerScreen({bool showSuccessToast = false}) async {
+    final allowed = await _ensureLoggedIn(
+      message:
+          'Please log in to support this prayer request and leave a comment.',
+    );
+    if (!allowed || !mounted) return;
+
     final isConnected = await InternetConnection().hasInternetAccess;
     if (!isConnected) {
       Constants.showToast('No internet connection', 1000);
@@ -731,6 +946,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
         child: Column(
           children: [
             Container(
+              width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
               decoration: BoxDecoration(
                 color: brown,
@@ -958,6 +1174,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                                           ),
                                         );
                                       },
+                                      onReport: () => _openReport(item),
                                       likeCount: _likeCounts[item.id] ?? 0,
                                       liked: _isLiked(item.id),
                                       likeBusy:
@@ -1056,6 +1273,7 @@ class _PrayerCard extends StatelessWidget {
     required this.isMine,
     required this.onOpen,
     required this.onShare,
+    required this.onReport,
     required this.likeCount,
     required this.liked,
     required this.likeBusy,
@@ -1072,6 +1290,7 @@ class _PrayerCard extends StatelessWidget {
   final bool isMine;
   final VoidCallback onOpen;
   final VoidCallback onShare;
+  final VoidCallback onReport;
   final int likeCount;
   final bool liked;
   final bool likeBusy;
@@ -1205,6 +1424,18 @@ class _PrayerCard extends StatelessWidget {
                       padding: const EdgeInsets.all(6),
                       child: Icon(
                         Icons.share_outlined,
+                        size: 20,
+                        color: isDark ? Colors.white : brown,
+                      ),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: onReport,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Icon(
+                        Icons.flag_outlined,
                         size: 20,
                         color: isDark ? Colors.white : brown,
                       ),
