@@ -135,7 +135,6 @@ String _subscriptionRenewalDisplayText(int diffDy, [String? plan]) {
   }
   return '$diffDy $dayLabel left for the renewal of the subscription.';
 }
-
 String _subscriptionPeriodDisplayText(
   String? plan,
   int diffDy,
