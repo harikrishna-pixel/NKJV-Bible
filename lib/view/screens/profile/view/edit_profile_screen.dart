@@ -3,10 +3,12 @@ import 'dart:io';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:country_picker/country_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:get/get.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart' as p;
 import 'package:biblebookapp/core/image_picker_mixin.dart';
 import 'package:biblebookapp/core/notifiers/auth/auth.notifier.dart';
@@ -124,7 +126,7 @@ class EditProfileScreenState extends State<EditProfileScreen>
   String? photoUrl;
   bool isLoading = false;
   XFile? pickedImage;
-  /// Local avatar asset preview only — API upload comes later.
+  /// Selected avatar asset path (also sent as profile_image on update).
   String? selectedAvatarAsset;
 
   static const List<String> _avatarAssets = [
@@ -277,9 +279,30 @@ class EditProfileScreenState extends State<EditProfileScreen>
     if (!mounted || selected == null) return;
     setState(() {
       selectedAvatarAsset = selected;
-      // Preview only — keep gallery XFile path unused until avatar API is wired.
       pickedImage = null;
     });
+  }
+
+  /// Gallery file or avatar asset → temp file for profile_image upload.
+  Future<File?> _resolveProfileImageFile() async {
+    if (pickedImage != null) {
+      final file = File(pickedImage!.path);
+      if (await file.exists()) return file;
+    }
+    final asset = selectedAvatarAsset?.trim();
+    if (asset == null || asset.isEmpty) return null;
+    try {
+      final data = await rootBundle.load(asset);
+      final bytes = data.buffer.asUint8List();
+      final dir = await getTemporaryDirectory();
+      final name = asset.split('/').last;
+      final file = File('${dir.path}/profile_avatar_$name');
+      await file.writeAsBytes(bytes, flush: true);
+      return file;
+    } catch (e) {
+      debugPrint('avatar → profile_image file failed: $e');
+      return null;
+    }
   }
 
   checkuserloggedin(context) async {
@@ -603,6 +626,10 @@ class EditProfileScreenState extends State<EditProfileScreen>
                                               .uploadImage(firebaseUser);
                                         }
                                       }
+                                      final profileImageFile =
+                                          await _resolveProfileImageFile();
+                                      print(
+                                          'Update Profile Data → gallery=${pickedImage?.path} avatar=$selectedAvatarAsset file=${profileImageFile?.path}');
                                       await authnotifier.updateprofle(
                                           email: emailCon.text.isNotEmpty
                                               ? emailCon.text
@@ -610,7 +637,8 @@ class EditProfileScreenState extends State<EditProfileScreen>
                                           name: nameCon.text.isNotEmpty
                                               ? nameCon.text
                                               : user1,
-                                          context: context);
+                                          context: context,
+                                          profileImage: profileImageFile);
                                     }
                                   } catch (e) {}
                                 },

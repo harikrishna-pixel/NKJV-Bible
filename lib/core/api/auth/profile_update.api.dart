@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'dart:developer' as devtools show log;
+import 'dart:io';
 
 import 'package:biblebookapp/core/api/auth/temp_token.api.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import '../../../Model/auth/temp_token_model.dart';
 import '../../../constant/app_api_constant.dart';
@@ -45,7 +47,8 @@ class ProfileUpdateApi {
       deviceversion,
       devicemodel,
       devicelocale,
-      devicetimezone}) async {
+      devicetimezone,
+      File? profileImage}) async {
     final Uri uri =
         Uri.parse(AppApiConstant.baseurl + AppApiConstant.updateprofleapi);
     final userid = await cacheNotifier.readCache(key: 'userid');
@@ -57,29 +60,72 @@ class ProfileUpdateApi {
       // if (data.statusCode == 200) {
       //   if (data.data!.tempAccessToken != null) {
       //  devtools.log("access token is ${data.data!.tempAccessToken}");
-      var response = await CustomHttp().postwithtoken(
-        path: uri,
-        //token: data.data!.tempAccessToken.toString(),
-        token: authtoken,
-        data: {
-          "email": email,
-          "name": name,
-          "action": "1",
-          "user_id": userid.toString(),
-          // "app_version": appversion ?? "1.0.0",
-          // "device_type": "Android",
-          // //"device_type": Platform.isAndroid ? "Android" : "ios",
-          // "device_version": deviceversion ?? "15.2",
-          // "device_model": devicemodel ?? "iPhone 16",
-          // "device_locale": devicelocale ?? "en-US",
-          // "device_timezone": devicetimezone ?? "America/New_York",
-          "app_id": BibleInfo.appID,
-        },
-      );
+      final payload = {
+        "email": email,
+        "name": name,
+        "action": "1",
+        "user_id": userid.toString(),
+        // "app_version": appversion ?? "1.0.0",
+        // "device_type": "Android",
+        // //"device_type": Platform.isAndroid ? "Android" : "ios",
+        // "device_version": deviceversion ?? "15.2",
+        // "device_model": devicemodel ?? "iPhone 16",
+        // "device_locale": devicelocale ?? "en-US",
+        // "device_timezone": devicetimezone ?? "America/New_York",
+        "app_id": BibleInfo.appID,
+      };
 
-      final statuscode = response!.statusCode;
+      print('========== profile-update Data ==========');
+      print('URL: $uri');
+      print('fields: $payload');
+      print(
+          'profile_image: ${profileImage == null ? "none" : profileImage.path}');
+      if (profileImage != null) {
+        print('profile_image size: ${await profileImage.length()} bytes');
+      }
+      print('========== End profile-update Data ==========');
+
+      late final http.Response response;
+      if (profileImage != null && await profileImage.exists()) {
+        // Additive: same fields + multipart profile_image (gallery/avatar).
+        final request = http.MultipartRequest('POST', uri);
+        if (authtoken != null && authtoken.toString().isNotEmpty) {
+          request.headers['Authorization'] = 'Bearer ${authtoken.toString()}';
+        }
+        payload.forEach((key, value) {
+          request.fields[key] = value.toString();
+        });
+        final fileName = profileImage.uri.pathSegments.isNotEmpty
+            ? profileImage.uri.pathSegments.last
+            : 'profile_image.jpg';
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'profile_image',
+            profileImage.path,
+            filename: fileName,
+          ),
+        );
+        print('Sending multipart profile-update with profile_image...');
+        final streamed = await request.send();
+        response = await http.Response.fromStream(streamed);
+      } else {
+        final plain = await CustomHttp().postwithtoken(
+          path: uri,
+          //token: data.data!.tempAccessToken.toString(),
+          token: authtoken,
+          data: payload,
+        );
+        if (plain == null) {
+          devtools.log("lprofile update api  is not found");
+          return null;
+        }
+        response = plain;
+      }
+
+      final statuscode = response.statusCode;
       final body = response.body;
 
+      print('profile-update response: $statuscode - $body');
       devtools.log("profile update api msg is $statuscode - $body");
 
       if (body.isNotEmpty) {

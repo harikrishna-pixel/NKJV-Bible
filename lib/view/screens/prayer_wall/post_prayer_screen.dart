@@ -185,6 +185,16 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
       final effectiveName =
           enteredName.isNotEmpty ? enteredName : loginName;
 
+      // Additive: profile photo URL for Prayer Wall post (profile_image).
+      final cachedImage =
+          (await CacheNotifier().readCache(key: 'profile_image') ?? '')
+              .toString()
+              .trim();
+      final profileImageUrl =
+          cachedImage.isNotEmpty ? cachedImage : null;
+      print(
+          'Post prayer profile_image URL → ${profileImageUrl ?? "none"}');
+
       final created = await PrayerWallService.createPrayer(
         prayerTitle: title,
         prayerDescription: details,
@@ -192,6 +202,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         isAnonymous: _isAnonymous,
         prayerDuration: _durationDays,
         userName: effectiveName.isNotEmpty ? effectiveName : null,
+        profileImage: profileImageUrl,
       );
       await progress.advanceTo(4);
       // await WalletService.deductCredits(_totalCredits);

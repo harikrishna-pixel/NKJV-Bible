@@ -47,6 +47,7 @@ class PrayerWallService {
     required String prayerCategory,
     bool isAnonymous = true,
     String? userName,
+    String? profileImage,
     int prayerDuration = 7,
   }) async {
     final bodyMap = <String, dynamic>{
@@ -62,6 +63,11 @@ class PrayerWallService {
     final normalizedUserName = userName?.trim();
     if (normalizedUserName != null && normalizedUserName.isNotEmpty) {
       bodyMap['user_name'] = normalizedUserName;
+    }
+    // Additive: pass profile photo URL when available (does not change other fields).
+    final normalizedImage = profileImage?.trim();
+    if (normalizedImage != null && normalizedImage.isNotEmpty) {
+      bodyMap['profile_image'] = normalizedImage;
     }
     final bodyJson = _encodeBody(bodyMap);
     print('PrayerWallService.createPrayer request body: $bodyJson');
