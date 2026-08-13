@@ -21,7 +21,9 @@ import 'package:get/get.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart' as p;
+import 'package:biblebookapp/core/api/auth/profile_update.api.dart';
 import '../../../../core/notifiers/cache.notifier.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 void confirmLogoutAccount(BuildContext context) {
   double screenWidth = MediaQuery.of(context).size.width;
@@ -59,6 +61,7 @@ void confirmLogoutAccount(BuildContext context) {
                     await cacheprovider.removeCache(key: 'user');
                     await cacheprovider.removeCache(key: 'name');
                     await cacheprovider.removeCache(key: 'authtoken');
+                    await cacheprovider.removeCache(key: 'profile_image');
                     await cacheprovider.removeCache(
                         key: OwnReferralCodeDialog.referralCacheKey);
                     //   FirebaseAuth.instance.signOut();
@@ -144,6 +147,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   String? _referralCode = '';
   String? _referredBy = '';
   int? _referralRewardClaimed;
+  String? _profileImageUrl;
   loadDB() async {
     final db = DBHelper();
     if (mounted) {
@@ -193,13 +197,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       });
       // Additive: pick up referrer credits when referral_count grew on backend.
       syncReferrerCreditsFromSession();
+      // Additive: show cached / API profile photo (does not change login logic).
+      _loadProfileImage();
     } else {
       setState(() {
         user = '';
         _referralCode = '';
         _referredBy = '';
         _referralRewardClaimed = null;
+        _profileImageUrl = null;
       });
+    }
+  }
+
+  Future<void> _loadProfileImage() async {
+    try {
+      final url = await ProfileUpdateApi().loadAndCacheProfileImageUrl();
+      if (!mounted) return;
+      setState(() => _profileImageUrl = url);
+    } catch (e) {
+      debugPrint('_loadProfileImage: $e');
     }
   }
 
@@ -408,18 +425,54 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                         color: Color(0xFFFBD5B2),
                                         shape: BoxShape.circle,
                                       ),
-                                      child: Center(
-                                        child: Text(
-                                          _safeInitials,
-                                          style: TextStyle(
-                                            fontSize: 30,
-                                            fontWeight: FontWeight.w700,
-                                            fontFamily: 'Georgia',
-                                            color: CommanColor.whiteBlack(
-                                                context),
-                                          ),
-                                        ),
-                                      ),
+                                      clipBehavior: Clip.antiAlias,
+                                      child: (_profileImageUrl != null &&
+                                              _profileImageUrl!.trim().isNotEmpty)
+                                          ? CachedNetworkImage(
+                                              imageUrl: _profileImageUrl!.trim(),
+                                              width: 92,
+                                              height: 92,
+                                              fit: BoxFit.cover,
+                                              placeholder: (context, url) =>
+                                                  Center(
+                                                child: Text(
+                                                  _safeInitials,
+                                                  style: TextStyle(
+                                                    fontSize: 30,
+                                                    fontWeight: FontWeight.w700,
+                                                    fontFamily: 'Georgia',
+                                                    color: CommanColor
+                                                        .whiteBlack(context),
+                                                  ),
+                                                ),
+                                              ),
+                                              errorWidget:
+                                                  (context, url, error) =>
+                                                      Center(
+                                                child: Text(
+                                                  _safeInitials,
+                                                  style: TextStyle(
+                                                    fontSize: 30,
+                                                    fontWeight: FontWeight.w700,
+                                                    fontFamily: 'Georgia',
+                                                    color: CommanColor
+                                                        .whiteBlack(context),
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                          : Center(
+                                              child: Text(
+                                                _safeInitials,
+                                                style: TextStyle(
+                                                  fontSize: 30,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontFamily: 'Georgia',
+                                                  color: CommanColor.whiteBlack(
+                                                      context),
+                                                ),
+                                              ),
+                                            ),
                                     ),
                                     const SizedBox(width: 16),
                                     Expanded(

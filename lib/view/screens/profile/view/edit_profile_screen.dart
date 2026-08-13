@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart' as p;
 import 'package:biblebookapp/core/image_picker_mixin.dart';
 import 'package:biblebookapp/core/notifiers/auth/auth.notifier.dart';
+import 'package:biblebookapp/core/api/auth/profile_update.api.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/core/string_extensions.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
@@ -314,10 +315,15 @@ class EditProfileScreenState extends State<EditProfileScreen>
     final dataname = await cacheprovider.readCache(key: 'name');
     String? datac = await cacheprovider.readCache(key: 'country');
     debugPrint('name is $dataname');
+    final cachedProfileImage =
+        await cacheprovider.readCache(key: 'profile_image');
     setState(() {
       isLoading = false;
       // Existing Firebase photo (if any) — display only; upload path unchanged.
-      photoUrl = FirebaseAuth.instance.currentUser?.photoURL;
+      final cachedUrl = cachedProfileImage?.toString().trim() ?? '';
+      photoUrl = cachedUrl.isNotEmpty
+          ? cachedUrl
+          : FirebaseAuth.instance.currentUser?.photoURL;
       if (dataname != null) {
         user1 = dataname;
         nameCon.text = user1.toString();
@@ -343,6 +349,13 @@ class EditProfileScreenState extends State<EditProfileScreen>
         addressCon.clear();
       }
     });
+    if (photoUrl == null || photoUrl!.trim().isEmpty) {
+      final url = await ProfileUpdateApi().loadAndCacheProfileImageUrl();
+      if (!mounted) return;
+      if (url != null && url.isNotEmpty) {
+        setState(() => photoUrl = url);
+      }
+    }
   }
 
   @override

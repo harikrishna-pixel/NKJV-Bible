@@ -57,6 +57,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
   String? _userId;
   /// Name last saved when posting (fallback display).
   String? _localDisplayName;
+  /// Cached profile photo URL (fallback for my posts if API omits image).
+  String? _viewerProfileImage;
   final CacheNotifier _cacheNotifier = CacheNotifier();
 
   /// Logged-in name if any, otherwise last locally saved post name.
@@ -125,6 +127,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
       final authtoken = await _cacheNotifier.readCache(key: 'authtoken');
       final userid = await _cacheNotifier.readCache(key: 'userid');
       final name = await _cacheNotifier.readCache(key: 'name');
+      final profileImage =
+          await _cacheNotifier.readCache(key: 'profile_image');
       final localName = await PrayerWallLocalStore.loadLastDisplayName();
 
       final loggedIn = (authtoken != null && authtoken.toString().isNotEmpty) ||
@@ -136,6 +140,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
         _userId = userid?.toString();
         _userName = name?.toString();
         _localDisplayName = localName;
+        final img = profileImage?.toString().trim() ?? '';
+        _viewerProfileImage = img.isNotEmpty ? img : null;
         _authLoading = false;
       });
     } catch (_) {
@@ -147,6 +153,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
         _userId = null;
         _userName = null;
         _localDisplayName = localName;
+        _viewerProfileImage = null;
         _authLoading = false;
       });
     }
@@ -1145,6 +1152,19 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                                                                   ? _prayerAuthorMap[item.id]!
                                                                       .trim()
                                                                   : 'Community member')))),
+                                      profileImageUrl: () {
+                                        final fromApi =
+                                            item.profileImage?.trim() ?? '';
+                                        if (fromApi.isNotEmpty) return fromApi;
+                                        if (_isMyPrayer(item) &&
+                                            (_viewerProfileImage
+                                                    ?.trim()
+                                                    .isNotEmpty ??
+                                                false)) {
+                                          return _viewerProfileImage!.trim();
+                                        }
+                                        return null;
+                                      }(),
                                       isMine: _isMyPrayer(item),
                                       onOpen: () => _openPrayerActions(item),
                                       onShare: () {
@@ -1256,6 +1276,7 @@ class _PrayerCard extends StatefulWidget {
     required this.isDark,
     required this.timeLabel,
     required this.displayName,
+    this.profileImageUrl,
     required this.isMine,
     required this.onOpen,
     required this.onShare,
@@ -1274,6 +1295,8 @@ class _PrayerCard extends StatefulWidget {
   final bool isDark;
   final String timeLabel;
   final String displayName;
+  /// Optional photo URL (API profile_image / cached viewer image).
+  final String? profileImageUrl;
   final bool isMine;
   final VoidCallback onOpen;
   final VoidCallback onShare;
@@ -1341,6 +1364,8 @@ class _PrayerCardState extends State<_PrayerCard> {
     final liked = widget.liked;
     final likeBusy = widget.likeBusy;
     final commentCount = widget.commentCount;
+    final photoUrl = (widget.profileImageUrl ?? item.profileImage ?? '').trim();
+    final hasPhoto = photoUrl.isNotEmpty;
 
     return InkWell(
       onTap: isMine ? widget.onOpen : null,
@@ -1377,14 +1402,19 @@ class _PrayerCardState extends State<_PrayerCard> {
                     backgroundColor: isDark
                         ? const Color(0xFF4A382C)
                         : brown.withOpacity(0.18),
-                    child: Text(
-                      _avatarInitials(displayName),
-                      style: TextStyle(
-                        color: isDark ? Colors.white : brown,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
+                    backgroundImage:
+                        hasPhoto ? NetworkImage(photoUrl) : null,
+                    onBackgroundImageError: hasPhoto ? (_, __) {} : null,
+                    child: hasPhoto
+                        ? null
+                        : Text(
+                            _avatarInitials(displayName),
+                            style: TextStyle(
+                              color: isDark ? Colors.white : brown,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
+                          ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(

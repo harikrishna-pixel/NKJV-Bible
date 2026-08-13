@@ -10,6 +10,7 @@ class PrayerWallItem {
     required this.isAnonymous,
     this.authorName,
     this.authorUserId,
+    this.profileImage,
     this.createdAt,
     this.expiresAt,
     this.prayerDuration,
@@ -22,6 +23,8 @@ class PrayerWallItem {
   final bool isAnonymous;
   final String? authorName;
   final String? authorUserId;
+  /// Profile photo URL from API `profile_image` (when present).
+  final String? profileImage;
   final DateTime? createdAt;
   /// From API `expiresAt` when present.
   final DateTime? expiresAt;
@@ -107,6 +110,43 @@ class PrayerWallItem {
     return null;
   }
 
+  static String? _extractProfileImage(Map<String, dynamic> map) {
+    final direct = _cleanName(
+      map['profile_image'] ??
+          map['profileImage'] ??
+          map['profile_image_url'] ??
+          map['avatar'] ??
+          map['avatar_url'] ??
+          map['photoURL'] ??
+          map['photo_url'],
+    );
+    if (direct != null) return direct;
+
+    final nestedUser = map['user'];
+    if (nestedUser is Map) {
+      final userMap = Map<String, dynamic>.from(nestedUser);
+      final fromUser = _cleanName(
+        userMap['profile_image'] ??
+            userMap['profileImage'] ??
+            userMap['avatar'] ??
+            userMap['photoURL'],
+      );
+      if (fromUser != null) return fromUser;
+    }
+
+    final nestedPoster = map['postedBy'] ?? map['createdBy'] ?? map['author'];
+    if (nestedPoster is Map) {
+      final posterMap = Map<String, dynamic>.from(nestedPoster);
+      return _cleanName(
+        posterMap['profile_image'] ??
+            posterMap['profileImage'] ??
+            posterMap['avatar'] ??
+            posterMap['photoURL'],
+      );
+    }
+    return null;
+  }
+
   static PrayerWallItem? fromDynamic(dynamic raw) {
     if (raw is! Map) return null;
     final map = Map<String, dynamic>.from(raw);
@@ -120,6 +160,7 @@ class PrayerWallItem {
         : true;
     final authorName = _extractAuthorName(map);
     final authorUserId = _extractAuthorUserId(map);
+    final profileImage = _extractProfileImage(map);
     DateTime? created;
     final ca = map['createdAt'] ?? map['created_at'];
     if (ca != null) {
@@ -152,6 +193,7 @@ class PrayerWallItem {
       isAnonymous: anon,
       authorName: authorName,
       authorUserId: authorUserId,
+      profileImage: profileImage,
       createdAt: created,
       expiresAt: expires,
       prayerDuration: duration,
