@@ -9,6 +9,7 @@ import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/milestone_lifetime_paywall_coordinator.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
+import 'package:biblebookapp/streak_flow/pour_out_worries_screen.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
@@ -2869,6 +2870,147 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     );
   }
 
+  /// UI-only banner → Find Peace / Pour Out Worries flow.
+  Widget _buildGiveItToGodBanner(
+    BuildContext context, {
+    required bool isDark,
+    required Size size,
+  }) {
+    final titleColor = isDark ? Colors.white : const Color(0xFF3D2914);
+    final bodyColor = isDark
+        ? Colors.white.withOpacity(0.78)
+        : const Color(0xFF6B5344);
+    final metaColor = isDark
+        ? const Color(0xFFE0B35C)
+        : const Color(0xFFB8893A);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          Get.to(() => const PourOutWorriesScreen());
+        },
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: isDark
+                  ? [
+                      const Color(0xFF3A2A1C),
+                      const Color(0xFF2A2018),
+                    ]
+                  : [
+                      const Color(0xFFF7E4CF),
+                      const Color(0xFFF3D7BC),
+                      const Color(0xFFEFC9A8),
+                    ],
+            ),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withOpacity(0.14)
+                  : const Color(0xFFE8C9A8),
+            ),
+            boxShadow: isDark
+                ? null
+                : [
+                    BoxShadow(
+                      color: const Color(0xFF8B6B4A).withOpacity(0.12),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+          ),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: size.width > 450 ? 14 : 10,
+              vertical: size.width > 450 ? 12 : 10,
+            ),
+            child: Row(
+              children: [
+                // Hands + dove illustration (transparent asset)
+                SizedBox(
+                  width: size.width > 450 ? 108 : 92,
+                  height: size.width > 450 ? 88 : 76,
+                  child: Image.asset(
+                    'assets/take_moment/give_it_to_god_icon.png',
+                    fit: BoxFit.contain,
+                    alignment: Alignment.centerLeft,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Give It to God',
+                        style: TextStyle(
+                          fontSize: size.width > 450 ? 18 : 16,
+                          fontWeight: FontWeight.w700,
+                          color: titleColor,
+                          fontFamily: 'Georgia',
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Release your worries. Breathe. Find peace \n in His presence.',
+                        style: TextStyle(
+                          fontSize: size.width > 450 ? 13 : 12,
+                          height: 1.3,
+                          color: bodyColor,
+                          fontFamily: 'Georgia',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.schedule,
+                            size: 14,
+                            color: metaColor,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            '2 min guided moment',
+                            style: TextStyle(
+                              fontSize: size.width > 450 ? 13 : 12,
+                              fontWeight: FontWeight.w600,
+                              color: metaColor,
+                              fontFamily: 'Georgia',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isDark
+                        ? Colors.white.withOpacity(0.12)
+                        : _kPrayerBrownDark,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_forward,
+                    size: 18,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _prayerLoadingStepRow({
     required IconData icon,
     required String label,
@@ -4388,6 +4530,14 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                     const EdgeInsets.symmetric(horizontal: 16),
                                 child: Column(
                                   children: [
+                                    _buildGiveItToGodBanner(
+                                      context,
+                                      isDark: isDark,
+                                      size: size,
+                                    ),
+                                    SizedBox(
+                                      height: size.width > 450 ? 16 : 12,
+                                    ),
                                     Align(
                                       alignment: Alignment.centerLeft,
                                       child: Text(
