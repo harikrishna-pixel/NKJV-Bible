@@ -7,7 +7,14 @@ import 'package:provider/provider.dart';
 /// Walkthrough for adding home-screen widgets. Swipe left/right or use Next.
 /// Opened from Home Screen drawer -> Add Widget.
 class AddWidgetIntroScreen extends StatefulWidget {
-  const AddWidgetIntroScreen({super.key});
+  const AddWidgetIntroScreen({
+    super.key,
+    this.iosWidgetKind,
+    this.widgetTitle,
+  });
+
+  final String? iosWidgetKind;
+  final String? widgetTitle;
 
   @override
   State<AddWidgetIntroScreen> createState() => _AddWidgetIntroScreenState();

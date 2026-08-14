@@ -3,6 +3,8 @@ import 'package:biblebookapp/Model/mainBookListModel.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
+import 'package:biblebookapp/home_widget/widget_prompt_cards.dart';
+import 'package:biblebookapp/home_widget/widget_prompt_service.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:flutter/material.dart';
@@ -67,6 +69,7 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
     _loadRotatingMessage();
     _loadReadingPercentage();
     _syncBookMetaFromDb();
+    WidgetPromptService.noteChapterCompleted();
   }
 
   /// Additive: after a book switch, MarkAsRead may still hold the previous
@@ -621,6 +624,24 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                 ],
               ),
             ),
+          ),
+          SizedBox(height: isCompact ? 10 : 12),
+          FutureBuilder<bool>(
+            future: WidgetPromptService.a1TriggerMet(),
+            builder: (context, triggerSnap) {
+              final nextChapter = (int.tryParse(widget.ReadedChapter) ?? 0) + 1;
+              final nextLabel = hasNextChapter
+                  ? '${widget.RededBookName} $nextChapter'
+                  : 'Next book';
+              return WidgetPromptGate(
+                id: WidgetPromptId.a1,
+                triggerMet: triggerSnap.data == true,
+                builder: (context, onDismiss) => WidgetPromptA1Row(
+                  nextLabel: nextLabel,
+                  onDismiss: onDismiss,
+                ),
+              );
+            },
           ),
         ],
       ),

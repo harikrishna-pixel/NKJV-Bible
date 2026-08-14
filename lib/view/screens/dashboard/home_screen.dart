@@ -60,6 +60,7 @@ import 'package:biblebookapp/streak_flow/streak_flow_screens.dart'
     hide SharPreferences;
 import '../../constants/share_preferences.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
+import 'package:biblebookapp/live_activity/content_live_activity.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:biblebookapp/view/widget/webview.dart';
 import 'package:biblebookapp/view/screens/study_plans/study_plans_screen.dart'
@@ -4749,15 +4750,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   // Additive UI: prayer ends today / has ended banners.
-                                  Padding(
-                                    padding: EdgeInsets.only(
-                                      top: controller.selectedChapter.value
-                                              .isNotEmpty
-                                          ? readerContentTopPadding
-                                          : 0,
-                                    ),
-                                    child: const PrayerWallHomeExpiryBanner(),
-                                  ),
+                                  const PrayerWallHomeExpiryBanner(),
                                   Expanded(
                                     child: ListView.builder(
                               key: ValueKey(
@@ -4776,8 +4769,13 @@ class _HomeScreenState extends State<HomeScreen>
                                   left: 15,
                                   right: 15,
                                   bottom: 20,
-                                  // Banner already offsets below app bar.
-                                  top: 0),
+                                  // Scroll inset so the first line is fully
+                                  // visible at top (status bar + reader app bar).
+                                  top: controller.selectedChapter.value
+                                          .isNotEmpty
+                                      ? readerContentTopPadding
+                                      : MediaQuery.viewPaddingOf(context)
+                                          .top),
                               itemBuilder: (context, index) {
                                 var data = readerVerses[index];
                                 return AutoScrollTag(
@@ -7600,11 +7598,12 @@ class PremiumWelcomeAlert {
     final prefs = await SharedPreferences.getInstance();
     await SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, true);
     await prefs.setString('premiumalrt', '2');
-    await showDialog(
+    final result = await showDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
-        void close() => Navigator.of(dialogContext).pop();
+        void close([String? result]) =>
+            Navigator.of(dialogContext).pop(result);
 
         return Dialog(
           backgroundColor: Colors.transparent,
@@ -7673,9 +7672,9 @@ class PremiumWelcomeAlert {
                           SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                              onPressed: close,
+                              onPressed: () => close('ask'),
                       style: ElevatedButton.styleFrom(
-                                backgroundColor: _brown,
+                                backgroundColor: const Color(0xFFC4A35A),
                                 elevation: 0,
                         padding: EdgeInsets.symmetric(
                                   vertical: isTablet ? 16 : 14,
@@ -7686,7 +7685,7 @@ class PremiumWelcomeAlert {
                         ),
                       ),
                       child: Text(
-                                'Start Exploring',
+                                'Ask your first question',
                                 textAlign: TextAlign.center,
                         style: TextStyle(
                                   fontSize: isTablet ? 18 : 16,
@@ -7694,6 +7693,22 @@ class PremiumWelcomeAlert {
                           color: Colors.white,
                         ),
                       ),
+                            ),
+                          ),
+                          SizedBox(height: isTablet ? 14 : 12),
+                          GestureDetector(
+                            onTap: () => close('widget'),
+                            child: Text(
+                              "Put today's verse on your Home Screen",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: 'Georgia',
+                                fontSize: isTablet ? 15 : 13.5,
+                                fontWeight: FontWeight.w600,
+                                color: _ink,
+                                decoration: TextDecoration.underline,
+                                decorationColor: _ink,
+                              ),
                             ),
                           ),
                         ],
@@ -7707,6 +7722,14 @@ class PremiumWelcomeAlert {
         );
       },
     );
+    if (result == 'ask') {
+      Get.to(() => ChatScreen());
+    } else if (result == 'widget') {
+      try {
+        await updateAllLauncherWidgets();
+        await ContentLiveActivitySync.syncMemoryVerse(forceStart: true);
+      } catch (_) {}
+    }
     await Future.delayed(_kClearUpgradeDeferDelay);
     await SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, false);
   }

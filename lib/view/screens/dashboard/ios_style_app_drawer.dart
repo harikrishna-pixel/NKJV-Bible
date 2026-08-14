@@ -1,3 +1,4 @@
+import 'package:biblebookapp/home_widget/widget_prompt_service.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:flutter/material.dart';
@@ -149,17 +150,22 @@ class _DrawerSubItem {
     required this.icon,
     required this.onTap,
     this.asset,
+    this.trailing,
+    this.showAttentionDot = false,
   });
 
   final String label;
   final IconData icon;
   final String? asset;
   final VoidCallback onTap;
+  final Widget? trailing;
+  final bool showAttentionDot;
 }
 
 class _IosStyleAppDrawerState extends State<IosStyleAppDrawer> {
-  /// All sections start collapsed (including App).
-  String? _expandedKey;
+  /// Daily starts open so Widgets is visible.
+  String? _expandedKey = 'daily';
+  bool _showWidgetsDot = false;
 
   void _toggle(String key) {
     setState(() {
@@ -173,6 +179,20 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer> {
       scaffold.closeDrawer();
     }
     Future.microtask(action);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWidgetsRowState();
+  }
+
+  Future<void> _loadWidgetsRowState() async {
+    try {
+      final dot = await WidgetPromptService.showDrawerAttentionDot();
+      if (!mounted) return;
+      setState(() => _showWidgetsDot = dot);
+    } catch (_) {}
   }
 
   @override
@@ -196,6 +216,17 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer> {
         icon: Icons.local_fire_department_outlined,
         asset: 'assets/home icons/book.png',
         onTap: widget.onFaithJourneyTap,
+      ),
+      _DrawerSubItem(
+        label: 'Widgets',
+        icon: Icons.widgets_outlined,
+        onTap: () {
+          WidgetPromptService.markWidgetFamilySeen();
+          if (mounted) setState(() => _showWidgetsDot = false);
+          widget.onWidgetsTap();
+        },
+        trailing: const _WidgetsAddedChip(count: 0),
+        showAttentionDot: _showWidgetsDot,
       ),
     ];
 
@@ -265,11 +296,6 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer> {
     ];
 
     final moreChildren = <_DrawerSubItem>[
-      _DrawerSubItem(
-        label: 'Widgets',
-        icon: Icons.widgets_outlined,
-        onTap: widget.onWidgetsTap,
-      ),
       _DrawerSubItem(
         label: 'Backup & Sync',
         icon: Icons.cloud_upload_outlined,
@@ -908,17 +934,31 @@ class _PlainSubList extends StatelessWidget {
                             ),
                     ),
                     const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        item.label,
-                        style: TextStyle(
-                          fontFamily: 'Georgia',
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                          color: _DrawerPalette.of(context).ink,
-                        ),
+                    Text(
+                      item.label,
+                      style: TextStyle(
+                        fontFamily: 'Georgia',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: _DrawerPalette.of(context).ink,
                       ),
                     ),
+                    if (item.trailing != null) ...[
+                      const SizedBox(width: 8),
+                      item.trailing!,
+                    ],
+                    if (item.showAttentionDot) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFC49134),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                    const Spacer(),
                   ],
                 ),
               ),
@@ -958,6 +998,31 @@ class _IconTile extends StatelessWidget {
               ),
             )
           : Icon(icon, size: 18, color: _DrawerPalette.of(context).ink),
+    );
+  }
+}
+
+class _WidgetsAddedChip extends StatelessWidget {
+  const _WidgetsAddedChip({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3D5B5),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        '$count added',
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFFC47A3A),
+        ),
+      ),
     );
   }
 }

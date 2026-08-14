@@ -44,6 +44,13 @@ const String _kHourlyVerseKind = 'HourlyVerseWidget';
 const String _kRandomVerseKind = 'RandomBibleVerseWidget';
 const String _kVerseImageKind = 'VerseImageWidget';
 
+/// Public kind ids for additive widget-prompt checks (match iOS Widget structs).
+const String kVerseOfTheDayWidgetKind = _kVerseOfTheDayKind;
+const String kBiblePrayerWidgetKind = _kBiblePrayerKind;
+const String kContinueReadingWidgetKind = _kContinueReadingKind;
+const String kWeeklyStreakWidgetKind = _kWeeklyStreakKind;
+const String kFavoriteVerseWidgetKind = _kFavoriteVerseKind;
+
 /// Data keys stored in UserDefaults (App Group) for the widgets.
 const String _kVerseTextKey = 'widget_verse_text';
 const String _kVerseReferenceKey = 'widget_verse_reference';
@@ -596,5 +603,33 @@ Future<void> updateAllLauncherWidgets({
     }
   } catch (e) {
     debugPrint('BibleHomeWidget: updateAllLauncherWidgets failed: $e');
+  }
+}
+
+/// Additive: true if any home-screen widget of this app is already pinned.
+Future<bool> isAnyHomeWidgetInstalled() async {
+  try {
+    final widgets = await HomeWidget.getInstalledWidgets();
+    return widgets.isNotEmpty;
+  } catch (e) {
+    debugPrint('BibleHomeWidget: isAnyHomeWidgetInstalled failed: $e');
+    return false;
+  }
+}
+
+/// Additive: true if a specific widget kind is already on the Home Screen.
+Future<bool> isHomeWidgetKindInstalled(String kind) async {
+  if (kind.trim().isEmpty) return false;
+  try {
+    final widgets = await HomeWidget.getInstalledWidgets();
+    for (final w in widgets) {
+      final iosKind = (w.iOSKind ?? '').trim();
+      final android = (w.androidClassName ?? '').trim();
+      if (iosKind == kind || android.contains(kind)) return true;
+    }
+    return false;
+  } catch (e) {
+    debugPrint('BibleHomeWidget: isHomeWidgetKindInstalled failed: $e');
+    return false;
   }
 }

@@ -9,6 +9,8 @@ import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/milestone_lifetime_paywall_coordinator.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
+import 'package:biblebookapp/home_widget/widget_prompt_cards.dart';
+import 'package:biblebookapp/home_widget/widget_prompt_service.dart';
 import 'package:biblebookapp/streak_flow/pour_out_worries_screen.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
@@ -235,43 +237,114 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
             ),
           ),
           const SizedBox(width: 10),
-          GestureDetector(
-            onTap: () async {
-              await Get.to(
-                () => const SettingScreen(notificationValue: false),
-              );
-              if (mounted) _refreshPrayerReminderPrompt();
-            },
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    _kPrayerBrownMid,
-                    _kPrayerBrownDark,
+          WidgetPromptGate(
+            id: WidgetPromptId.a8,
+            triggerMet: true,
+            fallback: GestureDetector(
+              onTap: () async {
+                await Get.to(
+                  () => const SettingScreen(notificationValue: false),
+                );
+                if (mounted) _refreshPrayerReminderPrompt();
+              },
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      _kPrayerBrownMid,
+                      _kPrayerBrownDark,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Set Reminder',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                    SizedBox(width: 6),
+                    Icon(Icons.chevron_right, size: 16, color: Colors.white),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Set Reminder',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                  ),
-                  SizedBox(width: 6),
-                  Icon(Icons.chevron_right, size: 16, color: Colors.white),
-                ],
               ),
             ),
+            builder: (context, onDismiss) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  GestureDetector(
+                    onTap: () async {
+                      await Get.to(
+                        () => const SettingScreen(notificationValue: false),
+                      );
+                      if (mounted) _refreshPrayerReminderPrompt();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            _kPrayerBrownMid,
+                            _kPrayerBrownDark,
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'Set Reminder',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  GestureDetector(
+                    onTap: () =>
+                        WidgetPromptService.openHowToAdd(WidgetPromptId.a8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white.withOpacity(0.1)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _kPrayerBrownMid.withOpacity(0.55),
+                        ),
+                      ),
+                      child: Text(
+                        'Add widget',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : _kPrayerBrownMid,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -715,6 +788,7 @@ ${category.prompt}
           responseText.toLowerCase().contains('sorry, i could not generate') ||
               responseText.toLowerCase().startsWith('error:');
       if (!isErrorResponse) {
+        await WidgetPromptService.notePrayerGenerated();
         await WalletService.deductCredits(chatCost);
         if (mounted && requestId == _prayerRequestGeneration) {
           final prefs = await SharedPreferences.getInstance();
@@ -1143,6 +1217,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
           responseText.toLowerCase().contains('sorry, i could not generate') ||
               responseText.toLowerCase().startsWith('error:');
       if (!isErrorResponse) {
+        await WidgetPromptService.notePrayerGenerated();
         await WalletService.deductCredits(chatCost);
         if (mounted && requestId == _prayerRequestGeneration) {
           final prefs = await SharedPreferences.getInstance();
@@ -3810,20 +3885,36 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
       );
     }
 
-    return Row(
-      children: [
-        pill(
-          icon: Icons.copy_rounded,
-          label: 'Copy',
-          onTap: () => _copyPrayerResponse(messageText),
-        ),
-        const SizedBox(width: 12),
-        pill(
-          icon: Icons.share_outlined,
-          label: 'Share',
-          onTap: () => _sharePrayerResponse(messageText),
-        ),
-      ],
+    return FutureBuilder<bool>(
+      future: () async {
+        final count = await WidgetPromptService.prayerGeneratedCount();
+        return WidgetPromptService.shouldShow(
+          WidgetPromptId.a8b,
+          triggerMet: count >= 2,
+        );
+      }(),
+      builder: (context, snap) {
+        final showAdd = snap.data == true;
+        return Row(
+          children: [
+            pill(
+              icon: Icons.copy_rounded,
+              label: 'Copy',
+              onTap: () => _copyPrayerResponse(messageText),
+            ),
+            const SizedBox(width: 8),
+            pill(
+              icon: Icons.share_outlined,
+              label: 'Share',
+              onTap: () => _sharePrayerResponse(messageText),
+            ),
+            if (showAdd) ...[
+              const SizedBox(width: 8),
+              const WidgetPromptA8bPill(),
+            ],
+          ],
+        );
+      },
     );
   }
 
