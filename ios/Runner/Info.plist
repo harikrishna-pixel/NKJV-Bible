@@ -47,6 +47,13 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-4194577750257069~7649128990</string>
+	<key>SKAdNetworkItems</key>
+	<array>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>su67r6k2v3.skadnetwork</string>
+		</dict>
+	</array>
 	<key>GIDClientID</key>
 	<string>727999460969-6ph3vmtbq4o76rbtomvpe1aff341bgdo.apps.googleusercontent.com</string>
 	<key>LSRequiresIPhoneOS</key>

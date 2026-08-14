@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:developer';
 import 'dart:io';
+import 'package:biblebookapp/ads/levelplay_ads.dart';
+import 'package:biblebookapp/ads/levelplay_placements.dart';
 import 'package:biblebookapp/Model/category_model.dart';
 import 'package:biblebookapp/Model/image_model.dart';
 import 'package:biblebookapp/constant/size_config.dart';
@@ -86,8 +88,17 @@ class AdService {
     );
   }
 
-  void showInterstitialAd() async {
+  void showInterstitialAd({
+    String placement = LevelPlayPlacements.chapterBetweenInterstitial,
+  }) async {
     await Future.delayed(Duration(milliseconds: 600));
+    final shown = await LevelPlayAds.instance.showInterstitial(
+      placement: placement,
+    );
+    if (shown) {
+      EasyLoading.dismiss();
+      return;
+    }
     if (_sharedInterstitialAd != null) {
       EasyLoading.dismiss();
       _sharedInterstitialAd!.show();
@@ -105,7 +116,13 @@ class AdService {
   /// Completes when the ad is dismissed / fails / times out.
   Future<void> showInterstitialAdAndWait({
     Duration timeout = const Duration(seconds: 30),
+    String placement = LevelPlayPlacements.chapterBetweenInterstitial,
   }) async {
+    final shown = await LevelPlayAds.instance.showInterstitial(
+      placement: placement,
+    );
+    if (shown) return;
+
     final ad = _sharedInterstitialAd;
     if (ad == null || !_sharedInterstitialLoaded) {
       loadInterstitialAd(() {});
@@ -166,6 +183,7 @@ class AdService {
     if (_sharedInterstitialLoading) return;
 
     _sharedInterstitialLoading = true;
+    unawaited(LevelPlayAds.instance.preloadInterstitial());
     final trackingAllowed = await isTrackingAllowed();
 
     String? adUnitId =
@@ -254,6 +272,10 @@ class AdService {
 
   InterstitialAd? get interstitialAd =>
       _sharedInterstitialLoaded ? _sharedInterstitialAd : null;
+
+  bool get hasReadyInterstitial =>
+      LevelPlayAds.instance.interstitialReady ||
+      (_sharedInterstitialLoaded && _sharedInterstitialAd != null);
   RewardedInterstitialAd? get rewardedInterstitialAd => _rewardedInterstitialAd;
   BannerAd? get bannerAd => _isBannerAdLoaded ? _bannerAd : null;
   NativeAd? get fullScreenAd => _isFullScreenAdLoaded ? _fullScreenAd : null;
@@ -1107,7 +1129,10 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
                           if (_adService._isInterstitialAdLoaded) {
                             EasyLoading.showInfo('Please wait...');
                             await SharPreferences.setString('OpenAd', '1');
-                            _adService.showInterstitialAd();
+                            _adService.showInterstitialAd(
+                              placement: LevelPlayPlacements
+                                  .wallpaperBetweenInterstitial,
+                            );
 
                             // Future.delayed(Duration.zero, () {
                             //   showAd.value = false;

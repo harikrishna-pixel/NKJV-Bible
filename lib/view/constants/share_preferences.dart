@@ -44,6 +44,12 @@ class SharPreferences {
   static const googleInterstitialAd = 'googleInterstitialAd';
   static const googleBannerId = 'googleBannerId';
   static const nativeAdId = 'nativeAdId';
+  // LevelPlay / IronSource — filled from API Network-1 fields, never hardcoded.
+  static const levelPlayAppKey = 'levelPlayAppKey';
+  static const levelPlayBannerId = 'levelPlayBannerId';
+  static const levelPlayInterstitialId = 'levelPlayInterstitialId';
+  static const levelPlayNativeId = 'levelPlayNativeId';
+  static const levelPlayRewardedId = 'levelPlayRewardedId';
   /// Display-only: Memory Verse Live Activity review progress (does not affect verse logic).
   static const liveActivityMemoryReviewed = 'live_activity_memory_reviewed';
   static const liveActivityMemoryReviewTotal = 'live_activity_memory_review_total';

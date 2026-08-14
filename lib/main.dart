@@ -1,3 +1,4 @@
+import 'package:biblebookapp/ads/levelplay_ads.dart';
 import 'package:biblebookapp/constant/size_config.dart';
 import 'package:biblebookapp/core/notifiers/auth/auth.notifier.dart';
 import 'package:biblebookapp/core/notifiers/bottom.notifier.dart';
@@ -155,6 +156,7 @@ Future<void> _bootstrapBackgroundStartup() async {
   try {
     await MobileAds.instance.initialize().timeout(const Duration(seconds: 8));
     RewardedAdService();
+    unawaited(LevelPlayAds.instance.ensureInitialized());
   } catch (e) {
     debugPrint("main: MobileAds init failed: $e");
   }

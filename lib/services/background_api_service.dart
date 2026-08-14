@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:biblebookapp/ads/levelplay_ads.dart';
 import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/controller/api_service.dart';
 import 'package:biblebookapp/Model/get_audio_model.dart';
@@ -339,6 +340,18 @@ class BackgroundApiService {
       'rewaredInterstitialAd': getAdId(
           value.data?.adsGoogleRewardInterstitialIdAndroid ?? "",
           value.data?.adsGoogleRewardInterstitialIdIos ?? ""),
+      'levelPlayAppKey': getAdId(value.data?.adsNetwork_1Field_1Android ?? "",
+          value.data?.adsNetwork_1Field_1Ios ?? ""),
+      'levelPlayBannerId': getAdId(value.data?.adsNetwork_1Field_2Android ?? "",
+          value.data?.adsNetwork_1Field_2Ios ?? ""),
+      'levelPlayInterstitialId': getAdId(
+          value.data?.adsNetwork_1Field_3Android ?? "",
+          value.data?.adsNetwork_1Field_3Ios ?? ""),
+      'levelPlayNativeId': getAdId(value.data?.adsNetwork_1Field_4Android ?? "",
+          value.data?.adsNetwork_1Field_4Ios ?? ""),
+      'levelPlayRewardedId': getAdId(
+          value.data?.adsNetwork_1Field_5Android ?? "",
+          value.data?.adsNetwork_1Field_5Ios ?? ""),
     };
   }
 
@@ -357,6 +370,18 @@ class BackgroundApiService {
       await prefs.setString('surveyappid', value.data?.surveyAppId ?? '');
       await prefs.setString('surveyappenable', value.data?.surveyEnable ?? '');
       await prefs.setString('showinterstitialrow', value.data?.showInterstitialRow ?? '');
+      Future<void> cacheIfPresent(String key, String? value) async {
+        final v = (value ?? '').trim();
+        if (v.isEmpty) return;
+        await prefs.setString(key, v);
+      }
+      await cacheIfPresent('levelPlayAppKey', adIds['levelPlayAppKey']);
+      await cacheIfPresent('levelPlayBannerId', adIds['levelPlayBannerId']);
+      await cacheIfPresent(
+          'levelPlayInterstitialId', adIds['levelPlayInterstitialId']);
+      await cacheIfPresent('levelPlayNativeId', adIds['levelPlayNativeId']);
+      await cacheIfPresent('levelPlayRewardedId', adIds['levelPlayRewardedId']);
+      unawaited(LevelPlayAds.instance.ensureInitialized());
     } catch (e) {
       debugPrint('Background API: Error saving ad preferences: $e');
     }

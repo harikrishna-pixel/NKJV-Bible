@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:biblebookapp/ads/levelplay_placements.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/main.dart';
@@ -2414,7 +2415,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
 
     // Prefer a smooth back animation: only wait for an interstitial if it is
     // already loaded. Never block on network/subscription checks.
-    final adReady = _adService.interstitialAd != null;
+    final adReady = _adService.hasReadyInterstitial;
     if (adReady && mounted) {
       try {
     final downloadProvider =
@@ -2448,57 +2449,10 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
 
   // Show interstitial ad and wait for dismissal
   Future<void> _showInterstitialAdAndWait() async {
-    final completer = Completer<void>();
-
-    // Check if ad is available
-    final ad = _adService.interstitialAd;
-    debugPrint(
-        '🔍 AD CHECK: _adService.interstitialAd = ${ad != null ? "LOADED" : "NULL"}');
-    if (ad == null) {
-      debugPrint('⚠️ AD: No ad loaded, skipping...');
-      completer.complete(); // No ad available, proceed immediately
-      return completer.future;
-    }
-
-    debugPrint('✅ AD: Showing interstitial ad now...');
-
-    // Set up callback to complete when ad is dismissed
-    ad.fullScreenContentCallback = FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (ad) async {
-        await SharPreferences.setString('OpenAd', '1');
-        ad.dispose();
-        debugPrint('✅ AD: Ad dismissed, reloading for next time...');
-        _loadInterstitialAd(); // Reload ad for next time
-        if (!completer.isCompleted) {
-          completer.complete(); // Ad dismissed, proceed
-        }
-      },
-      onAdFailedToShowFullScreenContent: (ad, error) {
-        ad.dispose();
-        debugPrint('❌ AD: Ad failed to show: $error, reloading...');
-        _loadInterstitialAd(); // Reload ad for next time
-        if (!completer.isCompleted) {
-          completer.complete(); // Ad failed, proceed
-        }
-      },
-      onAdShowedFullScreenContent: (ad) async {
-        await SharPreferences.setString('OpenAd', '1');
-        debugPrint('✅ AD: Ad is now showing...');
-      },
+    await _adService.showInterstitialAdAndWait(
+      placement: LevelPlayPlacements.readingClickcountInterstitial,
     );
-
-    // Show the ad
-    ad.show();
-
-    // Wait for ad to be dismissed or fail (with timeout)
-    return completer.future.timeout(
-      const Duration(seconds: 30),
-      onTimeout: () {
-        if (!completer.isCompleted) {
-          completer.complete(); // Timeout - proceed anyway
-        }
-      },
-    );
+    _loadInterstitialAd();
   }
 
   // Parse verse reference to extract book, chapter, and verse

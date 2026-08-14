@@ -56,6 +56,9 @@
 //   }
 // }
 
+import 'dart:async';
+import 'package:biblebookapp/ads/levelplay_ads.dart';
+import 'package:biblebookapp/ads/levelplay_placements.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
@@ -85,6 +88,7 @@ class RewardedAdService with WidgetsBindingObserver {
   }) async {
     if (_isAdLoaded) return;
 
+    unawaited(LevelPlayAds.instance.preloadRewarded());
     String? adUnitId =
         await SharPreferences.getString(SharPreferences.rewardedAd);
     if (data != null && data.isNotEmpty) {
@@ -135,6 +139,14 @@ class RewardedAdService with WidgetsBindingObserver {
     String? data,
   }) {
     if (data != null) {
+      if (LevelPlayAds.instance.rewardedReady) {
+        unawaited(LevelPlayAds.instance.showRewarded(
+          placement: LevelPlayPlacements.wallpaperDownloadRewarded,
+          onRewarded: onRewardEarned,
+          onClosed: onAdDismissed,
+        ));
+        return;
+      }
       if (!_isAdLoaded || _rewardedAd == null || _isShowingAd) {
         Constants.showToast("Ad not available.");
         _rewardedAd = null;

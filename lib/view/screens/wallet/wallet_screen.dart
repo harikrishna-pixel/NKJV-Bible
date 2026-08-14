@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:biblebookapp/ads/levelplay_ads.dart';
+import 'package:biblebookapp/ads/levelplay_placements.dart';
 import 'package:biblebookapp/controller/api_service.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
@@ -419,6 +421,7 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Future<void> _loadRewardedAd() async {
+    unawaited(LevelPlayAds.instance.preloadRewarded());
     String? adUnitId =
         await SharPreferences.getString(SharPreferences.rewardedAd);
     if (adUnitId == null || adUnitId.isEmpty) {
@@ -991,6 +994,40 @@ class _WalletScreenState extends State<WalletScreen> {
       await _refreshRemainingAdsToday();
 
       // Check if ad is loaded
+      final lpReady = LevelPlayAds.instance.rewardedReady;
+      if (lpReady) {
+        await SharPreferences.setString('OpenAd', '1');
+        final shown = await LevelPlayAds.instance.showRewarded(
+          placement: LevelPlayPlacements.walletCreditRewarded,
+          onRewarded: () {
+            unawaited(() async {
+              try {
+                final newBalance = await WalletService.watchAdForCredits();
+                if (newBalance != null) {
+                  if (_cachedPrefs != null) {
+                    await _cachedPrefs!.setInt('user_wallet_credits', newBalance);
+                  }
+                  await _loadCredits();
+                  await _refreshRemainingAdsToday();
+                  await _checkMaxAdsWatched();
+                  Constants.showToast(
+                      'Watched ad! Received 50 credits.', _walletToastMs);
+                } else {
+                  await _refreshRemainingAdsToday();
+                  Constants.showToast(
+                      'You have already watched 2 ads today', _walletToastMs);
+                }
+              } catch (e) {
+                debugPrint('WalletScreen: Error giving credits after ad: $e');
+              }
+            }());
+          },
+          onClosed: () {
+            _loadRewardedAd();
+          },
+        );
+        if (shown) return;
+      }
       if (!_isRewardedAdLoaded || _rewardedAd == null) {
         Constants.showToast(
             'Ad is loading. Please try again in a moment.', _walletToastMs);

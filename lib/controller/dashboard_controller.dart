@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
+import 'package:biblebookapp/ads/levelplay_ads.dart';
 import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/constant/size_config.dart';
 import 'package:biblebookapp/services/background_api_service.dart';
@@ -572,6 +573,21 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
           value.data?.adsGoogleRewardInterstitialIdIos?.isNotEmpty == true
               ? value.data!.adsGoogleRewardInterstitialIdIos!
               : BibleInfo.adsGoogleRewardInterstitialIdIos),
+      'levelPlayAppKey': getAdId(
+          value.data?.adsNetwork_1Field_1Android ?? '',
+          value.data?.adsNetwork_1Field_1Ios ?? ''),
+      'levelPlayBannerId': getAdId(
+          value.data?.adsNetwork_1Field_2Android ?? '',
+          value.data?.adsNetwork_1Field_2Ios ?? ''),
+      'levelPlayInterstitialId': getAdId(
+          value.data?.adsNetwork_1Field_3Android ?? '',
+          value.data?.adsNetwork_1Field_3Ios ?? ''),
+      'levelPlayNativeId': getAdId(
+          value.data?.adsNetwork_1Field_4Android ?? '',
+          value.data?.adsNetwork_1Field_4Ios ?? ''),
+      'levelPlayRewardedId': getAdId(
+          value.data?.adsNetwork_1Field_5Android ?? '',
+          value.data?.adsNetwork_1Field_5Ios ?? ''),
     };
   }
 
@@ -602,6 +618,25 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
           value.data?.showInterstitialRow ?? ''),
     ]);
 
+    Future<void> cacheIfPresent(String key, String? value) async {
+      final v = (value ?? '').trim();
+      if (v.isEmpty) return;
+      await SharPreferences.setString(key, v);
+    }
+
+    await cacheIfPresent(
+        SharPreferences.levelPlayAppKey, adIds['levelPlayAppKey']);
+    await cacheIfPresent(
+        SharPreferences.levelPlayBannerId, adIds['levelPlayBannerId']);
+    await cacheIfPresent(SharPreferences.levelPlayInterstitialId,
+        adIds['levelPlayInterstitialId']);
+    await cacheIfPresent(
+        SharPreferences.levelPlayNativeId, adIds['levelPlayNativeId']);
+    await cacheIfPresent(
+        SharPreferences.levelPlayRewardedId, adIds['levelPlayRewardedId']);
+
+    unawaited(LevelPlayAds.instance.ensureInitialized());
+
     //  debugPrint("Native ads id is ${adIds['nativeAdId']}");
     debugPrint(
         "Rewarded interstitial ad id is ${adIds['rewaredInterstitialAd']}");
@@ -617,6 +652,7 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     await initReadMeBelowAd(adUnitId: adIds['bannerId2'] ?? '');
     await initPopUpAd(adUnitId: adIds['bannerId3'] ?? '');
     await initImageBannerAd(adUnitId: adIds['bannerId3'] ?? '');
+    unawaited(LevelPlayAds.instance.ensureInitialized());
     // await initInterstitialAd(adUnitId: adIds['interstitialAdUnitId'] ?? '');
     // ]);
 
@@ -625,6 +661,16 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
   }
 
   Future<void> _handleApiError(dynamic e) async {
+    final cachedGoogle =
+        await SharPreferences.getString(SharPreferences.googleInterstitialAd);
+    final cachedLp =
+        await SharPreferences.getString(SharPreferences.levelPlayAppKey);
+    if ((cachedGoogle != null && cachedGoogle.isNotEmpty) ||
+        (cachedLp != null && cachedLp.isNotEmpty)) {
+      debugPrint('loadApi error — using last cached ad IDs: $e');
+      unawaited(LevelPlayAds.instance.ensureInitialized());
+      return;
+    }
     adFree.value = true;
     isInterstitialAdLoad.value = false;
     isBannerAdLoaded.value = false;

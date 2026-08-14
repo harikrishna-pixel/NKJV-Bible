@@ -3,6 +3,8 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:ui';
 import 'dart:ui' as ui;
+import 'package:biblebookapp/ads/levelplay_ads.dart';
+import 'package:biblebookapp/ads/levelplay_placements.dart';
 import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:biblebookapp/Model/dailyVerseList.dart';
@@ -1783,13 +1785,13 @@ class _HomeScreenState extends State<HomeScreen>
       // Wait for a preloaded/in-flight interstitial silently.
       // Do not show "Please wait..." unless an ad is actually ready to show.
       for (var i = 0; i < 15; i++) {
-        if (_adService.interstitialAd != null) break;
+        if (_adService.hasReadyInterstitial) break;
         await Future.delayed(const Duration(milliseconds: 200));
         if (!mounted) return;
       }
 
       if (!mounted) return;
-      if (_adService.interstitialAd == null) {
+      if (!_adService.hasReadyInterstitial) {
         // No ad available — skip loader and proceed with no interstitial.
         return;
       }
@@ -2333,46 +2335,8 @@ class _HomeScreenState extends State<HomeScreen>
   // Helper method to show interstitial ad and wait for dismissal (for good internet)
   // This ensures ad shows FIRST, then content shows AFTER ad is dismissed
   Future<void> _showInterstitialAdAndWait() async {
-    final completer = Completer<void>();
-
-    // Check if ad is available
-    final ad = _adService.interstitialAd;
-    if (ad == null) {
-      completer.complete(); // No ad available, proceed immediately
-      return completer.future;
-    }
-
-    // Set up callback to complete when ad is dismissed
-    ad.fullScreenContentCallback = FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (ad) async {
-        await SharPreferences.setString('OpenAd', '1');
-        ad.dispose();
-        if (!completer.isCompleted) {
-          completer.complete(); // Ad dismissed, proceed with content
-        }
-      },
-      onAdFailedToShowFullScreenContent: (ad, error) {
-        ad.dispose();
-        if (!completer.isCompleted) {
-          completer.complete(); // Ad failed, proceed with content
-        }
-      },
-      onAdShowedFullScreenContent: (ad) async {
-        await SharPreferences.setString('OpenAd', '1');
-      },
-    );
-
-    // Show the ad
-    ad.show();
-
-    // Wait for ad to be dismissed or fail (with timeout to prevent infinite wait)
-    return completer.future.timeout(
-      const Duration(seconds: 30),
-      onTimeout: () {
-        if (!completer.isCompleted) {
-          completer.complete(); // Timeout - proceed anyway
-        }
-      },
+    await _adService.showInterstitialAdAndWait(
+      placement: LevelPlayPlacements.chapterEndInterstitial,
     );
   }
 
@@ -4643,11 +4607,14 @@ class _HomeScreenState extends State<HomeScreen>
                       debugPrint(
                           "now Chapter and count is $swipeCount $_swipeThreshold");
                       await Future.delayed(Duration(milliseconds: 500));
-                      if (_adService.interstitialAd != null &&
+                      if (_adService.hasReadyInterstitial &&
                           controller.adFree.value == false) {
                         EasyLoading.showInfo('Please wait...');
                         await SharPreferences.setString('OpenAd', '1');
-                        _adService.showInterstitialAd();
+                        _adService.showInterstitialAd(
+                          placement: LevelPlayPlacements
+                              .chapterBetweenInterstitial,
+                        );
                       }
                     }
                     debugPrint(
@@ -4676,11 +4643,14 @@ class _HomeScreenState extends State<HomeScreen>
                       debugPrint(
                           "now Chapter and count is $swipeCount $_swipeThreshold");
                       await Future.delayed(Duration(milliseconds: 600));
-                      if (_adService.interstitialAd != null &&
+                      if (_adService.hasReadyInterstitial &&
                           controller.adFree.value == false) {
                         EasyLoading.showInfo('Please wait...');
                         await SharPreferences.setString('OpenAd', '1');
-                        _adService.showInterstitialAd();
+                        _adService.showInterstitialAd(
+                          placement: LevelPlayPlacements
+                              .chapterBetweenInterstitial,
+                        );
                       }
                     }
                     debugPrint(
@@ -4769,13 +4739,9 @@ class _HomeScreenState extends State<HomeScreen>
                                   left: 15,
                                   right: 15,
                                   bottom: 20,
-                                  // Scroll inset so the first line is fully
-                                  // visible at top (status bar + reader app bar).
-                                  top: controller.selectedChapter.value
-                                          .isNotEmpty
-                                      ? readerContentTopPadding
-                                      : MediaQuery.viewPaddingOf(context)
-                                          .top),
+                                  // Keep first verse fully below status bar /
+                                  // Dynamic Island when scrolled to top.
+                                  top: 8),
                               itemBuilder: (context, index) {
                                 var data = readerVerses[index];
                                 return AutoScrollTag(
@@ -5015,8 +4981,7 @@ class _HomeScreenState extends State<HomeScreen>
                                                                 }
 
                                                                 // Only show ad if online with good connection
-                                                                      if (_adService.interstitialAd !=
-                                                                        null &&
+                                                                      if (_adService.hasReadyInterstitial &&
                                                                           controller.adFree.value ==
                                                                         false) {
                                                                   // Check if 3 minutes have passed since last ad
@@ -5315,7 +5280,7 @@ class _HomeScreenState extends State<HomeScreen>
                                                                           }
 
                                                                           // Only show ad if online with good connection
-                                                                                if (_adService.interstitialAd != null && controller.adFree.value == false) {
+                                                                                if (_adService.hasReadyInterstitial && controller.adFree.value == false) {
                                                                             // Check if 3 minutes have passed since last ad
                                                                                   final canShowAd = await _canShowMarkAsReadAd();
                                                                             if (canShowAd) {
@@ -7425,13 +7390,15 @@ class _MyAdBannerState extends State<MyAdBanner> {
 
   @override
   Widget build(BuildContext context) {
-    return _isLoaded
-        ? SizedBox(
-            width: _bannerAd.size.width.toDouble(),
-            height: _bannerAd.size.height.toDouble(),
-            child: AdWidget(ad: _bannerAd),
-          )
-        : SizedBox.shrink();
+    return LevelPlayOrGoogleBanner(
+      googleFallback: _isLoaded
+          ? SizedBox(
+              width: _bannerAd.size.width.toDouble(),
+              height: _bannerAd.size.height.toDouble(),
+              child: AdWidget(ad: _bannerAd),
+            )
+          : const SizedBox.shrink(),
+    );
   }
 }
 
@@ -7567,13 +7534,15 @@ class _MyAdBanner2State extends State<MyAdBanner2> {
 
   @override
   Widget build(BuildContext context) {
-    return _isLoaded
-        ? SizedBox(
-            width: _bannerAd.size.width.toDouble(),
-            height: _bannerAd.size.height.toDouble(),
-            child: AdWidget(ad: _bannerAd),
-          )
-        : SizedBox.shrink();
+    return LevelPlayOrGoogleBanner(
+      googleFallback: _isLoaded
+          ? SizedBox(
+              width: _bannerAd.size.width.toDouble(),
+              height: _bannerAd.size.height.toDouble(),
+              child: AdWidget(ad: _bannerAd),
+            )
+          : const SizedBox.shrink(),
+    );
   }
 }
 
