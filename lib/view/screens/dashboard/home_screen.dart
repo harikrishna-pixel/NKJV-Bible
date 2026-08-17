@@ -30,6 +30,8 @@ import 'package:biblebookapp/view/screens/books/books_screen.dart';
 import 'package:biblebookapp/view/screens/calendar_screen/view/calendar_screen.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/add_widget_intro_screen.dart';
+import 'package:biblebookapp/home_widget/widget_how_to_add_screen.dart';
+import 'package:biblebookapp/home_widget/widget_prompt_service.dart';
 import 'package:biblebookapp/view/screens/dashboard/ios_style_app_drawer.dart';
 import 'package:biblebookapp/view/screens/dashboard/social_link_screen.dart';
 import 'package:biblebookapp/view/screens/verse_topics/verse_topics_screen.dart';
@@ -4739,9 +4741,13 @@ class _HomeScreenState extends State<HomeScreen>
                                   left: 15,
                                   right: 15,
                                   bottom: 20,
-                                  // Keep first verse fully below status bar /
-                                  // Dynamic Island when scrolled to top.
-                                  top: 8),
+                                  // Clear status bar + reader app bar so verse 1
+                                  // is fully visible at the top of the scroll.
+                                  top: controller.selectedChapter.value
+                                          .isNotEmpty
+                                      ? readerContentTopPadding
+                                      : MediaQuery.viewPaddingOf(context)
+                                          .top),
                               itemBuilder: (context, index) {
                                 var data = readerVerses[index];
                                 return AutoScrollTag(
@@ -6351,9 +6357,14 @@ class _HomeScreenState extends State<HomeScreen>
           );
         },
         onWidgetsTap: () {
-          Future.microtask(() {
+          Future.microtask(() async {
+            final seen = await WidgetPromptService.galleryViewedCount();
+            if (seen > 0) {
+              final label = seen == 1 ? 'widget' : 'widgets';
+              Constants.showToast('You saw $seen $label', 2500);
+            }
             Get.to(
-              () => const AddWidgetIntroScreen(),
+              () => const WidgetHowToAddScreen(),
               transition: Transition.cupertino,
               duration: const Duration(milliseconds: 350),
             );

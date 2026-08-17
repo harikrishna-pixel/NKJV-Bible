@@ -225,7 +225,7 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer> {
           if (mounted) setState(() => _showWidgetsDot = false);
           widget.onWidgetsTap();
         },
-        trailing: const _WidgetsAddedChip(count: 0),
+        trailing: const _WidgetsAddedChip(),
         showAttentionDot: _showWidgetsDot,
       ),
     ];
@@ -1003,26 +1003,30 @@ class _IconTile extends StatelessWidget {
 }
 
 class _WidgetsAddedChip extends StatelessWidget {
-  const _WidgetsAddedChip({required this.count});
-
-  final int count;
+  const _WidgetsAddedChip();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF3D5B5),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        '$count added',
-        style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: Color(0xFFC47A3A),
-        ),
-      ),
+    return FutureBuilder<int>(
+      future: WidgetPromptService.galleryViewedCount(),
+      builder: (context, snap) {
+        final count = snap.data ?? 0;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF3D5B5),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            '$count added',
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFFC47A3A),
+            ),
+          ),
+        );
+      },
     );
   }
 }

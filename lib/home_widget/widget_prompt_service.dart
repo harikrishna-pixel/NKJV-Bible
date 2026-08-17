@@ -4,7 +4,7 @@ import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/live_activity/content_live_activity.dart';
 import 'package:biblebookapp/live_activity/live_activity_queue.dart';
 import 'package:biblebookapp/streak/streak_live_activity.dart';
-import 'package:biblebookapp/view/screens/dashboard/add_widget_intro_screen.dart';
+import 'package:biblebookapp/home_widget/widget_how_to_add_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -145,6 +145,74 @@ class WidgetPromptService {
     }
   }
 
+  static const _gallerySeenKey = 'widget_gallery_seen_kinds';
+
+  static const _compressed = 'assets/bible_widget_comopressed';
+
+  static List<String> previewAssetsFor(WidgetPromptId? id) {
+    if (id == null) {
+      return const [
+        '$_compressed/Daily_Verse_1.png',
+        '$_compressed/Daily_Verse_2.png',
+        '$_compressed/Daily_Verse_3.png',
+        '$_compressed/Continue_Reading_1.png',
+        '$_compressed/Continue_Reading_2.png',
+        '$_compressed/Continue_Reading_3.png',
+        '$_compressed/Reading_Streak_1.png',
+        '$_compressed/Reading_Streak_2.png',
+        '$_compressed/Reading_Streak_3.png',
+        '$_compressed/Favorite_Verse.png',
+        '$_compressed/Favorite_Verse_2.png',
+        '$_compressed/Bible_Prayer_1.png',
+        '$_compressed/Bible_Prayer_2.png',
+        '$_compressed/Bible_Prayer_3.png',
+        '$_compressed/Bible_Chat_1.png',
+        '$_compressed/Bible_Chat_2.png',
+        '$_compressed/Bible_Chat_3.png',
+      ];
+    }
+    switch (id) {
+      case WidgetPromptId.a1:
+        return const [
+          '$_compressed/Continue_Reading_1.png',
+          '$_compressed/Continue_Reading_2.png',
+          '$_compressed/Continue_Reading_3.png',
+        ];
+      case WidgetPromptId.a2:
+        return const [
+          '$_compressed/Reading_Streak_1.png',
+          '$_compressed/Reading_Streak_2.png',
+          '$_compressed/Reading_Streak_3.png',
+        ];
+      case WidgetPromptId.a6:
+        return const [
+          '$_compressed/Favorite_Verse.png',
+          '$_compressed/Favorite_Verse_2.png',
+        ];
+      case WidgetPromptId.a8:
+      case WidgetPromptId.a8b:
+        return const [
+          '$_compressed/Bible_Prayer_1.png',
+          '$_compressed/Bible_Prayer_2.png',
+          '$_compressed/Bible_Prayer_3.png',
+        ];
+    }
+  }
+
+  static Future<void> markGalleryViewed(WidgetPromptId? id) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_gallerySeenKey) ?? [];
+    final token = id == null ? 'all' : kindFor(id);
+    if (list.contains(token)) return;
+    list.add(token);
+    await prefs.setStringList(_gallerySeenKey, list);
+  }
+
+  static Future<int> galleryViewedCount() async {
+    final prefs = await SharedPreferences.getInstance();
+    return (prefs.getStringList(_gallerySeenKey) ?? []).length;
+  }
+
   /// Syncs the matching Home widget, then starts the existing iOS Live Activity
   /// so it appears the same way other iOS widgets already do.
   static Future<void> openHowToAdd(WidgetPromptId id) async {
@@ -168,14 +236,10 @@ class WidgetPromptService {
       debugPrint('WidgetPrompt: sync before tutorial failed: $e');
     }
     await startExistingIosWidget(id);
-    if (kIsWeb || !Platform.isIOS) {
-      await Get.to(
-        () => AddWidgetIntroScreen(
-          iosWidgetKind: kindFor(id),
-          widgetTitle: titleFor(id),
-        ),
-      );
-    }
+    await Get.to(
+      () => WidgetHowToAddScreen(promptId: id),
+      transition: Transition.cupertino,
+    );
   }
 
   /// Bump when a new home-widget family ships so the drawer gold/red dot returns.

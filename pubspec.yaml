@@ -150,6 +150,7 @@ flutter:
     - assets/zipped/NKJV/
     - assets/icons/
     - assets/prayer_guidance_icons/
+    - assets/bible_widget_comopressed/
     - assets/onboarding/
     - assets/dark_modes/
     - assets/light_modes/
