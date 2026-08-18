@@ -15,6 +15,7 @@ private let appGroupId = "group.com.balaklrapps.newkingsjamesversion"
 // MARK: - Old Paper Theme
 
 private let oldPaperBackground = Color(red: 0.95, green: 0.92, blue: 0.84)
+private let widgetFlatCream = Color(red: 0.992, green: 0.973, blue: 0.914)
 private let oldPaperText = Color(red: 0.29, green: 0.22, blue: 0.18)
 private let oldPaperSecondary = Color(red: 0.45, green: 0.35, blue: 0.28)
 private let oldPaperAccent = Color(red: 0.55, green: 0.42, blue: 0.33)
@@ -27,19 +28,21 @@ private struct OldPaperTitleRow: View {
   let title: String
 
   var body: some View {
-    HStack(spacing: 6) {
+    HStack(spacing: 4) {
       Rectangle()
         .fill(oldPaperAccent.opacity(0.35))
         .frame(height: 1)
+        .frame(maxWidth: .infinity)
       Text(title)
         .font(.system(size: 10, weight: .semibold, design: .serif))
         .foregroundStyle(oldPaperText)
         .widgetFullColorContent()
-        .lineLimit(1)
-        .minimumScaleFactor(0.8)
+        .fixedSize(horizontal: true, vertical: false)
+        .layoutPriority(1)
       Rectangle()
         .fill(oldPaperAccent.opacity(0.35))
         .frame(height: 1)
+        .frame(maxWidth: .infinity)
     }
   }
 }
@@ -59,6 +62,7 @@ private struct WidgetFlourish: View {
 
 private enum WidgetBackgroundStyle {
   case parchment
+  case flatCream
   case leather
   case prayerGuidance
   case verseScenic
@@ -76,6 +80,8 @@ private enum WidgetBackgroundStyle {
         startPoint: .topLeading,
         endPoint: .bottomTrailing
       )
+    case .flatCream:
+      widgetFlatCream
     case .leather:
       LinearGradient(
         colors: [
@@ -270,7 +276,10 @@ struct VerseOfTheDayView: View {
   @Environment(\.widgetFamily) private var family
 
   var body: some View {
-    widgetWithBackground(.parchment, largeImage: "widget_path_bg") {
+    widgetWithBackground(
+      family == .systemLarge ? .parchment : .flatCream,
+      largeImage: family == .systemLarge ? "widget_path_bg" : nil
+    ) {
       Group {
         if family == .systemLarge {
           VStack(spacing: 10) {
@@ -293,28 +302,24 @@ struct VerseOfTheDayView: View {
             Spacer(minLength: 0)
           }
         } else {
-          VStack(spacing: 5) {
-            ZStack {
-              Image(systemName: "book.closed.fill")
-                .font(.system(size: 12))
-                .foregroundColor(oldPaperText)
-              Image(systemName: "plus")
-                .font(.system(size: 5, weight: .bold))
-                .foregroundColor(oldPaperText)
-                .offset(y: -1)
-            }
+          VStack(spacing: family == .systemSmall ? 6 : 8) {
+            Image(systemName: "book.closed.fill")
+              .font(.system(size: family == .systemSmall ? 13 : 15))
+              .foregroundColor(oldPaperText)
+              .widgetFullColorContent()
             OldPaperTitleRow(title: "Daily Verse")
             Text(plainVerseTextForWidget(entry.verseText))
-              .font(.system(size: 13, weight: .bold, design: .serif))
+              .font(.system(size: family == .systemSmall ? 14 : 15, weight: .bold, design: .serif))
               .foregroundStyle(oldPaperText)
               .widgetFullColorContent()
               .multilineTextAlignment(.center)
-              .lineLimit(4)
+              .lineLimit(family == .systemSmall ? 3 : 4)
+              .truncationMode(.tail)
               .minimumScaleFactor(0.82)
-              .padding(.horizontal, 2)
+              .padding(.horizontal, 4)
             Spacer(minLength: 0)
             Text(entry.verseReference)
-              .font(.system(size: 10, weight: .medium, design: .serif))
+              .font(.system(size: family == .systemSmall ? 11 : 12, weight: .regular, design: .serif))
               .foregroundStyle(oldPaperSecondary)
               .widgetFullColorContent()
               .multilineTextAlignment(.center)
@@ -323,7 +328,7 @@ struct VerseOfTheDayView: View {
         }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .padding(family == .systemLarge ? 16 : 10)
+      .padding(family == .systemLarge ? 16 : (family == .systemSmall ? 12 : 14))
     }
     .widgetURL(URL(string: "biblebookapp://verse?homeWidget"))
   }
@@ -478,25 +483,29 @@ struct BiblePrayerView: View {
       }
       .widgetURL(URL(string: "biblebookapp://prayer?homeWidget"))
     } else {
-      widgetWithBackground(.parchment) {
-        VStack(alignment: .leading, spacing: 6) {
-          HStack(spacing: 4) {
+      widgetWithBackground(.flatCream) {
+        VStack(alignment: .leading, spacing: 8) {
+          HStack(spacing: 5) {
             Image(systemName: "hands.sparkles")
-              .font(.caption)
+              .font(.system(size: 13))
               .foregroundColor(oldPaperAccent)
-            Text(entry.title)
-              .font(.caption)
-              .fontWeight(.semibold)
+              .widgetFullColorContent()
+            Text("Bible Prayer")
+              .font(.system(size: 13, weight: .semibold))
               .foregroundColor(oldPaperAccent)
+              .widgetFullColorContent()
           }
           Text(entry.prayerText)
-            .font(.subheadline)
+            .font(.system(size: 15, weight: .bold))
             .foregroundStyle(oldPaperText)
             .widgetFullColorContent()
             .lineLimit(4)
+            .truncationMode(.tail)
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(12)
+        .padding(14)
       }
       .widgetURL(URL(string: "biblebookapp://prayer?homeWidget"))
     }
