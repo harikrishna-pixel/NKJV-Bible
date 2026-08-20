@@ -39,11 +39,15 @@ class LibraryEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final primary = CommanColor.lightDarkPrimary(context);
     final screenWidth = MediaQuery.of(context).size.width;
+    final usesLightSurface = CommanColor.usesLightCustomSurface(context);
     final isDark = CommanColor.isDarkTheme(context);
-    final titleColor = isDark ? Colors.white : primary;
-    final subtitleColor =
-        isDark ? Colors.white.withOpacity(0.88) : primary.withOpacity(0.85);
-    final iconColor = isDark ? Colors.white : primary;
+    // White/yellow themes keep a light page even in Dark Mode — brown ink, not white.
+    final titleColor =
+        usesLightSurface ? primary : (isDark ? Colors.white : primary);
+    final subtitleColor = usesLightSurface
+        ? primary.withOpacity(0.85)
+        : (isDark ? Colors.white.withOpacity(0.88) : primary.withOpacity(0.85));
+    final iconColor = titleColor;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 28),

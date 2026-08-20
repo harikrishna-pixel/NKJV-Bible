@@ -1,5 +1,6 @@
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
+import 'package:biblebookapp/view/screens/chat/prayer_guidance_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -23,6 +24,13 @@ class TakeMomentCompleteScreen extends StatelessWidget {
           selectedBookNameForRead: "",
           selectedVerseForRead: "",
         ));
+    Future.microtask(() {
+      Get.to(
+        () => const PrayerGuidanceScreen(),
+        transition: Transition.cupertino,
+        duration: const Duration(milliseconds: 350),
+      );
+    });
   }
 
   @override
@@ -50,17 +58,6 @@ class TakeMomentCompleteScreen extends StatelessWidget {
           SafeArea(
             child: Column(
               children: [
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _dot(active: false, textColor: textColor),
-                    const SizedBox(width: 12),
-                    _dot(active: false, textColor: textColor),
-                    const SizedBox(width: 12),
-                    _dot(active: true, textColor: textColor),
-                  ],
-                ),
                 const Spacer(flex: 3),
                 Text(
                   'Well done!',
@@ -129,19 +126,6 @@ class TakeMomentCompleteScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: _goHome,
-                  child: Text(
-                    'Return to Prayer',
-                    style: TextStyle(
-                      fontSize: isTablet ? 16 : 15,
-                      color: softText,
-                      fontFamily: 'Georgia',
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
                 const SizedBox(height: 24),
               ],
             ),
@@ -151,21 +135,4 @@ class TakeMomentCompleteScreen extends StatelessWidget {
     );
   }
 
-  Widget _dot({required bool active, required Color textColor}) {
-    return Container(
-      width: 10,
-      height: 10,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: active ? _gold : Colors.transparent,
-        border: Border.all(
-          color: active ? _gold : textColor.withOpacity(0.3),
-          width: active ? 2 : 1.5,
-        ),
-        boxShadow: active
-            ? [BoxShadow(color: _gold.withOpacity(0.5), blurRadius: 8)]
-            : null,
-      ),
-    );
-  }
 }

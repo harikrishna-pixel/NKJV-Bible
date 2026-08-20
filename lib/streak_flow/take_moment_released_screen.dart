@@ -8,7 +8,7 @@ import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 
 /// After Amen: confirmation first, then scripture — one route, no stacked overlap.
-/// Tap or 5s advances to the next step only once.
+/// Tap or 10s advances to the next step only once.
 class TakeMomentReleasedScreen extends StatefulWidget {
   const TakeMomentReleasedScreen({super.key});
 
@@ -21,7 +21,7 @@ class _TakeMomentReleasedScreenState extends State<TakeMomentReleasedScreen> {
   static const Color _brown = Color(0xFF3D2914);
   static const Color _gold = Color(0xFFC9A227);
   static const Color _warmTan = Color(0xFF8B7355);
-  static const Duration _autoAdvance = Duration(seconds: 5);
+  static const Duration _autoAdvance = Duration(seconds: 10);
 
   /// 0 = placed confirmation, 1 = scripture
   int _step = 0;
@@ -99,28 +99,6 @@ class _TakeMomentReleasedScreenState extends State<TakeMomentReleasedScreen> {
                         softText: softText,
                       ),
               ),
-              Positioned(
-                right: 8,
-                top: 0,
-                bottom: 0,
-                child: Center(
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: _goNext,
-                      borderRadius: BorderRadius.circular(28),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Icon(
-                          Icons.chevron_right_rounded,
-                          size: isTablet ? 44 : 38,
-                          color: softText.withOpacity(0.9),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
@@ -135,17 +113,6 @@ class _TakeMomentReleasedScreenState extends State<TakeMomentReleasedScreen> {
   }) {
     return Column(
       children: [
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _dot(active: false, textColor: textColor),
-            const SizedBox(width: 12),
-            _dot(active: false, textColor: textColor),
-            const SizedBox(width: 12),
-            _dot(active: true, textColor: textColor),
-          ],
-        ),
         const Spacer(flex: 2),
         Container(
           width: 56,
@@ -226,17 +193,6 @@ class _TakeMomentReleasedScreenState extends State<TakeMomentReleasedScreen> {
   }) {
     return Column(
       children: [
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _dot(active: false, textColor: textColor),
-            const SizedBox(width: 12),
-            _dot(active: false, textColor: textColor),
-            const SizedBox(width: 12),
-            _dot(active: true, textColor: textColor),
-          ],
-        ),
         const Spacer(flex: 2),
         Container(
           width: isTablet ? 100 : 84,
@@ -366,21 +322,4 @@ class _TakeMomentReleasedScreenState extends State<TakeMomentReleasedScreen> {
     );
   }
 
-  Widget _dot({required bool active, required Color textColor}) {
-    return Container(
-      width: 10,
-      height: 10,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: active ? _gold : Colors.transparent,
-        border: Border.all(
-          color: active ? _gold : textColor.withOpacity(0.3),
-          width: active ? 2 : 1.5,
-        ),
-        boxShadow: active
-            ? [BoxShadow(color: _gold.withOpacity(0.5), blurRadius: 8)]
-            : null,
-      ),
-    );
-  }
 }

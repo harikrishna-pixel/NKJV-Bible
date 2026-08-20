@@ -205,6 +205,9 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         profileImage: profileImageUrl,
       );
       await progress.advanceTo(4);
+      // UI only: let step 4 finish visibly before the success confirmation.
+      await Future<void>.delayed(const Duration(milliseconds: 2500));
+      if (!mounted) return;
       // await WalletService.deductCredits(_totalCredits);
       if (effectiveName.isNotEmpty) {
         await PrayerWallLocalStore.saveLastDisplayName(effectiveName);
@@ -237,6 +240,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         verifyingOpen = false;
       }
       if (!mounted) return;
+      setState(() => _submitting = false);
       final result = await PrayerWallVerifyDialogs.showVerified(context);
       if (!mounted) return;
       Navigator.of(context).pop(result == true);

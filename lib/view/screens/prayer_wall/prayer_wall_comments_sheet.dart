@@ -772,7 +772,7 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                 Icon(
                   Icons.chat_bubble_outline_rounded,
                   size: 36,
-                  color: muted.withValues(alpha: 0.7),
+                  color: muted.withValues(alpha: isDark ? 0.45 : 0.35),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -781,7 +781,8 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                   style: TextStyle(
                     fontSize: 13.5,
                     height: 1.3,
-                    color: muted,
+                    fontWeight: FontWeight.w400,
+                    color: muted.withValues(alpha: isDark ? 0.55 : 0.42),
                   ),
                 ),
               ],

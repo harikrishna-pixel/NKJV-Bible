@@ -4015,11 +4015,16 @@ class _HomeScreenState extends State<HomeScreen>
                 ? _SmoothReaderAppBar(
                     visible: showUI,
                     height: readerAppBarHeight,
-                    child: AppBar(
+                    child: Theme(
+                      data: Theme.of(context).copyWith(
+                        dividerColor: Colors.transparent,
+                      ),
+                      child: AppBar(
                     toolbarHeight: readerToolbarHeight,
                           iconTheme: IconThemeData(
                               color: CommanColor.whiteBlack(context)),
-                    flexibleSpace: Container(
+                    flexibleSpace: SizedBox.expand(
+                      child: Container(
                       color: p.Provider.of<ThemeProvider>(context)
                                   .currentCustomTheme ==
                               AppCustomTheme.vintage
@@ -4049,11 +4054,15 @@ class _HomeScreenState extends State<HomeScreen>
                             )
                           : null,
                     ),
+                    ),
                     backgroundColor: p.Provider.of<ThemeProvider>(context)
                                 .currentCustomTheme ==
                             AppCustomTheme.vintage
                         ? Colors.transparent
                         : null,
+                    surfaceTintColor: Colors.transparent,
+                    scrolledUnderElevation: 0,
+                    shadowColor: Colors.transparent,
                     leadingWidth: 96,
                     titleSpacing: 0,
                     leading: Row(
@@ -4271,7 +4280,7 @@ class _HomeScreenState extends State<HomeScreen>
                             }
                             return BoxDecoration(
                               color: isVintage
-                                      ? CommanColor.white
+                                      ? const Color(0xFFF5F0E6)
                                   : themeProvider.backgroundColor,
                               border: Border(
                                 bottom: BorderSide(
@@ -4342,8 +4351,9 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                     ),
                     centerTitle: true,
-                    elevation: 2,
+                    elevation: 0,
                   ),
+                    ),
                   )
                 : null,
             body: child,
@@ -4740,8 +4750,8 @@ class _HomeScreenState extends State<HomeScreen>
                                   right: 15,
                                   bottom: 20,
                                   // Keep first verse fully below status bar /
-                                  // Dynamic Island when scrolled to top.
-                                  top: 8),
+                                  // Dynamic Island and the reader app bar.
+                                  top: readerContentTopPadding),
                               itemBuilder: (context, index) {
                                 var data = readerVerses[index];
                                 return AutoScrollTag(

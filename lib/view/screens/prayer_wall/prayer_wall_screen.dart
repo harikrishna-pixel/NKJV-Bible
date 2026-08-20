@@ -72,6 +72,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
   Map<String, String> _likeIdByPrayerId = {};
   final Set<String> _likeToggleBusy = {};
   bool _statusPromptShowing = false;
+  bool _openingPostPrayer = false;
 
   bool _looksOffline(Object e) => isNetworkRelatedError(e);
 
@@ -849,28 +850,38 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
   }
 
   Future<void> _openPostPrayerScreen({bool showSuccessToast = false}) async {
-    final allowed = await _ensureLoggedIn(
-      message:
-          'Please log in to support this prayer request and leave a comment.',
-    );
-    if (!allowed || !mounted) return;
+    if (_openingPostPrayer) return;
+    if (mounted) setState(() => _openingPostPrayer = true);
+    try {
+      final allowed = await _ensureLoggedIn(
+        message:
+            'Please log in to support this prayer request and leave a comment.',
+      );
+      if (!allowed || !mounted) return;
 
-    final isConnected = await InternetConnection().hasInternetAccess;
-    if (!isConnected) {
-      Constants.showToast('No internet connection', 1000);
-      return;
-    }
-    final posted = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => const PostPrayerScreen(),
-      ),
-    );
-    if (posted == true && mounted) {
-      await _reloadLocalDisplayName();
-      await _hydratePrayerAuthorsFromDisk();
-      await _refresh();
-      if (showSuccessToast && mounted) {
-        _showAppleToast('Prayer posted successfully.');
+      final isConnected = await InternetConnection().hasInternetAccess;
+      if (!isConnected) {
+        Constants.showToast('No internet connection', 1000);
+        return;
+      }
+      final posted = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => const PostPrayerScreen(),
+        ),
+      );
+      if (posted == true && mounted) {
+        await _reloadLocalDisplayName();
+        await _hydratePrayerAuthorsFromDisk();
+        await _refresh();
+        if (showSuccessToast && mounted) {
+          _showAppleToast('Prayer posted successfully.');
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _openingPostPrayer = false);
+      } else {
+        _openingPostPrayer = false;
       }
     }
   }
@@ -926,13 +937,15 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
             : BoxDecoration(color: cream),
         child: Scaffold(
           backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: isDark ? brown.withValues(alpha: 0.9) : brown,
-        foregroundColor: Colors.white,
-        elevation: isDark ? 8 : 6,
-        onPressed: () => _openPostPrayerScreen(),
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: MediaQuery.of(context).viewInsets.bottom > 0
+          ? null
+          : FloatingActionButton(
+              backgroundColor: isDark ? brown.withValues(alpha: 0.9) : brown,
+              foregroundColor: Colors.white,
+              elevation: isDark ? 8 : 6,
+              onPressed: _openingPostPrayer ? null : () => _openPostPrayerScreen(),
+              child: const Icon(Icons.add),
+            ),
       body: SafeArea(
         child: Column(
           children: [

@@ -66,6 +66,15 @@ class SharPreferences {
   static const showWelcomeLogoComparison = 'show_welcome_logo_comparison';
   static const userLocalData = 'userLocalData';
   static const calendarLocal = 'calendarLocal';
+  /// Tradition resolved by calendar_api.php from this app's bundle.
+  static const calendarTradition = 'calendarTradition';
+  /// ETag for bibleCalendar/data/{tradition}.json (304 = unchanged).
+  static const calendarDataEtag = 'calendarDataEtag';
+  /// Cached body of bibleCalendar/data/{tradition}.json.
+  static const calendarDataJson = 'calendarDataJson';
+  /// Per-day API response cache (6 h) — key suffix is YYYY-MM-DD.
+  static const calendarDayApiJson = 'calendar_day_api_json';
+  static const calendarDayApiTs = 'calendar_day_api_ts';
   static const bookadscatid = 'bookadscatid';
   static const surveyappid = 'surveyappid';
   static const surveyappenable = 'surveyappenable';

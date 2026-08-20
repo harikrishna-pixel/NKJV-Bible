@@ -8,6 +8,8 @@ import 'package:biblebookapp/view/screens/chat/chat_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/widget/library_empty_state.dart';
+import 'package:biblebookapp/home_widget/widget_prompt_cards.dart';
+import 'package:biblebookapp/home_widget/widget_prompt_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
@@ -147,11 +149,21 @@ class _HighLightScreenState extends State<HighLightScreen> {
               });
               return ListView.builder(
                 shrinkWrap: true,
-                itemCount: items.length,
+                itemCount: items.length + 1,
                 padding: EdgeInsets.only(left: 10, right: 10, top: 10),
                 physics: const ScrollPhysics(),
                 itemBuilder: (context, index) {
-                  var data = items[index];
+                  if (index == 0) {
+                    return WidgetPromptGate(
+                      id: WidgetPromptId.a6,
+                      triggerMet: items.length >= 3,
+                      builder: (context, onDismiss) => WidgetPromptA6Card(
+                        savedCount: items.length,
+                        onDismiss: onDismiss,
+                      ),
+                    );
+                  }
+                  var data = items[index - 1];
 
                   return Column(
                     children: [
