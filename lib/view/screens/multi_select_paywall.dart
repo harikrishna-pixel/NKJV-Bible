@@ -1,13 +1,18 @@
+import 'dart:async';
+
 import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
+import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/paywall_preload_service.dart';
 import 'package:biblebookapp/streak_flow/streak_flow_screens.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:get/get.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Multi-select paywall matching OldPaper prototype screen 13 (PAYWALL v6).
@@ -74,7 +79,61 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_onPaywallOpen());
+    });
     _loadProducts();
+  }
+
+  Future<void> _onPaywallOpen() async {
+    if (!mounted) return;
+    if (!await SubscriptionScreen.isDashboardIapEnabled()) {
+      await _leaveIfDashboardIapDisabled();
+      return;
+    }
+    await SubscriptionScreen.trackAndMarkVisiblePaywallOpen();
+    try {
+      Provider.of<DownloadProvider>(context, listen: false).disableAd();
+    } catch (_) {}
+    await SharPreferences.setBoolean('closead', false);
+    await SharPreferences.setString('OpenAd', '1');
+  }
+
+  Future<void> _leaveIfDashboardIapDisabled() async {
+    if (!mounted) return;
+    try {
+      EasyLoading.dismiss();
+    } catch (_) {}
+    await _navigateAwayFromPaywall();
+  }
+
+  Future<void> _navigateAwayFromPaywall() async {
+    if (!mounted) return;
+    try {
+      Provider.of<DownloadProvider>(context, listen: false).enableAd();
+    } catch (_) {}
+    await SharPreferences.setBoolean('closead', true);
+
+    if (!mounted) return;
+    if (Navigator.of(context).canPop()) {
+      Get.back();
+      return;
+    }
+    await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
+  }
+
+  Future<void> _onInvisibleHostFinished(bool success,
+      {required bool wasPurchase}) async {
+    if (!success || !mounted) return;
+    if (Get.isRegistered<DashBoardController>()) {
+      await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
+    }
+    if (!mounted) return;
+    if (wasPurchase && widget.checkad != 'onboard') {
+      await SubscriptionScreen.finishVisiblePaywallPurchaseSuccess(context);
+      return;
+    }
+    await _navigateAwayFromPaywall();
   }
 
   Future<void> _loadProducts() async {
@@ -91,10 +150,10 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     for (final p in products) {
       final id = p.id.toLowerCase();
       if (p.id == _resolvedSixMonth ||
-          id.contains('sixmonth') && !id.contains('exit')) {
+          BibleInfo.isArSixMonthProductId(p.id)) {
         six ??= p;
       } else if (p.id == _resolvedOneYear ||
-          (id.contains('oneyear') && !id.contains('exit'))) {
+          BibleInfo.isArOneYearProductId(p.id)) {
         year ??= p;
       } else if (p.id == _resolvedLifetime ||
           (id.contains('lifetime') && !id.contains('exit'))) {
@@ -116,6 +175,11 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
   ProductDetails? get _selectedAiProduct =>
       _dur == _AiDur.oneYear ? _oneYear : _sixMonth;
+
+  String get _selectedProductId {
+    if (_sel == _PwCard.lifetime) return _resolvedLifetime;
+    return _dur == _AiDur.oneYear ? _resolvedOneYear : _resolvedSixMonth;
+  }
 
   /// Slot for SubscriptionScreen: 0=6mo, 1=1yr, 2=lifetime.
   int get _selectedPlanSlot {
@@ -163,13 +227,11 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   }
 
   Future<void> _continueLimited() async {
-    if (!mounted) return;
-    final navContext = context;
-    await StreakFlowNavigation.navigateToStreakFlowOrHome(navContext);
+    await _navigateAwayFromPaywall();
   }
 
   Future<void> _onClose() async {
-    await _continueLimited();
+    await _navigateAwayFromPaywall();
   }
 
   /// Purchase via existing invisible SubscriptionScreen (unchanged IAP logic).
@@ -188,6 +250,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
           lifeTimePlan: widget.lifeTimePlan,
           checkad: widget.checkad,
           initialSelectedPlanIndex: _selectedPlanSlot,
+          autoStartProductId: _selectedProductId,
           autoStartSelectedPlanPurchase: true,
           invisiblePurchaseHost: true,
         ),
@@ -195,24 +258,33 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     );
 
     if (ok == true && mounted) {
-      if (Get.isRegistered<DashBoardController>()) {
-        await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
-      }
-      if (!mounted) return;
-      await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
+      await _onInvisibleHostFinished(true, wasPurchase: true);
     }
   }
 
-  /// Restore uses existing SubscriptionScreen restore path (UI host, same logic).
   Future<void> _restorePurchases() async {
-    await SharPreferences.setBoolean('restorepurches', true);
+    if (!await SubscriptionScreen.isDashboardIapEnabled()) return;
     if (!mounted) return;
-    await SubscriptionScreen.openPaywallStacked(
-      sixMonthPlan: widget.sixMonthPlan,
-      oneYearPlan: widget.oneYearPlan,
-      lifeTimePlan: widget.lifeTimePlan,
-      checkad: widget.checkad,
+
+    final ok = await Navigator.of(context).push<bool>(
+      PageRouteBuilder<bool>(
+        opaque: false,
+        barrierDismissible: false,
+        barrierColor: Colors.transparent,
+        pageBuilder: (ctx, _, __) => SubscriptionScreen(
+          sixMonthPlan: widget.sixMonthPlan,
+          oneYearPlan: widget.oneYearPlan,
+          lifeTimePlan: widget.lifeTimePlan,
+          checkad: widget.checkad,
+          invisiblePurchaseHost: true,
+          autoStartRestore: true,
+        ),
+      ),
     );
+
+    if (ok == true && mounted) {
+      await _onInvisibleHostFinished(true, wasPurchase: false);
+    }
   }
 
   @override
@@ -220,7 +292,13 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     final w = MediaQuery.sizeOf(context).width;
     final isTablet = w > 600;
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _navigateAwayFromPaywall();
+      },
+      child: Scaffold(
       backgroundColor: _cream,
       body: Column(
         children: [
@@ -258,6 +336,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
           _buildFooter(isTablet, w),
         ],
       ),
+    ),
     );
   }
 

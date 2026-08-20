@@ -14,6 +14,11 @@ class BibleInfo {
       'com.balaklrapps.newkingsjamesversion.sixmonthadsfree';
   static String oneYearPlanid =
       'com.balaklrapps.newkingsjamesversion.oneyearadsfree';
+  /// Paywall 2 (`paywallShows == 2`) auto-renewable IDs. Paywall 1 keeps the IDs above.
+  static String arSixMonthPlanid =
+      'com.balaklrapps.newkingsjamesversion.arsixmadfree';
+  static String arOneYearPlanid =
+      'com.balaklrapps.newkingsjamesversion.aroneyadfree';
   static String twoYearPlanid =
       'com.balaklrapps.newkingsjamesversion.twoyearadsfree';
   static String lifeTimePlanid =
@@ -53,6 +58,24 @@ class BibleInfo {
   static String coinPack3Price = '\$6.99';
 
   static bool enableIAP = true;
+
+  /// Paywall UI mode: `1` = classic single paywall, `2` = multi / auto-renewable.
+  static int paywallShows = 2;
+
+  static bool get isAutoRenewablePaywallMode => paywallShows == 2;
+
+  /// When [paywallShows] is `2`, Chat & Prayer skip credit check/deduct.
+  static bool get skipsChatPrayerCredits => isAutoRenewablePaywallMode;
+
+  static bool isArSixMonthProductId(String productId) {
+    final id = productId.toLowerCase();
+    return productId == arSixMonthPlanid || id.contains('arsixm');
+  }
+
+  static bool isArOneYearProductId(String productId) {
+    final id = productId.toLowerCase();
+    return productId == arOneYearPlanid || id.contains('aroney');
+  }
 
   // enable-> true or disable-> false e-products here
   static bool enableEShop = false;

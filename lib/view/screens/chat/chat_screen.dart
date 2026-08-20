@@ -754,12 +754,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   void _startListening() async {
-    // Check if user has enough credits before starting voice input
-    final chatCost = await WalletService.getChatCost();
-    final hasCredits = await WalletService.getCredits() >= chatCost;
-    if (!hasCredits) {
-      await _showInsufficientCreditsDialog();
-      return;
+    if (!BibleInfo.skipsChatPrayerCredits) {
+      final chatCost = await WalletService.getChatCost();
+      final hasCredits = await WalletService.getCredits() >= chatCost;
+      if (!hasCredits) {
+        await _showInsufficientCreditsDialog();
+        return;
+      }
     }
 
     if (_speech == null) {
@@ -1449,14 +1450,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   Future<bool> _checkChatLimit() async {
-    // Check if user has enough credits (cost depends on selected answer length)
+    if (BibleInfo.skipsChatPrayerCredits) return true;
     final chatCost = await WalletService.getChatCost();
     final credits = await WalletService.getCredits();
     return credits >= chatCost;
   }
 
   Future<void> _deductChatCredits() async {
-    // Deduct credits for chat (cost depends on selected answer length)
+    if (BibleInfo.skipsChatPrayerCredits) return;
     final chatCost = await WalletService.getChatCost();
     final success = await WalletService.deductCredits(chatCost);
     if (success) {
@@ -1752,12 +1753,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       return;
     }
 
-    // Check if user has enough credits before sending (cost depends on selected answer length)
-    final chatCost = await WalletService.getChatCost();
-    final hasCredits = await WalletService.getCredits() >= chatCost;
-    if (!hasCredits) {
-      await _showInsufficientCreditsDialog();
-      return;
+    if (!BibleInfo.skipsChatPrayerCredits) {
+      final chatCost = await WalletService.getChatCost();
+      final hasCredits = await WalletService.getCredits() >= chatCost;
+      if (!hasCredits) {
+        await _showInsufficientCreditsDialog();
+        return;
+      }
     }
 
     // Add user message to UI first

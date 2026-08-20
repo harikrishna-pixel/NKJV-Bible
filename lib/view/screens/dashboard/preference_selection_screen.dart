@@ -16,6 +16,7 @@ import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/streak_flow/streak_flow_screens.dart' hide SharPreferences;
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
+import 'package:biblebookapp/view/screens/paywall_navigation.dart';
 import 'package:biblebookapp/view/screens/onboard_faith_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -1609,12 +1610,12 @@ class FaithJourneyDialog {
                               return;
                             }
 
-                            // Onboarding: open the classic SubscriptionScreen paywall.
+                            // Onboarding paywall — UI per [BibleInfo.paywallShows].
                             final sixMonthPlan = BibleInfo.sixMonthPlanid;
                             final oneYearPlan = BibleInfo.oneYearPlanid;
                             final lifeTimePlan = BibleInfo.lifeTimePlanid;
                             Get.offAll(
-                                () => SubscriptionScreen(
+                                () => PaywallNavigation.buildVisiblePaywall(
                                       sixMonthPlan: sixMonthPlan,
                                       oneYearPlan: oneYearPlan,
                                       lifeTimePlan: lifeTimePlan,

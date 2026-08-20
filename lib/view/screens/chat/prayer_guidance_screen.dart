@@ -521,12 +521,14 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
       return;
     }
 
-    // Credits check (same as Chat)
-    final chatCost = await WalletService.getChatCost();
-    final hasCredits = await WalletService.getCredits() >= chatCost;
-    if (!hasCredits) {
-      _showInsufficientCreditsDialog();
-      return;
+    // Credits check (same as Chat) — skipped in auto-renewable paywall mode.
+    if (!BibleInfo.skipsChatPrayerCredits) {
+      final chatCost = await WalletService.getChatCost();
+      final hasCredits = await WalletService.getCredits() >= chatCost;
+      if (!hasCredits) {
+        _showInsufficientCreditsDialog();
+        return;
+      }
     }
 
     final category = _categories[categoryIndex];
@@ -790,17 +792,20 @@ ${category.prompt}
               responseText.toLowerCase().startsWith('error:');
       if (!isErrorResponse) {
         await WidgetPromptService.notePrayerGenerated();
-        await WalletService.deductCredits(chatCost);
-        if (mounted && requestId == _prayerRequestGeneration) {
-          final prefs = await SharedPreferences.getInstance();
-          final creditDebitShown =
-              prefs.getBool('prayer_credit_debit_shown') ?? false;
-          if (!creditDebitShown) {
-            Constants.showToast(
-                'Used $chatCost credits for this response', 1500);
-            await prefs.setBool('prayer_credit_debit_shown', true);
+        if (!BibleInfo.skipsChatPrayerCredits) {
+          final chatCost = await WalletService.getChatCost();
+          await WalletService.deductCredits(chatCost);
+          if (mounted && requestId == _prayerRequestGeneration) {
+            final prefs = await SharedPreferences.getInstance();
+            final creditDebitShown =
+                prefs.getBool('prayer_credit_debit_shown') ?? false;
+            if (!creditDebitShown) {
+              Constants.showToast(
+                  'Used $chatCost credits for this response', 1500);
+              await prefs.setBool('prayer_credit_debit_shown', true);
+            }
+            _loadCreditsFromLocal();
           }
-          _loadCreditsFromLocal();
         }
         if (requestId == _prayerRequestGeneration) {
         await updateBiblePrayerWidget(prayerText: responseText);
@@ -947,12 +952,13 @@ ${category.prompt}
       return;
     }
 
-    // Credits check (same as Chat)
-    final chatCost = await WalletService.getChatCost();
-    final hasCredits = await WalletService.getCredits() >= chatCost;
-    if (!hasCredits) {
-      _showInsufficientCreditsDialog();
-      return;
+    if (!BibleInfo.skipsChatPrayerCredits) {
+      final chatCost = await WalletService.getChatCost();
+      final hasCredits = await WalletService.getCredits() >= chatCost;
+      if (!hasCredits) {
+        _showInsufficientCreditsDialog();
+        return;
+      }
     }
 
     final requestId = ++_prayerRequestGeneration;
@@ -1219,17 +1225,20 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
               responseText.toLowerCase().startsWith('error:');
       if (!isErrorResponse) {
         await WidgetPromptService.notePrayerGenerated();
-        await WalletService.deductCredits(chatCost);
-        if (mounted && requestId == _prayerRequestGeneration) {
-          final prefs = await SharedPreferences.getInstance();
-          final creditDebitShown =
-              prefs.getBool('prayer_credit_debit_shown') ?? false;
-          if (!creditDebitShown) {
-            Constants.showToast(
-                'Used $chatCost credits for this response', 1500);
-            await prefs.setBool('prayer_credit_debit_shown', true);
+        if (!BibleInfo.skipsChatPrayerCredits) {
+          final chatCost = await WalletService.getChatCost();
+          await WalletService.deductCredits(chatCost);
+          if (mounted && requestId == _prayerRequestGeneration) {
+            final prefs = await SharedPreferences.getInstance();
+            final creditDebitShown =
+                prefs.getBool('prayer_credit_debit_shown') ?? false;
+            if (!creditDebitShown) {
+              Constants.showToast(
+                  'Used $chatCost credits for this response', 1500);
+              await prefs.setBool('prayer_credit_debit_shown', true);
+            }
+            _loadCreditsFromLocal();
           }
-          _loadCreditsFromLocal();
         }
         if (requestId == _prayerRequestGeneration) {
         await updateBiblePrayerWidget(prayerText: responseText);

@@ -11,6 +11,7 @@ import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/preference_selection_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
+import 'package:biblebookapp/view/screens/paywall_navigation.dart';
 import 'package:biblebookapp/view/widget/webview.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
@@ -2043,7 +2044,7 @@ class _SettingScreenState extends State<SettingScreen>
                               await SharPreferences.getString('lifeTimePlan') ??
                                   BibleInfo.lifeTimePlanid;
                           Get.to(
-                            () => SubscriptionScreen(
+                            () => PaywallNavigation.buildVisiblePaywall(
                               sixMonthPlan: sixMonthPlan,
                               oneYearPlan: oneYearPlan,
                               lifeTimePlan: lifeTimePlan,

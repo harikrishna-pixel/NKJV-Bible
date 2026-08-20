@@ -85,6 +85,12 @@ class PaywallPreloadService {
           twoYearPlan: twoYearPlanId,
           lifeTimePlan: lifeTimePlan,
         );
+        if (BibleInfo.isAutoRenewablePaywallMode) {
+          ids.addAll(AppApiConstant.subscriptionProductIdQueryVariants(
+              BibleInfo.arSixMonthPlanid));
+          ids.addAll(AppApiConstant.subscriptionProductIdQueryVariants(
+              BibleInfo.arOneYearPlanid));
+        }
         debugPrint('PaywallPreloadService: App bundle prefix: $bundlePrefix');
         debugPrint('PaywallPreloadService: Querying product details for: $ids');
 

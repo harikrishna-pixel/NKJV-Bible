@@ -36,6 +36,15 @@ target 'Runner' do
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
 
+# IronSource/LevelPlay ships a static xcframework. CocoaPods rejects that
+# under dynamic use_frameworks!; skip the transitive-static check only.
+pre_install do |installer|
+  Pod::Installer::Xcode::TargetValidator.send(
+    :define_method,
+    :verify_no_static_framework_transitive_dependencies,
+  ) {}
+end
+
 
 # post_install do |installer|
 #   installer.pods_project.targets.each do |target|

@@ -32,6 +32,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../Model/get_audio_model.dart';
 import '../../core/notifiers/download.notifier.dart';
+import 'paywall_navigation.dart';
 
 // final List<PurchaseDetails> _purchases = [];
 
@@ -50,6 +51,13 @@ class SubscriptionScreen extends StatefulWidget {
   /// after products are ready (used by milestone screens).
   final bool autoStartSelectedPlanPurchase;
 
+  /// Exact store product ID to buy when [autoStartSelectedPlanPurchase] is true.
+  /// Paywall 2 passes 6M/1Y/LT so slot fallback cannot buy the wrong plan.
+  final String? autoStartProductId;
+
+  /// When true, triggers restore via invisible host (multi paywall restore).
+  final bool autoStartRestore;
+
   /// Transparent host: runs IAP (e.g. milestone Unlock) without showing paywall UI.
   final bool invisiblePurchaseHost;
 
@@ -62,6 +70,8 @@ class SubscriptionScreen extends StatefulWidget {
     this.fromHomeExitOffer = false,
     this.initialSelectedPlanIndex,
     this.autoStartSelectedPlanPurchase = false,
+    this.autoStartProductId,
+    this.autoStartRestore = false,
     this.invisiblePurchaseHost = false,
   });
 
@@ -95,16 +105,60 @@ class SubscriptionScreen extends StatefulWidget {
           'SubscriptionScreen: dashboard IAP disabled — skip openPaywallStacked');
       return null;
     }
-    return Get.to<T>(
-      () => SubscriptionScreen(
-        sixMonthPlan: sixMonthPlan,
-        oneYearPlan: oneYearPlan,
-        lifeTimePlan: lifeTimePlan,
-        checkad: checkad,
-        fromHomeExitOffer: fromHomeExitOffer,
+    return PaywallNavigation.openStacked<T>(
+      sixMonthPlan: sixMonthPlan,
+      oneYearPlan: oneYearPlan,
+      lifeTimePlan: lifeTimePlan,
+      checkad: checkad,
+      fromHomeExitOffer: fromHomeExitOffer,
+    );
+  }
+
+  /// Analytics + first-seen prefs for visible paywall (single or multi UI).
+  static Future<void> trackAndMarkVisiblePaywallOpen() async {
+    AnalyticsService.trackPaywallScreen();
+    final hasShownPaywall =
+        await SharPreferences.getBoolean('has_shown_paywall_first_time') ??
+            false;
+    if (!hasShownPaywall) {
+      await SharPreferences.setBoolean('has_shown_paywall_first_time', true);
+      await SharPreferences.setBoolean('is_first_time_paywall_cancel', true);
+    }
+    final firstSeen =
+        await SharPreferences.getString('paywall_first_seen_date');
+    if (firstSeen == null || firstSeen.isEmpty) {
+      await SharPreferences.setString(
+          'paywall_first_seen_date', DateTime.now().toIso8601String());
+    }
+  }
+
+  /// Post-purchase navigation for visible paywall success (non-onboarding).
+  static Future<void> finishVisiblePaywallPurchaseSuccess(
+      BuildContext context) async {
+    if (Get.isRegistered<DashBoardController>()) {
+      await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
+    }
+    try {
+      final provider = Provider.of<DownloadProvider>(context, listen: false);
+      await provider.warmDataBeforeHomeScreen();
+    } catch (e) {
+      debugPrint('warmDataBeforeHomeScreen error: $e');
+    }
+    await SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, true);
+    // Allow Premium Unlocked to show after this Paywall 2 purchase.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('premiumalrt', '1');
+    } catch (_) {}
+    Get.offAll(
+      () => HomeScreen(
+        From: "premium",
+        selectedVerseNumForRead: "",
+        selectedBookForRead: "",
+        selectedChapterForRead: "",
+        selectedBookNameForRead: "",
+        selectedVerseForRead: "",
       ),
-      transition: paywallRouteTransition,
-      duration: paywallRouteDuration,
     );
   }
 
@@ -161,6 +215,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   String? _pendingRestoreProductId; // Store product ID for pending restore
   Timer? _loadingTimeoutTimer; // Timer for 6-second loading timeout
   bool _autoPurchaseTriggered = false;
+  bool _autoRestoreTriggered = false;
   Set<String> _lastQueriedProductIds = {};
   Set<String> _lastStoreNotFoundIds = {};
   /// Additive: highest restore tier applied in the current Restore session
@@ -223,16 +278,26 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       productId.startsWith('$_planBundlePrefix.');
 
   bool _cacheHasPaywallSlot(Iterable<String> productIds, String slot) =>
-      productIds.any((id) => id.contains(slot));
+      productIds.any((id) {
+        if (slot == 'sixmonth' && BibleInfo.isArSixMonthProductId(id)) {
+          return true;
+        }
+        if (slot == 'oneyear' && BibleInfo.isArOneYearProductId(id)) {
+          return true;
+        }
+        return id.contains(slot);
+      });
 
   bool _isSixMonthProductId(String productId) =>
       productId == _resolvedSixMonthPlanId ||
       productId == widget.sixMonthPlan ||
+      BibleInfo.isArSixMonthProductId(productId) ||
       (productId.contains('sixmonth') && _isPaywallProductForThisApp(productId));
 
   bool _isOneYearProductId(String productId) =>
       productId == _resolvedOneYearPlanId ||
       productId == widget.oneYearPlan ||
+      BibleInfo.isArOneYearProductId(productId) ||
       (productId.contains('oneyear') && _isPaywallProductForThisApp(productId));
 
   bool _isTwoYearProductId(String productId) =>
@@ -308,6 +373,24 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
     final incomingTier = _restoreProductTier(productId);
     if (incomingTier <= 0) return false;
+
+    // Buy flow (Paywall 2 invisible host): never let a lower-tier restore
+    // (e.g. old 6M) overwrite the plan that was just purchased (1Y/LT).
+    if (widget.autoStartSelectedPlanPurchase) {
+      int buyCurrentTier = _highestRestoredTierApplied;
+      if (downloadProvider != null) {
+        final currentPlan = await downloadProvider.getSubscriptionPlan();
+        final storedTier = _storedSubscriptionPlanTier(currentPlan);
+        if (storedTier > buyCurrentTier) buyCurrentTier = storedTier;
+      }
+      if (incomingTier < buyCurrentTier) {
+        debugPrint(
+          'Buy flow: skip lower-tier $productId (tier $incomingTier) '
+          '< existing tier $buyCurrentTier',
+        );
+        return true;
+      }
+    }
 
     final incomingDate = _parseRestoreTransactionDate(transactionDate);
     // Additive: a dated restore always beats an undated prior claim (epoch dates
@@ -559,6 +642,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     if (best == null) {
       EasyLoading.dismiss();
       Constants.showToast('No active subscription available');
+      if (widget.invisiblePurchaseHost && widget.autoStartRestore && mounted) {
+        _popInvisiblePurchaseHost(false);
+      }
       return;
     }
     debugPrint(
@@ -601,8 +687,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   String _productPlanSlotLabel(String productId) {
     final id = productId.toLowerCase();
-    if (id.contains('sixmonth')) return '6M';
-    if (id.contains('oneyear')) return '1Y';
+    if (BibleInfo.isArSixMonthProductId(productId) || id.contains('sixmonth')) {
+      return '6M';
+    }
+    if (BibleInfo.isArOneYearProductId(productId) || id.contains('oneyear')) {
+      return '1Y';
+    }
     if (id.contains('twoyear')) return '2Y';
     if (id.contains('lifetime')) return 'LT';
     return 'unknown';
@@ -618,19 +708,62 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   int _indexForPlanSlot(int slot) {
+    String? exactId;
+    if (slot == 0) exactId = _resolvedSixMonthPlanId;
+    if (slot == 1) exactId = _resolvedOneYearPlanId;
+    if (slot == 2) exactId = _resolvedLifeTimePlanId;
+    if (exactId != null && exactId.isNotEmpty) {
+      final exact = _products.indexWhere((p) => p.id == exactId);
+      if (exact >= 0) return exact;
+    }
     for (var i = 0; i < _products.length; i++) {
       if (_planSlotForProductId(_products[i].id) == slot) {
         return i;
       }
     }
-    return selectedindex.clamp(0, _products.length - 1);
+    return -1;
+  }
+
+  String? _resolvedIdForPlanSlot(int slot) {
+    if (slot == 0) return _resolvedSixMonthPlanId;
+    if (slot == 1) return _resolvedOneYearPlanId;
+    if (slot == 2) return _resolvedLifeTimePlanId;
+    return null;
+  }
+
+  ProductDetails? _productForAutoStartPurchase() {
+    final wantId = widget.autoStartProductId?.trim();
+    if (wantId != null && wantId.isNotEmpty) {
+      for (final p in _products) {
+        if (p.id == wantId) return p;
+      }
+    }
+    final slot = widget.initialSelectedPlanIndex;
+    if (slot == null) return null;
+    final idx = _indexForPlanSlot(slot);
+    if (idx >= 0 &&
+        idx < _products.length &&
+        _planSlotForProductId(_products[idx].id) == slot) {
+      return _products[idx];
+    }
+    final resolved = _resolvedIdForPlanSlot(slot);
+    if (resolved != null && resolved.isNotEmpty) {
+      for (final p in _products) {
+        if (p.id == resolved) return p;
+      }
+      for (final p in _buildAllFallbackProducts()) {
+        if (p.id == resolved) return p;
+      }
+    }
+    return null;
   }
 
   void _applyInitialPlanSelectionIfAny() {
     final idx = widget.initialSelectedPlanIndex;
     if (_products.isEmpty) return;
     if (idx != null) {
-      selectedindex = _indexForPlanSlot(idx);
+      final found = _indexForPlanSlot(idx);
+      if (found >= 0) selectedindex = found;
       return;
     }
 
@@ -662,12 +795,29 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   Future<void> _autoStartPurchaseIfNeeded() async {
     if (!widget.autoStartSelectedPlanPurchase || _autoPurchaseTriggered) return;
-    if (_products.isEmpty) return;
-    final idx = selectedindex.clamp(0, _products.length - 1);
+    final product = _productForAutoStartPurchase();
+    if (product == null) {
+      debugPrint(
+        'SubscriptionScreen: auto-start skipped — selected plan product '
+        'not loaded (slot=${widget.initialSelectedPlanIndex} '
+        'id=${widget.autoStartProductId})',
+      );
+      return;
+    }
     _autoPurchaseTriggered = true;
     await SharPreferences.setString('OpenAd', '1');
     await SharPreferences.setBoolean('startpurches', true);
-    _buyProduct(_products[idx]);
+    _buyProduct(product);
+  }
+
+  Future<void> _autoStartRestoreIfNeeded() async {
+    if (!widget.autoStartRestore || _autoRestoreTriggered) return;
+    _autoRestoreTriggered = true;
+    final controller = Get.isRegistered<DashBoardController>()
+        ? Get.find<DashBoardController>()
+        : Get.put(DashBoardController());
+    await SharPreferences.setBoolean('restorepurches', true);
+    await _restorePurchases(controller);
   }
 
   Future<void> _addLifetimeWalletBonus() async {
@@ -690,6 +840,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Future<void> _addLifetimeWalletBonusOnce() async {
+    // Paywall 2 (auto-renewable): Chat/Prayer already skip credits — don't grant wallet bonus.
+    if (BibleInfo.skipsChatPrayerCredits) return;
     final shouldGrant = await _tryMarkLifetimeWalletBonusGrantedOnce();
     if (!shouldGrant) return;
     await _addLifetimeWalletBonus();
@@ -1076,20 +1228,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   /// Mark that paywall has been shown (for first time tracking)
   Future<void> _markPaywallShown() async {
-    final hasShownPaywall =
-        await SharPreferences.getBoolean('has_shown_paywall_first_time') ??
-            false;
-    if (!hasShownPaywall) {
-      await SharPreferences.setBoolean('has_shown_paywall_first_time', true);
-      await SharPreferences.setBoolean('is_first_time_paywall_cancel', true);
-    }
-    // Store first time user sees paywall (for 3-day gate before exit offer / red dot)
-    final firstSeen =
-        await SharPreferences.getString('paywall_first_seen_date');
-    if (firstSeen == null || firstSeen.isEmpty) {
-      await SharPreferences.setString(
-          'paywall_first_seen_date', DateTime.now().toIso8601String());
-    }
+    await SubscriptionScreen.trackAndMarkVisiblePaywallOpen();
   }
 
   /// Check if exit offer should be shown and display it (for purchase cancellation)
@@ -2465,6 +2604,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     _logPaywallData(source: 'initialize');
 
     await _autoStartPurchaseIfNeeded();
+    await _autoStartRestoreIfNeeded();
 
     if (widget.fromHomeExitOffer && mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -2689,13 +2829,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     final hasTwoYear =
         _products.any((product) => _isTwoYearProductId(product.id));
     for (final fallback in _buildAllFallbackProducts()) {
-      if (fallback.id.contains('sixmonth')) {
+      if (_isSixMonthProductId(fallback.id)) {
         if (!hasSixMonth) {
           _products.add(fallback);
         }
         continue;
       }
-      if (fallback.id.contains('oneyear')) {
+      if (_isOneYearProductId(fallback.id)) {
         if (!hasOneYear) {
           _products.add(fallback);
         }
@@ -3094,6 +3234,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       EasyLoading.dismiss();
       DebugConsole.log("restore No active subscription available error - $e");
       Constants.showToast('No active subscription available');
+      if (widget.invisiblePurchaseHost && widget.autoStartRestore && mounted) {
+        _popInvisiblePurchaseHost(false);
+      }
     }
   }
 
