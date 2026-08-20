@@ -91,6 +91,7 @@ class LiturgicalCalendarService {
     for (final mapKey in ['fixedFeasts', 'greatFeastsFixed']) {
       final map = yearBlock?[mapKey] ?? data[mapKey];
       if (map is Map && map[mmdd] != null) {
+        //
         return map[mmdd].toString();
       }
     }
