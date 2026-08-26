@@ -901,7 +901,8 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                           // Show success dialog when user taps Continue
                           FaithJourneyDialog.showSuccessDialog(
                               context,
-                              isFromOnboarding: !widget.isSetting);
+                              isFromOnboarding: !widget.isSetting,
+                              selectedTopics: _selectedCategories.toList());
                         },
                       );
                       debugPrint(
@@ -1459,9 +1460,27 @@ class FaithJourneyDialog {
     );
   }
 
+  /// Display label for ready screen — uses saved selections when provided.
+  static String formatSelectedTopicsLabel(List<String> topics) {
+    final cleaned =
+        topics.map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+    if (cleaned.isEmpty) {
+      return 'Peace, Strength, Comfort & more.';
+    }
+    if (cleaned.length <= 3) {
+      return '${cleaned.join(', ')}.';
+    }
+    return '${cleaned.take(3).join(', ')} & more.';
+  }
+
   /// Show Success Dialog
-  static Future<void> showSuccessDialog(BuildContext context,
-      {bool isFromOnboarding = false}) async {
+  static Future<void> showSuccessDialog(
+    BuildContext context, {
+    bool isFromOnboarding = false,
+    List<String>? selectedTopics,
+  }) async {
+    final topicsLabel =
+        formatSelectedTopicsLabel(selectedTopics ?? const []);
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1567,7 +1586,7 @@ class FaithJourneyDialog {
                                 "We've personalized your verses around ",
                           ),
                           TextSpan(
-                            text: 'Peace, Strength, Comfort & more.',
+                            text: topicsLabel,
                             style: TextStyle(
                               fontWeight: FontWeight.w700,
                               color: topicsColor,

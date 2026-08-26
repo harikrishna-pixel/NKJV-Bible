@@ -3,6 +3,7 @@ import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/login_screen.dart';
+import 'package:biblebookapp/view/screens/authenitcation/view/widget/referral_code_bottom_sheet.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/post_prayer_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_comments_sheet.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
@@ -27,7 +28,8 @@ class PrayerWallScreen extends StatefulWidget {
   State<PrayerWallScreen> createState() => _PrayerWallScreenState();
 }
 
-class _PrayerWallScreenState extends State<PrayerWallScreen> {
+class _PrayerWallScreenState extends State<PrayerWallScreen>
+    with WidgetsBindingObserver {
   static const List<String> _sortOptions = [
     'Latest',
     'Most prayed',
@@ -47,6 +49,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
   Map<String, int> _commentCounts = {};
   Map<String, String> _prayerAuthorMap = {};
   Set<String> _myPrayerIds = {};
+  /// UI-only: prayers reported on this device (flag highlight).
+  Set<String> _reportedPrayerIds = {};
   String _filter = 'All';
   String _sort = 'Latest';
   bool _loading = true;
@@ -73,6 +77,33 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
   final Set<String> _likeToggleBusy = {};
   bool _statusPromptShowing = false;
   bool _openingPostPrayer = false;
+
+  /// UI-only: History icon — my posted prayers via ?prayerId=.
+  bool _showingHistory = false;
+  bool _historyLoading = false;
+  String? _historyError;
+  List<PrayerWallItem> _historyItems = [];
+  bool _openingHistory = false;
+
+  /// True when keyboard is up or a text field is focused (hide FAB overlay).
+  bool get _hideFabForInput {
+    final mqBottom = MediaQuery.viewInsetsOf(context).bottom;
+    if (mqBottom > 0) return true;
+    final view = View.maybeOf(context);
+    if (view != null &&
+        view.viewInsets.bottom / view.devicePixelRatio > 0) {
+      return true;
+    }
+    final focusCtx = FocusManager.instance.primaryFocus?.context;
+    if (focusCtx == null) return false;
+    return focusCtx.findAncestorWidgetOfExactType<TextField>() != null ||
+        focusCtx.findAncestorWidgetOfExactType<TextFormField>() != null ||
+        focusCtx.widget is EditableText;
+  }
+
+  void _onFocusOrMetricsChanged() {
+    if (mounted) setState(() {});
+  }
 
   bool _looksOffline(Object e) => isNetworkRelatedError(e);
 
@@ -116,11 +147,26 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    FocusManager.instance.addListener(_onFocusOrMetricsChanged);
     _hydrateLikesFromDisk();
     _hydratePrayerAuthorsFromDisk();
     _hydrateMyPrayerIdsFromDisk();
+    _hydrateReportedPrayerIdsFromDisk();
     _loadAuthAndLocalName();
     _refresh();
+  }
+
+  @override
+  void dispose() {
+    FocusManager.instance.removeListener(_onFocusOrMetricsChanged);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    _onFocusOrMetricsChanged();
   }
 
   Future<void> _loadAuthAndLocalName() async {
@@ -179,9 +225,20 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
   }
 
   Future<void> _hydrateMyPrayerIdsFromDisk() async {
-    final s = await PrayerWallLocalStore.loadMyPrayerIds();
+    // Owner ids = only prayers this device posted (meta/author on create).
+    final owned = await PrayerWallLocalStore.loadOwnedPrayerIds();
+    final raw = await PrayerWallLocalStore.loadMyPrayerIds();
+    if (owned.length != raw.length || !owned.containsAll(raw)) {
+      await PrayerWallLocalStore.saveMyPrayerIds(owned);
+    }
     if (!mounted) return;
-    setState(() => _myPrayerIds = s);
+    setState(() => _myPrayerIds = owned);
+  }
+
+  Future<void> _hydrateReportedPrayerIdsFromDisk() async {
+    final s = await PrayerWallLocalStore.loadReportedPrayerIds();
+    if (!mounted) return;
+    setState(() => _reportedPrayerIds = s);
   }
 
   /// True if this device has marked the prayer as liked (see persisted map).
@@ -258,9 +315,10 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
     }
   }
   List<PrayerWallItem> get _visible {
+    final source = _showingHistory ? _historyItems : _all;
     final base = _filter == 'All'
-        ? List<PrayerWallItem>.from(_all)
-        : _all.where((p) => p.category == _filter).toList();
+        ? List<PrayerWallItem>.from(source)
+        : source.where((p) => p.category == _filter).toList();
 
     int createdMs(PrayerWallItem p) =>
         p.createdAt?.millisecondsSinceEpoch ?? 0;
@@ -278,16 +336,14 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
     return base;
   }
 
+  /// Owner only: this device posted it, or API author user id matches login.
+  /// Does not use display-name matching (shared names would allow editing others).
   bool _isMyPrayer(PrayerWallItem item) {
     if (_myPrayerIds.contains(item.id)) return true;
+    if (_prayerAuthorMap.containsKey(item.id)) return true;
     final uid = (_userId ?? '').trim();
-    final uname = _viewerDisplayName;
     final authorId = (item.authorUserId ?? '').trim();
     if (uid.isNotEmpty && authorId.isNotEmpty && uid == authorId) return true;
-    final local = (_prayerAuthorMap[item.id] ?? '').trim();
-    if (uname.isNotEmpty && local.isNotEmpty && uname == local) return true;
-    final apiName = (item.authorName ?? '').trim();
-    if (uname.isNotEmpty && apiName.isNotEmpty && uname == apiName) return true;
     return false;
   }
 
@@ -299,21 +355,41 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
     } catch (_) {}
   }
 
+  /// UI-only: blocks parallel embedded-login routes from Like/Comment/Post taps.
+  static bool _embeddedLoginGateBusy = false;
+
   /// UI gate only: show Login Required, then open LoginScreen. No API changes.
-  Future<bool> _ensureLoggedIn({required String message}) async {
+  Future<bool> _ensureLoggedIn({
+    required String message,
+    VoidCallback? replaceOnSuccess,
+  }) async {
     if (_isLoggedIn) return true;
+    if (_embeddedLoginGateBusy) return false;
+
     final goLogin = await PrayerWallLoginRequiredDialog.show(
       context,
       message: message,
     );
     if (goLogin != true || !mounted) return false;
 
-    final result = await Get.to<dynamic>(
-      () => LoginScreen(hasSkip: false, popOnSuccess: true),
-    );
-    if (!mounted) return false;
-    await _loadAuthAndLocalName();
-    return _isLoggedIn || result == true;
+    _embeddedLoginGateBusy = true;
+    try {
+      final result = await Get.to<bool>(
+        () => LoginScreen(
+          hasSkip: false,
+          popOnSuccess: true,
+          replaceOnSuccess: replaceOnSuccess,
+        ),
+        routeName: LoginScreen.embeddedRouteName,
+        preventDuplicates: true,
+      );
+      if (!mounted) return false;
+      ReferralCodeBottomSheet.resetPresentationLock();
+      await _loadAuthAndLocalName();
+      return _isLoggedIn || result == true;
+    } finally {
+      _embeddedLoginGateBusy = false;
+    }
   }
 
   Future<void> _toggleLike(PrayerWallItem item) async {
@@ -366,7 +442,11 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
     }
   }
 
-  Future<bool> _ensureCanComment() {
+  /// Comments: anyone may open/view. Posting still requires login via [_ensureCanPostComment].
+  Future<bool> _ensureCanComment() => Future<bool>.value(true);
+
+  /// UI gate only: login required before posting a comment.
+  Future<bool> _ensureCanPostComment() {
     return _ensureLoggedIn(
       message:
           'Please log in to support this prayer request and leave a comment.',
@@ -395,6 +475,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
         reportReason: reason.trim(),
       );
       if (!mounted) return;
+      await PrayerWallLocalStore.markPrayerReported(item.id);
+      if (!mounted) return;
+      setState(() => _reportedPrayerIds.add(item.id));
       Constants.showToast('Report submitted successfully', 2000);
     } catch (e) {
       print('PrayerWall _openReport error: $e');
@@ -412,11 +495,6 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
     final brown = const Color(0xFF5C4033);
-    final dialogBg = isDark
-        ? CommanColor.darkPrimaryColor
-        : (themeProvider.currentCustomTheme == AppCustomTheme.vintage
-            ? const Color(0xFFF8F3EA)
-            : themeProvider.backgroundColor);
 
     final titleCtrl = TextEditingController(text: item.title);
     final descCtrl = TextEditingController(text: item.description);
@@ -438,12 +516,61 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
       action = await showDialog<String>(
         context: context,
         barrierDismissible: true,
+        barrierColor: Colors.black.withValues(alpha: 0.45),
         builder: (ctx) {
           final media = MediaQuery.of(ctx);
           final bottomInset = media.viewInsets.bottom;
           final topInset = media.padding.top;
           final maxSheetHeight =
               media.size.height - topInset - bottomInset - 24;
+          const parchment = Color(0xFFF5EFE4);
+          const ink = Color(0xFF4B3423);
+          const muted = Color(0xFF6B4E3D);
+          const fieldCream = Color(0xFFFFFFFF);
+          const deleteBorder = Color(0xFFB85C4A);
+          final sheetBg = isDark ? CommanColor.darkPrimaryColor : parchment;
+          final titleColor = isDark ? Colors.white : ink;
+          final labelColor = isDark ? Colors.white70 : brown;
+          final fieldBg = isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : fieldCream;
+          final fieldBorder = isDark
+              ? Colors.white.withValues(alpha: 0.12)
+              : const Color(0xFFE2D5C4);
+
+          Widget quillIcon({double size = 42}) {
+            return SizedBox(
+              width: size,
+              height: size,
+              child: Image.asset(
+                'assets/edit_post_quill_icon.png',
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Icon(
+                  Icons.edit_outlined,
+                  size: size * 0.55,
+                  color: isDark ? Colors.white70 : brown,
+                ),
+              ),
+            );
+          }
+
+          Widget crossDivider() {
+            final line = Color(0xFFD4C4B0).withValues(alpha: isDark ? 0.35 : 1);
+            return Row(
+              children: [
+                Expanded(child: Divider(color: line, thickness: 1, height: 1)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Icon(
+                    Icons.add,
+                    size: 14,
+                    color: isDark ? Colors.white54 : const Color(0xFF8B7355),
+                  ),
+                ),
+                Expanded(child: Divider(color: line, thickness: 1, height: 1)),
+              ],
+            );
+          }
 
           return AnimatedPadding(
             duration: const Duration(milliseconds: 160),
@@ -457,10 +584,11 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
             child: Align(
               alignment: Alignment.topCenter,
               child: Material(
-                color: dialogBg,
-                elevation: 12,
+                color: sheetBg,
+                elevation: 14,
                 shadowColor: Colors.black45,
-                borderRadius: BorderRadius.circular(22),
+                surfaceTintColor: Colors.transparent,
+                borderRadius: BorderRadius.circular(28),
                 clipBehavior: Clip.antiAlias,
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
@@ -472,38 +600,36 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(18, 16, 10, 8),
+                        padding: const EdgeInsets.fromLTRB(16, 16, 8, 6),
                         child: Row(
                           children: [
-                            Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: brown.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(Icons.edit_outlined,
-                                  color: isDark ? Colors.white70 : brown,
-                                  size: 18),
-                            ),
-                            const SizedBox(width: 10),
+                            quillIcon(size: 44),
                             Expanded(
                               child: Text(
-                                'Edit your post',
+                                'Edit Your Post',
+                                textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  color: isDark ? Colors.white : brown,
-                                  fontWeight: FontWeight.w800,
+                                  fontFamily: 'Georgia',
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  color: titleColor,
                                 ),
                               ),
                             ),
                             IconButton(
                               onPressed: () => Navigator.pop(ctx, 'cancel'),
-                              icon: Icon(Icons.close,
-                                  color: isDark ? Colors.white70 : brown),
+                              icon: Icon(
+                                Icons.close,
+                                color: isDark ? Colors.white70 : brown,
+                              ),
                               tooltip: 'Close',
                             ),
                           ],
                         ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(22, 0, 22, 10),
+                        child: crossDivider(),
                       ),
                       Flexible(
                         child: SingleChildScrollView(
@@ -516,145 +642,181 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               Text(
-                                'Title',
+                                'TITLE',
                                 style: TextStyle(
+                                  fontFamily: 'Georgia',
                                   fontSize: 12,
+                                  letterSpacing: 1.1,
                                   fontWeight: FontWeight.w700,
-                                  color: isDark
-                                      ? Colors.white70
-                                      : Colors.grey.shade700,
+                                  color: labelColor,
                                 ),
                               ),
-                              const SizedBox(height: 6),
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: isDark
-                                      ? Colors.white.withValues(alpha: 0.06)
-                                      : Colors.white,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: isDark
-                                        ? Colors.white.withValues(alpha: 0.08)
-                                        : const Color(0xFFE7DCCB),
-                                  ),
+                              const SizedBox(height: 8),
+                              Material(
+                                color: fieldBg,
+                                elevation: 0,
+                                shadowColor: Colors.transparent,
+                                surfaceTintColor: Colors.transparent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  side: BorderSide(color: fieldBorder),
                                 ),
+                                clipBehavior: Clip.antiAlias,
                                 child: TextField(
                                   controller: titleCtrl,
                                   maxLength: 120,
+                                  cursorColor: brown,
                                   style: TextStyle(
-                                      color: isDark ? Colors.white : brown),
+                                    color: isDark ? Colors.white : brown,
+                                    fontSize: 15,
+                                  ),
                                   decoration: InputDecoration(
                                     hintText: 'Enter a short title',
                                     hintStyle: TextStyle(
-                                        color: isDark
-                                            ? Colors.white54
-                                            : Colors.grey.shade600),
+                                      color: isDark
+                                          ? Colors.white54
+                                          : Colors.grey.shade600,
+                                    ),
+                                    filled: true,
+                                    fillColor: fieldBg,
                                     border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
                                     contentPadding: const EdgeInsets.fromLTRB(
-                                        12, 12, 12, 10),
+                                        14, 14, 14, 12),
                                     counterText: '',
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 14),
                               Text(
-                                'Details',
+                                'DETAILS',
                                 style: TextStyle(
+                                  fontFamily: 'Georgia',
                                   fontSize: 12,
+                                  letterSpacing: 1.1,
                                   fontWeight: FontWeight.w700,
-                                  color: isDark
-                                      ? Colors.white70
-                                      : Colors.grey.shade700,
+                                  color: labelColor,
                                 ),
                               ),
-                              const SizedBox(height: 6),
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: isDark
-                                      ? Colors.white.withValues(alpha: 0.06)
-                                      : Colors.white,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: isDark
-                                        ? Colors.white.withValues(alpha: 0.08)
-                                        : const Color(0xFFE7DCCB),
-                                  ),
+                              const SizedBox(height: 8),
+                              Material(
+                                color: fieldBg,
+                                elevation: 0,
+                                shadowColor: Colors.transparent,
+                                surfaceTintColor: Colors.transparent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  side: BorderSide(color: fieldBorder),
                                 ),
+                                clipBehavior: Clip.antiAlias,
                                 child: TextField(
                                   controller: descCtrl,
                                   maxLines: 5,
                                   maxLength: 2000,
                                   onTap: scrollFieldIntoView,
+                                  cursorColor: brown,
                                   style: TextStyle(
-                                      color: isDark ? Colors.white : brown,
-                                      height: 1.35),
+                                    color: isDark ? Colors.white : brown,
+                                    height: 1.35,
+                                    fontSize: 15,
+                                  ),
                                   decoration: InputDecoration(
                                     hintText: 'Write your prayer details…',
                                     hintStyle: TextStyle(
-                                        color: isDark
-                                            ? Colors.white54
-                                            : Colors.grey.shade600),
+                                      color: isDark
+                                          ? Colors.white54
+                                          : Colors.grey.shade600,
+                                    ),
+                                    filled: true,
+                                    fillColor: fieldBg,
                                     border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
                                     contentPadding: const EdgeInsets.fromLTRB(
-                                        12, 12, 12, 10),
+                                        14, 14, 14, 12),
                                     counterText: '',
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Tip: Use “Read more” on long posts for a full view.',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: isDark
-                                      ? Colors.white54
-                                      : Colors.grey.shade700,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
                             ],
                           ),
                         ),
                       ),
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+                        padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
                         child: Row(
                           children: [
                             Expanded(
-                              child: OutlinedButton(
-                                onPressed: () => Navigator.pop(ctx, 'delete'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.red.shade700,
-                                  side: BorderSide(color: Colors.red.shade200),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
+                              child: SizedBox(
+                                height: 48,
+                                child: OutlinedButton.icon(
+                                  onPressed: () =>
+                                      Navigator.pop(ctx, 'delete'),
+                                  icon: const Icon(Icons.delete_outline,
+                                      size: 18),
+                                  label: const Text(
+                                    'Delete',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 15,
+                                    ),
                                   ),
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 12),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: deleteBorder,
+                                    side: const BorderSide(
+                                      color: deleteBorder,
+                                      width: 1.4,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                  ),
                                 ),
-                                child: const Text('Delete'),
                               ),
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: 12),
                             Expanded(
-                              child: ElevatedButton(
-                                onPressed: () => Navigator.pop(ctx, 'save'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: brown,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
+                              child: SizedBox(
+                                height: 48,
+                                child: ElevatedButton(
+                                  onPressed: () => Navigator.pop(ctx, 'save'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: brown,
+                                    foregroundColor: const Color(0xFFF5EFE4),
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
                                   ),
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 12),
-                                ),
-                                child: const Text(
-                                  'Save',
-                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: const [
+                                      Text(
+                                        'Save',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Icon(Icons.edit, size: 16),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
                           ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: Icon(
+                          Icons.diamond_outlined,
+                          size: 12,
+                          color: isDark
+                              ? Colors.white38
+                              : muted.withValues(alpha: 0.45),
                         ),
                       ),
                     ],
@@ -801,6 +963,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
       try {
         await PrayerWallService.deletePrayer(item.id);
         await PrayerWallLocalStore.removePrayerAuthor(prayerId: item.id);
+        await PrayerWallLocalStore.removePrayerDurationMeta(prayerId: item.id);
         await PrayerWallLocalStore.removeMyPrayerId(item.id);
         if (!mounted) return;
         await _hydratePrayerAuthorsFromDisk();
@@ -849,25 +1012,133 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
     return 'Just now';
   }
 
+  /// Display name on a card. Own posts use the name saved with the prayer
+  /// (API / local map), not a forced login-cache override.
+  String _cardDisplayName(PrayerWallItem item) {
+    final fromApi = (item.authorName ?? '').trim();
+    final fromMap = (_prayerAuthorMap[item.id] ?? '').trim();
+
+    if (_isMyPrayer(item)) {
+      if (fromApi.isNotEmpty) return fromApi;
+      if (fromMap.isNotEmpty) return fromMap;
+      if (_viewerDisplayName.isNotEmpty) return _viewerDisplayName;
+      return 'You';
+    }
+
+    if (item.isAnonymous) return 'Anonymous';
+    if (fromApi.isNotEmpty) return fromApi;
+
+    final authorId = (item.authorUserId ?? '').trim();
+    final uid = (_userId ?? '').trim();
+    if (authorId.isNotEmpty &&
+        uid.isNotEmpty &&
+        authorId == uid &&
+        _viewerDisplayName.isNotEmpty) {
+      return _viewerDisplayName;
+    }
+    if (fromMap.isNotEmpty) return fromMap;
+    return 'Community member';
+  }
+
+  /// UI-only: History — load prayers I posted (ids from local store + ?prayerId=).
+  Future<void> _openMyPrayerHistory() async {
+    if (_openingHistory) return;
+    if (_showingHistory) {
+      setState(() {
+        _showingHistory = false;
+        _historyError = null;
+      });
+      return;
+    }
+
+    final allowed = await _ensureLoggedIn(
+      message: 'Please log in to view your prayer history.',
+    );
+    if (!allowed || !mounted) return;
+
+    setState(() => _showingHistory = true);
+    await _reloadMyPrayerHistory();
+  }
+
+  Future<void> _reloadMyPrayerHistory() async {
+    if (_openingHistory) return;
+    _openingHistory = true;
+    try {
+      if (!mounted) return;
+      setState(() {
+        _historyLoading = true;
+        _historyError = null;
+      });
+
+      final postedIds = await PrayerWallLocalStore.loadOwnedPrayerIds();
+      await PrayerWallLocalStore.saveMyPrayerIds(postedIds);
+      if (!mounted) return;
+      setState(() => _myPrayerIds = {...postedIds});
+
+      if (postedIds.isEmpty) {
+        setState(() {
+          _historyItems = [];
+          _historyLoading = false;
+        });
+        return;
+      }
+
+      final history =
+          await PrayerWallService.fetchPrayersByPrayerIds(postedIds);
+      if (!mounted) return;
+      final onlyMine =
+          history.where((p) => postedIds.contains(p.id)).toList();
+      setState(() {
+        _historyItems = onlyMine;
+        _historyLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _historyLoading = false;
+        _historyError = _friendlyError(e);
+        _historyItems = [];
+      });
+    } finally {
+      _openingHistory = false;
+    }
+  }
+
   Future<void> _openPostPrayerScreen({bool showSuccessToast = false}) async {
     if (_openingPostPrayer) return;
     if (mounted) setState(() => _openingPostPrayer = true);
     try {
-      final allowed = await _ensureLoggedIn(
-        message:
-            'Please log in to support this prayer request and leave a comment.',
-      );
-      if (!allowed || !mounted) return;
-
       final isConnected = await InternetConnection().hasInternetAccess;
       if (!isConnected) {
         Constants.showToast('No internet connection', 1000);
         return;
       }
-      final posted = await Navigator.of(context).push<bool>(
-        MaterialPageRoute(
-          builder: (_) => const PostPrayerScreen(),
-        ),
+      if (!mounted) return;
+
+      if (!_isLoggedIn) {
+        final allowed = await _ensureLoggedIn(
+          message:
+              'Please log in to support this prayer request and leave a comment.',
+          replaceOnSuccess: () {
+            Get.off(
+              () => const PostPrayerScreen(),
+              routeName: PostPrayerScreen.routeName,
+              preventDuplicates: true,
+              transition: Transition.noTransition,
+              duration: Duration.zero,
+            );
+          },
+        );
+        if (!allowed || !mounted) return;
+        // Login was replaced with Post a Prayer — do not push it again.
+        return;
+      }
+
+      if (!mounted) return;
+      final posted = await Get.to<bool>(
+        () => const PostPrayerScreen(),
+        routeName: PostPrayerScreen.routeName,
+        preventDuplicates: true,
       );
       if (posted == true && mounted) {
         await _reloadLocalDisplayName();
@@ -937,7 +1208,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
             : BoxDecoration(color: cream),
         child: Scaffold(
           backgroundColor: Colors.transparent,
-      floatingActionButton: MediaQuery.of(context).viewInsets.bottom > 0
+      floatingActionButton: _hideFabForInput
           ? null
           : FloatingActionButton(
               backgroundColor: isDark ? brown.withValues(alpha: 0.9) : brown,
@@ -966,12 +1237,21 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () {
+                      if (_showingHistory) {
+                        setState(() {
+                          _showingHistory = false;
+                          _historyError = null;
+                        });
+                        return;
+                      }
+                      Navigator.of(context).pop();
+                    },
                   ),
                   Expanded(
                     child: Center(
                       child: Text(
-                        'Prayer Wall',
+                        _showingHistory ? 'History' : 'Prayer Wall',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: Colors.white,
@@ -982,8 +1262,14 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                       ),
                     ),
                   ),
-                  // Balance the back button so the title stays centered.
-                  const SizedBox(width: 48),
+                  IconButton(
+                    tooltip: _showingHistory ? 'Prayer Wall' : 'History',
+                    icon: Icon(
+                      _showingHistory ? Icons.forum_outlined : Icons.history,
+                      color: Colors.white,
+                    ),
+                    onPressed: _openingHistory ? null : _openMyPrayerHistory,
+                  ),
                 ],
               ),
             ),
@@ -1073,9 +1359,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
               ),
             ),
             Expanded(
-              child: _loading
+              child: (_showingHistory ? _historyLoading : _loading)
                   ? const Center(child: CircularProgressIndicator())
-                  : _error != null
+                  : (_showingHistory ? _historyError : _error) != null
                       ? Center(
                           child: Padding(
                             padding: const EdgeInsets.all(24),
@@ -1083,7 +1369,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  _error!,
+                                  (_showingHistory ? _historyError : _error)!,
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     color: isDark
@@ -1093,7 +1379,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                                 ),
                                 const SizedBox(height: 16),
                                 ElevatedButton(
-                                  onPressed: _refresh,
+                                  onPressed: _showingHistory
+                                      ? _reloadMyPrayerHistory
+                                      : _refresh,
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: brown,
                                     foregroundColor: Colors.white,
@@ -1105,7 +1393,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                           ),
                         )
                       : RefreshIndicator(
-                          onRefresh: _refresh,
+                          onRefresh: _showingHistory
+                              ? _reloadMyPrayerHistory
+                              : _refresh,
                           child: _visible.isEmpty
                               ? ListView(
                                   children: [
@@ -1116,7 +1406,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                                     ),
                                     Center(
                                       child: Text(
-                                        'No prayers in this category yet.',
+                                        _showingHistory
+                                            ? 'No prayers in your history yet.'
+                                            : 'No prayers in this category yet.',
                                         style: TextStyle(
                                           color: isDark
                                               ? Colors.white70
@@ -1137,34 +1429,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                                       brown: brown,
                                       isDark: isDark,
                                       timeLabel: _timeLabel(item),
-                                      displayName: _isMyPrayer(item)
-                                          ? (_viewerDisplayName.isNotEmpty
-                                              ? _viewerDisplayName
-                                              : 'You')
-                                          : (item.isAnonymous
-                                              ? 'Anonymous'
-                                              : ((item.authorName?.trim().isNotEmpty ??
-                                                      false)
-                                                  ? item.authorName!.trim()
-                                                  : (((item.authorUserId
-                                                                      ?.trim()
-                                                                      .isNotEmpty ??
-                                                                  false) &&
-                                                              (_userId?.trim().isNotEmpty ??
-                                                                  false) &&
-                                                              item.authorUserId!
-                                                                      .trim() ==
-                                                                  _userId!.trim() &&
-                                                              _viewerDisplayName
-                                                                  .isNotEmpty)
-                                                          ? _viewerDisplayName
-                                                          : ((_prayerAuthorMap[item.id]
-                                                                          ?.trim()
-                                                                          .isNotEmpty ??
-                                                                      false)
-                                                                  ? _prayerAuthorMap[item.id]!
-                                                                      .trim()
-                                                                  : 'Community member')))),
+                                      displayName: _cardDisplayName(item),
                                       profileImageUrl: () {
                                         final fromApi =
                                             item.profileImage?.trim() ?? '';
@@ -1192,6 +1457,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                                         );
                                       },
                                       onReport: () => _openReport(item),
+                                      isReported:
+                                          _reportedPrayerIds.contains(item.id),
                                       likeCount: _likeCounts[item.id] ?? 0,
                                       liked: _isLiked(item.id),
                                       likeBusy:
@@ -1200,6 +1467,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
                                       commentCount:
                                           _commentCounts[item.id] ?? 0,
                                       onEnsureCanComment: _ensureCanComment,
+                                      onEnsureCanPostComment:
+                                          _ensureCanPostComment,
                                       onCommentsChanged:
                                           _refreshCommentCountsOnly,
                                     );
@@ -1294,12 +1563,14 @@ class _PrayerCard extends StatefulWidget {
     required this.onOpen,
     required this.onShare,
     required this.onReport,
+    this.isReported = false,
     required this.likeCount,
     required this.liked,
     required this.likeBusy,
     required this.onToggleLike,
     required this.commentCount,
     required this.onEnsureCanComment,
+    required this.onEnsureCanPostComment,
     required this.onCommentsChanged,
   });
 
@@ -1314,12 +1585,14 @@ class _PrayerCard extends StatefulWidget {
   final VoidCallback onOpen;
   final VoidCallback onShare;
   final VoidCallback onReport;
+  final bool isReported;
   final int likeCount;
   final bool liked;
   final bool likeBusy;
   final VoidCallback onToggleLike;
   final int commentCount;
   final Future<bool> Function() onEnsureCanComment;
+  final Future<bool> Function() onEnsureCanPostComment;
   final Future<void> Function() onCommentsChanged;
 
   @override
@@ -1497,9 +1770,13 @@ class _PrayerCardState extends State<_PrayerCard> {
                     child: Padding(
                       padding: const EdgeInsets.all(6),
                       child: Icon(
-                        Icons.flag_outlined,
+                        widget.isReported
+                            ? Icons.flag_rounded
+                            : Icons.flag_outlined,
                         size: 20,
-                        color: isDark ? Colors.white : brown,
+                        color: widget.isReported
+                            ? const Color(0xFFC45C3A)
+                            : (isDark ? Colors.white : brown),
                       ),
                     ),
                   ),
@@ -1721,6 +1998,7 @@ class _PrayerCardState extends State<_PrayerCard> {
                   titlePreview:
                       item.title.isNotEmpty ? item.title : item.description,
                   embedded: true,
+                  onEnsureCanPost: widget.onEnsureCanPostComment,
                   onChanged: () {
                     widget.onCommentsChanged();
                   },

@@ -15,6 +15,7 @@ class PrayerWallLocalStore {
   static const _kSeenPrayerIds = 'prayer_wall_seen_prayer_ids_v1';
   static const _kPrayerDurationMeta = 'prayer_wall_duration_meta_v1';
   static const _kStatusSubmittedIds = 'prayer_wall_status_submitted_ids_v1';
+  static const _kReportedPrayerIds = 'prayer_wall_reported_prayer_ids_v1';
   static const _kReporterId = 'prayer_wall_reporter_id_v1';
   static const _kBannerDismissKeys = 'prayer_wall_home_banner_dismiss_v1';
 
@@ -234,6 +235,23 @@ class PrayerWallLocalStore {
     await savePrayerDurationMeta(m);
   }
 
+  static Future<void> removePrayerDurationMeta({required String prayerId}) async {
+    final pid = prayerId.trim();
+    if (pid.isEmpty) return;
+    final m = await loadPrayerDurationMeta();
+    if (!m.containsKey(pid)) return;
+    m.remove(pid);
+    await savePrayerDurationMeta(m);
+  }
+
+  /// Ids this device actually posted (duration meta / author map on create).
+  /// Not the raw my-prayer list (that can be polluted by full-wall sync).
+  static Future<Set<String>> loadOwnedPrayerIds() async {
+    final meta = await loadPrayerDurationMeta();
+    final authors = await loadPrayerAuthorMap();
+    return {...meta.keys, ...authors.keys};
+  }
+
   static Future<Set<String>> loadStatusSubmittedIds() async {
     final p = await SharedPreferences.getInstance();
     final s = p.getString(_kStatusSubmittedIds);
@@ -258,6 +276,33 @@ class PrayerWallLocalStore {
     final s = await loadStatusSubmittedIds();
     s.add(pid);
     await saveStatusSubmittedIds(s);
+  }
+
+  /// UI-only: prayers this device already reported (flag highlight).
+  static Future<Set<String>> loadReportedPrayerIds() async {
+    final p = await SharedPreferences.getInstance();
+    final s = p.getString(_kReportedPrayerIds);
+    if (s == null || s.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(s);
+      if (decoded is! List) return {};
+      return decoded.map((e) => e.toString()).toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> saveReportedPrayerIds(Set<String> ids) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kReportedPrayerIds, jsonEncode(ids.toList()));
+  }
+
+  static Future<void> markPrayerReported(String prayerId) async {
+    final pid = prayerId.trim();
+    if (pid.isEmpty) return;
+    final s = await loadReportedPrayerIds();
+    s.add(pid);
+    await saveReportedPrayerIds(s);
   }
 
   /// UI-only dismiss keys for home expiry banners (e.g. `ends_today:<id>:<ymd>`).

@@ -270,14 +270,42 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
     return widget.widgetTitle ?? 'Available Widgets';
   }
 
-  void _openDrawerWidgetPreview(_DrawerWidgetCatalogItem item) {
+  /// Available widgets: open How to add steps (old flow) for this widget.
+  Future<void> _openDrawerWidgetHowTo(_DrawerWidgetCatalogItem item) async {
+    await WidgetPromptService.noteWidgetPreviewed(
+      iosWidgetKind: item.iosWidgetKind,
+      widgetTitle: item.title,
+    );
+    if (!mounted) return;
     setState(() {
       _hubPreviewActive = true;
       _drawerGalleryTitle = item.title;
       _drawerGalleryImages = item.previewImages;
       _showAvailableWidgets = false;
-      _showHowToGuide = false;
+      _showHowToGuide = true;
+      _hubRefreshToken++;
     });
+  }
+
+  /// Already-added widgets: swipe preview only (no How to add).
+  Future<void> _openDrawerWidgetPreview(_DrawerWidgetCatalogItem item) async {
+    await WidgetPromptService.noteWidgetPreviewed(
+      iosWidgetKind: item.iosWidgetKind,
+      widgetTitle: item.title,
+    );
+    if (!mounted) return;
+    setState(() {
+      _hubPreviewActive = true;
+      _drawerGalleryTitle = item.title;
+      _drawerGalleryImages = item.previewImages;
+      _showAvailableWidgets = true;
+      _showHowToGuide = false;
+      _galleryDotIndex = 0;
+      _hubRefreshToken++;
+    });
+    if (_galleryPageController.hasClients) {
+      _galleryPageController.jumpToPage(0);
+    }
   }
 
   void _closeDrawerWidgetPreview() {
@@ -286,20 +314,33 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
       _drawerGalleryTitle = null;
       _drawerGalleryImages = null;
       _showAvailableWidgets = false;
+      _showHowToGuide = false;
+      _hubRefreshToken++;
     });
   }
 
   void _handleAppBarBack() {
     if (_showAvailableWidgets) {
-      setState(() => _showAvailableWidgets = false);
+      setState(() {
+        _showAvailableWidgets = false;
+        _hubPreviewActive = false;
+        _drawerGalleryTitle = null;
+        _drawerGalleryImages = null;
+      });
+      return;
+    }
+    if (_showHowToGuide && _isDrawerEntry) {
+      setState(() {
+        _showHowToGuide = false;
+        _hubPreviewActive = false;
+        _drawerGalleryTitle = null;
+        _drawerGalleryImages = null;
+        _hubRefreshToken++;
+      });
       return;
     }
     if (_hubPreviewActive) {
       _closeDrawerWidgetPreview();
-      return;
-    }
-    if (_showHowToGuide && _isDrawerEntry) {
-      setState(() => _showHowToGuide = false);
       return;
     }
     Get.back();
@@ -674,7 +715,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => _openDrawerWidgetPreview(item),
+        onTap: () => _openDrawerWidgetHowTo(item),
         child: Ink(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
@@ -718,27 +759,26 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
                           color: _bodyInk.withOpacity(0.88),
                         ),
                       ),
-                      if (explored) ...[
-                        const SizedBox(height: 8),
-                        _statusChip(
-                          label: 'Explored',
-                          background:
-                              _isDarkPage ? _goldInk.withOpacity(0.18) : _exploredChip,
-                          foreground: _goldInk,
-                          borderColor: _goldInk.withOpacity(0.28),
-                        ),
-                      ],
                     ],
                   ),
                 ),
                 const SizedBox(width: 8),
                 OutlinedButton(
-                  onPressed: () => _openDrawerWidgetPreview(item),
+                  onPressed: () => _openDrawerWidgetHowTo(item),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _goldInk,
-                    backgroundColor:
-                        _isDarkPage ? Colors.black.withOpacity(0.12) : Colors.white,
-                    side: BorderSide(color: _goldInk.withOpacity(0.75)),
+                    backgroundColor: explored
+                        ? (_isDarkPage
+                            ? _goldInk.withOpacity(0.18)
+                            : _exploredChip)
+                        : (_isDarkPage
+                            ? Colors.black.withOpacity(0.12)
+                            : Colors.white),
+                    side: BorderSide(
+                      color: explored
+                          ? _goldInk.withOpacity(0.28)
+                          : _goldInk.withOpacity(0.75),
+                    ),
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     minimumSize: const Size(0, 34),
@@ -747,9 +787,9 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
-                  child: const Text(
-                    '+ Add',
-                    style: TextStyle(
+                  child: Text(
+                    explored ? 'Explored' : 'Explore',
+                    style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
@@ -773,7 +813,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Add a widget by long pressing it on your Home Screen or via the + Add button.',
+              'Add a widget by long pressing it on your Home Screen.',
               style: TextStyle(
                 fontSize: 12.5,
                 height: 1.35,
@@ -914,7 +954,13 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
-              onPressed: () => setState(() => _showHowToGuide = false),
+              onPressed: () => setState(() {
+                _showHowToGuide = false;
+                _hubPreviewActive = false;
+                _drawerGalleryTitle = null;
+                _drawerGalleryImages = null;
+                _hubRefreshToken++;
+              }),
               icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 14),
               label: const Text(
                 'Back to widget list',
@@ -1074,7 +1120,21 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
         ),
         const SizedBox(height: 14),
         TextButton(
-          onPressed: () => Get.back(),
+          onPressed: () {
+            // Drawer hub: stay on Widgets screen. Prompt flow: pop as before.
+            if (_isDrawerEntry) {
+              setState(() {
+                _showHowToGuide = false;
+                _showAvailableWidgets = false;
+                _hubPreviewActive = false;
+                _drawerGalleryTitle = null;
+                _drawerGalleryImages = null;
+                _hubRefreshToken++;
+              });
+              return;
+            }
+            Get.back();
+          },
           child: Text(
             'Got It',
             style: TextStyle(
@@ -1162,9 +1222,13 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
 
   Widget _bodyContent() {
     if (_showAvailableWidgets) return _availableWidgetsGallery();
-    if (_isDrawerEntry && !_showHowToGuide && !_hubPreviewActive) {
-      return _drawerWidgetsHub();
+    // Explore → How to add steps (old screen).
+    if (_isDrawerEntry && _showHowToGuide) return _howToContent();
+    // Already-added widget → preview gallery only.
+    if (_isDrawerEntry && _hubPreviewActive) {
+      return _availableWidgetsGallery();
     }
+    if (_isDrawerEntry) return _drawerWidgetsHub();
     return _howToContent();
   }
 

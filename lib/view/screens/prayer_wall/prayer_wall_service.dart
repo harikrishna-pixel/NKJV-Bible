@@ -41,6 +41,70 @@ class PrayerWallService {
     return PrayerWallItem.listFromResponseBody(res.body);
   }
 
+  /// Additive: one prayer by posted id — `GET /api/prayers?prayerId={id}`.
+  /// Server may ignore the query and return the full list; we keep only exact id.
+  /// Does not change [fetchPrayers] (full wall).
+  static Future<PrayerWallItem?> fetchPrayerByPrayerId(String prayerId) async {
+    final id = prayerId.trim();
+    if (id.isEmpty) return null;
+    final res = await http.get(
+      Uri.parse(PrayerWallApiConstant.prayersForPrayerId(id)),
+      headers: _jsonHeaders,
+    );
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw Exception(
+          'Prayer by id failed (${res.statusCode}): ${res.body}');
+    }
+    final list = PrayerWallItem.listFromResponseBody(res.body);
+    for (final p in list) {
+      if (p.id == id) return p;
+    }
+    // Some APIs return a single object instead of a list.
+    try {
+      final decoded = jsonDecode(res.body);
+      final one = PrayerWallItem.fromDynamic(decoded);
+      if (one != null && one.id == id) return one;
+    } catch (_) {}
+    return null;
+  }
+
+  /// Additive: load history for ids saved when the user posted.
+  /// Always filters to [prayerIds] only (API `?prayerId=` may return the full wall).
+  static Future<List<PrayerWallItem>> fetchPrayersByPrayerIds(
+    Iterable<String> prayerIds,
+  ) async {
+    final ids = prayerIds
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toSet();
+    if (ids.isEmpty) return [];
+
+    // One request (server ignores filter today); keep only requested ids.
+    List<PrayerWallItem> list;
+    try {
+      final probeId = ids.first;
+      final res = await http.get(
+        Uri.parse(PrayerWallApiConstant.prayersForPrayerId(probeId)),
+        headers: _jsonHeaders,
+      );
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        throw Exception(
+            'Prayers by id failed (${res.statusCode}): ${res.body}');
+      }
+      list = PrayerWallItem.listFromResponseBody(res.body);
+    } catch (_) {
+      list = await fetchPrayers();
+    }
+
+    final out = list.where((p) => ids.contains(p.id)).toList();
+    out.sort((a, b) {
+      final am = a.createdAt?.millisecondsSinceEpoch ?? 0;
+      final bm = b.createdAt?.millisecondsSinceEpoch ?? 0;
+      return bm.compareTo(am);
+    });
+    return out;
+  }
+
   static Future<Map<String, dynamic>> createPrayer({
     required String prayerTitle,
     required String prayerDescription,

@@ -157,6 +157,7 @@ class _HighLightScreenState extends State<HighLightScreen> {
                     return WidgetPromptGate(
                       id: WidgetPromptId.a6,
                       triggerMet: items.length >= 3,
+                      libraryTab: WidgetPromptService.libraryTabHighlight,
                       builder: (context, onDismiss) => WidgetPromptA6Card(
                         savedCount: items.length,
                         onDismiss: onDismiss,

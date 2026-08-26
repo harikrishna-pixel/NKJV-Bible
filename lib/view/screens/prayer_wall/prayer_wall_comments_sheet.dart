@@ -16,6 +16,7 @@ class PrayerWallCommentsSheet extends StatefulWidget {
     required this.titlePreview,
     this.embedded = false,
     this.onChanged,
+    this.onEnsureCanPost,
   });
 
   final String prayerId;
@@ -24,6 +25,8 @@ class PrayerWallCommentsSheet extends StatefulWidget {
   final bool embedded;
   /// Called after comments list changes (post/edit/delete).
   final VoidCallback? onChanged;
+  /// UI gate only: login check before posting. Viewing remains open.
+  final Future<bool> Function()? onEnsureCanPost;
 
   @override
   State<PrayerWallCommentsSheet> createState() => _PrayerWallCommentsSheetState();
@@ -88,6 +91,11 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
       Constants.showToast('Comment is too long (max 1000).');
       return;
     }
+    // UI gate: guests may view comments; posting requires login.
+    if (widget.onEnsureCanPost != null) {
+      final allowed = await widget.onEnsureCanPost!();
+      if (!allowed || !mounted) return;
+    }
     setState(() => _posting = true);
     try {
       final id = await PrayerWallService.postComment(
@@ -124,76 +132,118 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
 
     final newText = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: dialogBg,
-        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-        contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-        actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        title: Row(
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: brown.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
+      barrierColor: Colors.black.withValues(alpha: 0.4),
+      builder: (ctx) {
+        final fieldBg =
+            isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white;
+        final fieldBorder = isDark
+            ? Colors.white.withValues(alpha: 0.14)
+            : const Color(0xFFE2D5C4);
+        return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          backgroundColor: dialogBg,
+          surfaceTintColor: Colors.transparent,
+          shadowColor: Colors.black26,
+          elevation: 8,
+          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+          contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+          title: Row(
+            children: [
+              SizedBox(
+                width: 40,
+                height: 40,
+                child: Image.asset(
+                  'assets/edit_post_quill_icon.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: brown.withValues(alpha: 0.10),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.edit_outlined, color: brown, size: 18),
+                  ),
+                ),
               ),
-              child: Icon(Icons.edit_outlined, color: brown, size: 18),
+              const SizedBox(width: 10),
+              Text(
+                'Edit comment',
+                style: TextStyle(
+                  color: isDark ? Colors.white : brown,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 18,
+                ),
+              ),
+            ],
+          ),
+          content: Material(
+            color: fieldBg,
+            elevation: 0,
+            shadowColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: fieldBorder),
             ),
-            const SizedBox(width: 10),
-            Text(
-              'Edit comment',
+            clipBehavior: Clip.antiAlias,
+            child: TextField(
+              controller: ctrl,
+              maxLines: 4,
+              maxLength: 1000,
+              cursorColor: brown,
               style: TextStyle(
-                color: isDark ? Colors.white : brown,
-                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : CommanColor.black,
+                fontSize: 15,
+                height: 1.35,
               ),
+              decoration: InputDecoration(
+                hintText: 'Update your comment',
+                hintStyle: TextStyle(
+                  color: isDark ? Colors.white54 : Colors.grey.shade600,
+                ),
+                filled: true,
+                fillColor: fieldBg,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                counterText: '',
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: isDark ? const Color(0xFFF5EDE3) : brown,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: brown,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shadowColor: Colors.transparent,
+                surfaceTintColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+              ),
+              child: const Text('Save'),
             ),
           ],
-        ),
-        content: Container(
-          decoration: BoxDecoration(
-            color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : const Color(0xFFE7DCCB),
-            ),
-          ),
-          child: TextField(
-            controller: ctrl,
-            maxLines: 4,
-            maxLength: 1000,
-            style: TextStyle(color: isDark ? Colors.white : CommanColor.black),
-            decoration: InputDecoration(
-              hintText: 'Update your comment',
-              hintStyle: TextStyle(color: isDark ? Colors.white54 : null),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-              counterText: '',
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                color: isDark ? const Color(0xFFF5EDE3) : brown,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: brown, foregroundColor: Colors.white),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
+        );
+      },
     );
 
     if (newText == null || newText.isEmpty) return;
@@ -225,43 +275,153 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
     if (id == null) return;
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
+    const cream = Color(0xFFFFFBF7);
+    const ink = Color(0xFF4B3423);
+    const muted = Color(0xFF6B4E3D);
+    const brown = Color(0xFF5C4033);
+    const gold = Color(0xFFC9A227);
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor:
-            isDark ? CommanColor.darkPrimaryColor : null,
-        surfaceTintColor: Colors.transparent,
-        title: Text(
-          'Delete comment?',
-          style: TextStyle(color: isDark ? Colors.white : null),
-        ),
-        content: Text(
-          'This comment will be permanently deleted.',
-          style: TextStyle(color: isDark ? Colors.white70 : null),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                color: isDark ? const Color(0xFFF5EDE3) : null,
-                fontWeight: FontWeight.w600,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withValues(alpha: 0.4),
+      builder: (ctx) {
+        final bg = isDark ? CommanColor.darkPrimaryColor : cream;
+        final titleColor = isDark ? Colors.white : ink;
+        final bodyColor = isDark ? Colors.white70 : muted;
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+          child: Material(
+            color: bg,
+            borderRadius: BorderRadius.circular(24),
+            clipBehavior: Clip.antiAlias,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(22, 28, 22, 22),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    'assets/delete_comment_icon.png',
+                    width: 140,
+                    height: 140,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Icon(
+                      Icons.delete_outline_rounded,
+                      size: 56,
+                      color: brown.withValues(alpha: 0.85),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Delete comment?',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      color: titleColor,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'This comment will be permanently deleted and can’t be undone.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.4,
+                      fontWeight: FontWeight.w500,
+                      color: bodyColor,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Divider(
+                          color: gold.withValues(alpha: 0.45),
+                          thickness: 1,
+                          height: 1,
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Icon(
+                          Icons.eco_rounded,
+                          size: 16,
+                          color: gold.withValues(alpha: 0.9),
+                        ),
+                      ),
+                      Expanded(
+                        child: Divider(
+                          color: gold.withValues(alpha: 0.45),
+                          thickness: 1,
+                          height: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 48,
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: titleColor,
+                              side: BorderSide(
+                                color: brown.withValues(
+                                  alpha: isDark ? 0.55 : 0.7,
+                                ),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(28),
+                              ),
+                            ),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: SizedBox(
+                          height: 48,
+                          child: ElevatedButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: brown,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(28),
+                              ),
+                            ),
+                            child: const Text(
+                              'Delete',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              'Delete',
-              style: TextStyle(
-                color: isDark ? Colors.red.shade300 : null,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
     if (ok != true) return;
     try {
@@ -825,10 +985,15 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                               TextButton(
                                 onPressed: () => _edit(row),
                                 style: TextButton.styleFrom(
-                                  padding: EdgeInsets.zero,
+                                  padding: const EdgeInsets.only(
+                                    top: 4,
+                                    bottom: 4,
+                                    right: 10,
+                                  ),
                                   minimumSize: const Size(0, 28),
                                   tapTargetSize:
                                       MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: VisualDensity.compact,
                                 ),
                                 child: Text(
                                   'Edit',
@@ -839,13 +1004,18 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                                   ),
                                 ),
                               ),
+                              const SizedBox(width: 8),
                               TextButton(
                                 onPressed: () => _delete(row),
                                 style: TextButton.styleFrom(
-                                  padding: EdgeInsets.zero,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                    horizontal: 4,
+                                  ),
                                   minimumSize: const Size(0, 28),
                                   tapTargetSize:
                                       MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: VisualDensity.compact,
                                 ),
                                 child: const Text(
                                   'Delete',

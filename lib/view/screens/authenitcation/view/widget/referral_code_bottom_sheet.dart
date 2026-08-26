@@ -28,6 +28,49 @@ class ReferralCodeBottomSheet extends StatefulWidget {
   /// When true, apply via profile API (Account section) — no password needed.
   final bool useLoggedInSession;
 
+  /// UI-only: prevent stacked referral sheets from parallel login taps.
+  static bool _isShowing = false;
+  static Future<void>? _presentedSheet;
+  static Future<void> _openChain = Future<void>.value();
+
+  /// UI-only: clear lock if a prior sheet was interrupted (e.g. Prayer Wall login).
+  static void resetPresentationLock() {
+    _isShowing = false;
+    _presentedSheet = null;
+    _openChain = Future<void>.value();
+  }
+
+  static Future<void> _presentSheet({
+    required BuildContext context,
+    required Widget Function(BuildContext context) sheetBuilder,
+    bool useRootNavigator = true,
+  }) {
+    if (_presentedSheet != null) {
+      return _presentedSheet!;
+    }
+
+    late final Future<void> sheetFuture;
+    sheetFuture = showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: useRootNavigator,
+      isScrollControlled: true,
+      isDismissible: true,
+      enableDrag: true,
+      backgroundColor: Colors.transparent,
+      builder: sheetBuilder,
+    ).whenComplete(() {
+      _isShowing = false;
+      if (identical(_presentedSheet, sheetFuture)) {
+        _presentedSheet = null;
+      }
+      FocusManager.instance.primaryFocus?.unfocus();
+    });
+
+    _isShowing = true;
+    _presentedSheet = sheetFuture;
+    return sheetFuture;
+  }
+
   static Future<void> show({
     required BuildContext context,
     required String email,
@@ -35,6 +78,8 @@ class ReferralCodeBottomSheet extends StatefulWidget {
     String? ownReferralCode,
     String? initialReferredBy,
     int? initialReferralRewardClaimed,
+    /// When false, sheet stays on the login route (Prayer Wall return flow).
+    bool useRootNavigator = true,
   }) {
     // Do not open the sheet when this account already used a referral.
     final alreadyReferred =
@@ -44,38 +89,45 @@ class ReferralCodeBottomSheet extends StatefulWidget {
       return Future.value();
     }
 
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      isDismissible: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        final mediaQuery = MediaQuery.of(context);
-        final keyboardHeight = mediaQuery.viewInsets.bottom;
-        final availableHeight =
-            mediaQuery.size.height - mediaQuery.padding.top - 8;
+    late final Future<void> result;
+    result = _openChain.then((_) async {
+      if (_isShowing) {
+        await (_presentedSheet ?? Future<void>.value());
+        return;
+      }
+      if (!context.mounted) return;
 
-        return AnimatedPadding(
-          padding: EdgeInsets.only(bottom: keyboardHeight),
-          duration: const Duration(milliseconds: 120),
-          curve: Curves.easeOut,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: availableHeight - keyboardHeight,
+      await _presentSheet(
+        context: context,
+        useRootNavigator: useRootNavigator,
+        sheetBuilder: (sheetContext) {
+          final mediaQuery = MediaQuery.of(sheetContext);
+          final keyboardHeight = mediaQuery.viewInsets.bottom;
+          final availableHeight =
+              mediaQuery.size.height - mediaQuery.padding.top - 8;
+
+          return AnimatedPadding(
+            padding: EdgeInsets.only(bottom: keyboardHeight),
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeOut,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: availableHeight - keyboardHeight,
+              ),
+              child: ReferralCodeBottomSheet(
+                email: email,
+                password: password,
+                ownReferralCode: ownReferralCode,
+                initialReferredBy: initialReferredBy,
+                initialReferralRewardClaimed: initialReferralRewardClaimed,
+              ),
             ),
-            child: ReferralCodeBottomSheet(
-              email: email,
-              password: password,
-              ownReferralCode: ownReferralCode,
-              initialReferredBy: initialReferredBy,
-              initialReferralRewardClaimed: initialReferralRewardClaimed,
-            ),
-          ),
-        );
-      },
-    ).whenComplete(() {
-      FocusManager.instance.primaryFocus?.unfocus();
+          );
+        },
+      );
     });
+    _openChain = result.then((_) {}, onError: (_) {});
+    return result;
   }
 
   /// Account section: enter a referral code while already signed in.
@@ -93,37 +145,43 @@ class ReferralCodeBottomSheet extends StatefulWidget {
       return Future.value();
     }
 
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      isDismissible: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        final mediaQuery = MediaQuery.of(context);
-        final keyboardHeight = mediaQuery.viewInsets.bottom;
-        final availableHeight =
-            mediaQuery.size.height - mediaQuery.padding.top - 8;
+    late final Future<void> result;
+    result = _openChain.then((_) async {
+      if (_isShowing) {
+        await (_presentedSheet ?? Future<void>.value());
+        return;
+      }
+      if (!context.mounted) return;
 
-        return AnimatedPadding(
-          padding: EdgeInsets.only(bottom: keyboardHeight),
-          duration: const Duration(milliseconds: 120),
-          curve: Curves.easeOut,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: availableHeight - keyboardHeight,
+      await _presentSheet(
+        context: context,
+        sheetBuilder: (sheetContext) {
+          final mediaQuery = MediaQuery.of(sheetContext);
+          final keyboardHeight = mediaQuery.viewInsets.bottom;
+          final availableHeight =
+              mediaQuery.size.height - mediaQuery.padding.top - 8;
+
+          return AnimatedPadding(
+            padding: EdgeInsets.only(bottom: keyboardHeight),
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeOut,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: availableHeight - keyboardHeight,
+              ),
+              child: ReferralCodeBottomSheet(
+                ownReferralCode: ownReferralCode,
+                initialReferredBy: initialReferredBy,
+                initialReferralRewardClaimed: initialReferralRewardClaimed,
+                useLoggedInSession: true,
+              ),
             ),
-            child: ReferralCodeBottomSheet(
-              ownReferralCode: ownReferralCode,
-              initialReferredBy: initialReferredBy,
-              initialReferralRewardClaimed: initialReferralRewardClaimed,
-              useLoggedInSession: true,
-            ),
-          ),
-        );
-      },
-    ).whenComplete(() {
-      FocusManager.instance.primaryFocus?.unfocus();
+          );
+        },
+      );
     });
+    _openChain = result.then((_) {}, onError: (_) {});
+    return result;
   }
 
   @override

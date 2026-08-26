@@ -7,7 +7,13 @@ import 'package:provider/provider.dart';
 
 /// "Take a Moment With God" intro - first screen of Find Peace flow.
 class TakeMomentIntroScreen extends StatelessWidget {
-  const TakeMomentIntroScreen({super.key});
+  const TakeMomentIntroScreen({
+    super.key,
+    this.worryText,
+  });
+
+  /// User thoughts from Pour Out Your Worries (display on Let's Pray).
+  final String? worryText;
 
   static const Color _brown = Color(0xFF3D2914);
   static const Color _cream = Color(0xFFF5F0E6);
@@ -121,7 +127,9 @@ class TakeMomentIntroScreen extends StatelessWidget {
               _parchmentButton(
                 context,
                 label: 'Start',
-                onPressed: () => Get.to(() => const TakeMomentRestScreen()),
+                onPressed: () => Get.to(
+                  () => TakeMomentRestScreen(worryText: worryText),
+                ),
               ),
               const SizedBox(height: 36),
             ],

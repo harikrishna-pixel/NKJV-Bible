@@ -19,4 +19,8 @@ class PrayerWallApiConstant {
 
   static String likesForPrayer(String prayerId) =>
       '$likes?prayerId=$prayerId';
+
+  /// One prayer by id (history): `GET /api/prayers?prayerId={id}`.
+  static String prayersForPrayerId(String prayerId) =>
+      '$prayers?prayerId=${Uri.encodeQueryComponent(prayerId)}';
 }

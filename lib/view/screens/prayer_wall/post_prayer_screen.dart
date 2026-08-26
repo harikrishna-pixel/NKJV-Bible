@@ -4,6 +4,7 @@ import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_guidelines_dialog.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_verify_dialogs.dart';
 import 'package:flutter/material.dart';
@@ -18,6 +19,9 @@ class PostPrayerScreen extends StatefulWidget {
     this.initialDescription,
     this.initialCategory,
   });
+
+  /// GetX route id so Prayer Wall cannot push this screen twice.
+  static const routeName = '/PostPrayerScreen';
 
   final String? initialTitle;
   final String? initialDescription;
@@ -43,7 +47,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
   final _detailsCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
   String _category = 'Others';
-  int _durationDays = 7;
+  int _durationDays = 30;
   // Anonymous posting UI disabled for now; posts use author name when provided.
   bool _isAnonymous = false;
   bool _submitting = false;
@@ -243,7 +247,16 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
       setState(() => _submitting = false);
       final result = await PrayerWallVerifyDialogs.showVerified(context);
       if (!mounted) return;
-      Navigator.of(context).pop(result == true);
+      if (result == true) {
+        // UI destination only: "View Prayer Wall" must land on Prayer Wall,
+        // not fall through to Reading when the stack was popped too far.
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const PrayerWallScreen()),
+          (route) => route.isFirst,
+        );
+      } else {
+        Navigator.of(context).pop(false);
+      }
     } catch (e) {
       if (mounted && verifyingOpen) {
         Navigator.of(context, rootNavigator: true).pop();
@@ -459,11 +472,11 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        _durationChip('1 Day', 1, brown, isDark),
-                        const SizedBox(width: 8),
                         _durationChip('3 Days', 3, brown, isDark),
                         const SizedBox(width: 8),
                         _durationChip('1 Week', 7, brown, isDark),
+                        const SizedBox(width: 8),
+                        _durationChip('1 Month', 30, brown, isDark),
                       ],
                     ),
                     const SizedBox(height: 10),

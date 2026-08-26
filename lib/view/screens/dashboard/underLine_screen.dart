@@ -142,6 +142,7 @@ class _UnderLineScreenState extends State<UnderLineScreen> {
                     return WidgetPromptGate(
                       id: WidgetPromptId.a6,
                       triggerMet: items.length >= 3,
+                      libraryTab: WidgetPromptService.libraryTabUnderline,
                       builder: (context, onDismiss) => WidgetPromptA6Card(
                         savedCount: items.length,
                         onDismiss: onDismiss,

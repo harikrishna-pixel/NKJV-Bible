@@ -1195,11 +1195,10 @@ class _HomeScreenState extends State<HomeScreen>
   bool isLoggedIn = false;
   int swipeCount = 0;
   int _swipeThreshold = 7;
-  /// Additive: ignore accidental pan-end chapter jumps (cooldown + edge check).
+  /// Additive: ignore accidental pan-end chapter jumps (cooldown).
   DateTime? _lastChapterSwipeAt;
   static const Duration _chapterSwipeCooldown = Duration(milliseconds: 700);
   static const double _chapterSwipeMinVelocity = 250;
-  static const double _chapterSwipeEdgePx = 140;
   int appLaunchCount = 0;
   int appLaunchCountoffer = 0;
   int clickCount = 0;
@@ -4590,23 +4589,8 @@ class _HomeScreenState extends State<HomeScreen>
                           _chapterSwipeCooldown) {
                     return;
                   }
-                  // Additive edge guard: next only near bottom, prev only near top.
-                  // Short chapters (no scroll) still allow swipe (extent ~ 0).
-                  final scrollController =
-                      controller.autoScrollController.value;
-                  if (scrollController.hasClients) {
-                    final pos = scrollController.position;
-                    final nearBottom =
-                        pos.pixels >= pos.maxScrollExtent - _chapterSwipeEdgePx;
-                    final nearTop = pos.pixels <= _chapterSwipeEdgePx;
-                    if (vx < 0 && !nearBottom) {
-                      return;
-                    }
-                    if (vx > 0 && !nearTop) {
-                      return;
-                    }
-                  }
-                  // Show ad every 5 swipes
+                  // Swipe left → next chapter; swipe right → previous chapter.
+                  // Inner chapter/ad/prefs logic unchanged from original handlers.
                   if (vx < 0) {
                     //! AD interstitialAd
 
