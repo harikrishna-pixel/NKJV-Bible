@@ -136,13 +136,18 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _leaveSplash() async {
     if (_hasNavigated || !mounted) return;
     _hasNavigated = true;
+    // UI: hold at 98% → open ad on splash → then 100% → Home.
+    setState(() {
+      _progress = 0.98;
+    });
+    await Future.delayed(const Duration(milliseconds: 250));
+    if (!mounted) return;
+    await _maybeShowColdStartOpenAdOnSplash();
+    if (!mounted) return;
     setState(() {
       _progress = 1.0;
     });
     await Future.delayed(const Duration(milliseconds: 300));
-    if (!mounted) return;
-    // UI-only gate: cold-start open ad on splash, then navigate (same rules as Home wrapper).
-    await _maybeShowColdStartOpenAdOnSplash();
     if (!mounted) return;
     await handleNavigation();
   }
@@ -1576,7 +1581,13 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Widget _splashProgressBar(bool isCompact) {
-    final percent = (_progress * 100).clamp(0, 100).round();
+    // UI-only: loading caps at 98%; after ad phase _progress becomes 1.0 → 100%.
+    final percent = _hasNavigated
+        ? (_progress * 100).clamp(0, 100).round()
+        : ((_progress * 100).clamp(0, 98).round());
+    final fillFactor = _hasNavigated
+        ? _progress.clamp(0.0, 1.0)
+        : (_progress.clamp(0.0, 1.0) * 0.98);
     final barHeight = isCompact ? 24.0 : 26.0;
 
     return LayoutBuilder(
@@ -1599,7 +1610,7 @@ class _SplashScreenState extends State<SplashScreen>
                 Align(
                   alignment: Alignment.centerLeft,
                   child: FractionallySizedBox(
-                    widthFactor: _progress.clamp(0.0, 1.0),
+                    widthFactor: fillFactor,
                     heightFactor: 1,
                     child: DecoratedBox(
                       decoration: BoxDecoration(

@@ -200,6 +200,15 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
       print(
           'Post prayer profile_image URL → ${profileImageUrl ?? "none"}');
 
+      // Additive: login email (cached as key `user`).
+      final cachedEmail =
+          (await CacheNotifier().readCache(key: 'user') ?? '')
+              .toString()
+              .trim();
+      final email =
+          cachedEmail.isNotEmpty ? cachedEmail : null;
+      print('Post prayer email → ${email ?? "none"}');
+
       final created = await PrayerWallService.createPrayer(
         prayerTitle: title,
         prayerDescription: details,
@@ -208,6 +217,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         prayerDuration: _durationDays,
         userName: effectiveName.isNotEmpty ? effectiveName : null,
         profileImage: profileImageUrl,
+        email: email,
       );
       await progress.advanceTo(4);
       // UI only: let step 4 finish visibly before the success confirmation.

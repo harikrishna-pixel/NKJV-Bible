@@ -113,6 +113,7 @@ class PrayerWallService {
     bool isAnonymous = true,
     String? userName,
     String? profileImage,
+    String? email,
     int prayerDuration = 7,
   }) async {
     final bodyMap = <String, dynamic>{
@@ -133,6 +134,11 @@ class PrayerWallService {
     final normalizedImage = profileImage?.trim();
     if (normalizedImage != null && normalizedImage.isNotEmpty) {
       bodyMap['profile_image'] = normalizedImage;
+    }
+    // Additive: pass login email when available.
+    final normalizedEmail = email?.trim();
+    if (normalizedEmail != null && normalizedEmail.isNotEmpty) {
+      bodyMap['email'] = normalizedEmail;
     }
     final bodyJson = _encodeBody(bodyMap);
     // Debug: values sent with create prayer (app identity + full body).

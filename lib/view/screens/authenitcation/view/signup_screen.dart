@@ -18,12 +18,25 @@ import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referra
 import 'package:biblebookapp/utils/email_validator.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/login_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/post_prayer_screen.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/social_auth_widget.dart';
 import 'package:biblebookapp/view/screens/authenitcation/widgets/text_form_field.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 
 class SignupScreen extends HookConsumerWidget {
-  SignupScreen({super.key});
+  SignupScreen({
+    super.key,
+    this.popOnSuccess = false,
+    this.openPostPrayerOnSuccess = false,
+  });
+
+  /// UI-only: opened from Prayer Wall embedded Login — return to Wall, not Reading.
+  final bool popOnSuccess;
+
+  /// UI-only: Login had replaceOnSuccess for Post a Prayer.
+  final bool openPostPrayerOnSuccess;
+
   final _formKey = GlobalKey<FormState>();
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -323,14 +336,42 @@ class SignupScreen extends HookConsumerWidget {
                                                     'You received 100 free coins!');
                                               }
                                               if (!context.mounted) return;
-                                              Get.offAll(() => HomeScreen(
-                                                    From: "splash",
-                                                    selectedVerseNumForRead: "",
-                                                    selectedBookForRead: "",
-                                                    selectedChapterForRead: "",
-                                                    selectedBookNameForRead: "",
-                                                    selectedVerseForRead: "",
-                                                  ));
+                                              // UI only: Prayer Wall embedded
+                                              // signup returns to Wall (or Post),
+                                              // not Reading. Register logic unchanged.
+                                              if (openPostPrayerOnSuccess) {
+                                                Get.offAll(
+                                                  () => const PrayerWallScreen(),
+                                                );
+                                                WidgetsBinding.instance
+                                                    .addPostFrameCallback((_) {
+                                                  Get.to(
+                                                    () =>
+                                                        const PostPrayerScreen(),
+                                                    routeName:
+                                                        PostPrayerScreen
+                                                            .routeName,
+                                                    preventDuplicates: true,
+                                                  );
+                                                });
+                                              } else if (popOnSuccess) {
+                                                Get.offAll(
+                                                  () =>
+                                                      const PrayerWallScreen(),
+                                                );
+                                              } else {
+                                                Get.offAll(() => HomeScreen(
+                                                      From: "splash",
+                                                      selectedVerseNumForRead:
+                                                          "",
+                                                      selectedBookForRead: "",
+                                                      selectedChapterForRead:
+                                                          "",
+                                                      selectedBookNameForRead:
+                                                          "",
+                                                      selectedVerseForRead: "",
+                                                    ));
+                                              }
                                             }
                                           } catch (e) {
                                             Constants.showToast(e.toString());

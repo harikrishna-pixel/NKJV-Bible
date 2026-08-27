@@ -321,7 +321,14 @@ class LoginScreen extends HookConsumerWidget {
                                         color: CommanColor.whiteBlack(context)),
                                     recognizer: TapGestureRecognizer()
                                       ..onTap = () {
-                                        Get.to(() => SignupScreen());
+                                        Get.to(
+                                          () => SignupScreen(
+                                            popOnSuccess: popOnSuccess ||
+                                                replaceOnSuccess != null,
+                                            openPostPrayerOnSuccess:
+                                                replaceOnSuccess != null,
+                                          ),
+                                        );
                                       })
                               ])),
                     ],
@@ -337,7 +344,14 @@ class LoginScreen extends HookConsumerWidget {
                   children: [
                     GestureDetector(
                       onTap: () {
-                        Get.to(() => SignupScreen());
+                        Get.to(
+                          () => SignupScreen(
+                            popOnSuccess: popOnSuccess ||
+                                replaceOnSuccess != null,
+                            openPostPrayerOnSuccess:
+                                replaceOnSuccess != null,
+                          ),
+                        );
                       },
                       child: Text(
                         'Note:',

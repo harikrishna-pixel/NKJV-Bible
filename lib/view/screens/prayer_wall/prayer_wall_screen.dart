@@ -81,7 +81,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   bool _statusPromptShowing = false;
   bool _openingPostPrayer = false;
 
-  /// UI-only: History icon — my posted prayers via ?prayerId=.
+  /// UI-only: My Prayer section — posted prayers + blocked list tabs.
   bool _showingHistory = false;
   bool _historyLoading = false;
   String? _historyError;
@@ -569,19 +569,26 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   }
 
   Future<void> _openBlockedList() async {
-    if (_showingBlocked) {
-      setState(() => _showingBlocked = false);
+    // Blocked list lives inside My Prayer — open that section first.
+    if (!_showingHistory) {
+      final allowed = await _ensureLoggedIn(
+        message: 'Please log in to view blocked users.',
+      );
+      if (!allowed || !mounted) return;
+      setState(() {
+        _showingHistory = true;
+        _showingBlocked = true;
+        _historyError = null;
+      });
+      await _reloadMyPrayerHistory();
       return;
     }
-    final allowed = await _ensureLoggedIn(
-      message: 'Please log in to view blocked users.',
-    );
-    if (!allowed || !mounted) return;
-    setState(() {
-      _showingBlocked = true;
-      _showingHistory = false;
-      _historyError = null;
-    });
+    setState(() => _showingBlocked = !_showingBlocked);
+  }
+
+  void _selectMyPrayerTab({required bool blocked}) {
+    if (!_showingHistory) return;
+    setState(() => _showingBlocked = blocked);
   }
 
   Future<bool> _confirmBlockAction({
@@ -1350,6 +1357,53 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     return 'Community member';
   }
 
+  Widget _myPrayerSegmentChip({
+    required String label,
+    required bool selected,
+    required Color brown,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: selected
+              ? brown
+              : (isDark ? Colors.white12 : Colors.white),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected
+                ? brown
+                : (isDark ? const Color(0xFF5A4638) : Colors.grey.shade400),
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+            color: selected
+                ? Colors.white
+                : (isDark ? Colors.white : brown),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildBlockedList({
     required Color brown,
     required bool isDark,
@@ -1593,19 +1647,43 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     );
   }
 
-  /// UI-only: History — load prayers I posted (ids from local store + ?prayerId=).
+  /// UI-only: header uses profile photo (or person icon) — same tap target.
+  Widget _buildHeaderProfileIcon() {
+    final url = (_viewerProfileImage ?? '').trim();
+    if (url.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          url,
+          width: 28,
+          height: 28,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const Icon(
+            Icons.person_outline,
+            color: Colors.white,
+          ),
+        ),
+      );
+    }
+    return const Icon(
+      Icons.person_outline,
+      color: Colors.white,
+    );
+  }
+
+  /// UI-only: My Prayer — load prayers I posted (ids from local store + ?prayerId=).
   Future<void> _openMyPrayerHistory() async {
     if (_openingHistory) return;
     if (_showingHistory) {
       setState(() {
         _showingHistory = false;
+        _showingBlocked = false;
         _historyError = null;
       });
       return;
     }
 
     final allowed = await _ensureLoggedIn(
-      message: 'Please log in to view your prayer history.',
+      message: 'Please log in to view your prayers.',
     );
     if (!allowed || !mounted) return;
 
@@ -1795,13 +1873,14 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                   IconButton(
                     icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
                     onPressed: () {
-                      if (_showingBlocked) {
+                      if (_showingHistory && _showingBlocked) {
                         setState(() => _showingBlocked = false);
                         return;
                       }
                       if (_showingHistory) {
                         setState(() {
                           _showingHistory = false;
+                          _showingBlocked = false;
                           _historyError = null;
                         });
                         return;
@@ -1812,11 +1891,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                   Expanded(
                     child: Center(
                       child: Text(
-                        _showingBlocked
-                            ? 'Blocked (${_blockedUserIds.length})'
-                            : _showingHistory
-                                ? 'History'
-                                : 'Prayer Wall',
+                        _showingHistory ? 'My Profile' : 'Prayer Wall',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: Colors.white,
@@ -1827,34 +1902,49 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                       ),
                     ),
                   ),
-                  IconButton(
-                    tooltip: _showingBlocked
-                        ? 'Prayer Wall'
-                        : 'Blocked (${_blockedUserIds.length})',
-                    onPressed: _openBlockedList,
-                    icon: Badge(
-                      isLabelVisible: _blockedUserIds.isNotEmpty,
-                      label: Text('${_blockedUserIds.length}'),
-                      child: Icon(
-                        _showingBlocked
-                            ? Icons.forum_outlined
-                            : Icons.block_outlined,
-                        color: Colors.white,
-                      ),
+                  // My Prayer: no header action icons (back only).
+                  if (_showingHistory)
+                    const SizedBox(width: 48)
+                  else
+                    IconButton(
+                      tooltip: 'My Profile',
+                      icon: _buildHeaderProfileIcon(),
+                      onPressed:
+                          _openingHistory ? null : _openMyPrayerHistory,
                     ),
-                  ),
-                  IconButton(
-                    tooltip: _showingHistory ? 'Prayer Wall' : 'History',
-                    icon: Icon(
-                      _showingHistory ? Icons.forum_outlined : Icons.history,
-                      color: Colors.white,
-                    ),
-                    onPressed: _openingHistory ? null : _openMyPrayerHistory,
-                  ),
                 ],
               ),
             ),
-            if (!_showingBlocked)
+            if (_showingHistory)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _myPrayerSegmentChip(
+                        label: 'My Prayers',
+                        selected: !_showingBlocked,
+                        brown: brown,
+                        isDark: isDark,
+                        onTap: () => _selectMyPrayerTab(blocked: false),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _myPrayerSegmentChip(
+                        label: _blockedUserIds.isEmpty
+                            ? 'Blocked'
+                            : 'Blocked (${_blockedUserIds.length})',
+                        selected: _showingBlocked,
+                        brown: brown,
+                        isDark: isDark,
+                        onTap: () => _selectMyPrayerTab(blocked: true),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (!_showingHistory)
             SizedBox(
               // Increased height so category chips have enough vertical
               // space and don't get visually cut off on some devices.
@@ -1902,7 +1992,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                 },
               ),
             ),
-            if (!_showingBlocked)
+            if (!_showingHistory)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               child: Row(
@@ -1992,7 +2082,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                                     Center(
                                       child: Text(
                                         _showingHistory
-                                            ? 'No prayers in your history yet.'
+                                            ? 'No prayers in My Prayer yet.'
                                             : 'No prayers in this category yet.',
                                         style: TextStyle(
                                           color: isDark
@@ -2234,6 +2324,133 @@ class _PrayerCardState extends State<_PrayerCard> {
     setState(() => _commentsOpen = true);
   }
 
+  Future<void> _showCardMoreMenu({
+    required Color brown,
+    required bool isDark,
+  }) async {
+    const cream = Color(0xFFFFF9F3);
+    const ink = Color(0xFF4B3423);
+    const muted = Color(0xFF6B4E3D);
+    final sheetBg = isDark ? const Color(0xFF2C2118) : cream;
+    final titleColor = isDark ? Colors.white : ink;
+    final subtitleColor = isDark ? Colors.white70 : muted;
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Material(
+              color: sheetBg,
+              borderRadius: BorderRadius.circular(20),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 10),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Colors.white24
+                          : const Color(0xFFD0C4B4),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ListTile(
+                    leading: Icon(
+                      widget.isReported
+                          ? Icons.flag_rounded
+                          : Icons.flag_outlined,
+                      color: widget.isReported
+                          ? const Color(0xFFC45C3A)
+                          : (isDark ? Colors.white : brown),
+                    ),
+                    title: Text(
+                      'Report Prayer',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: titleColor,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Flag this prayer for review',
+                      style: TextStyle(color: subtitleColor, fontSize: 12),
+                    ),
+                    onTap: () => Navigator.of(ctx).pop('report'),
+                  ),
+                  if (widget.canBlock)
+                    ListTile(
+                      leading: Icon(
+                        widget.isBlocked
+                            ? Icons.block_rounded
+                            : Icons.block_outlined,
+                        color: widget.isBlocked
+                            ? const Color(0xFFC45C3A)
+                            : (isDark ? Colors.white : brown),
+                      ),
+                      title: Text(
+                        widget.isBlocked ? 'Unblock User' : 'Block User',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: titleColor,
+                        ),
+                      ),
+                      subtitle: Text(
+                        widget.isBlocked
+                            ? 'Show their prayers on your wall again'
+                            : 'Hide prayers from this user',
+                        style: TextStyle(color: subtitleColor, fontSize: 12),
+                      ),
+                      onTap: () => Navigator.of(ctx).pop('block'),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: isDark
+                              ? const Color(0xFFE8C9A0)
+                              : brown,
+                          side: BorderSide(
+                            color: brown.withValues(alpha: 0.55),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    if (!mounted) return;
+    if (action == 'report') {
+      widget.onReport();
+    } else if (action == 'block') {
+      widget.onBlock();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
@@ -2360,7 +2577,7 @@ class _PrayerCardState extends State<_PrayerCard> {
                       ),
                     ),
                   ),
-                  // UI-only: owner sees Edit (opens existing actions); others see Report.
+                  // UI-only: owner sees Edit; others see ⋮ (Report / Block).
                   if (isMine)
                     InkWell(
                       onTap: widget.onOpen,
@@ -2374,41 +2591,22 @@ class _PrayerCardState extends State<_PrayerCard> {
                         ),
                       ),
                     )
-                  else ...[
-                    if (widget.canBlock)
-                      InkWell(
-                        onTap: widget.onBlock,
-                        borderRadius: BorderRadius.circular(20),
-                        child: Padding(
-                          padding: const EdgeInsets.all(6),
-                          child: Icon(
-                            widget.isBlocked
-                                ? Icons.block_rounded
-                                : Icons.block_outlined,
-                            size: 20,
-                            color: widget.isBlocked
-                                ? const Color(0xFFC45C3A)
-                                : (isDark ? Colors.white : brown),
-                          ),
-                        ),
-                      ),
+                  else
                     InkWell(
-                      onTap: widget.onReport,
+                      onTap: () => _showCardMoreMenu(
+                        brown: brown,
+                        isDark: isDark,
+                      ),
                       borderRadius: BorderRadius.circular(20),
                       child: Padding(
                         padding: const EdgeInsets.all(6),
                         child: Icon(
-                          widget.isReported
-                              ? Icons.flag_rounded
-                              : Icons.flag_outlined,
-                          size: 20,
-                          color: widget.isReported
-                              ? const Color(0xFFC45C3A)
-                              : (isDark ? Colors.white : brown),
+                          Icons.more_vert,
+                          size: 22,
+                          color: isDark ? Colors.white : brown,
                         ),
                       ),
                     ),
-                  ],
                 ],
               ),
               const SizedBox(height: 10),
@@ -2557,10 +2755,10 @@ class _PrayerCardState extends State<_PrayerCard> {
                               else
                                 Icon(
                                   liked
-                                      ? Icons.favorite
-                                      : Icons.favorite_border,
+                                      ? Icons.volunteer_activism
+                                      : Icons.volunteer_activism_outlined,
                                   color: liked
-                                      ? Colors.red.shade400
+                                      ? brown
                                       : (isDark
                                           ? const Color(0xFFF5EDE3)
                                           : brown),
@@ -2571,6 +2769,15 @@ class _PrayerCardState extends State<_PrayerCard> {
                                 '$likeCount',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w700,
+                                  color: isDark ? Colors.white : brown,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Prayed',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
                                   color: isDark ? Colors.white : brown,
                                 ),
                               ),
@@ -2602,14 +2809,11 @@ class _PrayerCardState extends State<_PrayerCard> {
                                 size: 18,
                               ),
                               const SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  '$commentCount Comments',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: isDark ? Colors.white : brown,
-                                  ),
+                              Text(
+                                '$commentCount',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? Colors.white : brown,
                                 ),
                               ),
                             ],
