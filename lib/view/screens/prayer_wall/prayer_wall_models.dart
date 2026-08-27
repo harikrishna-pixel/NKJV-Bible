@@ -77,22 +77,41 @@ class PrayerWallItem {
     return null;
   }
 
-  static String? _extractAuthorUserId(Map<String, dynamic> map) {
+  /// Poster Mongo / Auth id from a prayer JSON row (API field names vary).
+  static String? extractAuthorUserId(Map<String, dynamic> map) {
     final direct = _cleanName(
       map['userId'] ??
           map['user_id'] ??
           map['authorId'] ??
           map['author_id'] ??
           map['createdById'] ??
-          map['created_by'],
+          map['created_by'] ??
+          map['firebaseUid'] ??
+          map['firebase_uid'] ??
+          map['mongoUserId'] ??
+          map['mongo_user_id'] ??
+          map['posterId'] ??
+          map['poster_id'] ??
+          map['ownerId'] ??
+          map['owner_id'],
     );
     if (direct != null) return direct;
 
-    final nestedUser = map['user'];
-    if (nestedUser is Map) {
-      final userMap = Map<String, dynamic>.from(nestedUser);
+    final userField = map['user'];
+    if (userField is String) {
+      final asString = _cleanName(userField);
+      if (asString != null) return asString;
+    }
+
+    if (userField is Map) {
+      final userMap = Map<String, dynamic>.from(userField);
       final fromUser = _cleanName(
-        userMap['userId'] ?? userMap['user_id'] ?? userMap['_id'] ?? userMap['id'],
+        userMap['userId'] ??
+            userMap['user_id'] ??
+            userMap['_id'] ??
+            userMap['id'] ??
+            userMap['firebaseUid'] ??
+            userMap['firebase_uid'],
       );
       if (fromUser != null) return fromUser;
     }
@@ -104,11 +123,16 @@ class PrayerWallItem {
         posterMap['userId'] ??
             posterMap['user_id'] ??
             posterMap['_id'] ??
-            posterMap['id'],
+            posterMap['id'] ??
+            posterMap['firebaseUid'] ??
+            posterMap['firebase_uid'],
       );
     }
     return null;
   }
+
+  static String? _extractAuthorUserId(Map<String, dynamic> map) =>
+      extractAuthorUserId(map);
 
   static String? _extractProfileImage(Map<String, dynamic> map) {
     final direct = _cleanName(

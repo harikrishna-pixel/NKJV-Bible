@@ -505,14 +505,14 @@ class AuthNotifier extends ChangeNotifier {
       final status = datafn['status'];
 
       final msg = datafn['message'];
-      final otptoken = '${datafn['data']['token']}';
 
-      debugPrint("otp token data: $otptoken");
-      await cacheNotifier.writeCache(key: "otp", value: otp.toString());
-      await cacheNotifier.writeCache(
-          key: "otptoken", value: otptoken.toString());
       if (datafn != null) {
         if (status == true) {
+          final otptoken = '${datafn['data']['token']}';
+          debugPrint("otp token data: $otptoken");
+          await cacheNotifier.writeCache(key: "otp", value: otp.toString());
+          await cacheNotifier.writeCache(
+              key: "otptoken", value: otptoken.toString());
           SnackbarUtil.showSnackbar(
             context: context,
             message: msg,
@@ -524,7 +524,7 @@ class AuthNotifier extends ChangeNotifier {
         } else {
           SnackbarUtil.showSnackbar(
             context: context,
-            message: msg,
+            message: 'Invalid code.',
             backgroundColor: Colors.redAccent,
           );
           return false;
@@ -532,7 +532,7 @@ class AuthNotifier extends ChangeNotifier {
       } else {
         SnackbarUtil.showSnackbar(
           context: context,
-          message: 'Something Went Wrong !',
+          message: 'Invalid code.',
           backgroundColor: Colors.redAccent,
         );
         return false;
@@ -540,7 +540,7 @@ class AuthNotifier extends ChangeNotifier {
     } catch (e) {
       SnackbarUtil.showSnackbar(
         context: context,
-        message: 'Something Went Wrong !',
+        message: 'Invalid code.',
         backgroundColor: Colors.redAccent,
       );
       print("forgot otp verify notifier error is $e");

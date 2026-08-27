@@ -9,6 +9,8 @@ class AppApiConstant {
   static const gettemptokenapi = 'api/temp-token';
   static const registerapi = 'api/register';
   static const loginapi = 'api/login';
+  /// AuthHub profile (PDF Steps 2/5): `POST /api/profile`.
+  static const profileapi = 'api/profile';
   static const forgotsendotp = 'api/forgot-pwd/send-otp';
   static const forgotverifyotp = 'api/forgot-pwd/verify-otp';
   static const forgotrestpwd = 'api/forgot-pwd/reset-pwd';

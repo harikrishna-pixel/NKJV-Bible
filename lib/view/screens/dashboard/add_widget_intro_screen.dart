@@ -575,24 +575,24 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
             Expanded(
               child: Text(
                 title,
-                style: TextStyle(
-                  fontFamily: 'Georgia',
-                  fontWeight: FontWeight.w700,
+          style: TextStyle(
+            fontFamily: 'Georgia',
+            fontWeight: FontWeight.w700,
                   fontSize: 13,
                   letterSpacing: 1.1,
-                  color: titleColor,
+            color: titleColor,
                 ),
               ),
-            ),
+          ),
           ],
         ),
         if (subtitle != null) ...[
           const SizedBox(height: 6),
-          Text(
+        Text(
             subtitle,
-            style: TextStyle(
+          style: TextStyle(
               fontSize: 13,
-              height: 1.35,
+            height: 1.35,
               color: _bodyInk.withOpacity(0.92),
             ),
           ),
@@ -799,9 +799,9 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
             ),
           ),
         ),
-      ),
-    );
-  }
+        ),
+      );
+    }
 
   Widget _hubFooterTip() {
     return Padding(
@@ -1145,9 +1145,9 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
           ),
         ),
         const SizedBox(height: 8),
-      ],
-    );
-  }
+        ],
+      );
+    }
 
   Widget _availableWidgetsGallery() {
     final pageWidth = MediaQuery.of(context).size.width - 40;

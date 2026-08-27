@@ -229,30 +229,10 @@ class LoginScreen extends HookConsumerWidget {
                                 _standardLoginSuccessHandled = true;
                                 Constants.showToast(
                                     "Hi ${user.displayName}, Welcome to ${BibleInfo.bible_shortName}");
-                                if (context.mounted) {
-                                  // One referral join per account — skip if
-                                  // this user already entered a code / claimed.
-                                  final alreadyReferred = (user.referredBy !=
-                                              null &&
-                                          user.referredBy!.trim().isNotEmpty) ||
-                                      ((user.referralRewardClaimed ?? 0) > 0);
-                                  if (!alreadyReferred) {
-                                    await ReferralCodeBottomSheet.show(
-                                      context: context,
-                                      email: loginState.emailCon.text.trim(),
-                                      password: loginState.passCon.text,
-                                      ownReferralCode: user.referralCode,
-                                      initialReferredBy: user.referredBy,
-                                      initialReferralRewardClaimed:
-                                          user.referralRewardClaimed,
-                                    );
-                                  }
-                                }
                                 if (!context.mounted) return;
-                                // Let the referral sheet finish closing before
-                                // replacing routes (prevents stacked overlays).
-                                await WidgetsBinding.instance.endOfFrame;
-                                if (!context.mounted) return;
+                                // UI only: after sign-in go to Reading (Home).
+                                // Do not show Referral Code sheet on login.
+                                // Account → Enter Referral Code is unchanged.
                                 return Get.offAll(() => HomeScreen(
                                     From: "splash",
                                     selectedVerseNumForRead: "",

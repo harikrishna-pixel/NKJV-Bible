@@ -19,6 +19,7 @@ class PrayerWallService {
   static Map<String, dynamic> get _appMeta => {
         'app_id': BibleInfo.appID,
         'app_name': BibleInfo.bible_shortName,
+        'bundle_id': BibleInfo.ios_Bundle_Id, // com.balaklrapps.newkingsjamesversion
       };
 
   static String _encodeBody(Map<String, dynamic> body) =>
@@ -134,13 +135,20 @@ class PrayerWallService {
       bodyMap['profile_image'] = normalizedImage;
     }
     final bodyJson = _encodeBody(bodyMap);
-    print('PrayerWallService.createPrayer request body: $bodyJson');
+    // Debug: values sent with create prayer (app identity + full body).
+    print('========== POST PRAYER ==========');
+    print('app_id    → ${BibleInfo.appID}');
+    print('app_name  → ${BibleInfo.bible_shortName}');
+    print('bundle_id → ${BibleInfo.ios_Bundle_Id}');
+    print('request body → $bodyJson');
+    print('================================');
 
     final res = await http.post(
       Uri.parse(PrayerWallApiConstant.prayers),
       headers: _jsonHeaders,
       body: bodyJson,
     );
+    print('POST prayer response → ${res.statusCode} ${res.body}');
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception('Create prayer failed (${res.statusCode}): ${res.body}');
     }
@@ -502,6 +510,62 @@ class PrayerWallService {
     );
     if (res.statusCode >= 200 && res.statusCode < 300) return;
     throw Exception('Report prayer failed (${res.statusCode}): ${res.body}');
+  }
+
+  /// POST `/api/blocked-users` — block a prayer poster for this user.
+  static Future<void> blockUser({
+    required String userId,
+    required String blockedUserId,
+  }) async {
+    final uid = userId.trim();
+    final blocked = blockedUserId.trim();
+    if (uid.isEmpty || blocked.isEmpty) {
+      throw Exception('blockUser: user_id and blocked_user_id required');
+    }
+    final body = jsonEncode({
+      'user_id': uid,
+      'blocked_user_id': blocked,
+    });
+    print('PrayerWallService.blockUser body: $body');
+    final res = await http.post(
+      Uri.parse(PrayerWallApiConstant.blockedUsers),
+      headers: _jsonHeaders,
+      body: body,
+    );
+    print(
+      'PrayerWallService.blockUser response: '
+      'status=${res.statusCode} body=${res.body}',
+    );
+    if (res.statusCode >= 200 && res.statusCode < 300) return;
+    throw Exception('Block user failed (${res.statusCode}): ${res.body}');
+  }
+
+  /// DELETE `/api/blocked-users` — unblock a user for this account.
+  static Future<void> unblockUser({
+    required String userId,
+    required String blockedUserId,
+  }) async {
+    final uid = userId.trim();
+    final blocked = blockedUserId.trim();
+    if (uid.isEmpty || blocked.isEmpty) {
+      throw Exception('unblockUser: user_id and blocked_user_id required');
+    }
+    final body = jsonEncode({
+      'user_id': uid,
+      'blocked_user_id': blocked,
+    });
+    print('PrayerWallService.unblockUser body: $body');
+    final res = await http.delete(
+      Uri.parse(PrayerWallApiConstant.blockedUsers),
+      headers: _jsonHeaders,
+      body: body,
+    );
+    print(
+      'PrayerWallService.unblockUser response: '
+      'status=${res.statusCode} body=${res.body}',
+    );
+    if (res.statusCode >= 200 && res.statusCode < 300) return;
+    throw Exception('Unblock user failed (${res.statusCode}): ${res.body}');
   }
 
   /// Same Gemini endpoint used by Chat / Prayer Guidance.

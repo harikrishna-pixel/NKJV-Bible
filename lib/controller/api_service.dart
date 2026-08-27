@@ -75,6 +75,9 @@ class Api {
   static String register =
       'https://bibleoffice.com/authhub/API/public/api/register';
   static String login = 'https://bibleoffice.com/authhub/API/public/api/login';
+  /// PDF AuthHub profile: `POST /api/profile` (app_id + user_id).
+  static String profile =
+      'https://bibleoffice.com/authhub/API/public/api/profile';
 }
 
 HttpWithMiddleware http = HttpWithMiddleware.build(middlewares: [
@@ -771,6 +774,98 @@ Future<void> cacheReferralFieldsFromUser(UserModel user) async {
     await cacheNotifier.writeCache(
         key: 'referred_by', value: user.referredBy!.trim());
   }
+  // Additive PDF fields (cache only — claim logic unchanged).
+  if (user.referralRewardCredits != null) {
+    await cacheNotifier.writeCache(
+        key: 'referral_reward_credits',
+        value: '${user.referralRewardCredits}');
+  }
+  if (user.totalReferredCount != null) {
+    await cacheNotifier.writeCache(
+        key: 'total_referred_count', value: '${user.totalReferredCount}');
+  }
+  if (user.totalClaimedCount != null) {
+    await cacheNotifier.writeCache(
+        key: 'total_claimed_count', value: '${user.totalClaimedCount}');
+  }
+  if (user.walletBalance != null) {
+    await cacheNotifier.writeCache(
+        key: 'wallet_balance', value: '${user.walletBalance}');
+  }
+}
+
+/// Additive: PDF `POST /api/profile` (app_id + user_id from login/register).
+/// Does not replace profile-update snapshot.
+Future<Map<String, dynamic>?> fetchAuthHubProfile() async {
+  try {
+    final userid = await cacheNotifier.readCache(key: 'userid');
+    final authtoken = await cacheNotifier.readCache(key: 'authtoken');
+    if (authtoken == null || authtoken.toString().trim().isEmpty) {
+      return null;
+    }
+    final tempToken = await getTempToken();
+    // PDF form: user_id = token from login/register; also try cached user_id.
+    final candidates = <String>[
+      authtoken.toString().trim(),
+      if (userid != null && userid.toString().trim().isNotEmpty)
+        userid.toString().trim(),
+    ];
+    for (final profileUserId in candidates.toSet()) {
+      final resp = await http.post(
+        Uri.parse(Api.profile),
+        headers: <String, String>{
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': 'Bearer $tempToken',
+        },
+        body: <String, String>{
+          'app_id': BibleInfo.appID.toString(),
+          'user_id': profileUserId,
+        },
+      );
+      debugPrint(
+          'fetchAuthHubProfile status=${resp.statusCode} body=${resp.body}');
+      if (resp.statusCode < 200 || resp.statusCode >= 300) continue;
+      final decoded = jsonDecode(resp.body);
+      if (decoded is! Map<String, dynamic>) continue;
+      final userMap = _userFromAuthResponse(decoded);
+      if (userMap != null) return decoded;
+      if (decoded['data'] is Map) return decoded;
+    }
+  } catch (e) {
+    debugPrint('fetchAuthHubProfile: $e');
+  }
+  return null;
+}
+
+/// Additive: merge referral fields from `/api/profile` into cache.
+Future<void> syncReferralFieldsFromAuthHubProfile() async {
+  final profile = await fetchAuthHubProfile();
+  if (profile == null) return;
+  final userMap = _userFromAuthResponse(profile);
+  if (userMap == null) return;
+  final token = (await cacheNotifier.readCache(key: 'authtoken'))?.toString() ??
+      '';
+  try {
+    if (userMap['user_id'] == null) return;
+    final user = UserModel.fromJson(userMap, token);
+    await cacheReferralFieldsFromUser(user);
+    debugPrint(
+        'syncReferralFieldsFromAuthHubProfile: referral_count=${user.referralCount} '
+        'credits=${user.referralRewardCredits}');
+  } catch (e) {
+    debugPrint('syncReferralFieldsFromAuthHubProfile parse: $e');
+    // Fallback: write raw ints if UserModel cast fails on shape.
+    final count = _parseReferralInt(userMap['referral_count']);
+    final claimed = _parseReferralInt(userMap['referral_reward_claimed']);
+    if (count != null) {
+      await cacheNotifier.writeCache(
+          key: 'referral_count', value: count.toString());
+    }
+    if (claimed != null) {
+      await cacheNotifier.writeCache(
+          key: 'referral_reward_claimed', value: claimed.toString());
+    }
+  }
 }
 
 Future<PendingReferrerReward?> fetchPendingReferrerReward() async {
@@ -815,6 +910,51 @@ Future<PendingReferrerReward?> fetchPendingReferrerReward() async {
       }
     } else {
       debugPrint('fetchPendingReferrerReward: empty snapshot body');
+    }
+
+    // Additive: PDF `/api/profile` may return referral_count when snapshot omits it.
+    try {
+      final hub = await fetchAuthHubProfile();
+      final hubUser = hub != null ? _userFromAuthResponse(hub) : null;
+      final hubCount = _parseReferralInt(hubUser?['referral_count']);
+      final hubClaimed =
+          _parseReferralInt(hubUser?['referral_reward_claimed']);
+      debugPrint(
+          'fetchPendingReferrerReward /api/profile referral_count → $hubCount');
+      if (hubCount != null) {
+        apiCount = hubCount;
+        await cacheNotifier.writeCache(
+            key: 'referral_count', value: hubCount.toString());
+      }
+      if (hubClaimed != null) {
+        apiClaimed = hubClaimed;
+        await cacheNotifier.writeCache(
+            key: 'referral_reward_claimed', value: hubClaimed.toString());
+      }
+      if (hubUser != null) {
+        final credits = _parseReferralInt(hubUser['referral_reward_credits']);
+        final totalRef = _parseReferralInt(hubUser['total_referred_count']);
+        final totalClaimed = _parseReferralInt(hubUser['total_claimed_count']);
+        final wallet = _parseReferralInt(hubUser['wallet_balance']);
+        if (credits != null) {
+          await cacheNotifier.writeCache(
+              key: 'referral_reward_credits', value: credits.toString());
+        }
+        if (totalRef != null) {
+          await cacheNotifier.writeCache(
+              key: 'total_referred_count', value: totalRef.toString());
+        }
+        if (totalClaimed != null) {
+          await cacheNotifier.writeCache(
+              key: 'total_claimed_count', value: totalClaimed.toString());
+        }
+        if (wallet != null) {
+          await cacheNotifier.writeCache(
+              key: 'wallet_balance', value: wallet.toString());
+        }
+      }
+    } catch (e) {
+      debugPrint('fetchPendingReferrerReward /api/profile: $e');
     }
 
     final cachedCount = _parseReferralInt(
@@ -938,6 +1078,14 @@ Map<String, dynamic>? _userFromAuthResponse(Map<String, dynamic> response) {
   final data = response['data'];
   if (data is Map && data['user'] is Map) {
     return Map<String, dynamic>.from(data['user'] as Map);
+  }
+  // PDF /api/profile sometimes nests fields under data (no user wrapper).
+  if (data is Map &&
+      (data.containsKey('referral_count') ||
+          data.containsKey('referral_code') ||
+          data.containsKey('user_id') ||
+          data.containsKey('email'))) {
+    return Map<String, dynamic>.from(data);
   }
   if (response['user'] is Map) {
     return Map<String, dynamic>.from(response['user'] as Map);
@@ -1080,14 +1228,14 @@ Map<String, String> _referralApplyLoginBody({
   required String referralCode,
 }) {
   final code = referralCode.trim();
-  // Only referred_by — referral_code is the user's OWN invite code field.
-  // Sending the friend's code as referral_code confuses apply / is ignored.
+  // Keep referred_by (existing). Also send referral_code (PDF register/login).
   return {
     'email': email,
     'password': password,
     'app_id': BibleInfo.appID.toString(),
     'device_type': Platform.isIOS ? 'iOS' : 'Android',
     'referred_by': code,
+    'referral_code': code,
   };
 }
 
@@ -1104,7 +1252,10 @@ Future<Map<String, dynamic>?> _fetchLoginProfile({
     'device_type': Platform.isIOS ? 'iOS' : 'Android',
   };
   if (referralCode != null && referralCode.trim().isNotEmpty) {
-    body['referral_code'] = referralCode.trim();
+    final code = referralCode.trim();
+    // PDF uses referral_code; keep referred_by for existing apply path.
+    body['referral_code'] = code;
+    body['referred_by'] = code;
   }
   final resp =
       await http.post(Uri.parse(Api.login), headers: <String, String>{
@@ -1214,9 +1365,11 @@ Future<String?> registerUser(
       'app_id': BibleInfo.appID,
       'interested_vc_tags': selectedCategories.toString()
     };
-    // Backend accepts invite only at register (profile-update cannot set it).
+    // Backend accepts invite at register. Keep referred_by; also send
+    // referral_code (PDF Postman field for friend's invite code).
     if (inviteCode.isNotEmpty) {
       body['referred_by'] = inviteCode;
+      body['referral_code'] = inviteCode;
     }
     final resp =
         await http.post(Uri.parse(Api.register), headers: <String, String>{
@@ -1257,6 +1410,8 @@ Future<String?> registerUser(
             fromApi.isNotEmpty ? fromApi : inviteCode;
         await cacheNotifier.writeCache(key: 'referred_by', value: stored);
       }
+      // Additive: pull PDF /api/profile fields after register.
+      await syncReferralFieldsFromAuthHubProfile();
       Constants.showToast("Account Created Successfully");
       return registeredReferralCode;
     } else {
@@ -1308,8 +1463,10 @@ Future<UserModel> loginUser(
       "device_type": Platform.isIOS ? "iOS" : "Android",
     };
     if (referralCode != null && referralCode.trim().isNotEmpty) {
-      // Apply invite via referred_by only (referral_code is own invite id).
-      body['referred_by'] = referralCode.trim();
+      // Keep referred_by (existing). Also send referral_code (PDF).
+      final code = referralCode.trim();
+      body['referred_by'] = code;
+      body['referral_code'] = code;
     }
     final resp =
         await http.post(Uri.parse(Api.login), headers: <String, String>{
@@ -1360,6 +1517,8 @@ Future<UserModel> loginUser(
       debugPrint(
           '  referral_reward_claimed  → ${user.referralRewardClaimed}');
       await cacheReferralFieldsFromUser(user);
+      // Additive: sync PDF /api/profile fields (does not change claim rules).
+      await syncReferralFieldsFromAuthHubProfile();
       // Pending credits claimed via Home popup (no silent credit).
       await syncReferrerCreditsFromProfile(user);
       return user;

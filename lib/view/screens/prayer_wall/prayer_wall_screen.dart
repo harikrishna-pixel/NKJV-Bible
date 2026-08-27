@@ -48,9 +48,12 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   Map<String, int> _likeCounts = {};
   Map<String, int> _commentCounts = {};
   Map<String, String> _prayerAuthorMap = {};
+  Map<String, String> _prayerAuthorUserIdMap = {};
   Set<String> _myPrayerIds = {};
   /// UI-only: prayers reported on this device (flag highlight).
   Set<String> _reportedPrayerIds = {};
+  /// UI-only: prayer `_id`s blocked on this device (hide those prayers).
+  Set<String> _blockedUserIds = {};
   String _filter = 'All';
   String _sort = 'Latest';
   bool _loading = true;
@@ -84,6 +87,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   String? _historyError;
   List<PrayerWallItem> _historyItems = [];
   bool _openingHistory = false;
+
+  /// UI-only: blocked prayers list (unblock + count).
+  bool _showingBlocked = false;
 
   /// True when keyboard is up or a text field is focused (hide FAB overlay).
   bool get _hideFabForInput {
@@ -151,8 +157,10 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     FocusManager.instance.addListener(_onFocusOrMetricsChanged);
     _hydrateLikesFromDisk();
     _hydratePrayerAuthorsFromDisk();
+    _hydratePrayerAuthorUserIdsFromDisk();
     _hydrateMyPrayerIdsFromDisk();
     _hydrateReportedPrayerIdsFromDisk();
+    _hydrateBlockedUserIdsFromDisk();
     _loadAuthAndLocalName();
     _refresh();
   }
@@ -224,6 +232,28 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     setState(() => _prayerAuthorMap = m);
   }
 
+  Future<void> _hydratePrayerAuthorUserIdsFromDisk() async {
+    final m = await PrayerWallLocalStore.loadPrayerAuthorUserIdMap();
+    if (!mounted) return;
+    setState(() => _prayerAuthorUserIdMap = m);
+  }
+
+  Future<void> _mergeAuthorUserIdsFromPrayers(List<PrayerWallItem> prayers) async {
+    final m = await PrayerWallLocalStore.loadPrayerAuthorUserIdMap();
+    var changed = false;
+    for (final p in prayers) {
+      final uid = (p.authorUserId ?? '').trim();
+      if (uid.isEmpty) continue;
+      if (m[p.id] == uid) continue;
+      m[p.id] = uid;
+      changed = true;
+    }
+    if (!changed) return;
+    await PrayerWallLocalStore.savePrayerAuthorUserIdMap(m);
+    if (!mounted) return;
+    setState(() => _prayerAuthorUserIdMap = m);
+  }
+
   Future<void> _hydrateMyPrayerIdsFromDisk() async {
     // Owner ids = only prayers this device posted (meta/author on create).
     final owned = await PrayerWallLocalStore.loadOwnedPrayerIds();
@@ -239,6 +269,12 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     final s = await PrayerWallLocalStore.loadReportedPrayerIds();
     if (!mounted) return;
     setState(() => _reportedPrayerIds = s);
+  }
+
+  Future<void> _hydrateBlockedUserIdsFromDisk() async {
+    final s = await PrayerWallLocalStore.loadBlockedUserIds();
+    if (!mounted) return;
+    setState(() => _blockedUserIds = s);
   }
 
   /// True if this device has marked the prayer as liked (see persisted map).
@@ -260,11 +296,16 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       if (!mounted) return;
       final prayers = results[0] as List<PrayerWallItem>;
       await PrayerWallLocalStore.markPrayersAsSeen(prayers.map((p) => p.id));
+      await _mergeAuthorUserIdsFromPrayers(prayers);
+      final mergedAuthorUserIdMap =
+          await PrayerWallLocalStore.loadPrayerAuthorUserIdMap();
+      if (!mounted) return;
       setState(() {
         _all = prayers;
         _likeCounts = Map<String, int>.from(results[1] as Map<String, int>);
         _commentCounts = Map<String, int>.from(results[2] as Map<String, int>);
         _prayerAuthorMap = authorMap;
+        _prayerAuthorUserIdMap = mergedAuthorUserIdMap;
         _loading = false;
       });
       await _maybeShowExpiredStatusPrompt();
@@ -316,9 +357,15 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   }
   List<PrayerWallItem> get _visible {
     final source = _showingHistory ? _historyItems : _all;
+    // UI-only: prayers this user/device reported stay hidden for them only.
+    // Does not change report API, ownership, or what other users see.
+    final notReported = source.where((p) => !_reportedPrayerIds.contains(p.id));
+    // UI-only: hide prayers this user blocked (prayer `_id` from GET /api/prayers).
+    final notBlocked =
+        notReported.where((p) => !_blockedUserIds.contains(p.id));
     final base = _filter == 'All'
-        ? List<PrayerWallItem>.from(source)
-        : source.where((p) => p.category == _filter).toList();
+        ? List<PrayerWallItem>.from(notBlocked)
+        : notBlocked.where((p) => p.category == _filter).toList();
 
     int createdMs(PrayerWallItem p) =>
         p.createdAt?.millisecondsSinceEpoch ?? 0;
@@ -485,6 +532,269 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       _showAppleToast(_looksOffline(e)
           ? 'No internet connection. Please try again.'
           : 'Could not submit report. Please try again.');
+    }
+  }
+
+  /// Prayer `_id` from GET /api/prayers, e.g. `6a8fbde1beff837effb65eed`.
+  static final RegExp _mongoObjectId = RegExp(r'^[a-fA-F0-9]{24}$');
+
+  String? _mongoPrayerId(String? raw) {
+    final id = (raw ?? '').trim();
+    if (!_mongoObjectId.hasMatch(id)) return null;
+    return id;
+  }
+
+  String? _blockPrayerId(PrayerWallItem item) => _mongoPrayerId(item.id);
+
+  /// Logged-in user's own prayer `_id` → `user_id` (not AuthHub userid).
+  String? _myPrayerIdForBlock() {
+    for (final p in _all) {
+      if (!_isMyPrayer(p)) continue;
+      final id = _mongoPrayerId(p.id);
+      if (id != null) return id;
+    }
+    for (final id in _myPrayerIds) {
+      final mongo = _mongoPrayerId(id);
+      if (mongo != null) return mongo;
+    }
+    return null;
+  }
+
+  List<PrayerWallItem> get _blockedItemsOnWall =>
+      _all.where((p) => _blockedUserIds.contains(p.id)).toList();
+
+  List<String> get _blockedIdsNotOnWall {
+    final onWall = _blockedItemsOnWall.map((p) => p.id).toSet();
+    return _blockedUserIds.where((id) => !onWall.contains(id)).toList();
+  }
+
+  Future<void> _openBlockedList() async {
+    if (_showingBlocked) {
+      setState(() => _showingBlocked = false);
+      return;
+    }
+    final allowed = await _ensureLoggedIn(
+      message: 'Please log in to view blocked users.',
+    );
+    if (!allowed || !mounted) return;
+    setState(() {
+      _showingBlocked = true;
+      _showingHistory = false;
+      _historyError = null;
+    });
+  }
+
+  Future<bool> _confirmBlockAction({
+    required bool unblock,
+  }) async {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDark = themeProvider.themeMode == ThemeMode.dark;
+    const cream = Color(0xFFFFF9F3);
+    const ink = Color(0xFF4B3423);
+    const muted = Color(0xFF6B4E3D);
+    const brown = Color(0xFF5C4033);
+    const peach = Color(0xFFF3E4D8);
+    final bg = isDark ? CommanColor.darkPrimaryColor : cream;
+    final titleColor = isDark ? Colors.white : ink;
+    final bodyColor = isDark ? Colors.white70 : muted;
+    final accent = isDark ? const Color(0xFFE8C9A0) : brown;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+        child: Material(
+          color: bg,
+          borderRadius: BorderRadius.circular(22),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 26, 22, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF4A382C) : peach,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    unblock ? Icons.lock_open_rounded : Icons.block_rounded,
+                    size: 30,
+                    color: accent,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  unblock ? 'Unblock user?' : 'Block user?',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'Georgia',
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: titleColor,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  unblock
+                      ? 'Their prayers will show on your wall again.'
+                      : 'You will no longer see prayers from this user.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.4,
+                    fontWeight: FontWeight.w500,
+                    color: bodyColor,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  height: 1,
+                  color: brown.withValues(alpha: isDark ? 0.35 : 0.18),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: brown,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      unblock ? 'Unblock' : 'Block',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: accent,
+                      side: BorderSide(
+                        color: brown.withValues(alpha: 0.55),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    return ok == true;
+  }
+
+  Future<void> _unblockByPrayerId(String prayerId) async {
+    final blockedId = _mongoPrayerId(prayerId);
+    if (blockedId == null) return;
+    final uid = _myPrayerIdForBlock();
+    if (uid == null) {
+      _showAppleToast('Cannot unblock this user right now.');
+      return;
+    }
+    final confirmed = await _confirmBlockAction(unblock: true);
+    if (!confirmed || !mounted) return;
+    try {
+      await PrayerWallService.unblockUser(
+        userId: uid,
+        blockedUserId: blockedId,
+      );
+      await PrayerWallLocalStore.unmarkBlockedUser(blockedId);
+      if (!mounted) return;
+      setState(() => _blockedUserIds.remove(blockedId));
+      Constants.showToast('User unblocked', 2000);
+    } catch (e) {
+      print('PrayerWall _unblockByPrayerId error: $e');
+      if (!mounted) return;
+      _showAppleToast(_looksOffline(e)
+          ? 'No internet connection. Please try again.'
+          : 'Could not update block. Please try again.');
+    }
+  }
+
+  Future<void> _openBlockUser(PrayerWallItem item) async {
+    print('unique prayer id: ${item.id}');
+
+    final blockedId = _blockPrayerId(item);
+    if (blockedId == null) {
+      _showAppleToast('Cannot block this user right now.');
+      return;
+    }
+
+    final allowed = await _ensureLoggedIn(
+      message: 'Please log in to block users.',
+    );
+    if (!allowed || !mounted) return;
+
+    final uid = _myPrayerIdForBlock();
+    if (uid == null) {
+      _showAppleToast('Cannot block this user right now.');
+      return;
+    }
+
+    print('block user_id (my posted prayer id): $uid');
+    print('block blocked_user_id (their prayer id): $blockedId');
+
+    final already = _blockedUserIds.contains(blockedId);
+    final confirmed = await _confirmBlockAction(unblock: already);
+    if (!confirmed || !mounted) return;
+
+    try {
+      if (already) {
+        await PrayerWallService.unblockUser(
+          userId: uid,
+          blockedUserId: blockedId,
+        );
+        await PrayerWallLocalStore.unmarkBlockedUser(blockedId);
+        if (!mounted) return;
+        setState(() => _blockedUserIds.remove(blockedId));
+        Constants.showToast('User unblocked', 2000);
+      } else {
+        await PrayerWallService.blockUser(
+          userId: uid,
+          blockedUserId: blockedId,
+        );
+        await PrayerWallLocalStore.markBlockedUser(blockedId);
+        if (!mounted) return;
+        setState(() => _blockedUserIds.add(blockedId));
+        Constants.showToast('User blocked', 2000);
+      }
+    } catch (e) {
+      print('PrayerWall _openBlockUser error: $e');
+      if (!mounted) return;
+      _showAppleToast(_looksOffline(e)
+          ? 'No internet connection. Please try again.'
+          : 'Could not update block. Please try again.');
     }
   }
 
@@ -1040,6 +1350,249 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     return 'Community member';
   }
 
+  Widget _buildBlockedList({
+    required Color brown,
+    required bool isDark,
+  }) {
+    final items = _blockedItemsOnWall;
+    final leftover = _blockedIdsNotOnWall;
+    final count = _blockedUserIds.length;
+    final cardBg = isDark ? const Color(0xFF2C2118) : const Color(0xFFFFF9F3);
+    final border = isDark ? const Color(0xFF5A4638) : const Color(0xFFE2D2C0);
+    final ink = isDark ? Colors.white : const Color(0xFF3D2914);
+    final muted =
+        isDark ? const Color(0xFFE8DDD0) : const Color(0xFF6B5344);
+    final peach = isDark ? const Color(0xFF4A382C) : const Color(0xFFF3E4D8);
+
+    String initials(String name) {
+      final raw = name.trim().replaceAll(RegExp(r'\s+'), '');
+      if (raw.isEmpty) return '?';
+      if (raw.length == 1) return raw[0].toUpperCase();
+      return '${raw[0].toUpperCase()}${raw[1].toUpperCase()}';
+    }
+
+    Widget unblockChip(VoidCallback onTap) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF3D2E24) : peach,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: brown.withValues(alpha: isDark ? 0.45 : 0.35),
+              ),
+            ),
+            child: Text(
+              'Unblock',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: isDark ? const Color(0xFFE8C9A0) : brown,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    Widget blockedCard({
+      required String name,
+      required String subtitle,
+      required VoidCallback onUnblock,
+    }) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 22,
+              backgroundColor: peach,
+              child: Text(
+                initials(name),
+                style: TextStyle(
+                  color: isDark ? Colors.white : brown,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      color: ink,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.3,
+                      color: muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            unblockChip(onUnblock),
+          ],
+        ),
+      );
+    }
+
+    if (count == 0) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(24, 40, 24, 100),
+        children: [
+          const SizedBox(height: 48),
+          Center(
+            child: Container(
+              width: 78,
+              height: 78,
+              decoration: BoxDecoration(
+                color: peach,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.block_outlined,
+                size: 36,
+                color: isDark ? const Color(0xFFE8C9A0) : brown,
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'No blocked prayers',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'Georgia',
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: ink,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'People you block will appear here.\nYou can unblock them anytime.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.4,
+              color: muted,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF3A2C22) : peach,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: brown.withValues(alpha: isDark ? 0.35 : 0.2),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF4A382C) : Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.block_rounded,
+                  size: 20,
+                  color: isDark ? const Color(0xFFE8C9A0) : brown,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'You blocked $count ${count == 1 ? 'person' : 'people'}',
+                      style: TextStyle(
+                        fontFamily: 'Georgia',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        color: ink,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Tap Unblock to see their prayers again.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        ...items.map((item) {
+          final name = _cardDisplayName(item);
+          final title =
+              item.title.isNotEmpty ? item.title : item.description;
+          return blockedCard(
+            name: name,
+            subtitle: title,
+            onUnblock: () => _unblockByPrayerId(item.id),
+          );
+        }),
+        ...leftover.map((id) {
+          return blockedCard(
+            name: 'Blocked prayer',
+            subtitle: 'This prayer is hidden from your wall.',
+            onUnblock: () => _unblockByPrayerId(id),
+          );
+        }),
+      ],
+    );
+  }
+
   /// UI-only: History — load prayers I posted (ids from local store + ?prayerId=).
   Future<void> _openMyPrayerHistory() async {
     if (_openingHistory) return;
@@ -1056,7 +1609,10 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     );
     if (!allowed || !mounted) return;
 
-    setState(() => _showingHistory = true);
+    setState(() {
+      _showingHistory = true;
+      _showingBlocked = false;
+    });
     await _reloadMyPrayerHistory();
   }
 
@@ -1143,6 +1699,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       if (posted == true && mounted) {
         await _reloadLocalDisplayName();
         await _hydratePrayerAuthorsFromDisk();
+        await _hydrateMyPrayerIdsFromDisk();
         await _refresh();
         if (showSuccessToast && mounted) {
           _showAppleToast('Prayer posted successfully.');
@@ -1208,7 +1765,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
             : BoxDecoration(color: cream),
         child: Scaffold(
           backgroundColor: Colors.transparent,
-      floatingActionButton: _hideFabForInput
+      floatingActionButton: (_hideFabForInput || _showingBlocked)
           ? null
           : FloatingActionButton(
               backgroundColor: isDark ? brown.withValues(alpha: 0.9) : brown,
@@ -1238,6 +1795,10 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                   IconButton(
                     icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
                     onPressed: () {
+                      if (_showingBlocked) {
+                        setState(() => _showingBlocked = false);
+                        return;
+                      }
                       if (_showingHistory) {
                         setState(() {
                           _showingHistory = false;
@@ -1251,7 +1812,11 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                   Expanded(
                     child: Center(
                       child: Text(
-                        _showingHistory ? 'History' : 'Prayer Wall',
+                        _showingBlocked
+                            ? 'Blocked (${_blockedUserIds.length})'
+                            : _showingHistory
+                                ? 'History'
+                                : 'Prayer Wall',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: Colors.white,
@@ -1259,6 +1824,22 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                           fontWeight: FontWeight.w600,
                           fontFamily: 'Georgia',
                         ),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: _showingBlocked
+                        ? 'Prayer Wall'
+                        : 'Blocked (${_blockedUserIds.length})',
+                    onPressed: _openBlockedList,
+                    icon: Badge(
+                      isLabelVisible: _blockedUserIds.isNotEmpty,
+                      label: Text('${_blockedUserIds.length}'),
+                      child: Icon(
+                        _showingBlocked
+                            ? Icons.forum_outlined
+                            : Icons.block_outlined,
+                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -1273,6 +1854,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                 ],
               ),
             ),
+            if (!_showingBlocked)
             SizedBox(
               // Increased height so category chips have enough vertical
               // space and don't get visually cut off on some devices.
@@ -1320,6 +1902,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                 },
               ),
             ),
+            if (!_showingBlocked)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               child: Row(
@@ -1359,7 +1942,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
               ),
             ),
             Expanded(
-              child: (_showingHistory ? _historyLoading : _loading)
+              child: _showingBlocked
+                  ? _buildBlockedList(brown: brown, isDark: isDark)
+                  : (_showingHistory ? _historyLoading : _loading)
                   ? const Center(child: CircularProgressIndicator())
                   : (_showingHistory ? _historyError : _error) != null
                       ? Center(
@@ -1459,6 +2044,11 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                                       onReport: () => _openReport(item),
                                       isReported:
                                           _reportedPrayerIds.contains(item.id),
+                                      onBlock: () => _openBlockUser(item),
+                                      isBlocked:
+                                          _blockedUserIds.contains(item.id),
+                                      canBlock: !_isMyPrayer(item) &&
+                                          _myPrayerIdForBlock() != null,
                                       likeCount: _likeCounts[item.id] ?? 0,
                                       liked: _isLiked(item.id),
                                       likeBusy:
@@ -1564,6 +2154,9 @@ class _PrayerCard extends StatefulWidget {
     required this.onShare,
     required this.onReport,
     this.isReported = false,
+    required this.onBlock,
+    this.isBlocked = false,
+    this.canBlock = false,
     required this.likeCount,
     required this.liked,
     required this.likeBusy,
@@ -1586,6 +2179,9 @@ class _PrayerCard extends StatefulWidget {
   final VoidCallback onShare;
   final VoidCallback onReport;
   final bool isReported;
+  final VoidCallback onBlock;
+  final bool isBlocked;
+  final bool canBlock;
   final int likeCount;
   final bool liked;
   final bool likeBusy;
@@ -1764,22 +2360,55 @@ class _PrayerCardState extends State<_PrayerCard> {
                       ),
                     ),
                   ),
-                  InkWell(
-                    onTap: widget.onReport,
-                    borderRadius: BorderRadius.circular(20),
-                    child: Padding(
-                      padding: const EdgeInsets.all(6),
-                      child: Icon(
-                        widget.isReported
-                            ? Icons.flag_rounded
-                            : Icons.flag_outlined,
-                        size: 20,
-                        color: widget.isReported
-                            ? const Color(0xFFC45C3A)
-                            : (isDark ? Colors.white : brown),
+                  // UI-only: owner sees Edit (opens existing actions); others see Report.
+                  if (isMine)
+                    InkWell(
+                      onTap: widget.onOpen,
+                      borderRadius: BorderRadius.circular(20),
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Icon(
+                          Icons.edit_outlined,
+                          size: 20,
+                          color: isDark ? Colors.white : brown,
+                        ),
+                      ),
+                    )
+                  else ...[
+                    if (widget.canBlock)
+                      InkWell(
+                        onTap: widget.onBlock,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: Icon(
+                            widget.isBlocked
+                                ? Icons.block_rounded
+                                : Icons.block_outlined,
+                            size: 20,
+                            color: widget.isBlocked
+                                ? const Color(0xFFC45C3A)
+                                : (isDark ? Colors.white : brown),
+                          ),
+                        ),
+                      ),
+                    InkWell(
+                      onTap: widget.onReport,
+                      borderRadius: BorderRadius.circular(20),
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Icon(
+                          widget.isReported
+                              ? Icons.flag_rounded
+                              : Icons.flag_outlined,
+                          size: 20,
+                          color: widget.isReported
+                              ? const Color(0xFFC45C3A)
+                              : (isDark ? Colors.white : brown),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
               const SizedBox(height: 10),

@@ -4,6 +4,7 @@ import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_guidelines_dialog.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_models.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_verify_dialogs.dart';
@@ -221,6 +222,8 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         // Always track prayers created by this device so Edit/Delete works even
         // for anonymous/community posts.
         await PrayerWallLocalStore.addMyPrayerId(prayerId);
+        print('posted prayer id: $prayerId');
+        print('this prayer id will be used as user_id for block');
         // Exact timestamp for status prompt: postedAt + durationDays.
         final postedAt = DateTime.tryParse(
               (created['createdAt'] ?? created['created_at'] ?? '').toString(),
@@ -236,6 +239,13 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
           await PrayerWallLocalStore.putPrayerAuthor(
             prayerId: prayerId,
             authorName: effectiveName,
+          );
+        }
+        final posterUserId = PrayerWallItem.extractAuthorUserId(created);
+        if (posterUserId != null && posterUserId.trim().isNotEmpty) {
+          await PrayerWallLocalStore.putPrayerAuthorUserId(
+            prayerId: prayerId,
+            authorUserId: posterUserId.trim(),
           );
         }
       }
@@ -472,11 +482,11 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        _durationChip('3 Days', 3, brown, isDark),
+                        _durationChip('7 Days', 7, brown, isDark),
                         const SizedBox(width: 8),
-                        _durationChip('1 Week', 7, brown, isDark),
+                        _durationChip('14 Days', 14, brown, isDark),
                         const SizedBox(width: 8),
-                        _durationChip('1 Month', 30, brown, isDark),
+                        _durationChip('30 Days', 30, brown, isDark),
                       ],
                     ),
                     const SizedBox(height: 10),

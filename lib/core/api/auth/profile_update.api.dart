@@ -531,8 +531,8 @@ class ProfileUpdateApi {
         );
       }
 
-      // Do NOT send email / do NOT write key=referral_code (that is the user's
-      // own code). Only set referred_by to the invite code entered.
+      // Do NOT send email. Prefer referred_by (existing); also try referral_code
+      // (PDF invite field) as an extra attempt only.
       final profileAttempts = <Map<String, String>>[
         {
           'action': '1',
@@ -547,6 +547,15 @@ class ProfileUpdateApi {
           'user_id': userId,
           'app_id': appId,
           'referred_by': code,
+          if (identity.name.isNotEmpty) 'name': identity.name,
+        },
+        // Additive PDF-aligned attempt (does not remove prior attempts).
+        {
+          'action': '1',
+          'user_id': userId,
+          'app_id': appId,
+          'referred_by': code,
+          'referral_code': code,
           if (identity.name.isNotEmpty) 'name': identity.name,
         },
       ];

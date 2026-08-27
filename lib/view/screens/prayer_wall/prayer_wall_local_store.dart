@@ -10,12 +10,15 @@ class PrayerWallLocalStore {
   static const _kLikeMap = 'prayer_wall_like_map_v1';
   static const _kMyCommentIds = 'prayer_wall_my_comment_ids_v1';
   static const _kPrayerAuthorMap = 'prayer_wall_prayer_author_map_v1';
+  static const _kPrayerAuthorUserIdMap =
+      'prayer_wall_prayer_author_user_id_map_v1';
   static const _kLastDisplayName = 'prayer_wall_last_display_name_v1';
   static const _kMyPrayerIds = 'prayer_wall_my_prayer_ids_v1';
   static const _kSeenPrayerIds = 'prayer_wall_seen_prayer_ids_v1';
   static const _kPrayerDurationMeta = 'prayer_wall_duration_meta_v1';
   static const _kStatusSubmittedIds = 'prayer_wall_status_submitted_ids_v1';
   static const _kReportedPrayerIds = 'prayer_wall_reported_prayer_ids_v1';
+  static const _kBlockedUserIds = 'prayer_wall_blocked_user_ids_v1';
   static const _kReporterId = 'prayer_wall_reporter_id_v1';
   static const _kBannerDismissKeys = 'prayer_wall_home_banner_dismiss_v1';
 
@@ -105,6 +108,37 @@ class PrayerWallLocalStore {
     final m = await loadPrayerAuthorMap();
     m.remove(pid);
     await savePrayerAuthorMap(m);
+  }
+
+  /// prayer ObjectId → poster user id (Mongo / AuthHub) for block API.
+  static Future<Map<String, String>> loadPrayerAuthorUserIdMap() async {
+    final p = await SharedPreferences.getInstance();
+    final s = p.getString(_kPrayerAuthorUserIdMap);
+    if (s == null || s.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(s);
+      if (decoded is! Map) return {};
+      return decoded.map((k, v) => MapEntry(k.toString(), v.toString()));
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> savePrayerAuthorUserIdMap(Map<String, String> map) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kPrayerAuthorUserIdMap, jsonEncode(map));
+  }
+
+  static Future<void> putPrayerAuthorUserId({
+    required String prayerId,
+    required String authorUserId,
+  }) async {
+    final pid = prayerId.trim();
+    final uid = authorUserId.trim();
+    if (pid.isEmpty || uid.isEmpty) return;
+    final m = await loadPrayerAuthorUserIdMap();
+    m[pid] = uid;
+    await savePrayerAuthorUserIdMap(m);
   }
 
   /// Last name used when posting (or prefilled from login). For display / prefill only.
@@ -303,6 +337,41 @@ class PrayerWallLocalStore {
     final s = await loadReportedPrayerIds();
     s.add(pid);
     await saveReportedPrayerIds(s);
+  }
+
+  /// UI-only: prayer `_id`s blocked via POST /api/blocked-users.
+  static Future<Set<String>> loadBlockedUserIds() async {
+    final p = await SharedPreferences.getInstance();
+    final s = p.getString(_kBlockedUserIds);
+    if (s == null || s.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(s);
+      if (decoded is! List) return {};
+      return decoded.map((e) => e.toString()).toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> saveBlockedUserIds(Set<String> ids) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kBlockedUserIds, jsonEncode(ids.toList()));
+  }
+
+  static Future<void> markBlockedUser(String userId) async {
+    final uid = userId.trim();
+    if (uid.isEmpty) return;
+    final s = await loadBlockedUserIds();
+    s.add(uid);
+    await saveBlockedUserIds(s);
+  }
+
+  static Future<void> unmarkBlockedUser(String userId) async {
+    final uid = userId.trim();
+    if (uid.isEmpty) return;
+    final s = await loadBlockedUserIds();
+    s.remove(uid);
+    await saveBlockedUserIds(s);
   }
 
   /// UI-only dismiss keys for home expiry banners (e.g. `ends_today:<id>:<ymd>`).
