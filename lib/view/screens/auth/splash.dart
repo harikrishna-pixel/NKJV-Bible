@@ -856,10 +856,17 @@ class _SplashScreenState extends State<SplashScreen>
 
     _schedulePostSplashAtt();
     await SharPreferences.setBoolean(SharPreferences.isLoadBookContent, true);
+    // UI-only: finish warm before route swap so splash→Home does not flash empty.
     try {
       final provider =
-      Provider.of<DownloadProvider>(context, listen: false);
-      unawaited(provider.warmDataBeforeHomeScreen());
+          Provider.of<DownloadProvider>(context, listen: false);
+      await provider.warmDataBeforeHomeScreen().timeout(
+        const Duration(seconds: 4),
+        onTimeout: () {
+          debugPrint(
+              'warmDataBeforeHomeScreen timed out — continuing to Home');
+        },
+      );
     } catch (e) {
       debugPrint('warmDataBeforeHomeScreen error: $e');
     }
