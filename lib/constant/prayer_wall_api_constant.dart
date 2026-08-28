@@ -13,6 +13,11 @@ class PrayerWallApiConstant {
   static String get likes => _path('/api/likes');
   static String get prayerReports => _path('/api/prayer-reports');
   static String get blockedUsers => _path('/api/blocked-users');
+  static String get usersResolve => _path('/api/users/resolve');
+
+  /// Additive: restore blocks after login — `GET /api/blocked-users?user_id=`.
+  static String blockedUsersForUser(String userId) =>
+      '$blockedUsers?user_id=${Uri.encodeQueryComponent(userId)}';
 
   /// Optional query helpers (no path params on server).
   static String commentsForPrayer(String prayerId) =>
@@ -24,4 +29,8 @@ class PrayerWallApiConstant {
   /// One prayer by id (history): `GET /api/prayers?prayerId={id}`.
   static String prayersForPrayerId(String prayerId) =>
       '$prayers?prayerId=${Uri.encodeQueryComponent(prayerId)}';
+
+  /// Additive: wall fetch with identity — `GET /api/prayers?identityUserId=`.
+  static String prayersForIdentityUserId(String identityUserId) =>
+      '$prayers?identityUserId=${Uri.encodeQueryComponent(identityUserId)}';
 }

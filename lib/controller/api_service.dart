@@ -8,6 +8,8 @@ import 'package:biblebookapp/Model/image_model.dart';
 import 'package:biblebookapp/core/api/auth/profile_update.api.dart';
 import 'package:biblebookapp/core/library_backup_upload_service.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
 import 'package:biblebookapp/view/constants/assets_constants.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
@@ -1412,6 +1414,10 @@ Future<String?> registerUser(
       }
       // Additive: pull PDF /api/profile fields after register.
       await syncReferralFieldsFromAuthHubProfile();
+      await PrayerWallLocalStore.clearAccountScopedData();
+      await PrayerWallService.resolveIdentityUser(
+        email: '${data['data']['user']['email']}',
+      );
       Constants.showToast("Account Created Successfully");
       return registeredReferralCode;
     } else {
@@ -1468,12 +1474,43 @@ Future<UserModel> loginUser(
       body['referred_by'] = code;
       body['referral_code'] = code;
     }
+    debugPrint('========== SIGN IN REQUEST ==========');
+    debugPrint('POST ${Api.login}');
+    for (final entry in body.entries) {
+      if (entry.key == 'password') {
+        debugPrint('  ${entry.key} → *** (${entry.value.length} chars)');
+      } else {
+        debugPrint('  ${entry.key} → ${entry.value}');
+      }
+    }
+    debugPrint('  Authorization → Bearer {temp_token}');
+    debugPrint('=====================================');
     final resp =
         await http.post(Uri.parse(Api.login), headers: <String, String>{
       'Content-Type': 'application/x-www-form-urlencoded',
       'Authorization': 'Bearer $token'
     }, body: body);
     final data = jsonDecode(resp.body);
+    debugPrint('========== SIGN IN RESPONSE ==========');
+    debugPrint('  status_code → ${resp.statusCode}');
+    debugPrint('  status      → ${data['status']}');
+    debugPrint('  message     → ${data['message']}');
+    if (data['status'] == true && data['data'] != null) {
+      final userData = data['data']['user'];
+      final authToken = data['data']['token']?.toString() ?? '';
+      debugPrint('  email       → ${userData?['email']}');
+      debugPrint('  name        → ${userData?['name']}');
+      debugPrint('  user_id     → ${userData?['user_id']}');
+      debugPrint(
+          '  token       → ${authToken.length > 20 ? '${authToken.substring(0, 20)}...' : authToken}');
+      if (userData?['referred_by'] != null) {
+        debugPrint('  referred_by → ${userData['referred_by']}');
+      }
+      if (userData?['referral_code'] != null) {
+        debugPrint('  referral_code → ${userData['referral_code']}');
+      }
+    }
+    debugPrint('======================================');
     debugPrint("user login - $data");
     if (data['status']) {
       await cacheNotifier.writeCache(
@@ -1494,6 +1531,12 @@ Future<UserModel> loginUser(
       }
 
       LibraryBackupUploadService.runAfterLogin();
+
+      // Account switch: drop previous user's Prayer Wall ownership, then resolve.
+      await PrayerWallLocalStore.clearAccountScopedData();
+      await PrayerWallService.resolveIdentityUser(
+        email: '${data['data']['user']['email']}',
+      );
 
       // Constants.showToast(
       //     "Hi ${data['data']['user']['name']}, Welcome to ${BibleInfo.bible_shortName}");

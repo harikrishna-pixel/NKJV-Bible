@@ -22,6 +22,7 @@ import '../../api/auth/register.api.dart';
 import 'dart:developer' as devtools show log;
 
 import '../cache.notifier.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
 
 /// Pull profile image URL from profile-update / auth JSON shapes.
 String? _profileImageUrlFromResponse(dynamic decoded) {
@@ -223,6 +224,7 @@ class AuthNotifier extends ChangeNotifier {
           await cacheNotifier.removeCache(key: 'user');
           await cacheNotifier.removeCache(key: 'name');
           await cacheNotifier.removeCache(key: 'authtoken');
+          await PrayerWallLocalStore.clearAccountScopedData();
           //   FirebaseAuth.instance.signOut();
           Constants.showToast("$msg");
           Get.offAll(() => const SplashScreen());

@@ -62,6 +62,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   bool _isLoggedIn = false;
   String? _userName;
   String? _userId;
+  String? _userEmail;
   /// Name last saved when posting (fallback display).
   String? _localDisplayName;
   /// Cached profile photo URL (fallback for my posts if API omits image).
@@ -90,6 +91,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
 
   /// UI-only: blocked prayers list (unblock + count).
   bool _showingBlocked = false;
+  bool _blockedApiRestoreBusy = false;
 
   /// True when keyboard is up or a text field is focused (hide FAB overlay).
   bool get _hideFabForInput {
@@ -182,23 +184,27 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       final authtoken = await _cacheNotifier.readCache(key: 'authtoken');
       final userid = await _cacheNotifier.readCache(key: 'userid');
       final name = await _cacheNotifier.readCache(key: 'name');
+      final emailCache = await _cacheNotifier.readCache(key: 'user');
       final profileImage =
           await _cacheNotifier.readCache(key: 'profile_image');
       final localName = await PrayerWallLocalStore.loadLastDisplayName();
 
       final loggedIn = (authtoken != null && authtoken.toString().isNotEmpty) ||
           (userid != null && userid.toString().isNotEmpty);
+      final email = (emailCache ?? '').toString().trim();
 
       if (!mounted) return;
       setState(() {
         _isLoggedIn = loggedIn;
         _userId = userid?.toString();
         _userName = name?.toString();
+        _userEmail = loggedIn && email.isNotEmpty ? email : null;
         _localDisplayName = localName;
         final img = profileImage?.toString().trim() ?? '';
         _viewerProfileImage = img.isNotEmpty ? img : null;
         _authLoading = false;
       });
+      await _restoreBlockedUserIdsFromApi();
     } catch (_) {
       if (!mounted) return;
       final localName = await PrayerWallLocalStore.loadLastDisplayName();
@@ -207,6 +213,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         _isLoggedIn = false;
         _userId = null;
         _userName = null;
+        _userEmail = null;
         _localDisplayName = localName;
         _viewerProfileImage = null;
         _authLoading = false;
@@ -277,6 +284,79 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     setState(() => _blockedUserIds = s);
   }
 
+  /// Additive: refill local blocked ids from GET /api/blocked-users.
+  /// Same `user_id` as POST (this account's prayer `_id`s). Does not change
+  /// block/unblock POST/DELETE or how the wall hides blocked prayers.
+  Future<void> _restoreBlockedUserIdsFromApi({
+    List<PrayerWallItem>? prayers,
+  }) async {
+    if (!mounted || _blockedApiRestoreBusy) return;
+    var email = (_userEmail ?? '').trim();
+    var loggedIn = _isLoggedIn;
+    if (!loggedIn || email.isEmpty) {
+      try {
+        final authtoken = await _cacheNotifier.readCache(key: 'authtoken');
+        final userid = await _cacheNotifier.readCache(key: 'userid');
+        final emailCache = await _cacheNotifier.readCache(key: 'user');
+        loggedIn = loggedIn ||
+            (authtoken != null && authtoken.toString().isNotEmpty) ||
+            (userid != null && userid.toString().isNotEmpty);
+        if (email.isEmpty) {
+          email = (emailCache ?? '').toString().trim();
+        }
+      } catch (_) {}
+    }
+    if (!loggedIn) return;
+
+    try {
+      final fromEmail =
+          await PrayerWallLocalStore.loadBlockedUserIdsForEmail(email);
+      if (fromEmail.isNotEmpty && mounted) {
+        final localMerged = {..._blockedUserIds, ...fromEmail};
+        await PrayerWallLocalStore.saveBlockedUserIds(
+          localMerged,
+          email: email,
+        );
+        if (!mounted) return;
+        setState(() => _blockedUserIds = localMerged);
+      }
+    } catch (e) {
+      print('PrayerWall restore blocked from email store: $e');
+    }
+
+    final source = prayers ?? _all;
+    // Wall fetch owns the GET; skip if prayers are not loaded yet.
+    if (prayers == null && source.isEmpty) return;
+    if (_blockedApiRestoreBusy) return;
+    _blockedApiRestoreBusy = true;
+    try {
+      final extra = <String>{..._myPrayerIds};
+      for (final id in extra.toList()) {
+        final mongo = _mongoPrayerId(id);
+        if (mongo != null) extra.add(mongo);
+      }
+      final fromApi = await PrayerWallService.fetchBlockedUserIdsForAccount(
+        email: email,
+        wallPrayers: source,
+        extraActorIds: extra,
+      );
+      if (!mounted) return;
+      final merged = {..._blockedUserIds, ...fromApi};
+      print(
+        'restore blocked merge local=${_blockedUserIds.length} '
+        'api=${fromApi.length} merged=${merged.length}',
+      );
+      if (merged.isEmpty) return;
+      await PrayerWallLocalStore.saveBlockedUserIds(merged, email: email);
+      if (!mounted) return;
+      setState(() => _blockedUserIds = merged);
+    } catch (e) {
+      print('PrayerWall _restoreBlockedUserIdsFromApi error: $e');
+    } finally {
+      _blockedApiRestoreBusy = false;
+    }
+  }
+
   /// True if this device has marked the prayer as liked (see persisted map).
   bool _isLiked(String prayerId) =>
       _likeIdByPrayerId.containsKey(prayerId);
@@ -299,6 +379,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       await _mergeAuthorUserIdsFromPrayers(prayers);
       final mergedAuthorUserIdMap =
           await PrayerWallLocalStore.loadPrayerAuthorUserIdMap();
+      if (!mounted) return;
+      await _restoreBlockedUserIdsFromApi(prayers: prayers);
       if (!mounted) return;
       setState(() {
         _all = prayers;
@@ -383,14 +465,15 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     return base;
   }
 
-  /// Owner only: this device posted it, or API author user id matches login.
-  /// Does not use display-name matching (shared names would allow editing others).
+  /// Owner only: same login email on the prayer, else this session's posted ids.
   bool _isMyPrayer(PrayerWallItem item) {
+    final myEmail = (_userEmail ?? '').trim().toLowerCase();
+    final prayerEmail = (item.email ?? '').trim().toLowerCase();
+    if (myEmail.isNotEmpty && prayerEmail.isNotEmpty) {
+      return myEmail == prayerEmail;
+    }
     if (_myPrayerIds.contains(item.id)) return true;
     if (_prayerAuthorMap.containsKey(item.id)) return true;
-    final uid = (_userId ?? '').trim();
-    final authorId = (item.authorUserId ?? '').trim();
-    if (uid.isNotEmpty && authorId.isNotEmpty && uid == authorId) return true;
     return false;
   }
 
@@ -591,8 +674,27 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     setState(() => _showingBlocked = blocked);
   }
 
+  String _avatarInitialsForName(String value) {
+    final raw = value.trim().replaceAll(RegExp(r'\s+'), '');
+    if (raw.isEmpty) return '?';
+    if (raw.length == 1) return raw[0].toUpperCase();
+    return '${raw[0].toUpperCase()}${raw[1].toUpperCase()}';
+  }
+
+  PrayerWallItem? _prayerItemById(String id) {
+    for (final p in _all) {
+      if (p.id == id) return p;
+    }
+    for (final p in _historyItems) {
+      if (p.id == id) return p;
+    }
+    return null;
+  }
+
   Future<bool> _confirmBlockAction({
     required bool unblock,
+    String? displayName,
+    String? profileImageUrl,
   }) async {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final isDark = themeProvider.themeMode == ThemeMode.dark;
@@ -600,123 +702,168 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     const ink = Color(0xFF4B3423);
     const muted = Color(0xFF6B4E3D);
     const brown = Color(0xFF5C4033);
-    const peach = Color(0xFFF3E4D8);
     final bg = isDark ? CommanColor.darkPrimaryColor : cream;
     final titleColor = isDark ? Colors.white : ink;
     final bodyColor = isDark ? Colors.white70 : muted;
     final accent = isDark ? const Color(0xFFE8C9A0) : brown;
 
+    final name = (displayName ?? '').trim();
+    final who = name.isNotEmpty ? name : 'this user';
+    final photoUrl = (profileImageUrl ?? '').trim();
+    final hasPhoto = photoUrl.isNotEmpty;
+    final initials = _avatarInitialsForName(
+      name.isNotEmpty ? name : 'Community member',
+    );
+
     final ok = await showDialog<bool>(
       context: context,
       barrierDismissible: true,
       barrierColor: Colors.black.withValues(alpha: 0.45),
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-        child: Material(
-          color: bg,
-          borderRadius: BorderRadius.circular(22),
-          clipBehavior: Clip.antiAlias,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(22, 26, 22, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF4A382C) : peach,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    unblock ? Icons.lock_open_rounded : Icons.block_rounded,
-                    size: 30,
-                    color: accent,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  unblock ? 'Unblock user?' : 'Block user?',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontFamily: 'Georgia',
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: titleColor,
-                    height: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  unblock
-                      ? 'Their prayers will show on your wall again.'
-                      : 'You will no longer see prayers from this user.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 1.4,
-                    fontWeight: FontWeight.w500,
-                    color: bodyColor,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Container(
-                  height: 1,
-                  color: brown.withValues(alpha: isDark ? 0.35 : 0.18),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.of(ctx).pop(true),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: brown,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
+      builder: (ctx) {
+        final dialogWidth = MediaQuery.sizeOf(ctx).width * 0.88;
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: SizedBox(
+            width: dialogWidth,
+            child: Material(
+              color: bg,
+              borderRadius: BorderRadius.circular(24),
+              clipBehavior: Clip.antiAlias,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(28, 28, 28, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircleAvatar(
+                      radius: 48,
+                      backgroundColor: isDark
+                          ? const Color(0xFF4A382C)
+                          : brown.withValues(alpha: 0.15),
+                      backgroundImage:
+                          hasPhoto ? NetworkImage(photoUrl) : null,
+                      onBackgroundImageError: hasPhoto ? (_, __) {} : null,
+                      child: hasPhoto
+                          ? null
+                          : Text(
+                              initials,
+                              style: TextStyle(
+                                color: isDark ? Colors.white : brown,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 30,
+                              ),
+                            ),
                     ),
-                    child: Text(
-                      unblock ? 'Unblock' : 'Block',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(ctx).pop(false),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: accent,
-                      side: BorderSide(
-                        color: brown.withValues(alpha: 0.55),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: const Text(
-                      'Cancel',
+                    const SizedBox(height: 20),
+                    Text(
+                      unblock ? 'Unblock $who?' : 'Block $who?',
+                      textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Georgia',
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: titleColor,
+                        height: 1.2,
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    if (unblock)
+                      Text(
+                        'Their prayers will show on your wall again.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 15,
+                          height: 1.5,
+                          fontWeight: FontWeight.w500,
+                          color: bodyColor,
+                        ),
+                      )
+                    else ...[
+                      Text(
+                        'You will no longer see prayers or activity from this user.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 15,
+                          height: 1.5,
+                          fontWeight: FontWeight.w500,
+                          color: bodyColor,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Their prayers will be removed from your Prayer Wall.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 15,
+                          height: 1.5,
+                          fontWeight: FontWeight.w500,
+                          color: bodyColor,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 26),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 52,
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.of(ctx).pop(false),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: accent,
+                                backgroundColor: isDark
+                                    ? Colors.transparent
+                                    : cream,
+                                side: BorderSide(
+                                  color: brown.withValues(alpha: 0.55),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                'Cancel',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: SizedBox(
+                            height: 52,
+                            child: ElevatedButton(
+                              onPressed: () => Navigator.of(ctx).pop(true),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: brown,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(
+                                unblock ? 'Unblock' : 'Block',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
     return ok == true;
   }
@@ -729,14 +876,23 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       _showAppleToast('Cannot unblock this user right now.');
       return;
     }
-    final confirmed = await _confirmBlockAction(unblock: true);
+    final blockedItem = _prayerItemById(prayerId);
+    final confirmed = await _confirmBlockAction(
+      unblock: true,
+      displayName:
+          blockedItem != null ? _cardDisplayName(blockedItem) : null,
+      profileImageUrl: blockedItem?.profileImage,
+    );
     if (!confirmed || !mounted) return;
     try {
       await PrayerWallService.unblockUser(
         userId: uid,
         blockedUserId: blockedId,
       );
-      await PrayerWallLocalStore.unmarkBlockedUser(blockedId);
+      await PrayerWallLocalStore.unmarkBlockedUser(
+        blockedId,
+        email: _userEmail,
+      );
       if (!mounted) return;
       setState(() => _blockedUserIds.remove(blockedId));
       Constants.showToast('User unblocked', 2000);
@@ -773,7 +929,11 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     print('block blocked_user_id (their prayer id): $blockedId');
 
     final already = _blockedUserIds.contains(blockedId);
-    final confirmed = await _confirmBlockAction(unblock: already);
+    final confirmed = await _confirmBlockAction(
+      unblock: already,
+      displayName: _cardDisplayName(item),
+      profileImageUrl: item.profileImage,
+    );
     if (!confirmed || !mounted) return;
 
     try {
@@ -782,7 +942,10 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
           userId: uid,
           blockedUserId: blockedId,
         );
-        await PrayerWallLocalStore.unmarkBlockedUser(blockedId);
+        await PrayerWallLocalStore.unmarkBlockedUser(
+          blockedId,
+          email: _userEmail,
+        );
         if (!mounted) return;
         setState(() => _blockedUserIds.remove(blockedId));
         Constants.showToast('User unblocked', 2000);
@@ -791,7 +954,10 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
           userId: uid,
           blockedUserId: blockedId,
         );
-        await PrayerWallLocalStore.markBlockedUser(blockedId);
+        await PrayerWallLocalStore.markBlockedUser(
+          blockedId,
+          email: _userEmail,
+        );
         if (!mounted) return;
         setState(() => _blockedUserIds.add(blockedId));
         Constants.showToast('User blocked', 2000);
@@ -1707,23 +1873,23 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       final postedIds = await PrayerWallLocalStore.loadOwnedPrayerIds();
       await PrayerWallLocalStore.saveMyPrayerIds(postedIds);
       if (!mounted) return;
-      setState(() => _myPrayerIds = {...postedIds});
 
-      if (postedIds.isEmpty) {
-        setState(() {
-          _historyItems = [];
-          _historyLoading = false;
-        });
-        return;
-      }
-
-      final history =
-          await PrayerWallService.fetchPrayersByPrayerIds(postedIds);
+      final fromIdentity =
+          await PrayerWallService.fetchPrayersByIdentityUserId();
       if (!mounted) return;
-      final onlyMine =
-          history.where((p) => postedIds.contains(p.id)).toList();
+      final myEmail = (_userEmail ?? '').trim().toLowerCase();
+      final mine = myEmail.isEmpty
+          ? fromIdentity
+          : fromIdentity
+              .where((p) => (p.email ?? '').trim().toLowerCase() == myEmail)
+              .toList();
+      final ids = mine.map((p) => p.id).toSet();
+      if (ids.isNotEmpty) {
+        await PrayerWallLocalStore.saveMyPrayerIds({...postedIds, ...ids});
+      }
       setState(() {
-        _historyItems = onlyMine;
+        _myPrayerIds = {...postedIds, ...ids};
+        _historyItems = mine;
         _historyLoading = false;
       });
     } catch (e) {

@@ -3,6 +3,7 @@ import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_guidelines_dialog.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_join_sheet.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_models.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
@@ -67,7 +68,32 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         _categories.contains(widget.initialCategory)) {
       _category = widget.initialCategory!;
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _prefillDisplayName());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onFirstFrame());
+  }
+
+  Future<void> _onFirstFrame() async {
+    await _prefillDisplayName();
+    if (!mounted) return;
+
+    final alreadyAccepted =
+        await PrayerWallLocalStore.hasAcceptedPrayerWallJoinTerms();
+    if (!mounted) return;
+
+    if (!alreadyAccepted) {
+      // Brief pause so the post form paints before the sheet slides up.
+      await Future<void>.delayed(const Duration(milliseconds: 280));
+      if (!mounted) return;
+    }
+
+    final accepted = await PrayerWallJoinSheet.ensureAccepted(context);
+    if (!mounted) return;
+    if (!accepted) {
+      Navigator.of(context).pop();
+      return;
+    }
+    if (!alreadyAccepted) {
+      PrayerWallJoinSheet.showSuccessBanner(context);
+    }
   }
 
   Future<void> _prefillDisplayName() async {
