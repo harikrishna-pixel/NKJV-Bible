@@ -203,21 +203,35 @@ class LoginScreen extends HookConsumerWidget {
                                 // Close with Get.back only (same stack as Get.to).
                                 // Never open referral here; toast after pop.
                                 if (popOnSuccess || replaceOnSuccess != null) {
-                                  if (_embeddedLoginSuccessHandled) return;
-                                  _embeddedLoginSuccessHandled = true;
                                   ReferralCodeBottomSheet.resetPresentationLock();
                                   final welcome =
                                       "Hi ${user.displayName}, Welcome to ${BibleInfo.bible_shortName}";
                                   if (replaceOnSuccess != null) {
-                                    replaceOnSuccess!();
-                                  } else {
-                                    // Like/Comment: pop this Login route on the
-                                    // same GetX navigator that opened it.
-                                    // Get.back() can close a toast and leave Login.
-                                    final nav = Get.key.currentState;
-                                    if (nav != null && nav.canPop()) {
-                                      nav.pop(true);
+                                    if (!_embeddedLoginSuccessHandled) {
+                                      _embeddedLoginSuccessHandled = true;
+                                      replaceOnSuccess!();
                                     }
+                                  } else {
+                                    // Close this Login route (Prayer Wall Get.to).
+                                    // Prefer this screen's navigator — Get.key
+                                    // can miss a nested stack and leave Login up.
+                                    var popped = false;
+                                    if (context.mounted &&
+                                        Navigator.of(context).canPop()) {
+                                      Navigator.of(context).pop(true);
+                                      popped = true;
+                                    } else {
+                                      final nav = Get.key.currentState;
+                                      if (nav != null && nav.canPop()) {
+                                        nav.pop(true);
+                                        popped = true;
+                                      }
+                                    }
+                                    if (!popped &&
+                                        !_embeddedLoginSuccessHandled) {
+                                      Get.back(result: true);
+                                    }
+                                    _embeddedLoginSuccessHandled = true;
                                   }
                                   WidgetsBinding.instance
                                       .addPostFrameCallback((_) {

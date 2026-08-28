@@ -98,11 +98,13 @@ class PrayerWallService {
       print('URL  → ${PrayerWallApiConstant.usersResolve}');
       print('body → $bodyJson');
       print('=============================================');
-      final res = await http.post(
-        Uri.parse(PrayerWallApiConstant.usersResolve),
-        headers: _jsonHeaders,
-        body: bodyJson,
-      );
+      final res = await http
+          .post(
+            Uri.parse(PrayerWallApiConstant.usersResolve),
+            headers: _jsonHeaders,
+            body: bodyJson,
+          )
+          .timeout(const Duration(seconds: 15));
       print(
         'POST /api/users/resolve response → '
         '${res.statusCode} ${res.body}',
@@ -747,10 +749,12 @@ class PrayerWallService {
       print('URL → $url');
       print('user_id → $uid');
       print('============================================');
-      final res = await http.get(
-        Uri.parse(url),
-        headers: _jsonHeaders,
-      );
+      final res = await http
+          .get(
+            Uri.parse(url),
+            headers: _jsonHeaders,
+          )
+          .timeout(const Duration(seconds: 15));
       print(
         'GET /api/blocked-users response → '
         '${res.statusCode} ${res.body}',
@@ -764,92 +768,15 @@ class PrayerWallService {
     }
   }
 
-  /// Additive: restore this account's blocked ids after login/reinstall.
-  /// Does not change POST/DELETE block or unblock.
+  /// Additive: restore blocked ids via resolve `user_id` only.
   static Future<Set<String>> fetchBlockedUserIdsForAccount({
     required String email,
     List<PrayerWallItem> wallPrayers = const [],
     Iterable<String> extraActorIds = const [],
   }) async {
-    final actorIds = <String>{};
-    for (final id in extraActorIds) {
-      final t = id.trim();
-      if (t.isNotEmpty) actorIds.add(t);
-    }
-
     final identity = await ensureIdentityUserId();
-    if (identity != null && identity.isNotEmpty) {
-      actorIds.add(identity);
-    }
-
-    final want = email.trim().toLowerCase();
-    void addMineFrom(Iterable<PrayerWallItem> list) {
-      for (final p in list) {
-        final prayerEmail = (p.email ?? '').trim().toLowerCase();
-        final ident = (p.identityUserId ?? '').trim();
-        final author = (p.authorUserId ?? '').trim();
-        final mine = (want.isNotEmpty &&
-                prayerEmail.isNotEmpty &&
-                prayerEmail == want) ||
-            (identity != null &&
-                identity.isNotEmpty &&
-                (ident == identity || author == identity));
-        if (!mine) continue;
-        final pid = p.id.trim();
-        if (pid.isNotEmpty) actorIds.add(pid);
-      }
-    }
-
-    addMineFrom(wallPrayers);
-
-    try {
-      var identityEmail = email.trim();
-      if (identityEmail.isEmpty) {
-        identityEmail = (await CacheNotifier().readCache(key: 'user') ?? '')
-            .toString()
-            .trim();
-      }
-      final identityUserId = identity ??
-          await resolveIdentityUser(
-            email: identityEmail.isEmpty ? null : identityEmail,
-          ) ??
-          await PrayerWallLocalStore.loadIdentityUserId();
-      if (identityUserId != null && identityUserId.isNotEmpty) {
-        final url =
-            PrayerWallApiConstant.prayersForIdentityUserId(identityUserId);
-        print('========== GET /api/prayers?identityUserId (block restore) ==========');
-        print('URL → $url');
-        print('====================================================================');
-        final res = await http.get(
-          Uri.parse(url),
-          headers: _jsonHeaders,
-        );
-        print(
-          'GET /api/prayers?identityUserId (block restore) → '
-          '${res.statusCode}',
-        );
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          addMineFrom(PrayerWallItem.listFromResponseBody(res.body));
-        }
-      }
-    } catch (e) {
-      print('fetchBlockedUserIdsForAccount identity prayers error: $e');
-    }
-
-    print(
-      'restore blocked actorIds (${actorIds.length}) → $actorIds',
-    );
-    if (actorIds.isEmpty) return {};
-
-    final out = <String>{};
-    final chunks = await Future.wait(
-      actorIds.map((id) => fetchBlockedUserIds(userId: id)),
-    );
-    for (final chunk in chunks) {
-      out.addAll(chunk);
-    }
-    print('restore blocked fromApi count → ${out.length} ids=$out');
-    return out;
+    if (identity == null || identity.isEmpty) return {};
+    return fetchBlockedUserIds(userId: identity);
   }
 
   /// POST `/api/blocked-users` — block a prayer poster for this user.

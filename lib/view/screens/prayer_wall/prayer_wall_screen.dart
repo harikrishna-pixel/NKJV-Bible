@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/images.dart';
@@ -63,6 +65,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   String? _userName;
   String? _userId;
   String? _userEmail;
+  /// Resolve `user_id` from POST /api/users/resolve (additive ownership check).
+  String? _resolveUserId;
   /// Name last saved when posting (fallback display).
   String? _localDisplayName;
   /// Cached profile photo URL (fallback for my posts if API omits image).
@@ -92,6 +96,10 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   /// UI-only: blocked prayers list (unblock + count).
   bool _showingBlocked = false;
   bool _blockedApiRestoreBusy = false;
+  /// Login email the in-memory blocked list was loaded for (account scoping).
+  String? _blockedListAccountEmail;
+  /// Login email [_myPrayerIds] belongs to (account scoping).
+  String? _myPrayerListAccountEmail;
 
   /// True when keyboard is up or a text field is focused (hide FAB overlay).
   bool get _hideFabForInput {
@@ -204,7 +212,18 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         _viewerProfileImage = img.isNotEmpty ? img : null;
         _authLoading = false;
       });
-      await _restoreBlockedUserIdsFromApi();
+      if (loggedIn && email.isNotEmpty) {
+        await _syncBlockedUserIdsForAccount(email);
+        await _syncMyPrayerIdsForAccount(email);
+        await _hydrateResolveUserId();
+      } else {
+        await _syncBlockedUserIdsForAccount(null);
+        await _syncMyPrayerIdsForAccount(null);
+        if (!mounted) return;
+        setState(() => _resolveUserId = null);
+      }
+      if (!mounted) return;
+      unawaited(_restoreBlockedUserIdsFromApi());
     } catch (_) {
       if (!mounted) return;
       final localName = await PrayerWallLocalStore.loadLastDisplayName();
@@ -216,6 +235,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         _userEmail = null;
         _localDisplayName = localName;
         _viewerProfileImage = null;
+        _resolveUserId = null;
         _authLoading = false;
       });
     }
@@ -261,7 +281,42 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     setState(() => _prayerAuthorUserIdMap = m);
   }
 
+  /// My Prayers / ownership: prayer email must match this login when email is known.
+  bool _prayerMatchesLoginEmail(PrayerWallItem item, [String? emailOverride]) {
+    final want = (emailOverride ?? _userEmail ?? '').trim().toLowerCase();
+    if (want.isEmpty) return true;
+    final prayerEmail = (item.email ?? '').trim().toLowerCase();
+    return prayerEmail.isNotEmpty && prayerEmail == want;
+  }
+
+  /// Drop previous account's posted-id cache when login email changes.
+  Future<void> _syncMyPrayerIdsForAccount(String? email) async {
+    final key = (email ?? '').trim().toLowerCase();
+    if (key.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _myPrayerIds = {};
+        _myPrayerListAccountEmail = null;
+      });
+      await PrayerWallLocalStore.saveMyPrayerIds({});
+      return;
+    }
+    if (_myPrayerListAccountEmail == key) return;
+    await PrayerWallLocalStore.saveMyPrayerIds({});
+    if (!mounted) return;
+    setState(() {
+      _myPrayerIds = {};
+      _myPrayerListAccountEmail = key;
+    });
+  }
+
   Future<void> _hydrateMyPrayerIdsFromDisk() async {
+    final want = (_userEmail ?? '').trim().toLowerCase();
+    if (want.isNotEmpty && _myPrayerListAccountEmail != want) {
+      await _syncMyPrayerIdsForAccount(_userEmail);
+      if (!mounted) return;
+      return;
+    }
     // Owner ids = only prayers this device posted (meta/author on create).
     final owned = await PrayerWallLocalStore.loadOwnedPrayerIds();
     final raw = await PrayerWallLocalStore.loadMyPrayerIds();
@@ -278,10 +333,45 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     setState(() => _reportedPrayerIds = s);
   }
 
-  Future<void> _hydrateBlockedUserIdsFromDisk() async {
-    final s = await PrayerWallLocalStore.loadBlockedUserIds();
+  /// Additive: cache resolve `user_id` for prayer ownership after logout/reinstall.
+  Future<void> _hydrateResolveUserId() async {
+    if (!_isLoggedIn) {
+      if (!mounted) return;
+      setState(() => _resolveUserId = null);
+      return;
+    }
+    final cached = await PrayerWallLocalStore.loadIdentityUserId();
+    final id = (cached != null && cached.isNotEmpty)
+        ? cached
+        : await PrayerWallService.ensureIdentityUserId();
     if (!mounted) return;
-    setState(() => _blockedUserIds = s);
+    setState(() => _resolveUserId = id);
+  }
+
+  Future<void> _hydrateBlockedUserIdsFromDisk() async {
+    // Account-scoped list loads in [_loadAuthAndLocalName]; avoid stale device-wide ids.
+    if (!mounted) return;
+    setState(() => _blockedUserIds = {});
+  }
+
+  /// Load blocked ids for the current login email only (not other accounts).
+  Future<void> _syncBlockedUserIdsForAccount(String? email) async {
+    final key = (email ?? '').trim().toLowerCase();
+    if (key.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _blockedUserIds = {};
+        _blockedListAccountEmail = null;
+      });
+      return;
+    }
+    final forAccount =
+        await PrayerWallLocalStore.loadBlockedUserIdsForEmail(key);
+    if (!mounted) return;
+    setState(() {
+      _blockedUserIds = forAccount;
+      _blockedListAccountEmail = key;
+    });
   }
 
   /// Additive: refill local blocked ids from GET /api/blocked-users.
@@ -308,48 +398,26 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     }
     if (!loggedIn) return;
 
-    try {
-      final fromEmail =
-          await PrayerWallLocalStore.loadBlockedUserIdsForEmail(email);
-      if (fromEmail.isNotEmpty && mounted) {
-        final localMerged = {..._blockedUserIds, ...fromEmail};
-        await PrayerWallLocalStore.saveBlockedUserIds(
-          localMerged,
-          email: email,
-        );
-        if (!mounted) return;
-        setState(() => _blockedUserIds = localMerged);
-      }
-    } catch (e) {
-      print('PrayerWall restore blocked from email store: $e');
+    final emailKey = email.trim().toLowerCase();
+    if (_blockedListAccountEmail != emailKey) {
+      await _syncBlockedUserIdsForAccount(email);
+      if (!mounted) return;
     }
 
-    final source = prayers ?? _all;
-    // Wall fetch owns the GET; skip if prayers are not loaded yet.
-    if (prayers == null && source.isEmpty) return;
     if (_blockedApiRestoreBusy) return;
     _blockedApiRestoreBusy = true;
     try {
-      final extra = <String>{..._myPrayerIds};
-      for (final id in extra.toList()) {
-        final mongo = _mongoPrayerId(id);
-        if (mongo != null) extra.add(mongo);
-      }
       final fromApi = await PrayerWallService.fetchBlockedUserIdsForAccount(
         email: email,
-        wallPrayers: source,
-        extraActorIds: extra,
       );
       if (!mounted) return;
-      final merged = {..._blockedUserIds, ...fromApi};
-      print(
-        'restore blocked merge local=${_blockedUserIds.length} '
-        'api=${fromApi.length} merged=${merged.length}',
-      );
-      if (merged.isEmpty) return;
-      await PrayerWallLocalStore.saveBlockedUserIds(merged, email: email);
+      // Replace with this account's server list — do not union other accounts' ids.
+      await PrayerWallLocalStore.saveBlockedUserIds(fromApi, email: email);
       if (!mounted) return;
-      setState(() => _blockedUserIds = merged);
+      setState(() {
+        _blockedUserIds = fromApi;
+        _blockedListAccountEmail = emailKey;
+      });
     } catch (e) {
       print('PrayerWall _restoreBlockedUserIdsFromApi error: $e');
     } finally {
@@ -380,8 +448,6 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       final mergedAuthorUserIdMap =
           await PrayerWallLocalStore.loadPrayerAuthorUserIdMap();
       if (!mounted) return;
-      await _restoreBlockedUserIdsFromApi(prayers: prayers);
-      if (!mounted) return;
       setState(() {
         _all = prayers;
         _likeCounts = Map<String, int>.from(results[1] as Map<String, int>);
@@ -390,6 +456,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         _prayerAuthorUserIdMap = mergedAuthorUserIdMap;
         _loading = false;
       });
+      unawaited(_restoreBlockedUserIdsFromApi(prayers: prayers));
       await _maybeShowExpiredStatusPrompt();
     } catch (e) {
       if (!mounted) return;
@@ -471,6 +538,29 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     final prayerEmail = (item.email ?? '').trim().toLowerCase();
     if (myEmail.isNotEmpty && prayerEmail.isNotEmpty) {
       return myEmail == prayerEmail;
+    }
+    final resolveId = (_resolveUserId ?? '').trim();
+    if (resolveId.isNotEmpty) {
+      final prayerIdentity = (item.identityUserId ?? '').trim();
+      if (prayerIdentity.isNotEmpty && prayerIdentity == resolveId) {
+        if (myEmail.isNotEmpty && prayerEmail.isNotEmpty) {
+          return prayerEmail == myEmail;
+        }
+        if (myEmail.isNotEmpty && prayerEmail.isEmpty) {
+          return _myPrayerIds.contains(item.id);
+        }
+        return prayerEmail.isEmpty || _myPrayerIds.contains(item.id);
+      }
+      final authorUid = (_prayerAuthorUserIdMap[item.id] ?? '').trim();
+      if (authorUid.isNotEmpty && authorUid == resolveId) {
+        if (myEmail.isNotEmpty && prayerEmail.isNotEmpty) {
+          return prayerEmail == myEmail;
+        }
+        if (myEmail.isNotEmpty && prayerEmail.isEmpty) {
+          return _myPrayerIds.contains(item.id);
+        }
+        return prayerEmail.isEmpty || _myPrayerIds.contains(item.id);
+      }
     }
     if (_myPrayerIds.contains(item.id)) return true;
     if (_prayerAuthorMap.containsKey(item.id)) return true;
@@ -629,18 +719,11 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
 
   String? _blockPrayerId(PrayerWallItem item) => _mongoPrayerId(item.id);
 
-  /// Logged-in user's own prayer `_id` → `user_id` (not AuthHub userid).
-  String? _myPrayerIdForBlock() {
-    for (final p in _all) {
-      if (!_isMyPrayer(p)) continue;
-      final id = _mongoPrayerId(p.id);
-      if (id != null) return id;
-    }
-    for (final id in _myPrayerIds) {
-      final mongo = _mongoPrayerId(id);
-      if (mongo != null) return mongo;
-    }
-    return null;
+  /// Resolve `user_id` from POST /api/users/resolve (used as block API `user_id`).
+  Future<String?> _resolveUserIdForBlock() async {
+    final id = await PrayerWallService.ensureIdentityUserId();
+    final trimmed = (id ?? '').trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 
   List<PrayerWallItem> get _blockedItemsOnWall =>
@@ -871,7 +954,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   Future<void> _unblockByPrayerId(String prayerId) async {
     final blockedId = _mongoPrayerId(prayerId);
     if (blockedId == null) return;
-    final uid = _myPrayerIdForBlock();
+    final uid = await _resolveUserIdForBlock();
     if (uid == null) {
       _showAppleToast('Cannot unblock this user right now.');
       return;
@@ -919,13 +1002,13 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     );
     if (!allowed || !mounted) return;
 
-    final uid = _myPrayerIdForBlock();
+    final uid = await _resolveUserIdForBlock();
     if (uid == null) {
       _showAppleToast('Cannot block this user right now.');
       return;
     }
 
-    print('block user_id (my posted prayer id): $uid');
+    print('block user_id (resolve user_id): $uid');
     print('block blocked_user_id (their prayer id): $blockedId');
 
     final already = _blockedUserIds.contains(blockedId);
@@ -1712,7 +1795,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
           ),
           const SizedBox(height: 18),
           Text(
-            'No blocked prayers',
+            'No blocked profiles',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: 'Georgia',
@@ -1836,6 +1919,49 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     );
   }
 
+  /// Additive: device-posted ids can be missing from identity GET; fill from wall
+  /// cache and existing `fetchPrayersByPrayerIds` without changing identity flow.
+  Future<List<PrayerWallItem>> _mergeDevicePostedIntoHistory({
+    required List<PrayerWallItem> fromIdentity,
+    required Set<String> ownedIds,
+    String? accountEmail,
+  }) async {
+    final want = (accountEmail ?? _userEmail ?? '').trim().toLowerCase();
+    final seen = fromIdentity.map((p) => p.id).toSet();
+    final localIds = {...ownedIds, ...await PrayerWallLocalStore.loadMyPrayerIds()};
+    final missing = localIds.where((id) => !seen.contains(id)).toSet();
+    if (missing.isEmpty) return fromIdentity;
+
+    final merged = List<PrayerWallItem>.from(fromIdentity);
+    for (final p in _all) {
+      if (!missing.contains(p.id)) continue;
+      if (want.isNotEmpty && !_prayerMatchesLoginEmail(p, want)) continue;
+      merged.add(p);
+      seen.add(p.id);
+    }
+
+    final stillMissing = missing.where((id) => !seen.contains(id)).toList();
+    if (stillMissing.isNotEmpty) {
+      try {
+        final fetched =
+            await PrayerWallService.fetchPrayersByPrayerIds(stillMissing);
+        for (final p in fetched) {
+          if (want.isNotEmpty && !_prayerMatchesLoginEmail(p, want)) continue;
+          if (seen.add(p.id)) merged.add(p);
+        }
+      } catch (e) {
+        print('PrayerWall merge device-posted into My Prayer: $e');
+      }
+    }
+
+    merged.sort((a, b) {
+      final am = a.createdAt?.millisecondsSinceEpoch ?? 0;
+      final bm = b.createdAt?.millisecondsSinceEpoch ?? 0;
+      return bm.compareTo(am);
+    });
+    return merged;
+  }
+
   /// UI-only: My Prayer — load prayers I posted (ids from local store + ?prayerId=).
   Future<void> _openMyPrayerHistory() async {
     if (_openingHistory) return;
@@ -1870,6 +1996,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         _historyError = null;
       });
 
+      if (!mounted) return;
+      await _syncMyPrayerIdsForAccount(_userEmail);
+
       final postedIds = await PrayerWallLocalStore.loadOwnedPrayerIds();
       await PrayerWallLocalStore.saveMyPrayerIds(postedIds);
       if (!mounted) return;
@@ -1877,19 +2006,32 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       final fromIdentity =
           await PrayerWallService.fetchPrayersByIdentityUserId();
       if (!mounted) return;
+      if ((_resolveUserId ?? '').trim().isEmpty) {
+        await _hydrateResolveUserId();
+      }
       final myEmail = (_userEmail ?? '').trim().toLowerCase();
       final mine = myEmail.isEmpty
           ? fromIdentity
           : fromIdentity
-              .where((p) => (p.email ?? '').trim().toLowerCase() == myEmail)
+              .where((p) => _prayerMatchesLoginEmail(p, myEmail))
               .toList();
-      final ids = mine.map((p) => p.id).toSet();
+      final historyItemsRaw = await _mergeDevicePostedIntoHistory(
+        fromIdentity: mine,
+        ownedIds: postedIds,
+        accountEmail: myEmail.isEmpty ? null : myEmail,
+      );
+      final historyItems = myEmail.isEmpty
+          ? historyItemsRaw
+          : historyItemsRaw
+              .where((p) => _prayerMatchesLoginEmail(p, myEmail))
+              .toList();
+      final ids = historyItems.map((p) => p.id).toSet();
       if (ids.isNotEmpty) {
-        await PrayerWallLocalStore.saveMyPrayerIds({...postedIds, ...ids});
+        await PrayerWallLocalStore.saveMyPrayerIds(ids);
       }
       setState(() {
-        _myPrayerIds = {...postedIds, ...ids};
-        _historyItems = mine;
+        _myPrayerIds = ids;
+        _historyItems = historyItems;
         _historyLoading = false;
       });
     } catch (e) {
@@ -1945,6 +2087,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         await _hydratePrayerAuthorsFromDisk();
         await _hydrateMyPrayerIdsFromDisk();
         await _refresh();
+        if (_showingHistory && mounted) {
+          await _reloadMyPrayerHistory();
+        }
         if (showSuccessToast && mounted) {
           _showAppleToast('Prayer posted successfully.');
         }
@@ -2303,8 +2448,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                                       onBlock: () => _openBlockUser(item),
                                       isBlocked:
                                           _blockedUserIds.contains(item.id),
-                                      canBlock: !_isMyPrayer(item) &&
-                                          _myPrayerIdForBlock() != null,
+                                      canBlock: !_isMyPrayer(item),
                                       likeCount: _likeCounts[item.id] ?? 0,
                                       liked: _isLiked(item.id),
                                       likeBusy:
