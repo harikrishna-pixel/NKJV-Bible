@@ -162,10 +162,13 @@ class _DrawerSubItem {
   final bool showAttentionDot;
 }
 
-class _IosStyleAppDrawerState extends State<IosStyleAppDrawer> {
-  /// Daily starts open so Widgets is visible.
-  String? _expandedKey = 'daily';
+class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
+    with WidgetsBindingObserver {
+  /// Daily starts collapsed; sub-options show only after tap.
+  String? _expandedKey;
   bool _showWidgetsDot = false;
+  int _widgetsAddedCount = 0;
+  int _widgetsRefreshToken = 0;
 
   void _toggle(String key) {
     setState(() {
@@ -184,14 +187,33 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadWidgetsRowState();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadWidgetsRowState();
+    }
   }
 
   Future<void> _loadWidgetsRowState() async {
     try {
       final dot = await WidgetPromptService.showDrawerAttentionDot();
+      final added = await WidgetPromptService.installedDrawerWidgetsCount();
       if (!mounted) return;
-      setState(() => _showWidgetsDot = dot);
+      setState(() {
+        _showWidgetsDot = dot;
+        _widgetsAddedCount = added;
+        _widgetsRefreshToken++;
+      });
     } catch (_) {}
   }
 
@@ -220,12 +242,22 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer> {
       _DrawerSubItem(
         label: 'Widgets',
         icon: Icons.widgets_outlined,
+        asset: 'assets/home icons/Widgets.png',
         onTap: () {
           WidgetPromptService.markWidgetFamilySeen();
           if (mounted) setState(() => _showWidgetsDot = false);
           widget.onWidgetsTap();
+          _loadWidgetsRowState();
         },
-        trailing: const _WidgetsAddedChip(),
+        trailing: FutureBuilder<int>(
+          key: ValueKey(_widgetsRefreshToken),
+          future: WidgetPromptService.installedDrawerWidgetsCount(),
+          builder: (context, snap) {
+            final count = snap.data ?? _widgetsAddedCount;
+            if (count <= 0) return const SizedBox.shrink();
+            return _WidgetsAddedChip(count: count);
+          },
+        ),
         showAttentionDot: _showWidgetsDot,
       ),
     ];
@@ -1003,30 +1035,26 @@ class _IconTile extends StatelessWidget {
 }
 
 class _WidgetsAddedChip extends StatelessWidget {
-  const _WidgetsAddedChip();
+  const _WidgetsAddedChip({required this.count});
+
+  final int count;
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<int>(
-      future: WidgetPromptService.galleryViewedCount(),
-      builder: (context, snap) {
-        final count = snap.data ?? 0;
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF3D5B5),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            '$count added',
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFFC47A3A),
-            ),
-          ),
-        );
-      },
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3D5B5),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        '$count added',
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFFC47A3A),
+        ),
+      ),
     );
   }
 }

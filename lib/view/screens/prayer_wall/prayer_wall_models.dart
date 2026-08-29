@@ -10,6 +10,8 @@ class PrayerWallItem {
     required this.isAnonymous,
     this.authorName,
     this.authorUserId,
+    this.email,
+    this.identityUserId,
     this.profileImage,
     this.createdAt,
     this.expiresAt,
@@ -23,13 +25,26 @@ class PrayerWallItem {
   final bool isAnonymous;
   final String? authorName;
   final String? authorUserId;
-  /// Profile photo URL from API `profile_image` (when present).
+  /// Login email stored on the prayer when posted.
+  final String? email;
+  /// Resolve `user_id` stored as identityUserId on the prayer.
+  final String? identityUserId;
   final String? profileImage;
   final DateTime? createdAt;
   /// From API `expiresAt` when present.
   final DateTime? expiresAt;
   /// From API `prayer_duration` when present.
   final int? prayerDuration;
+
+  /// True after postedAt + duration (or API expiresAt). Used for Expired tab.
+  bool get isDurationExpired {
+    final expires = expiresAt ??
+        (createdAt != null && (prayerDuration ?? 0) > 0
+            ? createdAt!.add(Duration(days: prayerDuration!))
+            : null);
+    if (expires == null) return false;
+    return !DateTime.now().isBefore(expires.toLocal());
+  }
 
   static String? _cleanName(dynamic v) {
     if (v == null) return null;
@@ -77,22 +92,43 @@ class PrayerWallItem {
     return null;
   }
 
-  static String? _extractAuthorUserId(Map<String, dynamic> map) {
+  /// Poster Mongo / Auth id from a prayer JSON row (API field names vary).
+  static String? extractAuthorUserId(Map<String, dynamic> map) {
     final direct = _cleanName(
       map['userId'] ??
           map['user_id'] ??
+          map['identityUserId'] ??
+          map['identity_user_id'] ??
           map['authorId'] ??
           map['author_id'] ??
           map['createdById'] ??
-          map['created_by'],
+          map['created_by'] ??
+          map['firebaseUid'] ??
+          map['firebase_uid'] ??
+          map['mongoUserId'] ??
+          map['mongo_user_id'] ??
+          map['posterId'] ??
+          map['poster_id'] ??
+          map['ownerId'] ??
+          map['owner_id'],
     );
     if (direct != null) return direct;
 
-    final nestedUser = map['user'];
-    if (nestedUser is Map) {
-      final userMap = Map<String, dynamic>.from(nestedUser);
+    final userField = map['user'];
+    if (userField is String) {
+      final asString = _cleanName(userField);
+      if (asString != null) return asString;
+    }
+
+    if (userField is Map) {
+      final userMap = Map<String, dynamic>.from(userField);
       final fromUser = _cleanName(
-        userMap['userId'] ?? userMap['user_id'] ?? userMap['_id'] ?? userMap['id'],
+        userMap['userId'] ??
+            userMap['user_id'] ??
+            userMap['_id'] ??
+            userMap['id'] ??
+            userMap['firebaseUid'] ??
+            userMap['firebase_uid'],
       );
       if (fromUser != null) return fromUser;
     }
@@ -104,11 +140,16 @@ class PrayerWallItem {
         posterMap['userId'] ??
             posterMap['user_id'] ??
             posterMap['_id'] ??
-            posterMap['id'],
+            posterMap['id'] ??
+            posterMap['firebaseUid'] ??
+            posterMap['firebase_uid'],
       );
     }
     return null;
   }
+
+  static String? _extractAuthorUserId(Map<String, dynamic> map) =>
+      extractAuthorUserId(map);
 
   static String? _extractProfileImage(Map<String, dynamic> map) {
     final direct = _cleanName(
@@ -160,6 +201,10 @@ class PrayerWallItem {
         : true;
     final authorName = _extractAuthorName(map);
     final authorUserId = _extractAuthorUserId(map);
+    final email = _cleanName(map['email']);
+    final identityUserId = _cleanName(
+      map['identityUserId'] ?? map['identity_user_id'],
+    );
     final profileImage = _extractProfileImage(map);
     DateTime? created;
     final ca = map['createdAt'] ?? map['created_at'];
@@ -193,6 +238,8 @@ class PrayerWallItem {
       isAnonymous: anon,
       authorName: authorName,
       authorUserId: authorUserId,
+      email: email,
+      identityUserId: identityUserId,
       profileImage: profileImage,
       createdAt: created,
       expiresAt: expires,
@@ -202,9 +249,17 @@ class PrayerWallItem {
 
   static List<PrayerWallItem> listFromResponseBody(String body) {
     final decoded = jsonDecode(body);
-    if (decoded is! List) return [];
+    List<dynamic>? raw;
+    if (decoded is List) {
+      raw = decoded;
+    } else if (decoded is Map) {
+      final m = Map<String, dynamic>.from(decoded);
+      final nested = m['data'] ?? m['prayers'] ?? m['items'] ?? m['results'];
+      if (nested is List) raw = nested;
+    }
+    if (raw == null) return [];
     final out = <PrayerWallItem>[];
-    for (final e in decoded) {
+    for (final e in raw) {
       final p = fromDynamic(e);
       if (p != null) out.add(p);
     }

@@ -6,30 +6,62 @@ const Color _kPromptInk = Color(0xFF2C2014);
 const Color _kPromptMuted = Color(0xFF6D5A45);
 
 /// Loads [shouldShow] without changing host-screen logic.
-class WidgetPromptGate extends StatelessWidget {
+class WidgetPromptGate extends StatefulWidget {
   const WidgetPromptGate({
     super.key,
     required this.id,
     required this.triggerMet,
     required this.builder,
     this.fallback = const SizedBox.shrink(),
+    this.libraryTab,
   });
 
   final WidgetPromptId id;
   final bool triggerMet;
   final Widget Function(BuildContext context, VoidCallback onDismiss) builder;
   final Widget fallback;
+  /// For A6 only: Bookmark / Highlights / Underline owner key.
+  final String? libraryTab;
+
+  @override
+  State<WidgetPromptGate> createState() => _WidgetPromptGateState();
+}
+
+class _WidgetPromptGateState extends State<WidgetPromptGate> {
+  Future<bool>? _future;
+
+  Future<bool> _load() => WidgetPromptService.shouldShow(
+        widget.id,
+        triggerMet: widget.triggerMet,
+        libraryTab: widget.libraryTab,
+      );
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant WidgetPromptGate oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.id != widget.id ||
+        oldWidget.triggerMet != widget.triggerMet ||
+        oldWidget.libraryTab != widget.libraryTab) {
+      _future = _load();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<bool>(
-      future: WidgetPromptService.shouldShow(id, triggerMet: triggerMet),
+      future: _future,
       builder: (context, snap) {
-        if (snap.data != true) return fallback;
+        if (snap.data != true) return widget.fallback;
         return _DismissiblePrompt(
-          id: id,
-          builder: builder,
-          fallback: fallback,
+          id: widget.id,
+          builder: widget.builder,
+          fallback: widget.fallback,
         );
       },
     );
@@ -51,19 +83,61 @@ class _DismissiblePrompt extends StatefulWidget {
   State<_DismissiblePrompt> createState() => _DismissiblePromptState();
 }
 
+/// Lets prompt CTAs hide the card after Steps without calling decline logic.
+class _PromptUiScope extends InheritedWidget {
+  const _PromptUiScope({
+    required this.hideAfterHowTo,
+    required super.child,
+  });
+
+  final VoidCallback hideAfterHowTo;
+
+  static _PromptUiScope? maybeOf(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<_PromptUiScope>();
+
+  @override
+  bool updateShouldNotify(_PromptUiScope oldWidget) =>
+      hideAfterHowTo != oldWidget.hideAfterHowTo;
+}
+
 class _DismissiblePromptState extends State<_DismissiblePrompt> {
   bool _hidden = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // R1: mounting a card prompt locks this session to that prompt id.
+    WidgetPromptService.notePromptDisplayed(widget.id);
+  }
 
   Future<void> _dismiss() async {
     await WidgetPromptService.markDismissed(widget.id);
     if (mounted) setState(() => _hidden = true);
   }
 
+  /// UI-only hide after Steps / Got it. Does not touch decline / hide-until.
+  void _hideAfterHowTo() {
+    if (mounted) setState(() => _hidden = true);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_hidden) return widget.fallback;
-    return widget.builder(context, _dismiss);
+    return _PromptUiScope(
+      hideAfterHowTo: _hideAfterHowTo,
+      child: widget.builder(context, _dismiss),
+    );
   }
+}
+
+Future<void> _openHowToThenHideUi(
+  BuildContext context,
+  WidgetPromptId id,
+) async {
+  final hideAfterHowTo = _PromptUiScope.maybeOf(context)?.hideAfterHowTo;
+  await WidgetPromptService.openHowToAdd(id);
+  if (!context.mounted) return;
+  hideAfterHowTo?.call();
 }
 
 /// A1 — slim Continue Reading row (chapter complete).
@@ -125,7 +199,7 @@ class WidgetPromptA1Row extends StatelessWidget {
           const SizedBox(width: 6),
           _GoldChipButton(
             label: 'Add widget',
-            onTap: () => WidgetPromptService.openHowToAdd(WidgetPromptId.a1),
+            onTap: () => _openHowToThenHideUi(context, WidgetPromptId.a1),
           ),
           InkWell(
             onTap: onDismiss,
@@ -211,7 +285,7 @@ class WidgetPromptA2Card extends StatelessWidget {
             alignment: Alignment.centerRight,
             child: _GoldChipButton(
               label: 'Add',
-              onTap: () => WidgetPromptService.openHowToAdd(WidgetPromptId.a2),
+              onTap: () => _openHowToThenHideUi(context, WidgetPromptId.a2),
             ),
           ),
         ],
@@ -288,7 +362,7 @@ class WidgetPromptA6Card extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () =>
-                  WidgetPromptService.openHowToAdd(WidgetPromptId.a6),
+                  _openHowToThenHideUi(context, WidgetPromptId.a6),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF8B6914),
                 foregroundColor: Colors.white,

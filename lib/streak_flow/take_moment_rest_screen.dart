@@ -8,7 +8,13 @@ import 'package:provider/provider.dart';
 
 /// "Rest in His presence" - Breathing meditation exercise
 class TakeMomentRestScreen extends StatefulWidget {
-  const TakeMomentRestScreen({super.key});
+  const TakeMomentRestScreen({
+    super.key,
+    this.worryText,
+  });
+
+  /// User thoughts from Pour Out Your Worries (display on Let's Pray).
+  final String? worryText;
 
   static const String peaceBackground = 'assets/peace-bg.png';
   static const String birdAsset = 'assets/bird.png';
@@ -59,7 +65,7 @@ enum _BreathPhase { inhale, hold, exhale }
 
 class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
     with TickerProviderStateMixin {
-  static const int _maxBreaths = 10;
+  static const int _maxBreaths = 5;
   static const Duration _inhaleDuration = Duration(seconds: 4);
   static const Duration _holdDuration = Duration(seconds: 2);
   static const Duration _exhaleDuration = Duration(seconds: 6);
@@ -134,7 +140,9 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
             _timer?.cancel();
             _isHolding = false;
             _orbController.value = 0;
-            Get.off(() => const TakeMomentPrayScreen());
+            Get.off(
+              () => TakeMomentPrayScreen(worryText: widget.worryText),
+            );
             return;
           }
           _breathNumber++;
@@ -232,10 +240,10 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
     final Color secondaryText = isDark ? Colors.white70 : _warmTan;
     // UI only: "Keep going..." once at breath 5 (top), then usual phase labels.
     final keepGoingOnce = _isHolding && _breathNumber == 5;
-    final keepGoingMilestone = _isHolding && _breathNumber >= 5;
-    final dot1 = false;
-    final dot2 = !keepGoingMilestone;
-    final dot3 = keepGoingMilestone;
+    // This screen is step 2; step 3 lights only on the next page.
+    const dot1 = false;
+    const dot2 = true;
+    const dot3 = false;
 
     return Scaffold(
       body: TakeMomentRestScreen.peaceBackgroundStack(

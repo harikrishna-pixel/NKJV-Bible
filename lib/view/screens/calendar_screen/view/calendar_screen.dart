@@ -3,7 +3,9 @@ import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/calendar_screen/bloc/calendar_data_bloc.dart';
+import 'package:biblebookapp/controller/liturgical_calendar_service.dart';
 import 'package:biblebookapp/view/screens/calendar_screen/view/widgets/calendar_event_item.dart';
+import 'package:biblebookapp/view/screens/calendar_screen/view/widgets/liturgical_day_card.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -158,6 +160,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     });
 
     final calendarBloc = ref.watch(calendarDataBloc);
+    final liturgicalFuture = useMemoized(
+      () => LiturgicalCalendarService.resolveDay(calendarBloc.focusDate),
+      [calendarBloc.focusDate],
+    );
     final themeProvider = p.Provider.of<ThemeProvider>(context);
     final isVintageTheme =
         themeProvider.currentCustomTheme == AppCustomTheme.vintage;
@@ -404,6 +410,15 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                           fontWeight: FontWeight.w600,
                           color: textColor),
                     ),
+                  ),
+                  FutureBuilder(
+                    future: liturgicalFuture,
+                    builder: (context, snap) {
+                      if (!snap.hasData || snap.data == null) {
+                        return const SizedBox.shrink();
+                      }
+                      return LiturgicalDayCard(info: snap.data!);
+                    },
                   ),
                   Padding(
                     key: _eventFieldKey,

@@ -209,6 +209,7 @@ class _PrayerWallReportDialogBodyState
                     Row(
                       children: [
                         Expanded(
+                          flex: 2,
                           child: SizedBox(
                             height: 46,
                             child: OutlinedButton(
@@ -225,6 +226,8 @@ class _PrayerWallReportDialogBodyState
                               ),
                               child: const Text(
                                 'Cancel',
+                                maxLines: 1,
+                                softWrap: false,
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
@@ -235,6 +238,7 @@ class _PrayerWallReportDialogBodyState
                         ),
                         const SizedBox(width: 10),
                         Expanded(
+                          flex: 3,
                           child: SizedBox(
                             height: 46,
                             child: ElevatedButton(
@@ -244,15 +248,23 @@ class _PrayerWallReportDialogBodyState
                                 backgroundColor: PrayerWallReportDialog._brown,
                                 foregroundColor: Colors.white,
                                 elevation: 0,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                               ),
-                              child: const Text(
-                                'Submit Report',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
+                              child: const FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  'Submit Report',
+                                  maxLines: 1,
+                                  softWrap: false,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ),

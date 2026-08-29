@@ -21,14 +21,50 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:provider/provider.dart' as P;
 
 class LoginScreen extends HookConsumerWidget {
-  LoginScreen({super.key, required this.hasSkip, this.popOnSuccess = false});
+  LoginScreen({
+    super.key,
+    required this.hasSkip,
+    this.popOnSuccess = false,
+    this.replaceOnSuccess,
+  });
   final bool hasSkip;
   final bool popOnSuccess;
+
+  /// UI-only: Prayer Wall + path — replace Login with Post a Prayer (no pop-then-push).
+  final VoidCallback? replaceOnSuccess;
+
+  /// GetX route id for Prayer Wall embedded login (must match [Get.to] routeName).
+  static const embeddedRouteName = '/prayer-wall-embedded-login';
+
+  /// UI-only: shared across all LoginScreen routes — blocks double sign-in.
+  static bool _signInFlowBusy = false;
+
+  /// UI-only: one embedded pop per Prayer Wall login route.
+  static bool _embeddedLoginSuccessHandled = false;
+
+  /// UI-only: one post-login referral + Home navigation at a time.
+  static bool _standardLoginSuccessHandled = false;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final formKey = useMemoized(() => GlobalKey<FormState>());
     final loginState = ref.watch(loginBloc);
     double screenWidth = MediaQuery.of(context).size.width;
+
+    useEffect(() {
+      if (popOnSuccess || replaceOnSuccess != null) {
+        _embeddedLoginSuccessHandled = false;
+      } else {
+        _standardLoginSuccessHandled = false;
+      }
+      return () {
+        if (popOnSuccess || replaceOnSuccess != null) {
+          _embeddedLoginSuccessHandled = false;
+        } else {
+          _standardLoginSuccessHandled = false;
+        }
+      };
+    }, const []);
 
     // Check and clear fields if account was deleted
     useMemoized(() {
@@ -66,8 +102,13 @@ class LoginScreen extends HookConsumerWidget {
                         color: CommanColor.whiteBlack(context),
                       ),
                       onPressed: () {
-                        if (popOnSuccess) {
-                          Get.back();
+                        if (popOnSuccess || replaceOnSuccess != null) {
+                          final nav = Get.key.currentState;
+                          if (nav != null && nav.canPop()) {
+                            nav.pop(false);
+                          } else {
+                            Get.back(result: false);
+                          }
                         } else {
                           Get.offAll(() => HomeScreen(
                               From: "splash",
@@ -147,49 +188,72 @@ class LoginScreen extends HookConsumerWidget {
                       const SizedBox(height: 32),
                       GestureDetector(
                         onTap: () async {
+                          if (_signInFlowBusy || loginState.isLoading) return;
                           if (formKey.currentState?.validate() ?? false) {
                             FocusScope.of(context).unfocus();
+                            _signInFlowBusy = true;
                             try {
-                              if (!loginState.isLoading) {
-                                final user = await loginState.login(context);
-                                //  Constants.showToast(
-                                //     "Hi $user, Welcome to Amplified Bible");
+                              final user = await loginState.login(context);
+                              //  Constants.showToast(
+                              //     "Hi $user, Welcome to Amplified Bible");
 
-                                // Always route to HomeScreen after successful login
-                                if (user != null) {
-                                  Constants.showToast(
-                                      "Hi ${user.displayName}, Welcome to ${BibleInfo.bible_shortName}");
-                                  if (context.mounted) {
-                                    // One referral join per account — skip if
-                                    // this user already entered a code / claimed.
-                                    final alreadyReferred = (user.referredBy !=
-                                                null &&
-                                            user.referredBy!.trim().isNotEmpty) ||
-                                        ((user.referralRewardClaimed ?? 0) > 0);
-                                    if (!alreadyReferred) {
-                                      await ReferralCodeBottomSheet.show(
-                                        context: context,
-                                        email: loginState.emailCon.text.trim(),
-                                        password: loginState.passCon.text,
-                                        ownReferralCode: user.referralCode,
-                                        initialReferredBy: user.referredBy,
-                                        initialReferralRewardClaimed:
-                                            user.referralRewardClaimed,
-                                      );
+                              // Always route to HomeScreen after successful login
+                              if (user != null) {
+                                // Embedded login (Prayer Wall → Post Prayer):
+                                // Close with Get.back only (same stack as Get.to).
+                                // Never open referral here; toast after pop.
+                                if (popOnSuccess || replaceOnSuccess != null) {
+                                  ReferralCodeBottomSheet.resetPresentationLock();
+                                  final welcome =
+                                      "Hi ${user.displayName}, Welcome to ${BibleInfo.bible_shortName}";
+                                  if (replaceOnSuccess != null) {
+                                    if (!_embeddedLoginSuccessHandled) {
+                                      _embeddedLoginSuccessHandled = true;
+                                      replaceOnSuccess!();
                                     }
+                                  } else {
+                                    // Close this Login route (Prayer Wall Get.to).
+                                    // Prefer this screen's navigator — Get.key
+                                    // can miss a nested stack and leave Login up.
+                                    var popped = false;
+                                    if (context.mounted &&
+                                        Navigator.of(context).canPop()) {
+                                      Navigator.of(context).pop(true);
+                                      popped = true;
+                                    } else {
+                                      final nav = Get.key.currentState;
+                                      if (nav != null && nav.canPop()) {
+                                        nav.pop(true);
+                                        popped = true;
+                                      }
+                                    }
+                                    if (!popped &&
+                                        !_embeddedLoginSuccessHandled) {
+                                      Get.back(result: true);
+                                    }
+                                    _embeddedLoginSuccessHandled = true;
                                   }
-                                  if (!context.mounted) return;
-                                  if (popOnSuccess) {
-                                    return Navigator.of(context).pop(true);
-                                  }
-                                  return Get.offAll(() => HomeScreen(
-                                      From: "splash",
-                                      selectedVerseNumForRead: "",
-                                      selectedBookForRead: "",
-                                      selectedChapterForRead: "",
-                                      selectedBookNameForRead: "",
-                                      selectedVerseForRead: ""));
+                                  WidgetsBinding.instance
+                                      .addPostFrameCallback((_) {
+                                    Constants.showToast(welcome);
+                                  });
+                                  return;
                                 }
+                                if (_standardLoginSuccessHandled) return;
+                                _standardLoginSuccessHandled = true;
+                                Constants.showToast(
+                                    "Hi ${user.displayName}, Welcome to ${BibleInfo.bible_shortName}");
+                                if (!context.mounted) return;
+                                // UI only: after sign-in go to Reading (Home).
+                                // Do not show Referral Code sheet on login.
+                                // Account → Enter Referral Code is unchanged.
+                                return Get.offAll(() => HomeScreen(
+                                    From: "splash",
+                                    selectedVerseNumForRead: "",
+                                    selectedBookForRead: "",
+                                    selectedChapterForRead: "",
+                                    selectedBookNameForRead: "",
+                                    selectedVerseForRead: ""));
                               }
                             } catch (e) {
                               if (e.toString() == 'verification') {
@@ -198,6 +262,8 @@ class LoginScreen extends HookConsumerWidget {
                               } else {
                                 Constants.showToast(e.toString());
                               }
+                            } finally {
+                              _signInFlowBusy = false;
                             }
                           }
                         },
@@ -269,7 +335,14 @@ class LoginScreen extends HookConsumerWidget {
                                         color: CommanColor.whiteBlack(context)),
                                     recognizer: TapGestureRecognizer()
                                       ..onTap = () {
-                                        Get.to(() => SignupScreen());
+                                        Get.to(
+                                          () => SignupScreen(
+                                            popOnSuccess: popOnSuccess ||
+                                                replaceOnSuccess != null,
+                                            openPostPrayerOnSuccess:
+                                                replaceOnSuccess != null,
+                                          ),
+                                        );
                                       })
                               ])),
                     ],
@@ -285,7 +358,14 @@ class LoginScreen extends HookConsumerWidget {
                   children: [
                     GestureDetector(
                       onTap: () {
-                        Get.to(() => SignupScreen());
+                        Get.to(
+                          () => SignupScreen(
+                            popOnSuccess: popOnSuccess ||
+                                replaceOnSuccess != null,
+                            openPostPrayerOnSuccess:
+                                replaceOnSuccess != null,
+                          ),
+                        );
                       },
                       child: Text(
                         'Note:',

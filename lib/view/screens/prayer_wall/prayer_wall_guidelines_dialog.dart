@@ -237,7 +237,7 @@ class PrayerWallGuidelinesDialog {
           fontWeight: FontWeight.w500,
         ),
         children: [
-          const TextSpan(text: 'Need help? Learn about '),
+          const TextSpan(text: 'Need help?\nLearn about '),
           TextSpan(
             text: 'Prayer Wall guidelines',
             style: TextStyle(

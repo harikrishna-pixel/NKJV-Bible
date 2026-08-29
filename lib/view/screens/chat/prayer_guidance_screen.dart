@@ -51,7 +51,7 @@ class PrayerGuidanceScreen extends StatefulWidget {
 class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
     with SingleTickerProviderStateMixin, RouteAware, WidgetsBindingObserver {
   static const String _baseUrl =
-      'https://my-backend-one-eta.vercel.app/api/gemini';
+      'https://combine-api-ruby.vercel.app/api/chat';
 
   final ScrollController _scrollController = ScrollController();
   final List<_GuidanceMessage> _messages = [];
@@ -741,7 +741,7 @@ ${category.prompt}
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'prompt': prompt}),
+        body: jsonEncode({'input': prompt}),
       );
       print(response.body);
       print(response.statusCode);
@@ -750,7 +750,10 @@ ${category.prompt}
       if (response.statusCode == 200) {
         try {
           final responseData = jsonDecode(response.body);
-          if (responseData['output'] != null && responseData['output'] is Map) {
+          if (responseData['output'] != null &&
+              responseData['output'] is String) {
+            responseText = responseData['output'] as String;
+          } else if (responseData['output'] != null && responseData['output'] is Map) {
             final output = responseData['output'] as Map;
             if (output['candidates'] is List &&
                 (output['candidates'] as List).isNotEmpty) {
@@ -1176,14 +1179,17 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'prompt': prompt}),
+        body: jsonEncode({'input': prompt}),
       );
 
       String responseText = 'Sorry, I could not generate a response.';
       if (response.statusCode == 200) {
         try {
           final responseData = jsonDecode(response.body);
-          if (responseData['output'] != null && responseData['output'] is Map) {
+          if (responseData['output'] != null &&
+              responseData['output'] is String) {
+            responseText = responseData['output'] as String;
+          } else if (responseData['output'] != null && responseData['output'] is Map) {
             final output = responseData['output'] as Map;
             if (output['candidates'] is List &&
                 (output['candidates'] as List).isNotEmpty) {

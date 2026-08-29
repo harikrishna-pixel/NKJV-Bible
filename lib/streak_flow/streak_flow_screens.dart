@@ -1757,14 +1757,14 @@ Future<void> _recordStreakActivityForDay(String dayKey) async {
 }
 
 void _goToHome(BuildContext context) {
-// Navigate immediately; warm data in the background so Close (X) does not
-// pause on the streak screen then flash a yellow/brown frame.
+// Warm stays fire-and-forget here (streak Close). Splash awaits warm before calling.
   try {
     final provider = Provider.of<DownloadProvider>(context, listen: false);
     provider.warmDataBeforeHomeScreen();
   } catch (e) {
     debugPrint('warmDataBeforeHomeScreen error: $e');
   }
+  // UI-only: no crossfade between splash parchment and Home (avoids flicker).
   Get.offAll(
         () => HomeScreen(
       From: "splash",
@@ -1774,8 +1774,7 @@ void _goToHome(BuildContext context) {
       selectedBookNameForRead: "",
       selectedVerseForRead: "",
     ),
-    transition: Transition.fadeIn,
-    duration: const Duration(milliseconds: 280),
+    transition: Transition.noTransition,
     opaque: true,
   );
 }
@@ -4807,6 +4806,7 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
     } catch (e) {
       debugPrint('warmDataBeforeHomeScreen error: $e');
     }
+    // UI-only: match splash→Home handoff (no fade flicker).
     Get.offAll(
           () => HomeScreen(
         From: "splash",
@@ -4816,8 +4816,7 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
         selectedBookNameForRead: "",
         selectedVerseForRead: "",
       ),
-      transition: Transition.fadeIn,
-      duration: const Duration(milliseconds: 280),
+      transition: Transition.noTransition,
       opaque: true,
     );
   }

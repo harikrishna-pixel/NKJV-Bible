@@ -1,16 +1,14 @@
 import 'dart:developer';
 import 'dart:io';
-import 'dart:typed_data';
+
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
-import 'package:timezone/data/latest.dart' as tz;
 
 class NotificationsServices {
   /// Single plugin instance — scheduling must use the same instance that was initialized.
@@ -141,7 +139,7 @@ class NotificationsServices {
 
   /// Next daily fire time in UTC (avoids wrong tz.local defaulting to UTC wall-clock).
   tz.TZDateTime _nextDailySchedule(int hh, int mm) {
-    tz.initializeTimeZones();
+    tzdata.initializeTimeZones();
     final now = DateTime.now();
     var local = DateTime(now.year, now.month, now.day, hh, mm);
     if (local.isBefore(now)) {
@@ -251,33 +249,6 @@ class NotificationsServices {
     await _plugin.cancel(id);
   }
 
-  static const String _prayerWallIconAsset = 'assets/Icon-1024.png';
-
-  static Future<Uint8List?> _loadPrayerWallIconBytes() async {
-    try {
-      final data = await rootBundle.load(_prayerWallIconAsset);
-      return data.buffer.asUint8List();
-    } catch (e) {
-      log('Prayer wall notif icon load failed: $e');
-      return null;
-    }
-  }
-
-  /// Writes [assets/Icon-1024.png] to a temp file for iOS attachments.
-  static Future<String?> _prayerWallIconTempPath() async {
-    try {
-      final bytes = await _loadPrayerWallIconBytes();
-      if (bytes == null) return null;
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/prayer_wall_notif_icon.png');
-      await file.writeAsBytes(bytes, flush: true);
-      return file.path;
-    } catch (e) {
-      log('Prayer wall notif icon temp path failed: $e');
-      return null;
-    }
-  }
-
   /// Immediate local banner (Prayer Wall activity, etc.). Additive — does not
   /// change daily/smart/scenario scheduling.
   Future<void> showImmediateNotification({
@@ -292,9 +263,8 @@ class NotificationsServices {
       return;
     }
 
-    final iconBytes = await _loadPrayerWallIconBytes();
-    final iconPath = await _prayerWallIconTempPath();
-
+    // UI only: do not attach/largeIcon the app logo — the system already
+    // shows the app icon once (duplicate logo on the right otherwise).
     await _plugin.show(
       id,
       title,
@@ -307,12 +277,7 @@ class NotificationsServices {
               'Alerts for new prayers, likes, and comments on Prayer Wall',
           importance: Importance.max,
           priority: Priority.max,
-          // App logo (assets/Icon-1024.png → drawable).
           icon: '@drawable/ic_prayer_wall_notif',
-          largeIcon: iconBytes != null
-              ? ByteArrayAndroidBitmap(iconBytes)
-              : const DrawableResourceAndroidBitmap(
-                  '@drawable/ic_prayer_wall_notif'),
           playSound: true,
           enableVibration: true,
           styleInformation: BigTextStyleInformation(
@@ -320,18 +285,14 @@ class NotificationsServices {
             contentTitle: title,
           ),
         ),
-        iOS: DarwinNotificationDetails(
+        iOS: const DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
           presentSound: true,
-          attachments: iconPath == null
-              ? null
-              : <DarwinNotificationAttachment>[
-                  DarwinNotificationAttachment(iconPath),
-                ],
         ),
       ),
       payload: payload,
     );
   }
 }
+ 

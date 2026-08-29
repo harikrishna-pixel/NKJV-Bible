@@ -156,6 +156,7 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
                     return WidgetPromptGate(
                       id: WidgetPromptId.a6,
                       triggerMet: items.length >= 3,
+                      libraryTab: WidgetPromptService.libraryTabBookmark,
                       builder: (context, onDismiss) => WidgetPromptA6Card(
                         savedCount: items.length,
                         onDismiss: onDismiss,

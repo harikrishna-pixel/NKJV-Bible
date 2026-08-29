@@ -4,7 +4,8 @@ import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/live_activity/content_live_activity.dart';
 import 'package:biblebookapp/live_activity/live_activity_queue.dart';
 import 'package:biblebookapp/streak/streak_live_activity.dart';
-import 'package:biblebookapp/home_widget/widget_how_to_add_screen.dart';
+import 'package:biblebookapp/view/constants/constant.dart';
+import 'package:biblebookapp/view/screens/dashboard/add_widget_intro_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -19,6 +20,13 @@ class WidgetPromptService {
 
   static int sessionChapterCompletes = 0;
 
+  /// R1: first eligible prompt this app process wins the session (all prompt ids).
+  static WidgetPromptId? _sessionPromptOwner;
+  static String? _sessionToken;
+  static Future<void> _sessionClaimChain = Future<void>.value();
+  static const _r1TokenKey = 'widget_prompt_r1_session_token_v1';
+  static const _r1OwnerKey = 'widget_prompt_r1_session_owner_v1';
+
   static const _lifetimeChaptersKey = 'widget_prompt_lifetime_chapters';
   static const _prayerGeneratedKey = 'widget_prompt_prayer_generated_count';
 
@@ -26,6 +34,25 @@ class WidgetPromptService {
       'widget_prompt_${id.name}_decline_count';
   static String _hideUntilKey(WidgetPromptId id) =>
       'widget_prompt_${id.name}_hide_until_ms';
+
+  /// Library tabs that can host A6 — only the first eligible tab keeps it.
+  static const libraryTabBookmark = 'bookmark';
+  static const libraryTabHighlight = 'highlight';
+  static const libraryTabUnderline = 'underline';
+  static const _a6LibraryOwnerKey = 'widget_prompt_a6_library_owner_v1';
+
+  /// UI-only: first Library tab that is eligible to show A6 owns the prompt.
+  static Future<bool> _isOrClaimLibraryA6Owner(String tab) async {
+    final key = tab.trim();
+    if (key.isEmpty) return true;
+    final prefs = await SharedPreferences.getInstance();
+    var owner = (prefs.getString(_a6LibraryOwnerKey) ?? '').trim();
+    if (owner.isEmpty) {
+      await prefs.setString(_a6LibraryOwnerKey, key);
+      owner = (prefs.getString(_a6LibraryOwnerKey) ?? '').trim();
+    }
+    return owner == key;
+  }
 
   static String kindFor(WidgetPromptId id) {
     switch (id) {
@@ -65,17 +92,87 @@ class WidgetPromptService {
     return prefs.getInt(_prayerGeneratedKey) ?? 0;
   }
 
+  static bool _isSessionPrompt(WidgetPromptId id) {
+    // R1: every widget prompt type shares one session slot.
+    switch (id) {
+      case WidgetPromptId.a1:
+      case WidgetPromptId.a2:
+      case WidgetPromptId.a6:
+      case WidgetPromptId.a8:
+      case WidgetPromptId.a8b:
+        return true;
+    }
+  }
+
+  static String _ensureProcessSessionToken() =>
+      _sessionToken ??= 'launch_${DateTime.now().microsecondsSinceEpoch}';
+
+  /// R1 — serialize claims so only one prompt wins this process session.
+  static Future<bool> _tryClaimSessionPrompt(WidgetPromptId id) {
+    if (!_isSessionPrompt(id)) return Future<bool>.value(true);
+
+    late final Future<bool> result;
+    result = _sessionClaimChain.then((_) => _claimSessionPromptUnlocked(id));
+    _sessionClaimChain = result.then((_) {}, onError: (_) {});
+    return result;
+  }
+
+  static Future<bool> _claimSessionPromptUnlocked(WidgetPromptId id) async {
+    final token = _ensureProcessSessionToken();
+    final prefs = await SharedPreferences.getInstance();
+    final storedToken = (prefs.getString(_r1TokenKey) ?? '').trim();
+    final storedOwner = (prefs.getString(_r1OwnerKey) ?? '').trim();
+
+    // New app process → new session token; previous launch owner does not apply.
+    if (storedToken != token) {
+      await prefs.setString(_r1TokenKey, token);
+      await prefs.setString(_r1OwnerKey, id.name);
+      _sessionPromptOwner = id;
+      debugPrint('WidgetPrompt R1: session claimed by ${id.name}');
+      return true;
+    }
+
+    if (storedOwner.isEmpty) {
+      await prefs.setString(_r1OwnerKey, id.name);
+      _sessionPromptOwner = id;
+      debugPrint('WidgetPrompt R1: session claimed by ${id.name}');
+      return true;
+    }
+
+    _sessionPromptOwner = WidgetPromptId.values.firstWhere(
+      (e) => e.name == storedOwner,
+      orElse: () => id,
+    );
+    final allowed = storedOwner == id.name;
+    if (!allowed) {
+      debugPrint(
+          'WidgetPrompt R1: blocked ${id.name} (owner=$storedOwner)');
+    }
+    return allowed;
+  }
+
+  /// Call when a prompt is actually mounted (reinforces R1 claim).
+  static Future<void> notePromptDisplayed(WidgetPromptId id) async {
+    if (!_isSessionPrompt(id)) return;
+    await _tryClaimSessionPrompt(id);
+  }
+
   static Future<bool> shouldShow(
     WidgetPromptId id, {
     required bool triggerMet,
+    String? libraryTab,
   }) async {
     if (!triggerMet) return false;
 
     final kindInstalled = await isHomeWidgetKindInstalled(kindFor(id));
     if (kindInstalled) return false;
 
-    // A8 is always-on UI (second action), not a frequency-limited prompt.
-    if (id == WidgetPromptId.a8) return true;
+    // A8 keeps always-on eligibility rules, but still respects R1 session slot.
+    if (id == WidgetPromptId.a8) {
+      return _tryClaimSessionPrompt(id);
+    }
+
+    if (await _hasOpenedHowTo(id)) return false;
 
     if (await isAnyHomeWidgetInstalled()) return false;
 
@@ -84,11 +181,24 @@ class WidgetPromptService {
     if (declines >= 3) return false;
     final hideUntil = prefs.getInt(_hideUntilKey(id)) ?? 0;
     if (DateTime.now().millisecondsSinceEpoch < hideUntil) return false;
+
+    // Display-only: A6 appears on one Library tab (first eligible claim).
+    if (id == WidgetPromptId.a6 &&
+        libraryTab != null &&
+        libraryTab.trim().isNotEmpty) {
+      if (!await _isOrClaimLibraryA6Owner(libraryTab)) return false;
+    }
+
+    // R1: one widget prompt per app session — first eligible wins (all types).
+    if (!await _tryClaimSessionPrompt(id)) return false;
+
     return true;
   }
 
   static Future<void> markDismissed(WidgetPromptId id) async {
     if (id == WidgetPromptId.a8) return;
+    // R1: interacting with this card locks the session to it.
+    await _tryClaimSessionPrompt(id);
     final prefs = await SharedPreferences.getInstance();
     final declines = (prefs.getInt(_declineKey(id)) ?? 0) + 1;
     await prefs.setInt(_declineKey(id), declines);
@@ -199,6 +309,9 @@ class WidgetPromptService {
     }
   }
 
+  static List<String> previewImagesFor(WidgetPromptId id) =>
+      previewAssetsFor(id);
+
   static Future<void> markGalleryViewed(WidgetPromptId? id) async {
     final prefs = await SharedPreferences.getInstance();
     final list = prefs.getStringList(_gallerySeenKey) ?? [];
@@ -216,6 +329,23 @@ class WidgetPromptService {
   /// Syncs the matching Home widget, then starts the existing iOS Live Activity
   /// so it appears the same way other iOS widgets already do.
   static Future<void> openHowToAdd(WidgetPromptId id) async {
+    Constants.showToast(
+      'Follow the steps to add this widget to your Home Screen.',
+      2500,
+    );
+    await Get.to(
+      () => AddWidgetIntroScreen(
+        iosWidgetKind: kindFor(id),
+        widgetTitle: titleFor(id),
+        previewImages: previewImagesFor(id),
+      ),
+      preventDuplicates: true,
+    );
+    await noteHowToOpened(id);
+    await noteWidgetPreviewed(
+      iosWidgetKind: kindFor(id),
+      widgetTitle: titleFor(id),
+    );
     try {
       switch (id) {
         case WidgetPromptId.a1:
@@ -236,17 +366,74 @@ class WidgetPromptService {
       debugPrint('WidgetPrompt: sync before tutorial failed: $e');
     }
     await startExistingIosWidget(id);
-    await Get.to(
-      () => WidgetHowToAddScreen(promptId: id),
-      transition: Transition.cupertino,
-    );
+  }
+
+  static String _howtoOpenedKey(WidgetPromptId id) =>
+      'widget_prompt_${id.name}_howto_opened';
+
+  static Future<bool> _hasOpenedHowTo(WidgetPromptId id) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_howtoOpenedKey(id)) ?? false;
+  }
+
+  static Future<bool> hasOpenedHowTo(WidgetPromptId id) =>
+      _hasOpenedHowTo(id);
+
+  static Future<void> noteHowToOpened(WidgetPromptId id) async {
+    if (id == WidgetPromptId.a8) return;
+    // R1: opening steps for a card prompt locks the session to it.
+    await _tryClaimSessionPrompt(id);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_howtoOpenedKey(id), true);
   }
 
   /// Bump when a new home-widget family ships so the drawer gold/red dot returns.
   static const widgetFamilyVersion = 1;
   static const _sessionCountKey = 'widget_prompt_app_session_count';
   static const _familySeenKey = 'widget_prompt_family_seen_version';
+  static const _addedKindsKey = 'widget_prompt_added_kinds';
   static bool _sessionCountedThisLaunch = false;
+
+  static String _kindKey(String? iosWidgetKind, String? widgetTitle) {
+    final kind = (iosWidgetKind ?? '').trim();
+    if (kind.isNotEmpty) return kind;
+    final title = (widgetTitle ?? '').trim();
+    if (title.isNotEmpty) return title;
+    return 'widgets';
+  }
+
+  static Future<int> widgetsAddedCount() async {
+    final prefs = await SharedPreferences.getInstance();
+    return (prefs.getStringList(_addedKindsKey) ?? []).toSet().length;
+  }
+
+  /// Home Screen install count for drawer badge (any size = one family).
+  static Future<int> installedDrawerWidgetsCount() =>
+      installedDrawerHubWidgetCount();
+
+  /// Home Screen install set for drawer hub UI (read-only).
+  static Future<Set<String>> installedDrawerWidgetKinds() =>
+      installedDrawerHubWidgetKinds();
+
+  /// Read-only list for drawer widget hub UI (does not change preview logic).
+  static Future<Set<String>> previewedWidgetKinds() async {
+    final prefs = await SharedPreferences.getInstance();
+    return (prefs.getStringList(_addedKindsKey) ?? []).toSet();
+  }
+
+  /// Widget families shown in the drawer hub (UI constant only).
+  static const int drawerWidgetFamilyCount = 9;
+
+  static Future<int> noteWidgetPreviewed({
+    String? iosWidgetKind,
+    String? widgetTitle,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final kinds = (prefs.getStringList(_addedKindsKey) ?? []).toSet();
+    kinds.add(_kindKey(iosWidgetKind, widgetTitle));
+    await prefs.setStringList(_addedKindsKey, kinds.toList());
+    return kinds.length;
+  }
 
   static Future<int> noteAppSession() async {
     final prefs = await SharedPreferences.getInstance();

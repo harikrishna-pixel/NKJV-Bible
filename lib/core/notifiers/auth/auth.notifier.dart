@@ -22,6 +22,7 @@ import '../../api/auth/register.api.dart';
 import 'dart:developer' as devtools show log;
 
 import '../cache.notifier.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
 
 /// Pull profile image URL from profile-update / auth JSON shapes.
 String? _profileImageUrlFromResponse(dynamic decoded) {
@@ -223,6 +224,7 @@ class AuthNotifier extends ChangeNotifier {
           await cacheNotifier.removeCache(key: 'user');
           await cacheNotifier.removeCache(key: 'name');
           await cacheNotifier.removeCache(key: 'authtoken');
+          await PrayerWallLocalStore.clearAccountScopedData();
           //   FirebaseAuth.instance.signOut();
           Constants.showToast("$msg");
           Get.offAll(() => const SplashScreen());
@@ -505,14 +507,14 @@ class AuthNotifier extends ChangeNotifier {
       final status = datafn['status'];
 
       final msg = datafn['message'];
-      final otptoken = '${datafn['data']['token']}';
 
-      debugPrint("otp token data: $otptoken");
-      await cacheNotifier.writeCache(key: "otp", value: otp.toString());
-      await cacheNotifier.writeCache(
-          key: "otptoken", value: otptoken.toString());
       if (datafn != null) {
         if (status == true) {
+          final otptoken = '${datafn['data']['token']}';
+          debugPrint("otp token data: $otptoken");
+          await cacheNotifier.writeCache(key: "otp", value: otp.toString());
+          await cacheNotifier.writeCache(
+              key: "otptoken", value: otptoken.toString());
           SnackbarUtil.showSnackbar(
             context: context,
             message: msg,
@@ -524,7 +526,7 @@ class AuthNotifier extends ChangeNotifier {
         } else {
           SnackbarUtil.showSnackbar(
             context: context,
-            message: msg,
+            message: 'Invalid code.',
             backgroundColor: Colors.redAccent,
           );
           return false;
@@ -532,7 +534,7 @@ class AuthNotifier extends ChangeNotifier {
       } else {
         SnackbarUtil.showSnackbar(
           context: context,
-          message: 'Something Went Wrong !',
+          message: 'Invalid code.',
           backgroundColor: Colors.redAccent,
         );
         return false;
@@ -540,7 +542,7 @@ class AuthNotifier extends ChangeNotifier {
     } catch (e) {
       SnackbarUtil.showSnackbar(
         context: context,
-        message: 'Something Went Wrong !',
+        message: 'Invalid code.',
         backgroundColor: Colors.redAccent,
       );
       print("forgot otp verify notifier error is $e");

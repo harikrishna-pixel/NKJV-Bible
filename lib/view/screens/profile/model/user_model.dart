@@ -11,6 +11,11 @@ class UserModel {
   final String? referredBy;
   final int? referralCount;
   final int? referralRewardClaimed;
+  /// Additive PDF fields (login/profile) — unused by existing claim logic.
+  final int? referralRewardCredits;
+  final int? totalReferredCount;
+  final int? totalClaimedCount;
+  final int? walletBalance;
 
   UserModel({
     this.address,
@@ -25,6 +30,10 @@ class UserModel {
     this.referredBy,
     this.referralCount,
     this.referralRewardClaimed,
+    this.referralRewardCredits,
+    this.totalReferredCount,
+    this.totalClaimedCount,
+    this.walletBalance,
   });
 
   static int? _parseInt(dynamic value) {
@@ -47,6 +56,10 @@ class UserModel {
       referredBy: json['referred_by'] as String?,
       referralCount: _parseInt(json['referral_count']),
       referralRewardClaimed: _parseInt(json['referral_reward_claimed']),
+      referralRewardCredits: _parseInt(json['referral_reward_credits']),
+      totalReferredCount: _parseInt(json['total_referred_count']),
+      totalClaimedCount: _parseInt(json['total_claimed_count']),
+      walletBalance: _parseInt(json['wallet_balance']),
     );
   }
 
@@ -64,6 +77,10 @@ class UserModel {
       'referred_by': referredBy,
       'referral_count': referralCount,
       'referral_reward_claimed': referralRewardClaimed,
+      'referral_reward_credits': referralRewardCredits,
+      'total_referred_count': totalReferredCount,
+      'total_claimed_count': totalClaimedCount,
+      'wallet_balance': walletBalance,
     };
   }
 }

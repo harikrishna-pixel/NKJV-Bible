@@ -3674,13 +3674,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               Positioned.fill(
                 child: ColorFiltered(
                   colorFilter: ColorFilter.mode(
-                    Colors.white.withOpacity(0.14),
+                    Colors.white.withOpacity(isTablet ? 0.04 : 0.14),
                     BlendMode.lighten,
                   ),
                   child: Image.asset(
                     _paywallHeroBg,
                     fit: BoxFit.cover,
-                    alignment: Alignment.topCenter,
+                    // Tablet is wider — bias right/top so the person stays visible.
+                    alignment: isTablet
+                        ? const Alignment(0.72, -0.92)
+                        : Alignment.topCenter,
                     filterQuality: FilterQuality.high,
                     gaplessPlayback: true,
                     errorBuilder: (_, __, ___) => Container(
@@ -3695,13 +3698,22 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [
-                        _paywallCream.withOpacity(0.06),
-                        _paywallCream.withOpacity(0.22),
-                        _paywallCream.withOpacity(0.72),
-                        _paywallCream,
-                      ],
-                      stops: const [0.0, 0.30, 0.64, 1.0],
+                      colors: isTablet
+                          ? [
+                              _paywallCream.withOpacity(0.02),
+                              _paywallCream.withOpacity(0.10),
+                              _paywallCream.withOpacity(0.48),
+                              _paywallCream,
+                            ]
+                          : [
+                              _paywallCream.withOpacity(0.06),
+                              _paywallCream.withOpacity(0.22),
+                              _paywallCream.withOpacity(0.72),
+                              _paywallCream,
+                            ],
+                      stops: isTablet
+                          ? const [0.0, 0.38, 0.72, 1.0]
+                          : const [0.0, 0.30, 0.64, 1.0],
                     ),
                   ),
                 ),
@@ -3711,17 +3723,24 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 left: 0,
                 right: 0,
                 child: Container(
-                  height: 180,
+                  height: isTablet ? 120 : 180,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.centerLeft,
                       end: Alignment.centerRight,
-                      colors: [
-                        _paywallCream.withOpacity(0.26),
-                        _paywallCream.withOpacity(0.14),
-                        _paywallCream.withOpacity(0.03),
-                        _paywallCream.withOpacity(0.0),
-                      ],
+                      colors: isTablet
+                          ? [
+                              _paywallCream.withOpacity(0.14),
+                              _paywallCream.withOpacity(0.06),
+                              _paywallCream.withOpacity(0.0),
+                              _paywallCream.withOpacity(0.0),
+                            ]
+                          : [
+                              _paywallCream.withOpacity(0.26),
+                              _paywallCream.withOpacity(0.14),
+                              _paywallCream.withOpacity(0.03),
+                              _paywallCream.withOpacity(0.0),
+                            ],
                       stops: const [0.0, 0.35, 0.70, 1.0],
                     ),
                   ),
@@ -3958,20 +3977,30 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   Widget _buildPaywallSectionTitle() {
     final isTablet = _isPaywallTablet(context);
+    final lineTint = const Color(0xFF5C4033).withOpacity(0.55);
+    Widget sideLine(String asset) {
+      final image = Image.asset(
+        asset,
+        height: 14,
+        fit: BoxFit.fitWidth,
+        errorBuilder: (_, __, ___) => Divider(
+          color: isTablet ? lineTint : Colors.grey.shade400,
+        ),
+      );
+      // Line assets are gray — tint to brand brown on tablet only.
+      if (!isTablet) return image;
+      return ColorFiltered(
+        colorFilter: ColorFilter.mode(lineTint, BlendMode.srcIn),
+        child: image,
+      );
+    }
+
     return Padding(
       padding: EdgeInsets.fromLTRB(
           isTablet ? 4 : 20, 0, isTablet ? 4 : 20, 0),
       child: Row(
         children: [
-          Expanded(
-            child: Image.asset(
-              'assets/Line 217.png',
-              height: 14,
-              fit: BoxFit.fitWidth,
-              errorBuilder: (_, __, ___) =>
-                  Divider(color: Colors.grey.shade400),
-            ),
-          ),
+          Expanded(child: sideLine('assets/Line 217.png')),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Text(
@@ -3984,15 +4013,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               ),
             ),
           ),
-          Expanded(
-            child: Image.asset(
-              'assets/Line 216.png',
-              height: 14,
-              fit: BoxFit.fitWidth,
-              errorBuilder: (_, __, ___) =>
-                  Divider(color: Colors.grey.shade400),
-            ),
-          ),
+          Expanded(child: sideLine('assets/Line 216.png')),
         ],
       ),
     );

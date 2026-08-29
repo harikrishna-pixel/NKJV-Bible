@@ -47,9 +47,13 @@ const String _kVerseImageKind = 'VerseImageWidget';
 /// Public kind ids for additive widget-prompt checks (match iOS Widget structs).
 const String kVerseOfTheDayWidgetKind = _kVerseOfTheDayKind;
 const String kBiblePrayerWidgetKind = _kBiblePrayerKind;
+const String kBibleChatWidgetKind = _kBibleChatKind;
 const String kContinueReadingWidgetKind = _kContinueReadingKind;
 const String kWeeklyStreakWidgetKind = _kWeeklyStreakKind;
 const String kFavoriteVerseWidgetKind = _kFavoriteVerseKind;
+const String kHourlyVerseWidgetKind = _kHourlyVerseKind;
+const String kRandomVerseWidgetKind = _kRandomVerseKind;
+const String kVerseImageWidgetKind = _kVerseImageKind;
 
 /// Data keys stored in UserDefaults (App Group) for the widgets.
 const String _kVerseTextKey = 'widget_verse_text';
@@ -632,4 +636,49 @@ Future<bool> isHomeWidgetKindInstalled(String kind) async {
     debugPrint('BibleHomeWidget: isHomeWidgetKindInstalled failed: $e');
     return false;
   }
+}
+
+/// Drawer hub families — any size of the same kind counts once.
+const List<String> kDrawerHubWidgetKinds = [
+  kVerseOfTheDayWidgetKind,
+  kRandomVerseWidgetKind,
+  kHourlyVerseWidgetKind,
+  kVerseImageWidgetKind,
+  kContinueReadingWidgetKind,
+  kWeeklyStreakWidgetKind,
+  kFavoriteVerseWidgetKind,
+  kBiblePrayerWidgetKind,
+  kBibleChatWidgetKind,
+];
+
+/// Additive: unique widget kinds currently pinned on the Home Screen.
+Future<Set<String>> installedHomeWidgetKinds() async {
+  try {
+    final widgets = await HomeWidget.getInstalledWidgets();
+    final kinds = <String>{};
+    for (final w in widgets) {
+      final iosKind = (w.iOSKind ?? '').trim();
+      if (iosKind.isNotEmpty) {
+        kinds.add(iosKind);
+        continue;
+      }
+      final android = (w.androidClassName ?? '').trim();
+      if (android.isNotEmpty) kinds.add(android);
+    }
+    return kinds;
+  } catch (e) {
+    debugPrint('BibleHomeWidget: installedHomeWidgetKinds failed: $e');
+    return {};
+  }
+}
+
+/// Additive: drawer-hub widget kinds installed (ignores widget size).
+Future<Set<String>> installedDrawerHubWidgetKinds() async {
+  final installed = await installedHomeWidgetKinds();
+  return kDrawerHubWidgetKinds.where(installed.contains).toSet();
+}
+
+/// Additive: how many drawer-hub widget families are on the Home Screen.
+Future<int> installedDrawerHubWidgetCount() async {
+  return (await installedDrawerHubWidgetKinds()).length;
 }

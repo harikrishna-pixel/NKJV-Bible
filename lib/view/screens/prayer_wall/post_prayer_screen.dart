@@ -3,7 +3,10 @@ import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_guidelines_dialog.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_join_sheet.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_models.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_verify_dialogs.dart';
 import 'package:flutter/material.dart';
@@ -18,6 +21,9 @@ class PostPrayerScreen extends StatefulWidget {
     this.initialDescription,
     this.initialCategory,
   });
+
+  /// GetX route id so Prayer Wall cannot push this screen twice.
+  static const routeName = '/PostPrayerScreen';
 
   final String? initialTitle;
   final String? initialDescription;
@@ -43,7 +49,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
   final _detailsCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
   String _category = 'Others';
-  int _durationDays = 7;
+  int _durationDays = 30;
   // Anonymous posting UI disabled for now; posts use author name when provided.
   bool _isAnonymous = false;
   bool _submitting = false;
@@ -62,7 +68,32 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         _categories.contains(widget.initialCategory)) {
       _category = widget.initialCategory!;
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _prefillDisplayName());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onFirstFrame());
+  }
+
+  Future<void> _onFirstFrame() async {
+    await _prefillDisplayName();
+    if (!mounted) return;
+
+    final alreadyAccepted =
+        await PrayerWallLocalStore.hasAcceptedPrayerWallJoinTerms();
+    if (!mounted) return;
+
+    if (!alreadyAccepted) {
+      // Brief pause so the post form paints before the sheet slides up.
+      await Future<void>.delayed(const Duration(milliseconds: 280));
+      if (!mounted) return;
+    }
+
+    final accepted = await PrayerWallJoinSheet.ensureAccepted(context);
+    if (!mounted) return;
+    if (!accepted) {
+      Navigator.of(context).pop();
+      return;
+    }
+    if (!alreadyAccepted) {
+      PrayerWallJoinSheet.showSuccessBanner(context);
+    }
   }
 
   Future<void> _prefillDisplayName() async {
@@ -195,6 +226,15 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
       print(
           'Post prayer profile_image URL → ${profileImageUrl ?? "none"}');
 
+      // Additive: login email (cached as key `user`).
+      final cachedEmail =
+          (await CacheNotifier().readCache(key: 'user') ?? '')
+              .toString()
+              .trim();
+      final email =
+          cachedEmail.isNotEmpty ? cachedEmail : null;
+      print('Post prayer email → ${email ?? "none"}');
+
       final created = await PrayerWallService.createPrayer(
         prayerTitle: title,
         prayerDescription: details,
@@ -203,8 +243,12 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         prayerDuration: _durationDays,
         userName: effectiveName.isNotEmpty ? effectiveName : null,
         profileImage: profileImageUrl,
+        email: email,
       );
       await progress.advanceTo(4);
+      // UI only: let step 4 finish visibly before the success confirmation.
+      await Future<void>.delayed(const Duration(milliseconds: 2500));
+      if (!mounted) return;
       // await WalletService.deductCredits(_totalCredits);
       if (effectiveName.isNotEmpty) {
         await PrayerWallLocalStore.saveLastDisplayName(effectiveName);
@@ -214,6 +258,8 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         // Always track prayers created by this device so Edit/Delete works even
         // for anonymous/community posts.
         await PrayerWallLocalStore.addMyPrayerId(prayerId);
+        print('posted prayer id: $prayerId');
+        print('this prayer id will be used as user_id for block');
         // Exact timestamp for status prompt: postedAt + durationDays.
         final postedAt = DateTime.tryParse(
               (created['createdAt'] ?? created['created_at'] ?? '').toString(),
@@ -231,15 +277,32 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
             authorName: effectiveName,
           );
         }
+        final posterUserId = PrayerWallItem.extractAuthorUserId(created);
+        if (posterUserId != null && posterUserId.trim().isNotEmpty) {
+          await PrayerWallLocalStore.putPrayerAuthorUserId(
+            prayerId: prayerId,
+            authorUserId: posterUserId.trim(),
+          );
+        }
       }
       if (mounted && verifyingOpen) {
         Navigator.of(context, rootNavigator: true).pop();
         verifyingOpen = false;
       }
       if (!mounted) return;
+      setState(() => _submitting = false);
       final result = await PrayerWallVerifyDialogs.showVerified(context);
       if (!mounted) return;
-      Navigator.of(context).pop(result == true);
+      if (result == true) {
+        // UI destination only: "View Prayer Wall" must land on Prayer Wall,
+        // not fall through to Reading when the stack was popped too far.
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const PrayerWallScreen()),
+          (route) => route.isFirst,
+        );
+      } else {
+        Navigator.of(context).pop(false);
+      }
     } catch (e) {
       if (mounted && verifyingOpen) {
         Navigator.of(context, rootNavigator: true).pop();
@@ -455,11 +518,11 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        _durationChip('1 Day', 1, brown, isDark),
+                        _durationChip('7 Days', 7, brown, isDark),
                         const SizedBox(width: 8),
-                        _durationChip('3 Days', 3, brown, isDark),
+                        _durationChip('14 Days', 14, brown, isDark),
                         const SizedBox(width: 8),
-                        _durationChip('1 Week', 7, brown, isDark),
+                        _durationChip('30 Days', 30, brown, isDark),
                       ],
                     ),
                     const SizedBox(height: 10),

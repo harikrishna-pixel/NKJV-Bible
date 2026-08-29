@@ -136,12 +136,164 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _leaveSplash() async {
     if (_hasNavigated || !mounted) return;
     _hasNavigated = true;
+    // UI: hold at 98% → open ad on splash → then 100% → Home.
+    setState(() {
+      _progress = 0.98;
+    });
+    await Future.delayed(const Duration(milliseconds: 250));
+    if (!mounted) return;
+    await _maybeShowColdStartOpenAdOnSplash();
+    if (!mounted) return;
     setState(() {
       _progress = 1.0;
     });
     await Future.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
     await handleNavigation();
+  }
+
+  /// Same destination check as [handleNavigation] Home path — no ad on Welcome/restore.
+  Future<bool> _willNavigateToHomeAfterSplash() async {
+    final isOnboardingCompleted =
+        await SharPreferences.getBoolean(SharPreferences.onboarding);
+    if (isOnboardingCompleted == null || !isOnboardingCompleted) return false;
+    try {
+      final counts = await _readCoreBibleCountsWithRetry();
+      if (counts == null) return false;
+      if (counts.verseCount == 0 || counts.bookCount == 0) return false;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _markSplashOpenAdFlowComplete() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('showopenad', 'false');
+    await prefs.setBool(SharPreferences.openAdFlowComplete, true);
+  }
+
+  /// Mirrors Home [UpgradeCheckWrapper] open-ad rules; blocks navigation until dismiss/fail.
+  Future<void> _maybeShowColdStartOpenAdOnSplash() async {
+    if (!await _willNavigateToHomeAfterSplash()) return;
+
+    final upgrader = Upgrader(
+      debugLogging: true,
+      durationUntilAlertAgain: const Duration(days: 1),
+    );
+    final updateAvailable = upgrader.isUpdateAvailable();
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getString('showopenad');
+    final pendingStreakRating = await SharPreferences.getInt(
+            SharPreferences.pendingStreakCompleteCelebration) ??
+        0;
+
+    if (pendingStreakRating >= 1) {
+      await prefs.setString('showopenad', 'false');
+      await SharPreferences.setString('OpenAd', '1');
+      await _markSplashOpenAdFlowComplete();
+      return;
+    }
+
+    if (updateAvailable || data != 'true') {
+      await _markSplashOpenAdFlowComplete();
+      return;
+    }
+
+    await _loadAndAwaitSplashOpenAd();
+    await _markSplashOpenAdFlowComplete();
+  }
+
+  Future<void> _loadAndAwaitSplashOpenAd() async {
+    final completer = Completer<void>();
+    void finish() {
+      if (!completer.isCompleted) completer.complete();
+    }
+
+    bool? isAdEnabledFromApi =
+        await SharPreferences.getBoolean(SharPreferences.isAdsEnabledApi);
+    if (!(isAdEnabledFromApi ?? true)) {
+      finish();
+      return;
+    }
+
+    final testFlag = await SharPreferences.getString('test');
+    if (testFlag == null) {
+      await SharPreferences.setString('test', 'test');
+      finish();
+      return;
+    }
+
+    var adsEnabled =
+        await SharPreferences.getBoolean(SharPreferences.isAdsEnabled) ?? true;
+    final rewardTime =
+        await SharPreferences.getString(SharPreferences.isRewardAdViewTime);
+    if (rewardTime != null) {
+      final diff =
+          DateTime.now().difference(DateTime.parse(rewardTime)).inDays;
+      if (!diff.isNegative) {
+        await SharPreferences.setBoolean(SharPreferences.isAdsEnabled, true);
+        adsEnabled =
+            await SharPreferences.getBoolean(SharPreferences.isAdsEnabled) ??
+                true;
+      } else {
+        await SharPreferences.setBoolean(SharPreferences.isAdsEnabled, false);
+        adsEnabled = false;
+      }
+    }
+
+    if (!adsEnabled) {
+      finish();
+      return;
+    }
+
+    final openAdUnitId =
+        await SharPreferences.getString(SharPreferences.openAppId);
+    AppOpenAd.load(
+      adUnitId: openAdUnitId ?? '',
+      request: await AdConsentManager.getAdRequest(),
+      adLoadCallback: AppOpenAdLoadCallback(
+        onAdLoaded: (ad) {
+          _appOpenAd = ad;
+          ad.fullScreenContentCallback = FullScreenContentCallback(
+            onAdDismissedFullScreenContent: (ad) {
+              ad.dispose();
+              _appOpenAd = null;
+              finish();
+            },
+            onAdFailedToShowFullScreenContent: (ad, error) {
+              ad.dispose();
+              _appOpenAd = null;
+              finish();
+            },
+          );
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (!mounted) {
+              finish();
+              return;
+            }
+            try {
+              ad.show();
+            } catch (_) {
+              finish();
+            }
+          });
+        },
+        onAdFailedToLoad: (error) {
+          debugPrint('Splash AppOpenAd failed to load: $error');
+          SharPreferences.setBoolean(SharPreferences.isAdsEnabled, false);
+          finish();
+        },
+      ),
+    );
+
+    try {
+      await completer.future.timeout(const Duration(seconds: 12));
+    } on TimeoutException {
+      debugPrint('Splash open ad timed out — continuing navigation');
+      _appOpenAd?.dispose();
+      _appOpenAd = null;
+    }
   }
 
   void _tryLeaveSplash() {
@@ -704,10 +856,17 @@ class _SplashScreenState extends State<SplashScreen>
 
     _schedulePostSplashAtt();
     await SharPreferences.setBoolean(SharPreferences.isLoadBookContent, true);
+    // UI-only: finish warm before route swap so splash→Home does not flash empty.
     try {
       final provider =
-      Provider.of<DownloadProvider>(context, listen: false);
-      unawaited(provider.warmDataBeforeHomeScreen());
+          Provider.of<DownloadProvider>(context, listen: false);
+      await provider.warmDataBeforeHomeScreen().timeout(
+        const Duration(seconds: 4),
+        onTimeout: () {
+          debugPrint(
+              'warmDataBeforeHomeScreen timed out — continuing to Home');
+        },
+      );
     } catch (e) {
       debugPrint('warmDataBeforeHomeScreen error: $e');
     }
@@ -1429,7 +1588,13 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Widget _splashProgressBar(bool isCompact) {
-    final percent = (_progress * 100).clamp(0, 100).round();
+    // UI-only: loading caps at 98%; after ad phase _progress becomes 1.0 → 100%.
+    final percent = _hasNavigated
+        ? (_progress * 100).clamp(0, 100).round()
+        : ((_progress * 100).clamp(0, 98).round());
+    final fillFactor = _hasNavigated
+        ? _progress.clamp(0.0, 1.0)
+        : (_progress.clamp(0.0, 1.0) * 0.98);
     final barHeight = isCompact ? 24.0 : 26.0;
 
     return LayoutBuilder(
@@ -1452,7 +1617,7 @@ class _SplashScreenState extends State<SplashScreen>
                 Align(
                   alignment: Alignment.centerLeft,
                   child: FractionallySizedBox(
-                    widthFactor: _progress.clamp(0.0, 1.0),
+                    widthFactor: fillFactor,
                     heightFactor: 1,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
@@ -1962,11 +2127,14 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
     if (widget.check != 'home') return;
 
     Future.microtask(() async {
-      final updateAvailable = _upgrader.isUpdateAvailable();
-
       final prefs = await SharedPreferences.getInstance();
-
       final data = prefs.getString('showopenad');
+      // Splash already showed cold-start open ad (showopenad cleared).
+      if (data != 'true') {
+        return;
+      }
+
+      final updateAvailable = _upgrader.isUpdateAvailable();
       final pendingStreakRating = await SharPreferences.getInt(
           SharPreferences.pendingStreakCompleteCelebration) ??
           0;
