@@ -36,6 +36,10 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     'Latest',
     'Most prayed',
   ];
+  static const List<String> _myPrayerSortOptions = [
+    'Current',
+    'Expired',
+  ];
   static const List<String> _filterCategories = [
     'All',
     'Health',
@@ -58,6 +62,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   Set<String> _blockedUserIds = {};
   String _filter = 'All';
   String _sort = 'Latest';
+  /// Inside My Prayers: Current (active) vs Expired (prayer-history).
+  String _myPrayerSort = 'Current';
   bool _loading = true;
   String? _error;
   bool _authLoading = true;
@@ -91,10 +97,15 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   bool _historyLoading = false;
   String? _historyError;
   List<PrayerWallItem> _historyItems = [];
+  /// Additive: expired prayers from GET /api/prayer-history (My Prayers → Expired).
+  List<PrayerWallItem> _expiredHistoryItems = [];
   bool _openingHistory = false;
 
   /// UI-only: blocked prayers list (unblock + count).
   bool _showingBlocked = false;
+  /// True when My Prayers sort is Expired.
+  bool get _showingExpired =>
+      _showingHistory && !_showingBlocked && _myPrayerSort == 'Expired';
   bool _blockedApiRestoreBusy = false;
   /// Login email the in-memory blocked list was loaded for (account scoping).
   String? _blockedListAccountEmail;
@@ -505,13 +516,20 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     }
   }
   List<PrayerWallItem> get _visible {
-    final source = _showingHistory ? _historyItems : _all;
+    final List<PrayerWallItem> source;
+    if (_showingHistory && !_showingBlocked && _myPrayerSort == 'Expired') {
+      source = _expiredHistoryItems;
+    } else if (_showingHistory) {
+      source = _historyItems.where((p) => !p.isDurationExpired).toList();
+    } else {
+      source = _all;
+    }
     // UI-only: prayers this user/device reported stay hidden for them only.
     // Does not change report API, ownership, or what other users see.
     final notReported = source.where((p) => !_reportedPrayerIds.contains(p.id));
-    // UI-only: hide prayers this user blocked (prayer `_id` from GET /api/prayers).
+    // UI-only: hide prayers this user blocked (prayer `_id` or their user id).
     final notBlocked =
-        notReported.where((p) => !_blockedUserIds.contains(p.id));
+        notReported.where((p) => !_isItemBlocked(p));
     final base = _filter == 'All'
         ? List<PrayerWallItem>.from(notBlocked)
         : notBlocked.where((p) => p.category == _filter).toList();
@@ -719,19 +737,49 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
 
   String? _blockPrayerId(PrayerWallItem item) => _mongoPrayerId(item.id);
 
+  /// Additive: block target for two-way feed — their resolve user id when present.
+  /// Falls back to prayer `_id` (existing POST shape).
+  String? _blockTargetId(PrayerWallItem item) {
+    return _mongoPrayerId(item.identityUserId) ??
+        _mongoPrayerId(item.authorUserId) ??
+        _blockPrayerId(item);
+  }
+
+  bool _itemMatchesBlockedId(PrayerWallItem p, String id) {
+    if (id.isEmpty) return false;
+    if (p.id == id) return true;
+    if ((p.identityUserId ?? '').trim() == id) return true;
+    if ((p.authorUserId ?? '').trim() == id) return true;
+    return false;
+  }
+
+  bool _isItemBlocked(PrayerWallItem p) {
+    for (final id in _blockedUserIds) {
+      if (_itemMatchesBlockedId(p, id)) return true;
+    }
+    return false;
+  }
+
   /// Resolve `user_id` from POST /api/users/resolve (used as block API `user_id`).
   Future<String?> _resolveUserIdForBlock() async {
     final id = await PrayerWallService.ensureIdentityUserId();
     final trimmed = (id ?? '').trim();
-    return trimmed.isEmpty ? null : trimmed;
+    if (trimmed.isNotEmpty) return trimmed;
+    // Additive: Unblock can run before disk cache is ready; reuse session id.
+    final fallback = (_resolveUserId ?? '').trim();
+    return fallback.isEmpty ? null : fallback;
   }
 
   List<PrayerWallItem> get _blockedItemsOnWall =>
-      _all.where((p) => _blockedUserIds.contains(p.id)).toList();
+      _all.where(_isItemBlocked).toList();
 
   List<String> get _blockedIdsNotOnWall {
-    final onWall = _blockedItemsOnWall.map((p) => p.id).toSet();
-    return _blockedUserIds.where((id) => !onWall.contains(id)).toList();
+    return _blockedUserIds.where((id) {
+      for (final p in _all) {
+        if (_itemMatchesBlockedId(p, id)) return false;
+      }
+      return true;
+    }).toList();
   }
 
   Future<void> _openBlockedList() async {
@@ -744,6 +792,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       setState(() {
         _showingHistory = true;
         _showingBlocked = true;
+        _myPrayerSort = 'Current';
         _historyError = null;
       });
       await _reloadMyPrayerHistory();
@@ -754,7 +803,10 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
 
   void _selectMyPrayerTab({required bool blocked}) {
     if (!_showingHistory) return;
-    setState(() => _showingBlocked = blocked);
+    setState(() {
+      _showingBlocked = blocked;
+      if (!blocked) _myPrayerSort = 'Current';
+    });
   }
 
   String _avatarInitialsForName(String value) {
@@ -991,7 +1043,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   Future<void> _openBlockUser(PrayerWallItem item) async {
     print('unique prayer id: ${item.id}');
 
-    final blockedId = _blockPrayerId(item);
+    final prayerId = _blockPrayerId(item);
+    final blockedId = _blockTargetId(item);
     if (blockedId == null) {
       _showAppleToast('Cannot block this user right now.');
       return;
@@ -1009,9 +1062,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     }
 
     print('block user_id (resolve user_id): $uid');
-    print('block blocked_user_id (their prayer id): $blockedId');
+    print('block blocked_user_id: $blockedId');
 
-    final already = _blockedUserIds.contains(blockedId);
+    final already = _isItemBlocked(item);
     final confirmed = await _confirmBlockAction(
       unblock: already,
       displayName: _cardDisplayName(item),
@@ -1025,12 +1078,29 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
           userId: uid,
           blockedUserId: blockedId,
         );
+        if (prayerId != null && prayerId != blockedId) {
+          try {
+            await PrayerWallService.unblockUser(
+              userId: uid,
+              blockedUserId: prayerId,
+            );
+          } catch (_) {}
+        }
         await PrayerWallLocalStore.unmarkBlockedUser(
           blockedId,
           email: _userEmail,
         );
+        if (prayerId != null) {
+          await PrayerWallLocalStore.unmarkBlockedUser(
+            prayerId,
+            email: _userEmail,
+          );
+        }
         if (!mounted) return;
-        setState(() => _blockedUserIds.remove(blockedId));
+        setState(() {
+          _blockedUserIds.remove(blockedId);
+          if (prayerId != null) _blockedUserIds.remove(prayerId);
+        });
         Constants.showToast('User unblocked', 2000);
       } else {
         await PrayerWallService.blockUser(
@@ -1041,8 +1111,17 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
           blockedId,
           email: _userEmail,
         );
+        if (prayerId != null && prayerId != blockedId) {
+          await PrayerWallLocalStore.markBlockedUser(
+            prayerId,
+            email: _userEmail,
+          );
+        }
         if (!mounted) return;
-        setState(() => _blockedUserIds.add(blockedId));
+        setState(() {
+          _blockedUserIds.add(blockedId);
+          if (prayerId != null) _blockedUserIds.add(prayerId);
+        });
         Constants.showToast('User blocked', 2000);
       }
     } catch (e) {
@@ -1641,9 +1720,12 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         alignment: Alignment.center,
         child: Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
           style: TextStyle(
             fontWeight: FontWeight.w700,
-            fontSize: 13,
+            fontSize: 12,
             color: selected
                 ? Colors.white
                 : (isDark ? Colors.white : brown),
@@ -1969,6 +2051,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       setState(() {
         _showingHistory = false;
         _showingBlocked = false;
+        _myPrayerSort = 'Current';
         _historyError = null;
       });
       return;
@@ -1982,6 +2065,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     setState(() {
       _showingHistory = true;
       _showingBlocked = false;
+      _myPrayerSort = 'Current';
     });
     await _reloadMyPrayerHistory();
   }
@@ -2029,9 +2113,53 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       if (ids.isNotEmpty) {
         await PrayerWallLocalStore.saveMyPrayerIds(ids);
       }
+
+      var fromHistoryApi = <PrayerWallItem>[];
+      try {
+        fromHistoryApi = await PrayerWallService.fetchPrayerHistory();
+      } catch (e) {
+        print('PrayerWall fetchPrayerHistory: $e');
+      }
+      if (!mounted) return;
+      final historyMine = myEmail.isEmpty
+          ? fromHistoryApi
+          : fromHistoryApi.where((p) {
+              final e = (p.email ?? '').trim().toLowerCase();
+              if (e.isEmpty) return true;
+              return e == myEmail;
+            }).toList();
+      final expired = <PrayerWallItem>[];
+      final expiredSeen = <String>{};
+      void addExpired(PrayerWallItem p) {
+        if (expiredSeen.add(p.id)) expired.add(p);
+      }
+      final activeIds = historyItems
+          .where((p) => !p.isDurationExpired)
+          .map((p) => p.id)
+          .toSet();
+      for (final p in historyItems) {
+        if (p.isDurationExpired) addExpired(p);
+      }
+      for (final p in historyMine) {
+        if (p.isDurationExpired) {
+          addExpired(p);
+        } else if (!activeIds.contains(p.id) &&
+            p.expiresAt == null &&
+            (p.prayerDuration == null || p.prayerDuration! <= 0)) {
+          // History endpoint row with no duration fields: treat as expired.
+          addExpired(p);
+        }
+      }
+      expired.sort((a, b) {
+        final am = a.createdAt?.millisecondsSinceEpoch ?? 0;
+        final bm = b.createdAt?.millisecondsSinceEpoch ?? 0;
+        return bm.compareTo(am);
+      });
+
       setState(() {
         _myPrayerIds = ids;
         _historyItems = historyItems;
+        _expiredHistoryItems = expired;
         _historyLoading = false;
       });
     } catch (e) {
@@ -2040,6 +2168,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         _historyLoading = false;
         _historyError = _friendlyError(e);
         _historyItems = [];
+        _expiredHistoryItems = [];
       });
     } finally {
       _openingHistory = false;
@@ -2192,6 +2321,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                         setState(() {
                           _showingHistory = false;
                           _showingBlocked = false;
+                          _myPrayerSort = 'Current';
                           _historyError = null;
                         });
                         return;
@@ -2342,6 +2472,45 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                 ],
               ),
             ),
+            if (_showingHistory && !_showingBlocked)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              child: Row(
+                children: [
+                  Text(
+                    'Sort:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white70 : brown,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  DropdownButton<String>(
+                    value: _myPrayerSort,
+                    underline: const SizedBox.shrink(),
+                    dropdownColor: isDark ? CommanColor.darkPrimaryColor : Colors.white,
+                    items: _myPrayerSortOptions
+                        .map(
+                          (s) => DropdownMenuItem(
+                            value: s,
+                            child: Text(
+                              s,
+                              style: TextStyle(
+                                color: isDark ? Colors.white : brown,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setState(() => _myPrayerSort = v);
+                    },
+                  ),
+                ],
+              ),
+            ),
             Expanded(
               child: _showingBlocked
                   ? _buildBlockedList(brown: brown, isDark: isDark)
@@ -2392,7 +2561,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                                     ),
                                     Center(
                                       child: Text(
-                                        _showingHistory
+                                        _showingExpired
+                                            ? 'No expired prayers yet.'
+                                            : _showingHistory
                                             ? 'No prayers in My Prayer yet.'
                                             : 'No prayers in this category yet.',
                                         style: TextStyle(
@@ -2446,8 +2617,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                                       isReported:
                                           _reportedPrayerIds.contains(item.id),
                                       onBlock: () => _openBlockUser(item),
-                                      isBlocked:
-                                          _blockedUserIds.contains(item.id),
+                                      isBlocked: _isItemBlocked(item),
                                       canBlock: !_isMyPrayer(item),
                                       likeCount: _likeCounts[item.id] ?? 0,
                                       liked: _isLiked(item.id),

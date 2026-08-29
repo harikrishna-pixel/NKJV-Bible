@@ -36,6 +36,16 @@ class PrayerWallItem {
   /// From API `prayer_duration` when present.
   final int? prayerDuration;
 
+  /// True after postedAt + duration (or API expiresAt). Used for Expired tab.
+  bool get isDurationExpired {
+    final expires = expiresAt ??
+        (createdAt != null && (prayerDuration ?? 0) > 0
+            ? createdAt!.add(Duration(days: prayerDuration!))
+            : null);
+    if (expires == null) return false;
+    return !DateTime.now().isBefore(expires.toLocal());
+  }
+
   static String? _cleanName(dynamic v) {
     if (v == null) return null;
     final s = v.toString().trim();
