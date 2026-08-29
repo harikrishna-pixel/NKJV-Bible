@@ -2333,6 +2333,10 @@ class _HomeScreenState extends State<HomeScreen>
         'last_mark_as_read_ad_time', DateTime.now().toIso8601String());
   }
 
+  Future<void> _waitForInterstitialReady() async {
+    await _adService.waitForInterstitialReady();
+  }
+
   // Helper method to show interstitial ad and wait for dismissal (for good internet)
   // This ensures ad shows FIRST, then content shows AFTER ad is dismissed
   Future<void> _showInterstitialAdAndWait() async {
@@ -4603,14 +4607,21 @@ class _HomeScreenState extends State<HomeScreen>
                       debugPrint(
                           "now Chapter and count is $swipeCount $_swipeThreshold");
                       await Future.delayed(Duration(milliseconds: 500));
-                      if (_adService.hasReadyInterstitial &&
-                          controller.adFree.value == false) {
-                        EasyLoading.showInfo('Please wait...');
-                        await SharPreferences.setString('OpenAd', '1');
-                        _adService.showInterstitialAd(
-                          placement: LevelPlayPlacements
-                              .chapterBetweenInterstitial,
-                        );
+                      if (controller.adFree.value == false) {
+                        final shouldLoad =
+                            await SharPreferences.shouldLoadAd();
+                        if (shouldLoad) {
+                          await _waitForInterstitialReady();
+                        }
+                        if (_adService.hasReadyInterstitial &&
+                            controller.adFree.value == false) {
+                          EasyLoading.showInfo('Please wait...');
+                          await SharPreferences.setString('OpenAd', '1');
+                          _adService.showInterstitialAd(
+                            placement: LevelPlayPlacements
+                                .chapterBetweenInterstitial,
+                          );
+                        }
                       }
                     }
                     debugPrint(
@@ -4639,14 +4650,21 @@ class _HomeScreenState extends State<HomeScreen>
                       debugPrint(
                           "now Chapter and count is $swipeCount $_swipeThreshold");
                       await Future.delayed(Duration(milliseconds: 600));
-                      if (_adService.hasReadyInterstitial &&
-                          controller.adFree.value == false) {
-                        EasyLoading.showInfo('Please wait...');
-                        await SharPreferences.setString('OpenAd', '1');
-                        _adService.showInterstitialAd(
-                          placement: LevelPlayPlacements
-                              .chapterBetweenInterstitial,
-                        );
+                      if (controller.adFree.value == false) {
+                        final shouldLoad =
+                            await SharPreferences.shouldLoadAd();
+                        if (shouldLoad) {
+                          await _waitForInterstitialReady();
+                        }
+                        if (_adService.hasReadyInterstitial &&
+                            controller.adFree.value == false) {
+                          EasyLoading.showInfo('Please wait...');
+                          await SharPreferences.setString('OpenAd', '1');
+                          _adService.showInterstitialAd(
+                            placement: LevelPlayPlacements
+                                .chapterBetweenInterstitial,
+                          );
+                        }
                       }
                     }
                     debugPrint(
@@ -4942,18 +4960,6 @@ class _HomeScreenState extends State<HomeScreen>
                                                                     // Offline - skip ad and navigate directly
                                                                     shouldSkipAd =
                                                                         true;
-                                                                  } else {
-                                                                    // Check if mobile only connection (likely 2G/slow) - skip ad
-                                                                    final connectivityResult =
-                                                                              await Connectivity().checkConnectivity();
-                                                                    final isMobileOnly = connectivityResult.contains(ConnectivityResult.mobile) &&
-                                                                              !connectivityResult.contains(ConnectivityResult.wifi) &&
-                                                                              !connectivityResult.contains(ConnectivityResult.ethernet);
-                                                                    if (isMobileOnly) {
-                                                                      // Low internet (2G/mobile only) - skip ad and navigate directly
-                                                                      shouldSkipAd =
-                                                                          true;
-                                                                    }
                                                                   }
                                                                 } catch (e) {
                                                                   // If connectivity check fails, skip ad and proceed
@@ -4981,6 +4987,12 @@ class _HomeScreenState extends State<HomeScreen>
                                                                 }
 
                                                                 // Only show ad if online with good connection
+                                                                final shouldLoadMarkAd =
+                                                                    await SharPreferences
+                                                                        .shouldLoadAd();
+                                                                if (shouldLoadMarkAd) {
+                                                                  await _waitForInterstitialReady();
+                                                                }
                                                                       if (_adService.hasReadyInterstitial &&
                                                                           controller.adFree.value ==
                                                                         false) {
@@ -5254,14 +5266,6 @@ class _HomeScreenState extends State<HomeScreen>
                                                                             if (!hasInternet) {
                                                                               // Offline - skip ad and navigate directly
                                                                               shouldSkipAd = true;
-                                                                            } else {
-                                                                              // Check if mobile only connection (likely 2G/slow) - skip ad
-                                                                              final connectivityResult = await Connectivity().checkConnectivity();
-                                                                              final isMobileOnly = connectivityResult.contains(ConnectivityResult.mobile) && !connectivityResult.contains(ConnectivityResult.wifi) && !connectivityResult.contains(ConnectivityResult.ethernet);
-                                                                              if (isMobileOnly) {
-                                                                                // Low internet (2G/mobile only) - skip ad and navigate directly
-                                                                                shouldSkipAd = true;
-                                                                              }
                                                                             }
                                                                           } catch (e) {
                                                                             // If connectivity check fails, skip ad and proceed
@@ -5280,6 +5284,12 @@ class _HomeScreenState extends State<HomeScreen>
                                                                           }
 
                                                                           // Only show ad if online with good connection
+                                                                                final shouldLoadMarkAd =
+                                                                                    await SharPreferences
+                                                                                        .shouldLoadAd();
+                                                                                if (shouldLoadMarkAd) {
+                                                                                  await _waitForInterstitialReady();
+                                                                                }
                                                                                 if (_adService.hasReadyInterstitial && controller.adFree.value == false) {
                                                                             // Check if 3 minutes have passed since last ad
                                                                                   final canShowAd = await _canShowMarkAsReadAd();

@@ -51,6 +51,7 @@ class AdService {
   static InterstitialAd? _sharedInterstitialAd;
   static bool _sharedInterstitialLoaded = false;
   static bool _sharedInterstitialLoading = false;
+  static final List<VoidCallback> _pendingInterstitialCallbacks = [];
 
   /// Same-library callers historically used instance fields; keep aliases.
   InterstitialAd? get _interstitialAd => _sharedInterstitialAd;
@@ -59,9 +60,9 @@ class AdService {
   void loadRewardedInterstitialAds(VoidCallback onAdLoaded) async {
     String? adUnitId =
         await SharPreferences.getString(SharPreferences.rewardedInterstitialAd);
-    RewardedInterstitialAd.loadWithAdManagerAdRequest(
+    RewardedInterstitialAd.load(
       adUnitId: adUnitId.toString(),
-      adManagerRequest: const AdManagerAdRequest(),
+      request: await AdConsentManager.getAdRequest(),
       rewardedInterstitialAdLoadCallback: RewardedInterstitialAdLoadCallback(
         onAdLoaded: (ad) {
           ad.fullScreenContentCallback = FullScreenContentCallback(
@@ -173,14 +174,39 @@ class AdService {
     }
   }
 
+  void _notifyInterstitialLoaded() {
+    for (final cb in List<VoidCallback>.from(_pendingInterstitialCallbacks)) {
+      cb();
+    }
+    _pendingInterstitialCallbacks.clear();
+  }
+
+  /// Brief wait for LevelPlay or Google interstitial (existing preload path).
+  Future<bool> waitForInterstitialReady({
+    int attempts = 15,
+    Duration interval = const Duration(milliseconds: 200),
+  }) async {
+    for (var i = 0; i < attempts; i++) {
+      if (hasReadyInterstitial) return true;
+      if (!_sharedInterstitialLoading) {
+        loadInterstitialAd(() {});
+      }
+      await Future.delayed(interval);
+    }
+    return hasReadyInterstitial;
+  }
+
   void loadInterstitialAd(VoidCallback onAdLoaded) async {
     // Already ready — notify caller immediately (Home / Mark as Read).
     if (_sharedInterstitialLoaded && _sharedInterstitialAd != null) {
       onAdLoaded();
       return;
     }
-    // In flight from a prior screen — avoid duplicate requests.
-    if (_sharedInterstitialLoading) return;
+    // In flight from a prior screen — queue callback when load completes.
+    if (_sharedInterstitialLoading) {
+      _pendingInterstitialCallbacks.add(onAdLoaded);
+      return;
+    }
 
     _sharedInterstitialLoading = true;
     unawaited(LevelPlayAds.instance.preloadInterstitial());
@@ -211,9 +237,11 @@ class AdService {
           _sharedInterstitialLoaded = true;
           _sharedInterstitialLoading = false;
           onAdLoaded();
+          _notifyInterstitialLoaded();
         },
         onAdFailedToLoad: (LoadAdError error) async {
           _sharedInterstitialLoading = false;
+          _pendingInterstitialCallbacks.clear();
           await SharPreferences.setString('OpenAd', '1');
           log('InterstitialAd failed to load: $error');
         },
@@ -257,7 +285,7 @@ class AdService {
           ad.dispose();
         },
       ),
-      request: const AdManagerAdRequest(),
+      request: await AdConsentManager.getAdRequest(),
       nativeTemplateStyle: NativeTemplateStyle(
         templateType: TemplateType.medium,
         callToActionTextStyle: NativeTemplateTextStyle(
@@ -657,9 +685,33 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
                                       ConnectivityResult.mobile) {
                                 RewardedAdService.loadAd(
                                     onAdLoaded: () {
-                                      if (context.mounted) {
-                                        setState(() => isAdReady = true);
-                                      }
+                                      if (!context.mounted) return;
+                                      setState(() => isAdReady = true);
+                                      RewardedAdService.showAd(
+                                        onRewardEarned: _handleReward,
+                                        onAdDismissed: () async {
+                                          await SharPreferences.setBoolean(
+                                              "downloadreward", true);
+                                          Constants.showToast(
+                                              "Reward unlocked! Download 3 more images for free",
+                                              6000);
+                                          RewardedAdService.loadAd(
+                                            onAdLoaded: () {
+                                              if (context.mounted) {
+                                                setState(
+                                                    () => isAdReady = true);
+                                              }
+                                            },
+                                            onAdFailed: () {
+                                              Constants.showToast(
+                                                  "Ad not available. image 2",
+                                                  6000);
+                                            },
+                                            data: "imaged",
+                                          );
+                                        },
+                                        data: "image d",
+                                      );
                                     },
                                     onAdFailed: () async {
                                       setState(
@@ -673,31 +725,6 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
                                           "downloadrewardcount", 3);
                                     },
                                     data: "imaged");
-                                if (isAdReady) {
-                                  await SharPreferences.setString(
-                                      'OpenAd', '1');
-                                  RewardedAdService.showAd(
-                                      onRewardEarned: _handleReward,
-                                      onAdDismissed: () async {
-                                        // setState(() => isAdReady = false);
-                                        await SharPreferences.setBoolean(
-                                            "downloadreward", true);
-                                        Constants.showToast(
-                                            "Reward unlocked! Download 3 more images for free",
-                                            6000);
-                                        RewardedAdService.loadAd(
-                                            onAdLoaded: () {
-                                              setState(() => isAdReady = true);
-                                            },
-                                            onAdFailed: () {
-                                              Constants.showToast(
-                                                  "Ad not available. image 2",
-                                                  6000);
-                                            },
-                                            data: "imaged");
-                                      },
-                                      data: "image d");
-                                }
                               } else {
                                 Constants.showToast(
                                     'No Internet Connection', 6000);
@@ -743,7 +770,8 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
       final data =
           await SharPreferences.getString(SharPreferences.showinterstitialrow);
 
-      int count = int.tryParse(data ?? '0') ?? 0;
+      int count = int.tryParse(data ?? '') ?? 0;
+      if (count <= 0) count = 7;
 
       setState(() {
         adcountview = count;
@@ -767,7 +795,7 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
           },
           data: "imaged");
       // Load other ads with single mounted check
-      // _adService.loadRewardedInterstitialAds(() {});
+      _adService.loadRewardedInterstitialAds(() {});
       _adService.loadInterstitialAd(() {});
       _adService.loadBannerAd(() {});
       _adService.loadFullScreenAd(() {});
@@ -1061,23 +1089,21 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
                         // });
 
                         return PhotoViewGalleryPageOptions.customChild(
-                          child:
-                              // showAd.value
-                              //     ? Center(
-                              //         child: ConstrainedBox(
-                              //           constraints: const BoxConstraints(
-                              //             minWidth: 320,
-                              //             minHeight: 320,
-                              //             maxWidth: 400,
-                              //             maxHeight: 400,
-                              //           ),
-                              //           child: _adService.fullScreenAd == null
-                              //               ? const SizedBox.shrink()
-                              //               : AdWidget(ad: _adService.fullScreenAd!),
-                              //         ),
-                              //       )
-                              //     :
-                              CachedNetworkImage(
+                          child: showAd.value &&
+                                  _adService.fullScreenAd != null
+                              ? Center(
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      minWidth: 320,
+                                      minHeight: 320,
+                                      maxWidth: 400,
+                                      maxHeight: 400,
+                                    ),
+                                    child: AdWidget(
+                                        ad: _adService.fullScreenAd!),
+                                  ),
+                                )
+                              : CachedNetworkImage(
                             imageUrl: photos[i].imageUrl ?? '',
                             fit: BoxFit.fill,
                             // octo_image allows only one of placeholder /
@@ -1123,48 +1149,29 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
                           });
                         }
                         if (val > 0 &&
+                            adcountview > 0 &&
                             val % adcountview == 0 &&
                             shouldLoadAd &&
-                            _adService._interstitialAd != null) {
-                          if (_adService._isInterstitialAdLoaded) {
-                            EasyLoading.showInfo('Please wait...');
-                            await SharPreferences.setString('OpenAd', '1');
-                            _adService.showInterstitialAd(
-                              placement: LevelPlayPlacements
-                                  .wallpaperBetweenInterstitial,
-                            );
-
-                            // Future.delayed(Duration.zero, () {
-                            //   showAd.value = false;
-                            // });
-                          }
+                            _adService.hasReadyInterstitial) {
+                          EasyLoading.showInfo('Please wait...');
+                          await SharPreferences.setString('OpenAd', '1');
+                          await _adService.showInterstitialAdAndWait(
+                            placement: LevelPlayPlacements
+                                .wallpaperBetweenInterstitial,
+                          );
                         }
                         if (context.mounted) {
+                          showAd.value = val > 0 &&
+                              adcountview > 0 &&
+                              val % adcountview == 0 &&
+                              _adService.fullScreenAd != null;
                           setState(() {
-                            // showAd.value = (val > 0 &&
-                            //     val % 5 == 0 &&
-                            //     _adService._fullScreenAd != null);
-                            if ((val > 0 &&
-                                val % adcountview == 0 &&
-                                _adService._fullScreenAd != null)) {
-                              currentIndex = val - (val ~/ 5);
+                            if (showAd.value) {
+                              currentIndex = val - (val ~/ adcountview);
                             } else {
                               currentIndex = val;
                             }
                           });
-                          // int newIndex;
-                          // if ((val > 0 &&
-                          //     val % 5 == 0 &&
-                          //     _adService._fullScreenAd != null)) {
-                          //   newIndex = val - (val ~/ 5);
-                          // } else {
-                          //   newIndex = val;
-                          // }
-
-                          // if (currentIndex != newIndex) {
-                          //   currentIndex = newIndex;
-                          //   shouldUpdate = true;
-                          // }
                         }
                       },
                     ),
