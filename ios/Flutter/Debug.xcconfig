@@ -1,2 +1,5 @@
 #include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
 #include "Generated.xcconfig"
+// Apple Silicon simulators are arm64. Generated.xcconfig may add arm64 here
+// when a pod lists arm64e; that hides all simulators from Xcode.
+EXCLUDED_ARCHS[sdk=iphonesimulator*]=i386

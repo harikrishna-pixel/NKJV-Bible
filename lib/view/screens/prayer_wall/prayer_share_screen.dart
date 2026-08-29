@@ -136,39 +136,45 @@ class PrayerShareScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: brown.withValues(alpha: 0.22)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title.trim().isEmpty ? 'Prayer Request' : title.trim(),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: isDark ? Colors.white : brown,
-                        fontFamily: 'Georgia',
-                      ),
+              Flexible(
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: brown.withValues(alpha: 0.22)),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title.trim().isEmpty
+                              ? 'Prayer Request'
+                              : title.trim(),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? Colors.white : brown,
+                            fontFamily: 'Georgia',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          description.trim().isEmpty
+                              ? '-'
+                              : description.trim(),
+                          style: TextStyle(
+                            fontSize: 13,
+                            height: 1.35,
+                            color:
+                                isDark ? Colors.white70 : Colors.grey.shade800,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      description.trim().isEmpty ? '-' : description.trim(),
-                      maxLines: 5,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        height: 1.35,
-                        color: isDark ? Colors.white70 : Colors.grey.shade800,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -193,7 +199,7 @@ class PrayerShareScreen extends StatelessWidget {
                 tileBg: tileBg,
                 onTap: () => _copy(context),
               ),
-              const Spacer(),
+              const SizedBox(height: 16),
               Text(
                 'Tip: Share the prayer so others can support you in faith.',
                 textAlign: TextAlign.center,

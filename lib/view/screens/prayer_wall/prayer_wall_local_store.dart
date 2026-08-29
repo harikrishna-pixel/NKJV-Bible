@@ -10,9 +10,22 @@ class PrayerWallLocalStore {
   static const _kLikeMap = 'prayer_wall_like_map_v1';
   static const _kMyCommentIds = 'prayer_wall_my_comment_ids_v1';
   static const _kPrayerAuthorMap = 'prayer_wall_prayer_author_map_v1';
+  static const _kPrayerAuthorUserIdMap =
+      'prayer_wall_prayer_author_user_id_map_v1';
   static const _kLastDisplayName = 'prayer_wall_last_display_name_v1';
   static const _kMyPrayerIds = 'prayer_wall_my_prayer_ids_v1';
   static const _kSeenPrayerIds = 'prayer_wall_seen_prayer_ids_v1';
+  static const _kPrayerDurationMeta = 'prayer_wall_duration_meta_v1';
+  static const _kStatusSubmittedIds = 'prayer_wall_status_submitted_ids_v1';
+  static const _kReportedPrayerIds = 'prayer_wall_reported_prayer_ids_v1';
+  static const _kBlockedUserIds = 'prayer_wall_blocked_user_ids_v1';
+  static const _kBlockedUserIdsByEmail =
+      'prayer_wall_blocked_user_ids_by_email_v1';
+  static const _kReporterId = 'prayer_wall_reporter_id_v1';
+  static const _kBannerDismissKeys = 'prayer_wall_home_banner_dismiss_v1';
+  static const _kIdentityUserIdField =
+      'prayer_wall_identity_user_id_field_v2';
+  static const _kJoinTermsAccepted = 'prayer_wall_join_terms_accepted_v1';
 
   static Future<Map<String, String>> loadLikeMap() async {
     final p = await SharedPreferences.getInstance();
@@ -102,6 +115,37 @@ class PrayerWallLocalStore {
     await savePrayerAuthorMap(m);
   }
 
+  /// prayer ObjectId → poster user id (Mongo / AuthHub) for block API.
+  static Future<Map<String, String>> loadPrayerAuthorUserIdMap() async {
+    final p = await SharedPreferences.getInstance();
+    final s = p.getString(_kPrayerAuthorUserIdMap);
+    if (s == null || s.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(s);
+      if (decoded is! Map) return {};
+      return decoded.map((k, v) => MapEntry(k.toString(), v.toString()));
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> savePrayerAuthorUserIdMap(Map<String, String> map) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kPrayerAuthorUserIdMap, jsonEncode(map));
+  }
+
+  static Future<void> putPrayerAuthorUserId({
+    required String prayerId,
+    required String authorUserId,
+  }) async {
+    final pid = prayerId.trim();
+    final uid = authorUserId.trim();
+    if (pid.isEmpty || uid.isEmpty) return;
+    final m = await loadPrayerAuthorUserIdMap();
+    m[pid] = uid;
+    await savePrayerAuthorUserIdMap(m);
+  }
+
   /// Last name used when posting (or prefilled from login). For display / prefill only.
   static Future<String?> loadLastDisplayName() async {
     final p = await SharedPreferences.getInstance();
@@ -182,5 +226,334 @@ class PrayerWallLocalStore {
       if (seen.add(pid)) changed = true;
     }
     if (changed) await saveSeenPrayerIds(seen);
+  }
+
+  /// Maps prayerId → { durationDays, postedAtMs } for exact expiry prompts.
+  static Future<Map<String, PrayerWallDurationMeta>>
+      loadPrayerDurationMeta() async {
+    final p = await SharedPreferences.getInstance();
+    final s = p.getString(_kPrayerDurationMeta);
+    if (s == null || s.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(s);
+      if (decoded is! Map) return {};
+      final out = <String, PrayerWallDurationMeta>{};
+      decoded.forEach((k, v) {
+        if (v is! Map) return;
+        final meta = PrayerWallDurationMeta.fromMap(
+          Map<String, dynamic>.from(v),
+        );
+        if (meta != null) out[k.toString()] = meta;
+      });
+      return out;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> savePrayerDurationMeta(
+    Map<String, PrayerWallDurationMeta> map,
+  ) async {
+    final p = await SharedPreferences.getInstance();
+    final encoded = map.map((k, v) => MapEntry(k, v.toMap()));
+    await p.setString(_kPrayerDurationMeta, jsonEncode(encoded));
+  }
+
+  static Future<void> putPrayerDurationMeta({
+    required String prayerId,
+    required int durationDays,
+    required DateTime postedAt,
+  }) async {
+    final pid = prayerId.trim();
+    if (pid.isEmpty || durationDays <= 0) return;
+    final m = await loadPrayerDurationMeta();
+    m[pid] = PrayerWallDurationMeta(
+      durationDays: durationDays,
+      postedAt: postedAt,
+    );
+    await savePrayerDurationMeta(m);
+  }
+
+  static Future<void> removePrayerDurationMeta({required String prayerId}) async {
+    final pid = prayerId.trim();
+    if (pid.isEmpty) return;
+    final m = await loadPrayerDurationMeta();
+    if (!m.containsKey(pid)) return;
+    m.remove(pid);
+    await savePrayerDurationMeta(m);
+  }
+
+  /// Ids this device actually posted (duration meta / author map on create).
+  /// Not the raw my-prayer list (that can be polluted by full-wall sync).
+  static Future<Set<String>> loadOwnedPrayerIds() async {
+    final meta = await loadPrayerDurationMeta();
+    final authors = await loadPrayerAuthorMap();
+    return {...meta.keys, ...authors.keys};
+  }
+
+  static Future<Set<String>> loadStatusSubmittedIds() async {
+    final p = await SharedPreferences.getInstance();
+    final s = p.getString(_kStatusSubmittedIds);
+    if (s == null || s.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(s);
+      if (decoded is! List) return {};
+      return decoded.map((e) => e.toString()).toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> saveStatusSubmittedIds(Set<String> ids) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kStatusSubmittedIds, jsonEncode(ids.toList()));
+  }
+
+  static Future<void> markStatusSubmitted(String prayerId) async {
+    final pid = prayerId.trim();
+    if (pid.isEmpty) return;
+    final s = await loadStatusSubmittedIds();
+    s.add(pid);
+    await saveStatusSubmittedIds(s);
+  }
+
+  /// UI-only: prayers this device already reported (flag highlight).
+  static Future<Set<String>> loadReportedPrayerIds() async {
+    final p = await SharedPreferences.getInstance();
+    final s = p.getString(_kReportedPrayerIds);
+    if (s == null || s.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(s);
+      if (decoded is! List) return {};
+      return decoded.map((e) => e.toString()).toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> saveReportedPrayerIds(Set<String> ids) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kReportedPrayerIds, jsonEncode(ids.toList()));
+  }
+
+  static Future<void> markPrayerReported(String prayerId) async {
+    final pid = prayerId.trim();
+    if (pid.isEmpty) return;
+    final s = await loadReportedPrayerIds();
+    s.add(pid);
+    await saveReportedPrayerIds(s);
+  }
+
+  /// UI-only: prayer `_id`s blocked via POST /api/blocked-users.
+  static Future<Set<String>> loadBlockedUserIds() async {
+    final p = await SharedPreferences.getInstance();
+    final s = p.getString(_kBlockedUserIds);
+    if (s == null || s.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(s);
+      if (decoded is! List) return {};
+      return decoded.map((e) => e.toString()).toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> saveBlockedUserIds(Set<String> ids, {String? email}) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kBlockedUserIds, jsonEncode(ids.toList()));
+    await saveBlockedUserIdsForEmail(email, ids);
+  }
+
+  static String _emailKey(String? email) => (email ?? '').trim().toLowerCase();
+
+  static Future<Map<String, List<String>>> _loadBlockedByEmailMap() async {
+    final p = await SharedPreferences.getInstance();
+    final s = p.getString(_kBlockedUserIdsByEmail);
+    if (s == null || s.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(s);
+      if (decoded is! Map) return {};
+      final out = <String, List<String>>{};
+      decoded.forEach((k, v) {
+        final email = k.toString().trim().toLowerCase();
+        if (email.isEmpty) return;
+        if (v is List) {
+          out[email] = v.map((e) => e.toString()).toList();
+        }
+      });
+      return out;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<Set<String>> loadBlockedUserIdsForEmail(String? email) async {
+    final key = _emailKey(email);
+    if (key.isEmpty) return {};
+    final map = await _loadBlockedByEmailMap();
+    return (map[key] ?? const <String>[]).toSet();
+  }
+
+  static Future<void> saveBlockedUserIdsForEmail(
+    String? email,
+    Set<String> ids,
+  ) async {
+    final key = _emailKey(email);
+    if (key.isEmpty) return;
+    final p = await SharedPreferences.getInstance();
+    final map = await _loadBlockedByEmailMap();
+    map[key] = ids.toList();
+    await p.setString(_kBlockedUserIdsByEmail, jsonEncode(map));
+  }
+
+  /// Call while login email is still in cache (before logout clears it).
+  static Future<void> snapshotBlockedIdsForEmail(String? email) async {
+    final ids = await loadBlockedUserIds();
+    if (ids.isEmpty) return;
+    final existing = await loadBlockedUserIdsForEmail(email);
+    await saveBlockedUserIdsForEmail(email, {...existing, ...ids});
+  }
+
+  static Future<void> markBlockedUser(String userId, {String? email}) async {
+    final uid = userId.trim();
+    if (uid.isEmpty) return;
+    final s = await loadBlockedUserIds();
+    s.add(uid);
+    await saveBlockedUserIds(s, email: email);
+  }
+
+  static Future<void> unmarkBlockedUser(String userId, {String? email}) async {
+    final uid = userId.trim();
+    if (uid.isEmpty) return;
+    final s = await loadBlockedUserIds();
+    s.remove(uid);
+    await saveBlockedUserIds(s, email: email);
+  }
+
+  /// UI-only dismiss keys for home expiry banners (e.g. `ends_today:<id>:<ymd>`).
+  static Future<Set<String>> loadHomeBannerDismissKeys() async {
+    final p = await SharedPreferences.getInstance();
+    final s = p.getString(_kBannerDismissKeys);
+    if (s == null || s.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(s);
+      if (decoded is! List) return {};
+      return decoded.map((e) => e.toString()).toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> markHomeBannerDismissed(String key) async {
+    final k = key.trim();
+    if (k.isEmpty) return;
+    final p = await SharedPreferences.getInstance();
+    final set = await loadHomeBannerDismissKeys();
+    set.add(k);
+    await p.setString(_kBannerDismissKeys, jsonEncode(set.toList()));
+  }
+
+  /// Stable anonymous reporter id for `/api/prayer-reports` (max 128 chars).
+  static const int reporterIdMaxLength = 128;
+
+  static String normalizeReporterId(String raw) {
+    final t = raw.trim();
+    if (t.isEmpty) return t;
+    if (t.length <= reporterIdMaxLength) return t;
+    return t.substring(0, reporterIdMaxLength);
+  }
+
+  static Future<String> getOrCreateReporterId() async {
+    final p = await SharedPreferences.getInstance();
+    final existing = normalizeReporterId(p.getString(_kReporterId) ?? '');
+    if (existing.isNotEmpty) {
+      // Keep a clipped id if an older oversized value was stored.
+      if (existing != (p.getString(_kReporterId) ?? '').trim()) {
+        await p.setString(_kReporterId, existing);
+      }
+      return existing;
+    }
+    final id = normalizeReporterId(
+      'device-${DateTime.now().millisecondsSinceEpoch}',
+    );
+    await p.setString(_kReporterId, id);
+    return id;
+  }
+
+  /// Additive: only the `identityUserId` field (not resolve `user_id`).
+  static Future<String?> loadIdentityUserId() async {
+    final p = await SharedPreferences.getInstance();
+    final id = (p.getString(_kIdentityUserIdField) ?? '').trim();
+    return id.isEmpty ? null : id;
+  }
+
+  static Future<void> saveIdentityUserId(String userId) async {
+    final id = userId.trim();
+    if (id.isEmpty) return;
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kIdentityUserIdField, id);
+  }
+
+  /// UI-only: one-time Prayer Wall join terms (per install; not cleared on logout).
+  static Future<bool> hasAcceptedPrayerWallJoinTerms() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getBool(_kJoinTermsAccepted) ?? false;
+  }
+
+  static Future<void> markPrayerWallJoinTermsAccepted() async {
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_kJoinTermsAccepted, true);
+  }
+
+  /// Logout/account-switch: drop this user's Prayer Wall ownership only.
+  /// Does not change post/like/comment/block API behavior.
+  static Future<void> clearAccountScopedData() async {
+    final p = await SharedPreferences.getInstance();
+    await p.remove(_kMyPrayerIds);
+    await p.remove(_kPrayerAuthorMap);
+    await p.remove(_kPrayerAuthorUserIdMap);
+    await p.remove(_kLastDisplayName);
+    await p.remove(_kIdentityUserIdField);
+    await p.remove(_kPrayerDurationMeta);
+    await p.remove(_kStatusSubmittedIds);
+    await p.remove(_kBlockedUserIds);
+    await p.remove(_kReportedPrayerIds);
+    await p.remove(_kMyCommentIds);
+    await p.remove(_kLikeMap);
+  }
+}
+
+class PrayerWallDurationMeta {
+  PrayerWallDurationMeta({
+    required this.durationDays,
+    required this.postedAt,
+  });
+
+  final int durationDays;
+  final DateTime postedAt;
+
+  DateTime get expiresAt => postedAt.add(Duration(days: durationDays));
+
+  bool get isExpired => !DateTime.now().isBefore(expiresAt);
+
+  Map<String, dynamic> toMap() => {
+        'durationDays': durationDays,
+        'postedAtMs': postedAt.millisecondsSinceEpoch,
+      };
+
+  static PrayerWallDurationMeta? fromMap(Map<String, dynamic> map) {
+    final days = map['durationDays'];
+    final ms = map['postedAtMs'];
+    final durationDays = days is int
+        ? days
+        : int.tryParse(days?.toString() ?? '');
+    final postedAtMs = ms is int ? ms : int.tryParse(ms?.toString() ?? '');
+    if (durationDays == null || durationDays <= 0 || postedAtMs == null) {
+      return null;
+    }
+    return PrayerWallDurationMeta(
+      durationDays: durationDays,
+      postedAt: DateTime.fromMillisecondsSinceEpoch(postedAtMs),
+    );
   }
 }
