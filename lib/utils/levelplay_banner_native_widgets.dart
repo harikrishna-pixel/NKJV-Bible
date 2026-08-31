@@ -122,6 +122,7 @@ class _LevelPlayNativeSlotState extends State<LevelPlayNativeSlot>
   LevelPlayNativeAd? _nativeAd;
   bool _failed = false;
   bool _hasNativeUnit = false;
+  bool _isLoaded = false;
 
   @override
   void initState() {
@@ -161,7 +162,7 @@ class _LevelPlayNativeSlotState extends State<LevelPlayNativeSlot>
 
   @override
   Widget build(BuildContext context) {
-    if (_failed || !_hasNativeUnit || _nativeAd == null) {
+    if (_failed || !_hasNativeUnit || _nativeAd == null || !_isLoaded) {
       return widget.fallback ?? const SizedBox.shrink();
     }
     return SizedBox(
@@ -181,6 +182,7 @@ class _LevelPlayNativeSlotState extends State<LevelPlayNativeSlot>
   @override
   void onAdLoaded(LevelPlayNativeAd nativeAd, AdInfo adInfo) {
     debugPrint('LevelPlayNativeSlot loaded');
+    if (mounted) setState(() => _isLoaded = true);
   }
 
   @override

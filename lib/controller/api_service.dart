@@ -16,6 +16,8 @@ import 'package:biblebookapp/view/screens/books/model/book_model.dart';
 import 'package:biblebookapp/view/screens/calendar_screen/model/calendar_model.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/more_apps/model/app_model.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
 import 'package:biblebookapp/view/screens/profile/model/user_model.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
@@ -81,6 +83,20 @@ HttpWithMiddleware http = HttpWithMiddleware.build(middlewares: [
   HttpLogger(logLevel: LogLevel.BODY),
 ]);
 final CacheNotifier cacheNotifier = CacheNotifier();
+
+/// Additive Prayer Wall identity after login/register. Does not change auth.
+Future<void> _bindPrayerWallIdentityAfterAuth(String? email) async {
+  try {
+    await PrayerWallLocalStore.clearAccountScopedData();
+    final trimmed = (email ?? '').trim();
+    await PrayerWallService.resolveIdentityUser(
+      email: trimmed.isEmpty ? null : trimmed,
+    );
+  } catch (e) {
+    debugPrint('PrayerWall identity bind skipped: $e');
+  }
+}
+
 // Future<GetAudioModel?>? getMusicDetails() async {
 //   String androidPackageName;
 //   androidPackageName = BibleInfo.android_Package_Name;
@@ -1002,6 +1018,9 @@ Future<String?> registerUser(
             fromApi.isNotEmpty ? fromApi : inviteCode;
         await cacheNotifier.writeCache(key: 'referred_by', value: stored);
       }
+      await _bindPrayerWallIdentityAfterAuth(
+        '${data['data']['user']['email']}',
+      );
       Constants.showToast("Account Created Successfully");
       return registeredReferralCode;
     } else {
@@ -1084,6 +1103,10 @@ Future<UserModel> loginUser(
       }
 
       LibraryBackupUploadService.runAfterLogin();
+
+      await _bindPrayerWallIdentityAfterAuth(
+        '${data['data']['user']['email']}',
+      );
 
       // Constants.showToast(
       //     "Hi ${data['data']['user']['name']}, Welcome to ${BibleInfo.bible_shortName}");

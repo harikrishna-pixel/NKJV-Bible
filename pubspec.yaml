@@ -156,6 +156,7 @@ flutter:
     - assets/music/
     - assets/study_plan_images/
     - assets/home-widgets/
+    - assets/bible_widget/
     - assets/export_backup/
     - assets/paywall_icons/
     - assets/paywall_icons/leaf_icon.png
@@ -166,6 +167,8 @@ flutter:
     - assets/social_links/
     - assets/splash_welcome_icons/
     - assets/streak_completed_icons/
+    - assets/prayer_wall/
+    - assets/take_moment/
     - assets/home-widgets/widget Mockup 1.png
     - assets/home-widgets/widget Mockup 2.png
     - assets/home-widgets/widget Mockup 3.png

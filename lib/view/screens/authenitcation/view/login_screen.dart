@@ -21,9 +21,20 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:provider/provider.dart' as P;
 
 class LoginScreen extends HookConsumerWidget {
-  LoginScreen({super.key, required this.hasSkip, this.popOnSuccess = false});
+  LoginScreen({
+    super.key,
+    required this.hasSkip,
+    this.popOnSuccess = false,
+    this.replaceOnSuccess,
+  });
   final bool hasSkip;
   final bool popOnSuccess;
+
+  /// Additive: Prayer Wall may replace Login with Post a Prayer.
+  final VoidCallback? replaceOnSuccess;
+
+  /// GetX route id for Prayer Wall embedded login.
+  static const embeddedRouteName = '/prayer-wall-embedded-login';
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final formKey = useMemoized(() => GlobalKey<FormState>());
@@ -66,7 +77,7 @@ class LoginScreen extends HookConsumerWidget {
                         color: CommanColor.whiteBlack(context),
                       ),
                       onPressed: () {
-                        if (popOnSuccess) {
+                        if (popOnSuccess || replaceOnSuccess != null) {
                           Get.back();
                         } else {
                           Get.offAll(() => HomeScreen(
@@ -160,6 +171,7 @@ class LoginScreen extends HookConsumerWidget {
                                   Constants.showToast(
                                       "Hi ${user.displayName}, Welcome to ${BibleInfo.bible_shortName}");
                                   if (context.mounted) {
+                                    if (replaceOnSuccess == null) {
                                     // One referral join per account — skip if
                                     // this user already entered a code / claimed.
                                     final alreadyReferred = (user.referredBy !=
@@ -177,8 +189,13 @@ class LoginScreen extends HookConsumerWidget {
                                             user.referralRewardClaimed,
                                       );
                                     }
+                                    }
                                   }
                                   if (!context.mounted) return;
+                                  if (replaceOnSuccess != null) {
+                                    replaceOnSuccess!();
+                                    return;
+                                  }
                                   if (popOnSuccess) {
                                     return Navigator.of(context).pop(true);
                                   }
@@ -269,7 +286,12 @@ class LoginScreen extends HookConsumerWidget {
                                         color: CommanColor.whiteBlack(context)),
                                     recognizer: TapGestureRecognizer()
                                       ..onTap = () {
-                                        Get.to(() => SignupScreen());
+                                        Get.to(() => SignupScreen(
+                                              popOnSuccess: popOnSuccess ||
+                                                  replaceOnSuccess != null,
+                                              openPostPrayerOnSuccess:
+                                                  replaceOnSuccess != null,
+                                            ));
                                       })
                               ])),
                     ],
@@ -285,7 +307,12 @@ class LoginScreen extends HookConsumerWidget {
                   children: [
                     GestureDetector(
                       onTap: () {
-                        Get.to(() => SignupScreen());
+                        Get.to(() => SignupScreen(
+                              popOnSuccess: popOnSuccess ||
+                                  replaceOnSuccess != null,
+                              openPostPrayerOnSuccess:
+                                  replaceOnSuccess != null,
+                            ));
                       },
                       child: Text(
                         'Note:',

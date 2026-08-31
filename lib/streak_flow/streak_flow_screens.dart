@@ -10,6 +10,8 @@ import 'package:biblebookapp/streak_flow/mood_prayer_data.dart';
 import 'package:biblebookapp/streak_flow/streak_saved_storage.dart';
 import 'package:biblebookapp/streak/streak_service.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
+import 'package:biblebookapp/home_widget/widget_prompt_cards.dart';
+import 'package:biblebookapp/home_widget/widget_prompt_service.dart';
 import 'package:biblebookapp/live_activity/live_activity_queue.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -5187,7 +5189,15 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
                         const SizedBox(height: 14),
                         SlideTransition(
                           position: _cardSlide,
-                          child: _StreakCompleteMotivationCard(),
+                          child: WidgetPromptGate(
+                            id: WidgetPromptId.a2,
+                            triggerMet: streakDays >= 3,
+                            fallback: _StreakCompleteMotivationCard(),
+                            builder: (context, onDismiss) => WidgetPromptA2Card(
+                              streakDays: streakDays,
+                              onDismiss: onDismiss,
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 14),
                         SlideTransition(

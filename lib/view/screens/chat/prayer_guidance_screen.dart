@@ -9,6 +9,9 @@ import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/milestone_lifetime_paywall_coordinator.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
+import 'package:biblebookapp/home_widget/widget_prompt_cards.dart';
+import 'package:biblebookapp/home_widget/widget_prompt_service.dart';
+import 'package:biblebookapp/streak_flow/pour_out_worries_screen.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
@@ -234,43 +237,114 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
             ),
           ),
           const SizedBox(width: 10),
-          GestureDetector(
-            onTap: () async {
-              await Get.to(
-                () => const SettingScreen(notificationValue: false),
-              );
-              if (mounted) _refreshPrayerReminderPrompt();
-            },
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    _kPrayerBrownMid,
-                    _kPrayerBrownDark,
+          WidgetPromptGate(
+            id: WidgetPromptId.a8,
+            triggerMet: true,
+            fallback: GestureDetector(
+              onTap: () async {
+                await Get.to(
+                  () => const SettingScreen(notificationValue: false),
+                );
+                if (mounted) _refreshPrayerReminderPrompt();
+              },
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      _kPrayerBrownMid,
+                      _kPrayerBrownDark,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Set Reminder',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                    SizedBox(width: 6),
+                    Icon(Icons.chevron_right, size: 16, color: Colors.white),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Set Reminder',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                  ),
-                  SizedBox(width: 6),
-                  Icon(Icons.chevron_right, size: 16, color: Colors.white),
-                ],
               ),
             ),
+            builder: (context, onDismiss) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  GestureDetector(
+                    onTap: () async {
+                      await Get.to(
+                        () => const SettingScreen(notificationValue: false),
+                      );
+                      if (mounted) _refreshPrayerReminderPrompt();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            _kPrayerBrownMid,
+                            _kPrayerBrownDark,
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'Set Reminder',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  GestureDetector(
+                    onTap: () =>
+                        WidgetPromptService.openHowToAdd(WidgetPromptId.a8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white.withOpacity(0.1)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _kPrayerBrownMid.withOpacity(0.55),
+                        ),
+                      ),
+                      child: Text(
+                        'Add widget',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : _kPrayerBrownMid,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -733,6 +807,7 @@ ${category.prompt}
         }
         if (requestId == _prayerRequestGeneration) {
         await updateBiblePrayerWidget(prayerText: responseText);
+        await WidgetPromptService.notePrayerGenerated();
         }
         // Prayer milestone paywall: keep bg music silent during dialog → lifetime offer.
         if (mounted && requestId == _prayerRequestGeneration) {
@@ -1166,6 +1241,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
         }
         if (requestId == _prayerRequestGeneration) {
         await updateBiblePrayerWidget(prayerText: responseText);
+        await WidgetPromptService.notePrayerGenerated();
         }
         // Prayer milestone paywall: keep bg music silent during dialog → lifetime offer.
         if (mounted && requestId == _prayerRequestGeneration) {
@@ -2880,6 +2956,149 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     );
   }
 
+  /// UI-only banner → Find Peace / Pour Out Worries flow.
+  Widget _buildGiveItToGodBanner(
+    BuildContext context, {
+    required bool isDark,
+    required Size size,
+  }) {
+    final titleColor = isDark ? Colors.white : const Color(0xFF3D2914);
+    final bodyColor = isDark
+        ? Colors.white.withOpacity(0.78)
+        : const Color(0xFF6B5344);
+    final metaColor = isDark
+        ? const Color(0xFFE0B35C)
+        : const Color(0xFFB8893A);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          Get.to(() => const PourOutWorriesScreen());
+        },
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: isDark
+                  ? [
+                      const Color(0xFF3A2A1C),
+                      const Color(0xFF2A2018),
+                    ]
+                  : [
+                      const Color(0xFFF7E4CF),
+                      const Color(0xFFF3D7BC),
+                      const Color(0xFFEFC9A8),
+                    ],
+            ),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withOpacity(0.14)
+                  : const Color(0xFFE8C9A8),
+            ),
+            boxShadow: isDark
+                ? null
+                : [
+                    BoxShadow(
+                      color: const Color(0xFF8B6B4A).withOpacity(0.12),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+          ),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: size.width > 450 ? 12 : 8,
+              vertical: size.width > 450 ? 8 : 5,
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: size.width > 450 ? 72 : 56,
+                  height: size.width > 450 ? 58 : 48,
+                  child: Image.asset(
+                    'assets/take_moment/give_it_to_god_icon.png',
+                    fit: BoxFit.contain,
+                    alignment: Alignment.centerLeft,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Give It to God',
+                        style: TextStyle(
+                          fontSize: size.width > 450 ? 16 : 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: titleColor,
+                          fontFamily: 'Georgia',
+                          height: 1.15,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Release your worries. Breathe. Find peace \n in His presence.',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: size.width > 450 ? 12 : 11,
+                          height: 1.2,
+                          color: bodyColor,
+                          fontFamily: 'Georgia',
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.schedule,
+                            size: 12,
+                            color: metaColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '2 min guided moment',
+                            style: TextStyle(
+                              fontSize: size.width > 450 ? 12 : 11,
+                              fontWeight: FontWeight.w600,
+                              color: metaColor,
+                              fontFamily: 'Georgia',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isDark
+                        ? Colors.white.withOpacity(0.12)
+                        : _kPrayerBrownDark,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_forward,
+                    size: 15,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _prayerCreatingStepConnector({bool compact = false}) {
     return Padding(
@@ -4412,6 +4631,14 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                     const EdgeInsets.symmetric(horizontal: 16),
                                 child: Column(
                                   children: [
+                                    _buildGiveItToGodBanner(
+                                      context,
+                                      isDark: isDark,
+                                      size: size,
+                                    ),
+                                    SizedBox(
+                                      height: size.width > 450 ? 16 : 12,
+                                    ),
                                     Align(
                                       alignment: Alignment.centerLeft,
                                       child: Text(

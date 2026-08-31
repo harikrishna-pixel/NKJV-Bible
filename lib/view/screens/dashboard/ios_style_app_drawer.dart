@@ -1,5 +1,6 @@
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/images.dart';
+import 'package:biblebookapp/home_widget/widget_prompt_service.dart';
 import 'package:flutter/material.dart';
 
 /// Accordion iOS-style cream drawer (collapsed rows + expanded sub-items).
@@ -153,17 +154,58 @@ class _DrawerSubItem {
     required this.icon,
     required this.onTap,
     this.asset,
+    this.trailing,
+    this.showAttentionDot = false,
   });
 
   final String label;
   final IconData icon;
   final String? asset;
   final VoidCallback onTap;
+  final Widget? trailing;
+  final bool showAttentionDot;
 }
 
-class _IosStyleAppDrawerState extends State<IosStyleAppDrawer> {
+class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
+    with WidgetsBindingObserver {
   /// All sections start collapsed (including App).
   String? _expandedKey;
+  bool _showWidgetsDot = false;
+  int _widgetsAddedCount = 0;
+  int _widgetsRefreshToken = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _loadWidgetsRowState();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadWidgetsRowState();
+    }
+  }
+
+  Future<void> _loadWidgetsRowState() async {
+    try {
+      final dot = await WidgetPromptService.showDrawerAttentionDot();
+      final added = await WidgetPromptService.installedDrawerWidgetsCount();
+      if (!mounted) return;
+      setState(() {
+        _showWidgetsDot = dot;
+        _widgetsAddedCount = added;
+        _widgetsRefreshToken++;
+      });
+    } catch (_) {}
+  }
 
   void _toggle(String key) {
     setState(() {
@@ -272,7 +314,22 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer> {
       _DrawerSubItem(
         label: 'Widgets',
         icon: Icons.widgets_outlined,
-        onTap: widget.onWidgetsTap,
+        onTap: () {
+          WidgetPromptService.markWidgetFamilySeen();
+          if (mounted) setState(() => _showWidgetsDot = false);
+          widget.onWidgetsTap();
+          _loadWidgetsRowState();
+        },
+        trailing: FutureBuilder<int>(
+          key: ValueKey(_widgetsRefreshToken),
+          future: WidgetPromptService.installedDrawerWidgetsCount(),
+          builder: (context, snap) {
+            final count = snap.data ?? _widgetsAddedCount;
+            if (count <= 0) return const SizedBox.shrink();
+            return _WidgetsAddedChip(count: count);
+          },
+        ),
+        showAttentionDot: _showWidgetsDot,
       ),
       _DrawerSubItem(
         label: 'Backup & Sync',
@@ -929,6 +986,17 @@ class _PlainSubList extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (item.showAttentionDot)
+                      Container(
+                        width: 8,
+                        height: 8,
+                        margin: const EdgeInsets.only(right: 6),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFC47A3A),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    if (item.trailing != null) item.trailing!,
                   ],
                 ),
               ),
@@ -968,6 +1036,31 @@ class _IconTile extends StatelessWidget {
               ),
             )
           : Icon(icon, size: 18, color: _DrawerPalette.of(context).ink),
+    );
+  }
+}
+
+class _WidgetsAddedChip extends StatelessWidget {
+  const _WidgetsAddedChip({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3D5B5),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        '$count added',
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFFC47A3A),
+        ),
+      ),
     );
   }
 }

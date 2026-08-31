@@ -9,6 +9,7 @@ import 'package:biblebookapp/view/screens/category_detail_screen/bloc/bookmark_s
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/myLibrary.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
 import 'package:biblebookapp/view/screens/profile/bloc/user_bloc.dart';
 import 'package:biblebookapp/view/screens/profile/model/library_status_model.dart';
 import 'package:biblebookapp/view/screens/profile/view/edit_profile_screen.dart';
@@ -55,12 +56,20 @@ void confirmLogoutAccount(BuildContext context) {
                     final cacheprovider =
                     P.Provider.of<CacheNotifier>(context, listen: false);
 
+                    final logoutEmail =
+                        (await cacheprovider.readCache(key: 'user') ?? '')
+                            .toString();
+                    await PrayerWallLocalStore.snapshotBlockedIdsForEmail(
+                      logoutEmail,
+                    );
+
                     await cacheprovider.removeCache(key: 'userid');
                     await cacheprovider.removeCache(key: 'user');
                     await cacheprovider.removeCache(key: 'name');
                     await cacheprovider.removeCache(key: 'authtoken');
                     await cacheprovider.removeCache(
                         key: OwnReferralCodeDialog.referralCacheKey);
+                    await PrayerWallLocalStore.clearAccountScopedData();
                     //   FirebaseAuth.instance.signOut();
                     Constants.showToast("Logged Out Successfully");
                     Get.offAll(() => HomeScreen(

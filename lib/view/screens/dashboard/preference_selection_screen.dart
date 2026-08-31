@@ -901,7 +901,8 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                           // Show success dialog when user taps Continue
                           FaithJourneyDialog.showSuccessDialog(
                               context,
-                              isFromOnboarding: !widget.isSetting);
+                              isFromOnboarding: !widget.isSetting,
+                              selectedTopics: _selectedCategories.toList());
                         },
                       );
                       debugPrint(
@@ -1342,16 +1343,6 @@ Future<List<VerseBookContentModel>> _parseVerseContent(
 }
 
 class FaithJourneyDialog {
-  static Widget _themedCompletionIcon({required bool isTablet}) {
-    final size = isTablet ? 108.0 : 92.0;
-    return Image.asset(
-      'assets/complete_image.png',
-      width: size,
-      height: size,
-      fit: BoxFit.contain,
-    );
-  }
-
   /// Show Loading Dialog
   static Future<void> showLoadingDialog(BuildContext context,
       {VoidCallback? onContinue}) async {
@@ -1474,90 +1465,150 @@ class FaithJourneyDialog {
     );
   }
 
+  /// Display label for ready screen — uses saved selections when provided.
+  static String formatSelectedTopicsLabel(List<String> topics) {
+    final cleaned =
+        topics.map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+    if (cleaned.isEmpty) {
+      return 'Peace, Strength, Comfort & more.';
+    }
+    if (cleaned.length <= 3) {
+      return '${cleaned.join(', ')}.';
+    }
+    return '${cleaned.take(3).join(', ')} & more.';
+  }
+
   /// Show Success Dialog
-  static Future<void> showSuccessDialog(BuildContext context,
-      {bool isFromOnboarding = false}) async {
+  static Future<void> showSuccessDialog(
+    BuildContext context, {
+    bool isFromOnboarding = false,
+    List<String>? selectedTopics,
+  }) async {
+    final topicsLabel =
+        formatSelectedTopicsLabel(selectedTopics ?? const []);
     showDialog(
       context: context,
       barrierDismissible: false,
+      barrierColor: Colors.transparent,
       builder: (ctx) {
         final mq = MediaQuery.of(ctx).size;
         final isTablet = mq.width > 600;
-        final screenWidth = MediaQuery.of(context).size.width;
-        return Center(
-          child: Container(
-            width: isTablet ? mq.width * 0.42 : mq.width * 0.86,
-            padding: EdgeInsets.all(isTablet ? 28 : 20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFFFFFDF8),
-                  Color(0xFFF8F0E4),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFB08D6E).withValues(alpha: 0.45)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _themedCompletionIcon(isTablet: isTablet),
-                SizedBox(height: isTablet ? 20 : 16),
-                Text(
-                  "Your Bible Experience Is Ready!",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: isTablet ? 22 : 18,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF3D2914),
-                    fontFamily: 'Georgia',
-                  ),
+        final isDark =
+            Provider.of<ThemeProvider>(ctx, listen: false).themeMode ==
+                ThemeMode.dark;
+        final titleColor =
+            isDark ? Colors.white : const Color(0xFF2C2118);
+        final bodyColor =
+            isDark ? Colors.white.withValues(alpha: 0.88) : const Color(0xFF5C4033);
+        final topicsColor =
+            isDark ? const Color(0xFFF3E4C0) : const Color(0xFF3D2914);
+        final crossColor =
+            isDark ? const Color(0xFFF3E4C0) : const Color(0xFF2C2118);
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.zero,
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              width: double.infinity,
+              height: double.infinity,
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage(Images.bgImage(ctx)),
+                  fit: BoxFit.fill,
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Divider(
-                        color: const Color(0xFF7A5435).withValues(alpha: 0.25),
-                      ),
-                    ),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Text(
-                        '◆',
-                        style: TextStyle(
-                          color: Color(0xFF7A5435),
-                          fontSize: 12,
+              ),
+              child: SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isTablet ? mq.width * 0.18 : 28,
+                  ),
+                  child: Column(
+                    children: [
+                      const Spacer(flex: 2),
+                      SizedBox(
+                        width: isTablet ? 120 : 96,
+                        height: isTablet ? 120 : 96,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Container(
+                              width: isTablet ? 120 : 96,
+                              height: isTablet ? 120 : 96,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFFF3E4C0),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFE8D49A)
+                                        .withValues(alpha: 0.85),
+                                    blurRadius: 28,
+                                    spreadRadius: 6,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            CustomPaint(
+                              size: Size(
+                                isTablet ? 36 : 28,
+                                isTablet ? 48 : 38,
+                              ),
+                              painter: _CrossPainter(
+                                color: crossColor,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                    Expanded(
-                      child: Divider(
-                        color: const Color(0xFF7A5435).withValues(alpha: 0.25),
+                      SizedBox(height: isTablet ? 28 : 22),
+                      Text(
+                        'Your Bible experience is ready',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Georgia',
+                          fontSize: isTablet ? 32 : 26,
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
+                          color: titleColor,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  "We've personalized your experience with verses that reflect your spiritual journey.\n\nLet's begin this beautiful walk together in God's Word.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: screenWidth < 380
-                        ? 12.5
-                        : isTablet
-                        ? 16
-                        : 14.7,
-                    height: 1.45,
-                    color: const Color(0xFF3D2914),
-                  ),
-                ),
-                SizedBox(height: isTablet ? 24 : 20),
-                ElevatedButton(
+                      SizedBox(height: isTablet ? 18 : 14),
+                      Text.rich(
+                        TextSpan(
+                          style: TextStyle(
+                            fontFamily: 'Georgia',
+                            fontSize: isTablet ? 18 : 15.5,
+                            height: 1.45,
+                            color: bodyColor,
+                          ),
+                          children: [
+                            const TextSpan(
+                              text: "We've personalized your verses around ",
+                            ),
+                            TextSpan(
+                              text: topicsLabel,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: topicsColor,
+                              ),
+                            ),
+                            const TextSpan(
+                              text:
+                                  " Let's begin this walk together in God's Word.",
+                            ),
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const Spacer(flex: 3),
+                      SizedBox(
+                        width: double.infinity,
+                        height: isTablet ? 60 : 54,
+                        child: ElevatedButton(
                   onPressed: () async {
-                    Navigator.of(ctx).pop(); // Close dialog
+                    // Keep parent route context — dialog ctx is invalid after pop.
+                    final navContext =
+                        context.mounted ? context : Get.context;
                     if (isFromOnboarding) {
                       // Mark onboarding complete only when user taps Start now (so
                       // closing on preference/category screen reopens to onboarding).
@@ -1568,7 +1619,11 @@ class FaithJourneyDialog {
                       final shouldShowPaywall =
                       await PaywallPreloadService.canShowOnboardingPaywall();
                       if (!shouldShowPaywall) {
-                        await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
+                        Navigator.of(ctx).pop();
+                        if (navContext != null && navContext.mounted) {
+                          await StreakFlowNavigation.navigateToStreakFlowOrHome(
+                              navContext);
+                        }
                         return;
                       }
 
@@ -1581,7 +1636,11 @@ class FaithJourneyDialog {
                         final isVerySlowConnection = connectionSpeed != null &&
                             connectionSpeed > 12000;
                         if (isVerySlowConnection) {
-                          await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
+                          Navigator.of(ctx).pop();
+                          if (navContext != null && navContext.mounted) {
+                            await StreakFlowNavigation
+                                .navigateToStreakFlowOrHome(navContext);
+                          }
                           return;
                         }
                       } catch (e) {
@@ -1618,51 +1677,114 @@ class FaithJourneyDialog {
                         );
                       }
                     } else {
-                      await StreakFlowNavigation.navigateToStreakFlowOrHome(ctx);
+                      Navigator.of(ctx).pop();
+                      if (navContext != null && navContext.mounted) {
+                        await StreakFlowNavigation.navigateToStreakFlowOrHome(
+                            navContext);
+                      }
                     }
                   },
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.zero, // REQUIRED
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                  child: Ink(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color(0xFF763201),
-                          Color(0xFFD5821F),
-                          Color(0xFF763201),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isTablet ? 40 : 24,
-                        vertical: isTablet ? 16 : 12,
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        "Start now",
-                        style: TextStyle(
-                          fontSize: isTablet ? 18 : 14,
-                          color: Colors.white,
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: Ink(
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  Color(0xFF763201),
+                                  Color(0xFFD5821F),
+                                  Color(0xFF763201),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Container(
+                              alignment: Alignment.center,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'Start now',
+                                    style: TextStyle(
+                                      fontSize: isTablet ? 20 : 18,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Icon(
+                                    Icons.arrow_forward,
+                                    color: Colors.white,
+                                    size: isTablet ? 22 : 20,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      SizedBox(height: isTablet ? 16 : 12),
+                      Text(
+                        'You can change topics anytime in Settings',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: isTablet ? 14 : 12.5,
+                          color: const Color(0xFF8A7460),
+                        ),
+                      ),
+                      SizedBox(height: isTablet ? 28 : 20),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         );
       },
     );
   }
+}
+
+class _CrossPainter extends CustomPainter {
+  const _CrossPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final barW = size.width * 0.28;
+    final vert = RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: Offset(size.width / 2, size.height / 2),
+        width: barW,
+        height: size.height,
+      ),
+      const Radius.circular(2),
+    );
+    final horiz = RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: Offset(size.width / 2, size.height * 0.38),
+        width: size.width,
+        height: barW,
+      ),
+      const Radius.circular(2),
+    );
+    canvas.drawRRect(vert, paint);
+    canvas.drawRRect(horiz, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CrossPainter oldDelegate) =>
+      oldDelegate.color != color;
 }
 
 class CustomLoadingIndicator extends StatefulWidget {

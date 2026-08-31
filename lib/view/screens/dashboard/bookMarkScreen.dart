@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:biblebookapp/constant/size_config.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
+import 'package:biblebookapp/home_widget/widget_prompt_cards.dart';
+import 'package:biblebookapp/home_widget/widget_prompt_service.dart';
 import 'package:biblebookapp/utils/custom_share.dart';
 import 'package:biblebookapp/view/screens/chat/chat_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
@@ -148,11 +150,22 @@ class _BookMarkScreenState extends State<BookMarkScreen> {
               });
               return ListView.builder(
                 shrinkWrap: true,
-                itemCount: items.length,
+                itemCount: items.length + 1,
                 padding: EdgeInsets.only(left: 10, right: 10, top: 10),
                 physics: const ScrollPhysics(),
                 itemBuilder: (context, index) {
-                  var data = items[index];
+                  if (index == 0) {
+                    return WidgetPromptGate(
+                      id: WidgetPromptId.a6,
+                      triggerMet: items.length >= 3,
+                      libraryTab: WidgetPromptService.libraryTabBookmark,
+                      builder: (context, onDismiss) => WidgetPromptA6Card(
+                        savedCount: items.length,
+                        onDismiss: onDismiss,
+                      ),
+                    );
+                  }
+                  var data = items[index - 1];
                   return Column(
                     children: [
                       Row(

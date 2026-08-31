@@ -281,7 +281,7 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
   late PageController controller;
   late int currentIndex;
   late bool isWallpaper;
-  late int adcountview;
+  int adcountview = 0;
   final AdService _adService = AdService();
   late ValueNotifier<bool> isDownloading;
   late ValueNotifier<bool> isShareImageLoading;
@@ -762,7 +762,7 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
           },
           data: "imaged");
       // Load other ads with single mounted check
-      // _adService.loadRewardedInterstitialAds(() {});
+      _adService.loadRewardedInterstitialAds(() {});
       _adService.loadInterstitialAd(() {});
       _adService.loadBannerAd(() {});
       _adService.loadFullScreenAd(() {});
@@ -988,12 +988,10 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
           if (diff < diffValidValue) {
             downloadImage(imageModel, isDownloadImage: isDownloadImage);
           } else {
-            //  openAd(imageModel, isDownloadImage);
-            downloadImage(imageModel, isDownloadImage: isDownloadImage);
+            openAd(imageModel, isDownloadImage);
           }
         } else {
-          //  openAd(imageModel, isDownloadImage);
-          downloadImage(imageModel, isDownloadImage: isDownloadImage);
+          openAd(imageModel, isDownloadImage);
         }
       } else {
         downloadImage(imageModel, isDownloadImage: isDownloadImage);
@@ -1065,23 +1063,21 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
                         // });
 
                         return PhotoViewGalleryPageOptions.customChild(
-                          child:
-                              // showAd.value
-                              //     ? Center(
-                              //         child: ConstrainedBox(
-                              //           constraints: const BoxConstraints(
-                              //             minWidth: 320,
-                              //             minHeight: 320,
-                              //             maxWidth: 400,
-                              //             maxHeight: 400,
-                              //           ),
-                              //           child: _adService.fullScreenAd == null
-                              //               ? const SizedBox.shrink()
-                              //               : AdWidget(ad: _adService.fullScreenAd!),
-                              //         ),
-                              //       )
-                              //     :
-                              CachedNetworkImage(
+                          child: showAd.value
+                              ? Center(
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      minWidth: 320,
+                                      minHeight: 320,
+                                      maxWidth: 400,
+                                      maxHeight: 400,
+                                    ),
+                                    child: _adService.fullScreenAd == null
+                                        ? const SizedBox.shrink()
+                                        : AdWidget(ad: _adService.fullScreenAd!),
+                                  ),
+                                )
+                              : CachedNetworkImage(
                             imageUrl: photos[i].imageUrl ?? '',
                             fit: BoxFit.fill,
                             // octo_image allows only one of placeholder /
@@ -1126,7 +1122,8 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
                             }
                           });
                         }
-                        if (val > 0 &&
+                        if (adcountview > 0 &&
+                            val > 0 &&
                             val % adcountview == 0 &&
                             shouldLoadAd) {
                           EasyLoading.showInfo('Please wait...');
@@ -1144,10 +1141,12 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
                         }
                         if (context.mounted) {
                           setState(() {
-                            // showAd.value = (val > 0 &&
-                            //     val % 5 == 0 &&
-                            //     _adService._fullScreenAd != null);
-                            if ((val > 0 &&
+                            showAd.value = (adcountview > 0 &&
+                                val > 0 &&
+                                val % adcountview == 0 &&
+                                _adService._fullScreenAd != null);
+                            if ((adcountview > 0 &&
+                                val > 0 &&
                                 val % adcountview == 0 &&
                                 _adService._fullScreenAd != null)) {
                               currentIndex = val - (val ~/ 5);

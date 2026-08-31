@@ -28,6 +28,9 @@ class ReferralCodeBottomSheet extends StatefulWidget {
   /// When true, apply via profile API (Account section) — no password needed.
   final bool useLoggedInSession;
 
+  /// Additive no-op for Prayer Wall embedded login. Does not change [show].
+  static void resetPresentationLock() {}
+
   static Future<void> show({
     required BuildContext context,
     required String email,

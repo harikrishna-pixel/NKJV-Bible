@@ -9,9 +9,12 @@ import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/bloc/bookmark_shared_pref_bloc.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
+import 'package:biblebookapp/utils/levelplay_ad_gate.dart';
+import 'package:biblebookapp/utils/levelplay_placements.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:get/get.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -138,23 +141,32 @@ class ListedImageDetailScreen extends HookConsumerWidget {
     final isDownloading = useState(false);
     final isShareImageLoading = useState(false);
     final controller = usePageController(initialPage: index);
-
-    AdService adService = AdService();
+    final adService = useMemoized(() => AdService());
+    final adcountview = useState(0);
+    final adTick = useState(0);
 
     // Load ad initially
     useMemoized(() {
       WidgetsBinding.instance.addPostFrameCallback((callback) async {
           try {
+            final data = await SharPreferences.getString(
+                SharPreferences.showinterstitialrow);
+            adcountview.value = int.tryParse(data ?? '0') ?? 0;
+
             final shouldLoadAd = await SharPreferences.shouldLoadAd();
 
             if (!shouldLoadAd) return;
 
             debugPrint("Loading ads...");
 
-            // Load other ads with single mounted check
-            // _adService.loadRewardedInterstitialAds(() {});
-
-            adService.loadBannerAd(() {});
+            adService.loadRewardedInterstitialAds(() {});
+            adService.loadInterstitialAd(() {});
+            adService.loadFullScreenAd(() {
+              adTick.value++;
+            });
+            adService.loadBannerAd(() {
+              adTick.value++;
+            });
           } catch (e) {
             debugPrint("Error loading ads: $e");
           }
@@ -305,10 +317,38 @@ class ListedImageDetailScreen extends HookConsumerWidget {
                                 (event.expectedTotalBytes ?? 1),
                       ),
                     ),
-                    onPageChanged: (val) {
+                    onPageChanged: (val) async {
                       // Update index only if different to prevent unnecessary updates
                       if (val != currentIndex.value) {
                       currentIndex.value = val;
+                      }
+
+                      final shouldLoadAd =
+                          await SharPreferences.shouldLoadAd();
+                      if (val % 3 == 0 && shouldLoadAd) {
+                        adService.loadBannerAd(() {
+                          adTick.value++;
+                        });
+                      }
+                      final count = adcountview.value;
+                      if (count > 0 &&
+                          val > 0 &&
+                          val % count == 0 &&
+                          shouldLoadAd) {
+                        EasyLoading.showInfo('Please wait...');
+                        await SharPreferences.setString('OpenAd', '1');
+                        await LevelPlayAdGate.interstitialOrFallback(
+                          placementName: LevelPlayPlacements
+                              .wallpaperBetweenInterstitial,
+                          admobFallback: () async {
+                            if (adService.interstitialAd != null) {
+                              adService.showInterstitialAd();
+                            }
+                          },
+                        );
+                        showAd.value = adService.fullScreenAd != null;
+                      } else if (showAd.value) {
+                        showAd.value = false;
                       }
                     },
                   ),

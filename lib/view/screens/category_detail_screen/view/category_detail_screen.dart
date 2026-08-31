@@ -44,12 +44,14 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
   Future<void> loadNativeAds() async {
     String? adUnitId =
         await SharPreferences.getString(SharPreferences.nativeAdId);
+    final unit = (adUnitId ?? '').trim();
+    if (unit.isEmpty || unit == 'null') return;
 
     // Create a Completer to handle asynchronous ad loading
     Completer<void> adLoadedCompleter = Completer<void>();
 
     NativeAd nativeAd = NativeAd(
-      adUnitId: adUnitId.toString(),
+      adUnitId: unit,
       listener: NativeAdListener(
         onAdLoaded: (ad) {
           adLoadedCompleter
