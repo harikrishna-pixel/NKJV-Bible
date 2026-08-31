@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>colors</key>
+	<array/>
+	<key>images</key>
+	<array>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/vijay/Downloads/NKJV/ios/BibleHomeWidget/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACImageNameWidgetLeatherBg</string>
+			<key>relativePath</key>
+			<string>./widget_leather_bg.imageset</string>
+			<key>swiftSymbol</key>
+			<string>widgetLeatherBg</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/vijay/Downloads/NKJV/ios/BibleHomeWidget/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACImageNameWidgetParchmentBg</string>
+			<key>relativePath</key>
+			<string>./widget_parchment_bg.imageset</string>
+			<key>swiftSymbol</key>
+			<string>widgetParchmentBg</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/vijay/Downloads/NKJV/ios/BibleHomeWidget/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACImageNameWidgetPathBg</string>
+			<key>relativePath</key>
+			<string>./widget_path_bg.imageset</string>
+			<key>swiftSymbol</key>
+			<string>widgetPathBg</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/vijay/Downloads/NKJV/ios/BibleHomeWidget/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACImageNameWidgetPrayerHands</string>
+			<key>relativePath</key>
+			<string>./widget_prayer_hands.imageset</string>
+			<key>swiftSymbol</key>
+			<string>widgetPrayerHands</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/vijay/Downloads/NKJV/ios/BibleHomeWidget/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACImageNameWidgetVerseImageBg</string>
+			<key>relativePath</key>
+			<string>./widget_verse_image_bg.imageset</string>
+			<key>swiftSymbol</key>
+			<string>widgetVerseImageBg</string>
+		</dict>
+	</array>
+	<key>symbols</key>
+	<array/>
+</dict>
+</plist>

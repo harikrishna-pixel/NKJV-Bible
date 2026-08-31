@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 8.2.1" type="baseline" client="gradle" dependencies="false" name="AGP (8.2.1)" variant="all" version="8.2.1">
+
+    <issue
+        id="MissingClass"
+        message="Class referenced in the manifest, `com.dexterous.flutterlocalnotifications.services.NotificationService`, was not found in the project or the libraries"
+        errorLine1="        &lt;service android:name=&quot;com.dexterous.flutterlocalnotifications.services.NotificationService&quot; android:permission=&quot;android.permission.BIND_JOB_SERVICE&quot; android:exported=&quot;true&quot;/>"
+        errorLine2="                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="60"
+            column="32"/>
+    </issue>
+
+    <issue
+        id="MissingClass"
+        message="Class referenced in the manifest, `com.dexterous.flutterlocalnotifications.services.NotificationIntentService`, was not found in the project or the libraries"
+        errorLine1="        &lt;service android:name=&quot;com.dexterous.flutterlocalnotifications.services.NotificationIntentService&quot; android:permission=&quot;android.permission.BIND_JOB_SERVICE&quot; android:exported=&quot;false&quot;/>"
+        errorLine2="                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="61"
+            column="32"/>
+    </issue>
+
+    <issue
+        id="MissingClass"
+        message="Class referenced in the manifest, `com.dexterous.flutterlocalnotifications.receivers.AlarmBroadcastReceiver`, was not found in the project or the libraries"
+        errorLine1="        &lt;receiver android:name=&quot;com.dexterous.flutterlocalnotifications.receivers.AlarmBroadcastReceiver&quot; android:exported=&quot;true&quot;/>"
+        errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="72"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="ScopedStorage"
+        message="The Google Play store has a policy that limits usage of MANAGE_EXTERNAL_STORAGE"
+        errorLine1="    &lt;uses-permission android:name=&quot;android.permission.MANAGE_EXTERNAL_STORAGE&quot;/>"
+        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="9"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of com.google.android.ump:user-messaging-platform than 2.2.0 is available: 3.1.0"
+        errorLine1="    implementation &quot;com.google.android.ump:user-messaging-platform:2.2.0&quot;"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle"
+            line="87"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of com.google.firebase:firebase-bom than 32.3.1 is available: 33.9.0"
+        errorLine1="    implementation platform(&apos;com.google.firebase:firebase-bom:32.3.1&apos;)"
+        errorLine2="                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle"
+            line="88"
+            column="29"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of com.android.tools:desugar_jdk_libs than 1.2.2 is available: 2.1.4"
+        errorLine1="    coreLibraryDesugaring &apos;com.android.tools:desugar_jdk_libs:1.2.2&apos;"
+        errorLine2="                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle"
+            line="91"
+            column="27"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of com.android.billingclient:billing than 6.1.0 is available: 7.1.1"
+        errorLine1="    implementation &apos;com.android.billingclient:billing:6.1.0&apos;"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle"
+            line="92"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="ExportedReceiver"
+        message="Exported receiver does not require permission"
+        errorLine1="        &lt;receiver android:name=&quot;com.dexterous.flutterlocalnotifications.receivers.AlarmBroadcastReceiver&quot; android:exported=&quot;true&quot;/>"
+        errorLine2="         ~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="72"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="This folder configuration (`v21`) is unnecessary; `minSdkVersion` is 23. Merge all the resources in this folder into `drawable`.">
+        <location
+            file="src/main/res/drawable-v21"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.app_name` appears to be unused"
+        errorLine1="    &lt;string name=&quot;app_name&quot;>Amplified Bible&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="3"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.fb_login_protocol_scheme` appears to be unused"
+        errorLine1="    &lt;string name=&quot;fb_login_protocol_scheme&quot;>fb545962244556419&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="4"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
+        <location
+            file="src/main/res/mipmap-hdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
+        <location
+            file="src/main/res/mipmap-mdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
+        <location
+            file="src/main/res/mipmap-xhdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
+        <location
+            file="src/main/res/mipmap-xxhdpi/ic_launcher.png"/>
+    </issue>
+
+    <issue
+        id="IconLauncherShape"
+        message="Launcher icons should not fill every pixel of their square region; see the design guide for details">
+        <location
+            file="src/main/res/mipmap-xxxhdpi/ic_launcher.png"/>
+    </issue>
+
+</issues>

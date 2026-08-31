@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "727999460969",
+    "project_id": "amplified-bible-ea0b7",
+    "storage_bucket": "amplified-bible-ea0b7.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:727999460969:android:5d4570aa3c535e3fe594f8",
+        "android_client_info": {
+          "package_name": "com.whitebibles.amplifiedbible"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfNxDE_BDTLal1iQLdt0W-mPsLNMeSf84"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

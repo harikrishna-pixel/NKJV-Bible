@@ -1,0 +1,22 @@
+{
+    "flutter": {
+        "platforms": {
+            "android": {
+                "default": {
+                    "projectId": "amplified-bible-ea0b7",
+                    "appId": "1:727999460969:android:5d4570aa3c535e3fe594f8",
+                    "fileOutput": "android/app/google-services.json"
+                }
+            },
+            "dart": {
+                "lib/firebase_options.dart": {
+                    "projectId": "amplified-bible-ea0b7",
+                    "configurations": {
+                        "android": "1:727999460969:android:5d4570aa3c535e3fe594f8",
+                        "ios": "1:727999460969:ios:992015c7b587c574e594f8"
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,251 @@
+{
+  "morning": {
+    "streak_not_started": [
+      {
+        "title": "Start with God",
+        "message": "Start your day with God. Begin today’s Bible streak now.",
+        "action": "open_streak"
+      },
+      {
+        "title": "A New Blessing Awaits",
+        "message": "A new day, a new blessing. Start your Bible streak today.",
+        "action": "open_streak"
+      },
+      {
+        "title": "Today's Word Awaits",
+        "message": "Don’t miss today’s Word. Start your Bible streak now.",
+        "action": "open_streak"
+      },
+      {
+        "title": "Begin Your Journey",
+        "message": "Your daily Bible journey begins here. Start your streak.",
+        "action": "open_streak"
+      },
+      {
+        "title": "God Is Waiting",
+        "message": "God’s Word is waiting for you. Start today’s streak.",
+        "action": "open_streak"
+      }
+    ],
+    "streak_pending": [
+      {
+        "title": "Finish Your Streak",
+        "message": "Your Bible streak is waiting. Complete it now.",
+        "action": "open_reading"
+      },
+      {
+        "title": "Keep Going",
+        "message": "You started today’s streak. Finish it and stay consistent.",
+        "action": "open_reading"
+      },
+      {
+        "title": "Stay Consistent",
+        "message": "Keep your streak alive. Complete today’s Bible reading.",
+        "action": "open_reading"
+      },
+      {
+        "title": "Almost There",
+        "message": "Almost there! Finish your Bible streak today.",
+        "action": "open_reading"
+      },
+      {
+        "title": "Don't Break the Chain",
+        "message": "Don’t break the chain. Complete your Bible streak now.",
+        "action": "open_reading"
+      }
+    ],
+    "streak_completed": [
+      {
+        "title": "Ask Anything",
+        "message": "Great job! Ask your Bible question in chat today.",
+        "action": "open_chat"
+      },
+      {
+        "title": "Explore Bible Chat",
+        "message": "Your streak is done! Explore Bible chat questions.",
+        "action": "open_chat"
+      },
+      {
+        "title": "Got Questions?",
+        "message": "Streak complete! Curious about the Bible? Ask in chat.",
+        "action": "open_chat"
+      },
+      {
+        "title": "Today's Chat Question",
+        "message": "Nice work! Try today’s Bible chat question.",
+        "action": "open_chat"
+      },
+      {
+        "title": "Go Deeper",
+        "message": "Want deeper insights? Ask a Bible question now.",
+        "action": "open_chat"
+      }
+    ]
+  },
+  "afternoon": {
+    "streak_not_started": [
+      {
+        "title": "Start Your Streak",
+        "message": "Haven’t started your Bible streak today. Begin now.",
+        "action": "open_streak"
+      },
+      {
+        "title": "A Moment with God",
+        "message": "Take a moment with God. Start today’s streak.",
+        "action": "open_streak"
+      },
+      {
+        "title": "Pause for Scripture",
+        "message": "A quick Bible moment can change your day. Start now.",
+        "action": "open_streak"
+      },
+      {
+        "title": "Time to Reflect",
+        "message": "Pause and reflect. Start your Bible streak today.",
+        "action": "open_streak"
+      },
+      {
+        "title": "Your Daily Word",
+        "message": "Your daily Word is waiting. Begin your streak.",
+        "action": "open_streak"
+      }
+    ],
+    "streak_pending": [
+      {
+        "title": "Finish Strong",
+        "message": "Finish your Bible streak and stay consistent.",
+        "action": "open_reading"
+      },
+      {
+        "title": "Halfway There",
+        "message": "You’re halfway there. Complete your Bible streak.",
+        "action": "open_reading"
+      },
+      {
+        "title": "Don't Leave It Unfinished",
+        "message": "Don’t leave it unfinished. Complete today’s streak.",
+        "action": "open_reading"
+      },
+      {
+        "title": "Continue Your Journey",
+        "message": "Continue your Bible journey. Finish today’s streak.",
+        "action": "open_reading"
+      },
+      {
+        "title": "Keep It Strong",
+        "message": "Keep your faith streak strong. Complete it now.",
+        "action": "open_reading"
+      }
+    ],
+    "streak_completed": [
+      {
+        "title": "Ask a Question",
+        "message": "Streak complete! Ask a Bible question now.",
+        "action": "open_chat"
+      },
+      {
+        "title": "Try Bible Chat",
+        "message": "Done with today’s streak? Try Bible chat.",
+        "action": "open_chat"
+      },
+      {
+        "title": "Discover More",
+        "message": "Explore deeper meaning. Ask a Bible question.",
+        "action": "open_chat"
+      },
+      {
+        "title": "Let's Talk Scripture",
+        "message": "Curious about scripture? Chat now.",
+        "action": "open_chat"
+      },
+      {
+        "title": "Continue the Journey",
+        "message": "Continue your journey with Bible chat.",
+        "action": "open_chat"
+      }
+    ]
+  },
+  "night": {
+    "streak_not_started": [
+      {
+        "title": "End with God's Word",
+        "message": "End your day with God’s Word. Start today’s streak.",
+        "action": "open_streak"
+      },
+      {
+        "title": "Peaceful Night Ahead",
+        "message": "A peaceful night begins with scripture. Start now.",
+        "action": "open_streak"
+      },
+      {
+        "title": "Before You Sleep",
+        "message": "Before you sleep, spend time in the Word.",
+        "action": "open_streak"
+      },
+      {
+        "title": "Don't Miss Today",
+        "message": "Don’t end the day without your Bible streak.",
+        "action": "open_streak"
+      },
+      {
+        "title": "Reflect Tonight",
+        "message": "Reflect tonight with God’s Word. Start your streak.",
+        "action": "open_streak"
+      }
+    ],
+    "streak_pending": [
+      {
+        "title": "Keep It Alive",
+        "message": "Don’t lose today’s streak. Complete it now.",
+        "action": "open_reading"
+      },
+      {
+        "title": "Before the Day Ends",
+        "message": "Finish today’s Bible streak before the day ends.",
+        "action": "open_reading"
+      },
+      {
+        "title": "Complete It Tonight",
+        "message": "Keep your streak alive. Complete it tonight.",
+        "action": "open_reading"
+      },
+      {
+        "title": "One Last Moment",
+        "message": "A quick Bible moment before sleep.",
+        "action": "open_reading"
+      },
+      {
+        "title": "Finish Today's Reading",
+        "message": "Complete today’s reading and keep the streak.",
+        "action": "open_reading"
+      }
+    ],
+    "streak_completed": [
+      {
+        "title": "Tonight's Verse",
+        "message": "Your streak is complete. Here’s tonight’s Bible verse.",
+        "action": "open_verse"
+      },
+      {
+        "title": "Word for Tonight",
+        "message": "End your day with God’s Word. Read today’s verse.",
+        "action": "open_verse"
+      },
+      {
+        "title": "Reflect Before Sleep",
+        "message": "A verse for your night. Reflect before sleep.",
+        "action": "open_verse"
+      },
+      {
+        "title": "Today's Blessing",
+        "message": "Your streak is done. Receive today’s blessing verse.",
+        "action": "open_verse"
+      },
+      {
+        "title": "Guided by God's Word",
+        "message": "Let God’s Word guide your evening. Read today's Bible verse.",
+        "action": "open_verse"
+      }
+    ]
+  }
+}

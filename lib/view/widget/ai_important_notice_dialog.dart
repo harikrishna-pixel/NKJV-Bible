@@ -1,0 +1,360 @@
+import 'package:biblebookapp/view/constants/share_preferences.dart';
+import 'package:biblebookapp/view/screens/dashboard/constants.dart';
+import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher_string.dart';
+
+class AiImportantNoticeDialog {
+  AiImportantNoticeDialog._();
+
+  static const Color _cream = Color(0xFFFFF9F3);
+  static const Color _ink = Color(0xFF4B3423);
+  static const Color _muted = Color(0xFF6B4E3D);
+  static const Color _accent = Color(0xFFE8874A);
+
+  static Future<void> show(
+    BuildContext context, {
+    VoidCallback? onDismissed,
+  }) async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => const _AiImportantNoticeDialogBody(),
+    );
+    await SharPreferences.setBoolean(
+        SharPreferences.aiGeminiPrivacyNoticeSeen, true);
+    onDismissed?.call();
+  }
+}
+
+class _AiImportantNoticeDialogBody extends StatelessWidget {
+  const _AiImportantNoticeDialogBody();
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      child: Material(
+        color: AiImportantNoticeDialog._cream,
+        borderRadius: BorderRadius.circular(24),
+        clipBehavior: Clip.antiAlias,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Align(
+                alignment: Alignment.topRight,
+                child: IconButton(
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close, color: Color(0xFF7A5A3A)),
+                ),
+              ),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'Important Notice',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          color: AiImportantNoticeDialog._ink,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'AI Chat helps answer your Bible and prayer questions using AI to provide Scripture-based guidance.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          height: 1.45,
+                          color: AiImportantNoticeDialog._muted,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildGeminiBanner(),
+                      const SizedBox(height: 14),
+                      _buildDataComparison(),
+                      const SizedBox(height: 14),
+                      _buildInfoRow(
+                        icon: Icons.verified_user_outlined,
+                        iconColor: const Color(0xFF3B82F6),
+                        text:
+                            'Your messages are used only to generate AI responses and improve the quality and reliability of the service. We do not sell your personal information or use it to personally identify you.',
+                      ),
+                      _buildDivider(),
+                      _buildInfoRow(
+                        icon: Icons.warning_amber_rounded,
+                        iconColor: const Color(0xFFF59E0B),
+                        text:
+                            'Please avoid sharing sensitive personal or confidential information in your conversations.',
+                      ),
+                      _buildDivider(),
+                      _buildInfoRow(
+                        icon: Icons.psychology_outlined,
+                        iconColor: const Color(0xFF8B5CF6),
+                        text:
+                            'AI-generated responses may occasionally be inaccurate or incomplete. Always compare responses with Scripture and use your own judgment. For important spiritual or life decisions, consult Scripture and trusted spiritual leaders.',
+                      ),
+                      _buildDivider(),
+                      _buildInfoRow(
+                        icon: Icons.person_outline,
+                        iconColor: const Color(0xFF22C55E),
+                        text:
+                            'Responses are generated by AI and are not written by a human advisor.',
+                      ),
+                      const SizedBox(height: 16),
+                      _buildFooter(context),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGeminiBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8E8D8),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAD7C3),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.shield_outlined,
+              size: 20,
+              color: AiImportantNoticeDialog._ink,
+            ),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'To generate responses, the message you type is securely sent to Google Gemini AI for processing.',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.4,
+                color: AiImportantNoticeDialog._muted,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDataComparison() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: _buildDataCard(
+          isShared: true,
+          title: 'Data shared with AI',
+          items: const [
+            'Your chat message',
+            'App version',
+            'Device type (technical information)',
+          ],
+        )),
+        const SizedBox(width: 10),
+        Expanded(child: _buildDataCard(
+          isShared: false,
+          title: 'We do NOT send',
+          items: const [
+            'Your name',
+            'Email address',
+            'Contacts',
+            'Photos',
+            'Location',
+            'Payment information',
+          ],
+        )),
+      ],
+    );
+  }
+
+  Widget _buildDataCard({
+    required bool isShared,
+    required String title,
+    required List<String> items,
+  }) {
+    final titleColor =
+        isShared ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
+    final bgColor =
+        isShared ? const Color(0xFFE8F7EC) : const Color(0xFFFDECEC);
+    final icon = isShared ? Icons.arrow_upward_rounded : Icons.lock_outline;
+    final iconBg =
+        isShared ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 13, color: Colors.white),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: titleColor,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '• ',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AiImportantNoticeDialog._muted,
+                      height: 1.35,
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      item,
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        height: 1.35,
+                        color: AiImportantNoticeDialog._muted,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow({
+    required IconData icon,
+    required Color iconColor,
+    required String text,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 22, color: iconColor),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 13,
+                height: 1.45,
+                color: AiImportantNoticeDialog._muted,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDivider() {
+    return Divider(
+      height: 1,
+      thickness: 1,
+      color: Colors.brown.withOpacity(0.12),
+    );
+  }
+
+  Widget _buildFooter(BuildContext context) {
+    const baseStyle = TextStyle(
+      fontSize: 12.5,
+      height: 1.45,
+      color: AiImportantNoticeDialog._muted,
+      fontWeight: FontWeight.w500,
+    );
+    const linkStyle = TextStyle(
+      fontSize: 12.5,
+      height: 1.45,
+      color: AiImportantNoticeDialog._accent,
+      fontWeight: FontWeight.w700,
+    );
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          Icons.info_outline,
+          size: 18,
+          color: AiImportantNoticeDialog._muted.withOpacity(0.8),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              const Text('By using AI Chat, you agree to our ', style: baseStyle),
+              GestureDetector(
+                onTap: () => launchUrlString(BibleInfo.termsandConditionURL),
+                child: const Text('Terms of Use', style: linkStyle),
+              ),
+              const Text(' and ', style: baseStyle),
+              GestureDetector(
+                onTap: () => launchUrlString(BibleInfo.privacyPolicyURL),
+                child: const Text('Privacy Policy', style: linkStyle),
+              ),
+              const Text('.', style: baseStyle),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}

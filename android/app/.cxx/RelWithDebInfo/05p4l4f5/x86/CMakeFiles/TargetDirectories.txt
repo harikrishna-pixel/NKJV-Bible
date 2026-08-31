@@ -1,0 +1,2 @@
+/Users/kesavarajam/Flutter_projects/marberx/06-02-25/amplified_bible-main/android/app/.cxx/RelWithDebInfo/05p4l4f5/x86/CMakeFiles/edit_cache.dir
+/Users/kesavarajam/Flutter_projects/marberx/06-02-25/amplified_bible-main/android/app/.cxx/RelWithDebInfo/05p4l4f5/x86/CMakeFiles/rebuild_cache.dir

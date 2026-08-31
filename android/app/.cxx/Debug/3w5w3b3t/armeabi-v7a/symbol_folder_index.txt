@@ -1,0 +1,1 @@
+/Users/kesavarajam/Flutter_projects/marberx/06-02-25/amplified_bible-main/android/app/build/intermediates/cxx/Debug/3w5w3b3t/obj/armeabi-v7a
