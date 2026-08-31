@@ -979,9 +979,55 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     return const Duration(days: 183);
   }
 
+  /// Additive: 1-year duration. Buy always uses 366 days from now (iOS often
+  /// reports Buy as restored with the original transaction date). Restore keeps
+  /// remaining time when the StoreKit date still yields a real future window.
+  Duration _resolveOneYearAdFreeDuration({
+    DateTime? anchorDate,
+    bool fromBuy = false,
+  }) {
+    if (fromBuy) {
+      debugPrint('One year: Buy flow — using fixed 366 days from now');
+      return const Duration(days: 366);
+    }
+    final start = anchorDate ?? DateTime.now();
+    final computedExpiry = DateTime(start.year + 1, start.month, start.day);
+    final diff = computedExpiry.difference(DateTime.now());
+    if (!diff.isNegative && diff.inHours >= 24) {
+      return diff;
+    }
+    debugPrint(
+      'One year: computed duration past/too short ($diff) — '
+      'using fixed 366 days',
+    );
+    return const Duration(days: 366);
+  }
+
+  /// Additive: 2-year duration, same Buy-vs-Restore rule as 1-year.
+  Duration _resolveTwoYearAdFreeDuration({
+    DateTime? anchorDate,
+    bool fromBuy = false,
+  }) {
+    if (fromBuy) {
+      debugPrint('Two year: Buy flow — using fixed 732 days from now');
+      return const Duration(days: 732);
+    }
+    final start = anchorDate ?? DateTime.now();
+    final computedExpiry = DateTime(start.year + 2, start.month, start.day);
+    final diff = computedExpiry.difference(DateTime.now());
+    if (!diff.isNegative && diff.inHours >= 24) {
+      return diff;
+    }
+    debugPrint(
+      'Two year: computed duration past/too short ($diff) — '
+      'using fixed 732 days',
+    );
+    return const Duration(days: 732);
+  }
+
   /// Additive: do not replace a longer existing premium expiry with a shorter one
-  /// (e.g. fresh 6M purchase overwritten by an older restored 6M transaction).
-  Future<bool> _shouldSkipShorterSixMonthExpiry(Duration incoming) async {
+  /// (e.g. fresh 6M/1Y purchase overwritten by an older restored transaction).
+  Future<bool> _shouldSkipShorterPremiumExpiry(Duration incoming) async {
     final existing = await SharPreferences.getString(
       SharPreferences.isRewardAdViewTime,
     );
@@ -991,15 +1037,27 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       final incomingExpiry = DateTime.now().add(incoming);
       if (incomingExpiry.isBefore(existingExpiry)) {
         debugPrint(
-          'Six month: skip shorter expiry overwrite '
+          'Premium: skip shorter expiry overwrite '
           '($incomingExpiry < $existingExpiry)',
         );
         return true;
       }
     } catch (e) {
-      debugPrint('Six month: expiry compare parse error: $e');
+      debugPrint('Premium: expiry compare parse error: $e');
     }
     return false;
+  }
+
+  /// Additive: apply timed premium unlock without clobbering a better expiry.
+  Future<void> _applyTimedPremium(
+    DashBoardController controller,
+    Duration diff,
+  ) async {
+    if (await _shouldSkipShorterPremiumExpiry(diff)) {
+      await controller.refreshPremiumStatusFromPrefs();
+      return;
+    }
+    await controller.disableAd(diff);
   }
 
   /// Additive: apply 6-month premium unlock without clobbering a better expiry.
@@ -1007,12 +1065,40 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     DashBoardController controller, {
     DateTime? anchorDate,
   }) async {
-    final diff = _resolveSixMonthAdFreeDuration(anchorDate: anchorDate);
-    if (await _shouldSkipShorterSixMonthExpiry(diff)) {
-      await controller.refreshPremiumStatusFromPrefs();
-      return;
-    }
-    await controller.disableAd(diff);
+    await _applyTimedPremium(
+      controller,
+      _resolveSixMonthAdFreeDuration(anchorDate: anchorDate),
+    );
+  }
+
+  /// Additive: apply 1-year premium unlock without writing a past expiry.
+  Future<void> _applyOneYearPremium(
+    DashBoardController controller, {
+    DateTime? anchorDate,
+    bool fromBuy = false,
+  }) async {
+    await _applyTimedPremium(
+      controller,
+      _resolveOneYearAdFreeDuration(
+        anchorDate: anchorDate,
+        fromBuy: fromBuy,
+      ),
+    );
+  }
+
+  /// Additive: apply 2-year premium unlock without writing a past expiry.
+  Future<void> _applyTwoYearPremium(
+    DashBoardController controller, {
+    DateTime? anchorDate,
+    bool fromBuy = false,
+  }) async {
+    await _applyTimedPremium(
+      controller,
+      _resolveTwoYearAdFreeDuration(
+        anchorDate: anchorDate,
+        fromBuy: fromBuy,
+      ),
+    );
   }
 
   /// Check if user has an active subscription for the given product ID
@@ -2109,9 +2195,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           EasyLoading.dismiss();
           return;
         }
-        final dur = DateTime(dateTime.year + 1, dateTime.month, dateTime.day);
-        final diff = dur.difference(DateTime.now());
-        await controller.disableAd(diff);
+        await _applyOneYearPremium(
+          controller,
+          anchorDate: dateTime,
+          fromBuy: startFlag == true,
+        );
         // Set subscription plan to gold for one year plan
         if (downloadProvider != null) {
           await downloadProvider.setSubscriptionPlan('gold');
@@ -2136,9 +2224,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           EasyLoading.dismiss();
           return;
         }
-        final dur = DateTime(dateTime.year + 2, dateTime.month, dateTime.day);
-        final diff = dur.difference(DateTime.now());
-        await controller.disableAd(diff);
+        await _applyTwoYearPremium(
+          controller,
+          anchorDate: dateTime,
+          fromBuy: startFlag == true,
+        );
         if (downloadProvider != null) {
           await downloadProvider.setSubscriptionPlan('gold');
         }

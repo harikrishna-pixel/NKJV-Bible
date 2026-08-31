@@ -1923,8 +1923,18 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
   }
 
   disableAd(Duration duration) async {
+    // Additive: never persist a past/zero expiry — that re-enables ads and
+    // shows "expired" even after a successful Buy that iOS reported as restored.
+    var safeDuration = duration;
+    if (safeDuration.isNegative || safeDuration.inSeconds <= 0) {
+      debugPrint(
+        'disableAd: refusing non-positive duration $duration — '
+        'using 366 days',
+      );
+      safeDuration = const Duration(days: 366);
+    }
     final prefs = await SharedPreferences.getInstance();
-    var expiryDate = DateTime.now().add(duration);
+    var expiryDate = DateTime.now().add(safeDuration);
 
     RewardAdExpireDate.value = expiryDate.toString();
     await SharPreferences.setString(
