@@ -226,6 +226,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   String? _bestRestoreProductId;
   /// Additive: while true, StoreKit restored products are collected and applied once.
   bool _restoreCollecting = false;
+  /// Additive: detect-only restore on paywall open — queue StoreKit products,
+  /// never apply until the user confirms the restore dialog.
+  bool _restoreDetecting = false;
+  bool _activeRestorePromptShown = false;
   final List<Map<String, String>> _restoreCollectedProducts = [];
   /// Additive: when applying the one chosen Restore product, ignore prior stored
   /// plan tier (e.g. stale platinum) so the collected best can overwrite it.
@@ -1216,7 +1220,168 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     );
   }
 
+  Future<bool> _hasLocalActivePremium() async {
+    final expiryRaw =
+        await SharPreferences.getString(SharPreferences.isRewardAdViewTime);
+    if (expiryRaw == null || expiryRaw.isEmpty) return false;
+    try {
+      final expiryDate = DateTime.parse(expiryRaw);
+      return !expiryDate.difference(DateTime.now()).isNegative;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  String _activePlanDisplayName(String productId) {
+    if (_isLifetimeProductId(productId)) return 'Lifetime Premium';
+    if (_isTwoYearProductId(productId)) return '2-Year Premium';
+    if (_isOneYearProductId(productId)) return '1-Year Premium';
+    if (_isSixMonthProductId(productId)) return '6-Month Premium';
+    return 'Premium';
+  }
+
+  void _queueRestoreCandidateFromApi(dynamic res) {
+    if (res == null || res['status'] != 'success') return;
+    final rawData = res['data'].toString().split('-productId:');
+    if (rawData.length != 2) return;
+    final data = rawData[1].split('-date:');
+    final productId = data[0].toString();
+    final date = data.length > 1 ? data[1].toString() : '';
+    _queueRestoreProduct(productId, date);
+  }
+
+  /// Additive: if StoreKit has an active plan and local Premium is empty
+  /// (reinstall), ask before applying. Does not change Buy / Restore apply paths.
+  Future<void> _promptRestoreIfStoreHasActiveSubscription() async {
+    if (!mounted) return;
+    if (widget.invisiblePurchaseHost) return;
+    if (widget.autoStartRestore) return;
+    if (widget.autoStartSelectedPlanPurchase) return;
+    if (widget.fromHomeExitOffer) return;
+    if (_activeRestorePromptShown || _restoreDetecting) return;
+    if (await _hasLocalActivePremium()) return;
+
+    final hasInternet = await InternetConnection().hasInternetAccess;
+    if (!hasInternet || !mounted) return;
+
+    _restoreDetecting = true;
+    _beginRestoreCollection();
+    debugPrint('Paywall detect: checking store for existing subscription');
+
+    try {
+      await _inAppPurchase.restorePurchases();
+      await Future.delayed(const Duration(seconds: 9));
+      try {
+        _queueRestoreCandidateFromApi(await restorePurchase());
+      } catch (e) {
+        debugPrint('Paywall detect: restore API error - $e');
+      }
+
+      if (!_restoreDetecting || !mounted) {
+        _restoreCollecting = false;
+        return;
+      }
+
+      final best = await _pickBestCollectedRestoreProduct();
+      _restoreCollecting = false;
+      _restoreDetecting = false;
+      _resetRestoreSessionSelection();
+
+      if (best == null) {
+        debugPrint('Paywall detect: no store subscription found');
+        return;
+      }
+      if (await _hasLocalActivePremium()) return;
+
+      _activeRestorePromptShown = true;
+      final controller = Get.isRegistered<DashBoardController>()
+          ? Get.find<DashBoardController>()
+          : Get.put(DashBoardController());
+      if (!mounted) return;
+      await _showDetectedActiveSubscriptionDialog(
+        best['id'] ?? '',
+        controller,
+      );
+    } catch (e) {
+      _restoreDetecting = false;
+      _restoreCollecting = false;
+      debugPrint('Paywall detect: $e');
+    }
+  }
+
+  Future<void> _showDetectedActiveSubscriptionDialog(
+    String productId,
+    DashBoardController controller,
+  ) async {
+    if (!mounted) return;
+    final planName = _activePlanDisplayName(productId);
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return PopScope(
+          canPop: false,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Text(
+              'You have an active subscription',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: Text(
+              'Your $planName is still active. Would you like to restore it?',
+              style: const TextStyle(
+                fontSize: 16,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                },
+                child: const Text(
+                  'Not now',
+                  style: TextStyle(
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.of(dialogContext).pop();
+                  await _restorePurchases(controller);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: CommanColor.lightModePrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Yes, Restore',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _buyProduct(ProductDetails prod) async {
+    // Additive: a Buy tap cancels detect-only restore so existing buy path runs.
+    if (_restoreDetecting) {
+      _restoreDetecting = false;
+      _restoreCollecting = false;
+    }
     // Additive: block purchase when dashboard IAP is disabled.
     if (!await SubscriptionScreen.isDashboardIapEnabled()) {
       debugPrint(
@@ -2525,6 +2690,22 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               }
             }
           } else if (purchaseDetails.status == PurchaseStatus.restored) {
+            // Additive: detect-only pass queues products and does not apply.
+            // If the user already started Buy, stop detecting and use existing path.
+            if (_restoreDetecting) {
+              final buyStarted =
+                  await SharPreferences.getBoolean('startpurches');
+              if (buyStarted == true) {
+                _restoreDetecting = false;
+                _restoreCollecting = false;
+              } else {
+                _queueRestoreProduct(
+                  purchaseDetails.productID,
+                  purchaseDetails.transactionDate ?? '',
+                );
+                return;
+              }
+            }
             final restoreFlag =
                 await SharPreferences.getBoolean('restorepurches');
             final startFlag = await SharPreferences.getBoolean('startpurches');
@@ -2695,6 +2876,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
     await _autoStartPurchaseIfNeeded();
     await _autoStartRestoreIfNeeded();
+    await _promptRestoreIfStoreHasActiveSubscription();
 
     if (widget.fromHomeExitOffer && mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -3282,6 +3464,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   /// 🔹 Trigger restore (iOS only)
   Future<void> _restorePurchases(DashBoardController controller) async {
+    // Additive: user chose Restore — stop detect-only so it cannot show a second dialog.
+    _restoreDetecting = false;
     // Check connectivity FIRST before showing loader
     final hasInternet = await InternetConnection().hasInternetAccess;
     if (!hasInternet) {
