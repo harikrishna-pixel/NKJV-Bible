@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
+import 'package:biblebookapp/services/wallet_profile_sync.dart';
 
 /// Wallet Service to manage user credits/coins
 class WalletService {
@@ -38,6 +39,14 @@ class WalletService {
     return prefs.getInt(_creditsKey) ?? 0;
   }
 
+  /// Additive: set absolute balance (profile restore / cloud sync only).
+  static Future<void> setCreditsBalance(int balance) async {
+    if (balance < 0) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_creditsKey, balance);
+    debugPrint('WalletService: Set balance to $balance');
+  }
+
   /// Add credits to wallet
   static Future<int> addCredits(int amount) async {
     final prefs = await SharedPreferences.getInstance();
@@ -45,6 +54,8 @@ class WalletService {
     final newBalance = current + amount;
     await prefs.setInt(_creditsKey, newBalance);
     debugPrint('WalletService: Added $amount credits. New balance: $newBalance');
+    // Additive: sync cloud wallet for signed-in users (does not change amounts).
+    WalletProfileSync.schedulePushToProfile(newBalance);
     return newBalance;
   }
 
@@ -56,6 +67,8 @@ class WalletService {
       final newBalance = current - amount;
       await prefs.setInt(_creditsKey, newBalance);
       debugPrint('WalletService: Deducted $amount credits. New balance: $newBalance');
+      // Additive: sync cloud wallet for signed-in users (does not change amounts).
+      WalletProfileSync.schedulePushToProfile(newBalance);
       return true;
     }
     debugPrint('WalletService: Insufficient credits. Required: $amount, Available: $current');

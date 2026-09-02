@@ -21,6 +21,7 @@ import 'package:biblebookapp/view/screens/more_apps/model/app_model.dart';
 import 'package:biblebookapp/view/screens/profile/model/user_model.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
+import 'package:biblebookapp/services/wallet_profile_sync.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -793,6 +794,8 @@ Future<void> cacheReferralFieldsFromUser(UserModel user) async {
   if (user.walletBalance != null) {
     await cacheNotifier.writeCache(
         key: 'wallet_balance', value: '${user.walletBalance}');
+    // Additive: restore local wallet from profile after login/reinstall.
+    await WalletProfileSync.applyProfileBalanceToLocal(user.walletBalance!);
   }
 }
 
@@ -853,7 +856,8 @@ Future<void> syncReferralFieldsFromAuthHubProfile() async {
     await cacheReferralFieldsFromUser(user);
     debugPrint(
         'syncReferralFieldsFromAuthHubProfile: referral_count=${user.referralCount} '
-        'credits=${user.referralRewardCredits}');
+        'credits=${user.referralRewardCredits} '
+        'wallet_balance=${user.walletBalance}');
   } catch (e) {
     debugPrint('syncReferralFieldsFromAuthHubProfile parse: $e');
     // Fallback: write raw ints if UserModel cast fails on shape.
@@ -953,6 +957,7 @@ Future<PendingReferrerReward?> fetchPendingReferrerReward() async {
         if (wallet != null) {
           await cacheNotifier.writeCache(
               key: 'wallet_balance', value: wallet.toString());
+          await WalletProfileSync.applyProfileBalanceToLocal(wallet);
         }
       }
     } catch (e) {
@@ -1559,6 +1564,7 @@ Future<UserModel> loginUser(
       debugPrint('  referral_count           → ${user.referralCount}');
       debugPrint(
           '  referral_reward_claimed  → ${user.referralRewardClaimed}');
+      debugPrint('  wallet_balance           → ${user.walletBalance}');
       await cacheReferralFieldsFromUser(user);
       // Additive: sync PDF /api/profile fields (does not change claim rules).
       await syncReferralFieldsFromAuthHubProfile();

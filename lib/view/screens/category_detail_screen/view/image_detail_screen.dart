@@ -456,7 +456,8 @@ class ImageDetailScreenState extends ConsumerState<ImageDetailScreen> {
     final subscriptionPlan = await downloadProvider.getSubscriptionPlan();
     final hasPremium = subscriptionPlan != null &&
         subscriptionPlan.isNotEmpty &&
-        ['platinum', 'gold', 'silver'].contains(subscriptionPlan.toLowerCase());
+        ['platinum', 'gold', 'silver', 'twoyear']
+            .contains(subscriptionPlan.toLowerCase());
 
     showDialog(
       context: context,

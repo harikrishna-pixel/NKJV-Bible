@@ -38,6 +38,7 @@ import 'package:biblebookapp/view/screens/verse_topics/verse_topics_screen.dart'
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_home_expiry_banner.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/services/prayer_wall_activity_notifier.dart';
+import 'package:biblebookapp/services/premium_entitlement_label_sync.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/eproducts_screen.dart';
@@ -107,14 +108,9 @@ import 'package:html/parser.dart' as html;
 
 /// Display-only thresholds for subscription info copy (does not affect IAP logic).
 const int _kSubscriptionLifetimeDisplayMinDays = 10000;
-const int _kSubscriptionTwoYearDisplayMinDays = 400;
 
 bool _isLifetimeSubscriptionDisplay(int diffDy) =>
     diffDy > _kSubscriptionLifetimeDisplayMinDays;
-
-bool _isTwoYearSubscriptionDisplay(int diffDy) =>
-    diffDy >= _kSubscriptionTwoYearDisplayMinDays &&
-    diffDy <= _kSubscriptionLifetimeDisplayMinDays;
 
 /// Calendar-day count until expiry (matches what users expect in "X days left").
 int _subscriptionDaysRemaining(DateTime expiryDate, [DateTime? now]) {
@@ -131,9 +127,9 @@ String _subscriptionRenewalDisplayText(int diffDy, [String? plan]) {
   }
   final planKey = plan?.toLowerCase() ?? '';
   final dayLabel = diffDy == 1 ? 'day' : 'days';
-  // Additive: silver/gold copy must not become "never expire" just because
+  // Additive: silver/gold/twoyear copy must not become "never expire" just because
   // remaining days are huge (e.g. bad lifetime expiry overwrite).
-  if (planKey == 'silver' || planKey == 'gold') {
+  if (planKey == 'silver' || planKey == 'gold' || planKey == 'twoyear') {
     return '$diffDy $dayLabel left for the renewal of the subscription.';
   }
   if (_isLifetimeSubscriptionDisplay(diffDy) || planKey == 'platinum') {
@@ -141,29 +137,29 @@ String _subscriptionRenewalDisplayText(int diffDy, [String? plan]) {
   }
   return '$diffDy $dayLabel left for the renewal of the subscription.';
 }
+
 String _subscriptionPeriodDisplayText(
   String? plan,
   int diffDy,
   DateTime expiryDate,
 ) {
   final planKey = plan?.toLowerCase() ?? '';
-  // Additive: trust stored plan key first so Restore info matches the plan
-  // that was applied (silver/gold), not a lifetime day-threshold fallback.
+  // Display-only: trust stored plan key. Do not infer "2 years" from day count
+  // while plan is gold — that mislabeled 1Y (and leftover gold after a 6M buy).
   if (planKey == 'silver') {
     return 'Your subscription period is 6 months';
   }
-  if (planKey == 'gold') {
-  if (_isTwoYearSubscriptionDisplay(diffDy)) {
+  if (planKey == 'twoyear') {
     return 'Your subscription period is 2 years';
   }
+  if (planKey == 'gold') {
     return 'Your subscription period is 1 year';
   }
   if (_isLifetimeSubscriptionDisplay(diffDy) || planKey == 'platinum') {
     return 'Your subscription period is lifetime';
   }
-  if (_isTwoYearSubscriptionDisplay(diffDy)) {
-    return 'Your subscription period is 2 years';
-  }
+  // Additive: no day-count "2 years" when plan key is missing — that mislabeled
+  // devices with stale/empty plan data. Real 2Y uses plan key `twoyear`.
   return 'Your subscription expires on ${DateFormat('dd-MM-yyyy').format(expiryDate)}';
 }
 
@@ -2829,7 +2825,7 @@ class _HomeScreenState extends State<HomeScreen>
           final subscriptionPlan = await downloadProvider.getSubscriptionPlan();
           final isSubscribed = subscriptionPlan != null &&
               subscriptionPlan.isNotEmpty &&
-              ['platinum', 'gold', 'silver']
+              ['platinum', 'gold', 'silver', 'twoyear']
                   .contains(subscriptionPlan.toLowerCase());
 
           // Show interstitial ad only for non-subscribed users and when online with good internet
@@ -3173,6 +3169,17 @@ class _HomeScreenState extends State<HomeScreen>
     if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
     if (!Get.isRegistered<DashBoardController>()) return;
     await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
+    // Additive: correct stale plan labels from remembered IAP product.
+    try {
+      if (!mounted) return;
+      final downloadProvider =
+          Provider.of<DownloadProvider>(context, listen: false);
+      await PremiumEntitlementLabelSync.syncPlanLabelFromRememberedProduct(
+        downloadProvider,
+      );
+    } catch (e) {
+      debugPrint('Premium plan label sync error: $e');
+    }
   }
 
   /// After Mark as Read / chapter picker pops, ensure verses match the header chapter.
@@ -6157,6 +6164,28 @@ class _HomeScreenState extends State<HomeScreen>
       );
     }
 
+    Future<void> openPremiumInfoFromDrawer() async {
+      // Additive: refresh local expiry + correct stale plan label before Info UI.
+      // Does not change buy/charge/ad logic.
+      await controller.refreshPremiumStatusFromPrefs();
+      try {
+        final downloadProvider =
+            Provider.of<DownloadProvider>(context, listen: false);
+        await PremiumEntitlementLabelSync.syncPlanLabelFromRememberedProduct(
+          downloadProvider,
+        );
+      } catch (e) {
+        debugPrint('Premium Info plan sync error: $e');
+      }
+      if (!context.mounted) return;
+      final expiryRaw = '${controller.RewardAdExpireDate}';
+      if (DateTime.tryParse(expiryRaw) != null) {
+        showSubscriptionInfoSheet();
+      } else if (controller.isSubscriptionEnabled ?? false) {
+        openPaywallFromDrawer();
+      }
+    }
+
     return Drawer(
       // Force new drawer instance when premium status changes.
       key: ValueKey('ios_home_drawer_$isPremium'),
@@ -6191,11 +6220,7 @@ class _HomeScreenState extends State<HomeScreen>
           openPaywallFromDrawer();
         },
         onPremiumInfoTap: () {
-          if (DateTime.tryParse('${controller.RewardAdExpireDate}') != null) {
-            showSubscriptionInfoSheet();
-          } else if (controller.isSubscriptionEnabled ?? false) {
-            openPaywallFromDrawer();
-          }
+          unawaited(openPremiumInfoFromDrawer());
         },
         onDailyVerseTap: () {
           if (controller.adFree.value == false) {

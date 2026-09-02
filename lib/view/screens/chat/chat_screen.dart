@@ -1210,7 +1210,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final plan = await downloadProvider.getSubscriptionPlan();
       final isSubscribed = plan != null &&
           plan.isNotEmpty &&
-          ['platinum', 'gold', 'silver'].contains(plan.toLowerCase());
+          ['platinum', 'gold', 'silver', 'twoyear'].contains(plan.toLowerCase());
       if (!isSubscribed) {
         try {
           // Dashboard ads off → never show chat-back interstitial.

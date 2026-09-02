@@ -258,6 +258,71 @@ class ProfileUpdateApi {
     }
   }
 
+  /// Additive: persist wallet_balance on profile (same key/value pattern as referral).
+  Future<String?> updateWalletBalance(int balance) async {
+    final Uri uri =
+        Uri.parse(AppApiConstant.baseurl + AppApiConstant.updateprofleapi);
+    final userid = await cacheNotifier.readCache(key: 'userid');
+    final authtoken = await cacheNotifier.readCache(key: 'authtoken');
+
+    try {
+      final userId = userid.toString();
+      final identity = await _cachedNameAndEmail();
+
+      // Do NOT prime with email+name alone (no key) — that returns 400
+      // "Email already exists" for logged-in users. Send email+name together
+      // with key+value so the server validates identity but updates wallet only.
+      final walletAttempts = <Map<String, String>>[
+        {
+          'action': '1',
+          'key': 'wallet_balance',
+          'value': balance.toString(),
+          'user_id': userId,
+          'app_id': BibleInfo.appID,
+          if (identity.email.isNotEmpty) 'email': identity.email,
+          if (identity.name.isNotEmpty) 'name': identity.name,
+        },
+        {
+          'action': '1',
+          'key': 'wallet_balance',
+          'value': balance.toString(),
+          'user_id': userId,
+          'app_id': BibleInfo.appID,
+          if (identity.name.isNotEmpty) 'name': identity.name,
+        },
+        {
+          'action': '1',
+          'key': 'wallet_balance',
+          'value': balance.toString(),
+          'user_id': userId,
+          'app_id': BibleInfo.appID,
+        },
+      ];
+
+      String? lastBody;
+      for (var i = 0; i < walletAttempts.length; i++) {
+        final body = await _postProfileUpdate(
+          uri: uri,
+          authtoken: authtoken,
+          logLabel: 'wallet_balance attempt ${i + 1}',
+          payload: walletAttempts[i],
+        );
+        lastBody = body;
+        if (_profileResponseSucceeded(body)) {
+          return body;
+        }
+      }
+
+      if (lastBody != null && lastBody.isNotEmpty) {
+        return lastBody;
+      }
+      return null;
+    } catch (e) {
+      devtools.log('profile update wallet_balance error: $e');
+      return null;
+    }
+  }
+
   Future<String?> updateReferralRewardClaimed({
     required int value,
     String? referredBy,
@@ -449,10 +514,17 @@ class ProfileUpdateApi {
     devtools.log('profile update $logLabel request: $payload');
     debugPrint('profile update $logLabel REQUEST: $payload');
 
-    final response = await CustomHttp().postwithtoken(
-      path: uri,
-      token: authtoken,
-      data: payload,
+    final headers = <String, String>{
+      'Content-Type': 'application/x-www-form-urlencoded',
+    };
+    if (authtoken != null && authtoken.trim().isNotEmpty) {
+      headers['Authorization'] = 'Bearer ${authtoken.trim()}';
+    }
+
+    final response = await CustomHttp().client.post(
+      uri,
+      body: payload,
+      headers: headers,
     );
 
     final statuscode = response?.statusCode;

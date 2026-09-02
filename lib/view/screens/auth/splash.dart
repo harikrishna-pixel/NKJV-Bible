@@ -6,6 +6,7 @@ import 'dart:math' hide log;
 
 import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
+import 'package:biblebookapp/controller/api_service.dart';
 import 'package:biblebookapp/view/screens/onboard_faith_screen.dart';
 import 'package:biblebookapp/view/screens/welcome_screen.dart';
 import 'package:biblebookapp/view/screens/notification_info_screen.dart';
@@ -444,6 +445,8 @@ class _SplashScreenState extends State<SplashScreen>
             DBMigrationHelper.migrateToEncryptedDatabase(password),
             WalletService.initializeWallet(),
           ]).timeout(_splashHeavyStepTimeout);
+          // Additive: restore wallet from profile when session already exists.
+          unawaited(syncReferralFieldsFromAuthHubProfile());
         } on TimeoutException {
           debugPrint('SPLASH migration/wallet timed out — continuing');
         }

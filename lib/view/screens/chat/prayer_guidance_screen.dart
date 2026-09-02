@@ -2440,7 +2440,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
             .timeout(const Duration(milliseconds: 200), onTimeout: () => null);
     final isSubscribed = subscriptionPlan != null &&
         subscriptionPlan.isNotEmpty &&
-            ['platinum', 'gold', 'silver']
+            ['platinum', 'gold', 'silver', 'twoyear']
                 .contains(subscriptionPlan.toLowerCase());
     if (!isSubscribed) {
         final lastStr = await SharPreferences.getString(

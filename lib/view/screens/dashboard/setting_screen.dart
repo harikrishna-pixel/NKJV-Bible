@@ -1893,7 +1893,8 @@ class _SettingScreenState extends State<SettingScreen>
     final subscriptionPlan = await downloadProvider.getSubscriptionPlan();
     final hasSubscriptionPlan = subscriptionPlan != null &&
         subscriptionPlan.isNotEmpty &&
-        ['platinum', 'gold', 'silver'].contains(subscriptionPlan.toLowerCase());
+        ['platinum', 'gold', 'silver', 'twoyear']
+            .contains(subscriptionPlan.toLowerCase());
 
     // Check expiry date (this is set by disableAd() during subscription/restore)
     String? expiryDateString;
@@ -2420,7 +2421,7 @@ class _ThemeDialogState extends State<ThemeDialog> {
                       await downloadProvider.getSubscriptionPlan();
                   final hasSubscriptionPlan = subscriptionPlan != null &&
                       subscriptionPlan.isNotEmpty &&
-                      ['platinum', 'gold', 'silver']
+                      ['platinum', 'gold', 'silver', 'twoyear']
                           .contains(subscriptionPlan.toLowerCase());
 
                   // Check expiry date (this is set by disableAd() during subscription/restore)
