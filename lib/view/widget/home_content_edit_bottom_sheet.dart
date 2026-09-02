@@ -5880,7 +5880,7 @@ class HomeContentEditBottomSheetState
     final subscriptionPlan = await downloadProvider.getSubscriptionPlan();
     final isSubscribed = subscriptionPlan != null &&
         subscriptionPlan.isNotEmpty &&
-        ['platinum', 'gold', 'silver'].contains(subscriptionPlan.toLowerCase());
+        ['platinum', 'gold', 'silver', 'twoyear'].contains(subscriptionPlan.toLowerCase());
 
     // For subscribed users, show toast instead of alert dialog
     if (isSubscribed) {

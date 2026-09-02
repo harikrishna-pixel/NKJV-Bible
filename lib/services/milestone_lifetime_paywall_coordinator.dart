@@ -24,7 +24,7 @@ class MilestoneLifetimePaywallCoordinator {
     final download = Provider.of<DownloadProvider>(context, listen: false);
     final plan = await download.getSubscriptionPlan();
     if (plan == null || plan.isEmpty) return false;
-    return ['platinum', 'gold', 'silver'].contains(plan.toLowerCase());
+    return ['platinum', 'gold', 'silver', 'twoyear'].contains(plan.toLowerCase());
   }
 
   /// Call after a successful scripture chat AI response (not errors).

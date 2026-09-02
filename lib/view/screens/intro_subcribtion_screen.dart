@@ -213,6 +213,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   bool _shouldShowRestoreDialog =
       false; // Track if restore dialog should be shown
   String? _pendingRestoreProductId; // Store product ID for pending restore
+  /// Additive: product the user tapped Buy for — ignore other StoreKit
+  /// history items in the same buy session (e.g. stale 2Y).
+  String? _activeBuyProductId;
   Timer? _loadingTimeoutTimer; // Timer for 6-second loading timeout
   bool _autoPurchaseTriggered = false;
   bool _autoRestoreTriggered = false;
@@ -310,6 +313,28 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       productId == widget.lifeTimePlan ||
       (productId.contains('lifetime') && _isPaywallProductForThisApp(productId));
 
+  /// Additive: during Buy, accept the tapped product by exact ID or same plan
+  /// family (6M/1Y/2Y/LT). Only skip clearly different plans (e.g. historic 2Y
+  /// while buying 1Y). Does not change apply/charge logic.
+  bool _isActiveBuyTargetProduct(String productId) {
+    final target = _activeBuyProductId;
+    if (target == null || target.isEmpty) return true;
+    if (productId == target) return true;
+    if (_isSixMonthProductId(target) && _isSixMonthProductId(productId)) {
+      return true;
+    }
+    if (_isOneYearProductId(target) && _isOneYearProductId(productId)) {
+      return true;
+    }
+    if (_isTwoYearProductId(target) && _isTwoYearProductId(productId)) {
+      return true;
+    }
+    if (_isLifetimeProductId(target) && _isLifetimeProductId(productId)) {
+      return true;
+    }
+    return false;
+  }
+
   /// Additive: restore plan rank so a later 6M restore cannot overwrite Lifetime/1Y.
   /// Higher = better. Unknown products = 0 (do not block existing branches).
   int _restoreProductTier(String productId) {
@@ -328,6 +353,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       case 'platinum':
         return 3;
       case 'gold':
+      case 'twoyear':
         return 2;
       case 'silver':
         return 1;
@@ -662,7 +688,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       );
     } finally {
       _forceApplyCollectedRestoreBest = false;
-      EasyLoading.dismiss();
+      // Do not EasyLoading.dismiss() here — restorePurchaseHandle already
+      // dismissed the Restoring loader and shows the success toast; another
+      // dismiss would clear "Purchase restored successfully" before redirect.
     }
   }
 
@@ -883,6 +911,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Future<void> _navigateAfterNonLifetimePurchaseSuccess() async {
+    _activeBuyProductId = null;
     if (widget.invisiblePurchaseHost) {
       await _addLifetimeWalletBonusOnce();
     }
@@ -895,8 +924,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     bool lifetimeWalletBonus = false,
     bool invisiblePopSuccess = false,
   }) async {
+    _activeBuyProductId = null;
     if (lifetimeWalletBonus) {
       await _addLifetimeWalletBonusOnce();
+    }
+    if (!startFlag) {
+      await Future.delayed(const Duration(milliseconds: 1500));
     }
     if (widget.invisiblePurchaseHost) {
       // Same refresh as full paywall success — keep home drawer in sync.
@@ -1029,6 +1062,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         expectedPlan = 'platinum';
       } else if (_isOneYearProductId(productId)) {
         expectedPlan = 'gold';
+      } else if (_isTwoYearProductId(productId)) {
+        expectedPlan = 'twoyear';
       } else if (_isSixMonthProductId(productId)) {
         expectedPlan = 'silver';
       }
@@ -1188,6 +1223,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
         await SharPreferences.setString('OpenAd', '1');
         await SharPreferences.setBoolean('startpurches', true);
+        _activeBuyProductId = prod.id;
 
         // Check again before purchase (in case subscription status changed)
         final hasActiveSubscriptionCheck =
@@ -2021,12 +2057,25 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       _claimRestoreCandidate(productId, transactionDate: date);
     }
 
+    // Additive: during Buy, ignore non-target StoreKit history early.
+    if (startFlagEarly == true &&
+        _activeBuyProductId != null &&
+        _activeBuyProductId!.isNotEmpty &&
+        !_isActiveBuyTargetProduct(productId)) {
+      debugPrint(
+        'Buy session early: skip non-target $productId '
+        '(buying $_activeBuyProductId)',
+      );
+      return;
+    }
+
     final dateTime = _parseRestoreTransactionDate(date) ?? DateTime.now();
     await Future.delayed(Duration(seconds: 2));
     final data = await SharPreferences.getBoolean('restorepurches');
     final startFlag = await SharPreferences.getBoolean('startpurches');
-    final successToastMessage =
-        (startFlag == true) ? 'Purchase Successful' : 'Restore Successful';
+    final successToastMessage = (startFlag == true)
+        ? 'Purchase Successful'
+        : 'Purchase restored successfully';
     debugPrint(
       "restore data 1 is $data | startFlag=$startFlag | productId=$productId",
     );
@@ -2061,6 +2110,20 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         EasyLoading.dismiss();
         return;
       }
+
+      // Additive: during Buy, only apply the product the user tapped — ignore
+      // other StoreKit history (stale 2Y must not label a 6M/1Y buy).
+      if (startFlag == true &&
+          _activeBuyProductId != null &&
+          _activeBuyProductId!.isNotEmpty &&
+          !_isActiveBuyTargetProduct(productId)) {
+        debugPrint(
+          'Buy session: skip non-target $productId '
+          '(buying $_activeBuyProductId)',
+        );
+        return;
+      }
+
       _claimRestoreCandidate(productId, transactionDate: date);
 
       // Additive: stamp last Buy product (Keychain) so reinstall Restore
@@ -2140,7 +2203,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         final diff = dur.difference(DateTime.now());
         await controller.disableAd(diff);
         if (downloadProvider != null) {
-          await downloadProvider.setSubscriptionPlan('gold');
+          await downloadProvider.setSubscriptionPlan('twoyear');
         }
         await Future.delayed(Duration(seconds: 1));
         EasyLoading.dismiss();
@@ -2212,6 +2275,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         if (purchaseDetails.status == PurchaseStatus.error) {
           debugPrint('Error: ${purchaseDetails.error}');
           DebugConsole.log(" purchases error - $purchaseDetails");
+          _activeBuyProductId = null;
           // Reset userTap on error
           if (mounted) {
             EasyLoading.dismiss();
@@ -2222,6 +2286,18 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           }
         } else if (purchaseDetails.status == PurchaseStatus.purchased ||
             purchaseDetails.status == PurchaseStatus.restored) {
+          final startFlagGate =
+              await SharPreferences.getBoolean('startpurches');
+          if (startFlagGate == true &&
+              _activeBuyProductId != null &&
+              _activeBuyProductId!.isNotEmpty &&
+              !_isActiveBuyTargetProduct(purchaseDetails.productID)) {
+            debugPrint(
+              'Buy session stream: skip non-target '
+              '${purchaseDetails.productID} (buying $_activeBuyProductId)',
+            );
+            return;
+          }
           if (purchaseDetails.status == PurchaseStatus.purchased) {
             final data1 = await SharPreferences.getBoolean('startpurches');
             debugPrint("purchase data 5 is $data1");
@@ -2332,7 +2408,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     }
                   }
                   if (downloadProvider != null) {
-                    await downloadProvider.setSubscriptionPlan('gold');
+                    await downloadProvider.setSubscriptionPlan('twoyear');
                   }
                   await Future.delayed(Duration(seconds: 2));
                   if (Platform.isIOS) {
@@ -2482,6 +2558,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           EasyLoading.dismiss();
         } else if (purchaseDetails.status == PurchaseStatus.canceled) {
           EasyLoading.dismiss();
+          _activeBuyProductId = null;
           if (widget.invisiblePurchaseHost) {
             if (mounted) {
               setState(() {

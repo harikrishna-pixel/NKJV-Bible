@@ -48,7 +48,7 @@ class DownloadProvider with ChangeNotifier {
 //  static Stream<int> getUsedLimitStream() => _usedLimitController.stream;
   Stream<bool> isPlanActiveStream() async* {
     final plan = await getSubscriptionPlan();
-    yield ['platinum', 'gold', 'silver'].contains(plan?.toLowerCase());
+    yield ['platinum', 'gold', 'silver', 'twoyear'].contains(plan?.toLowerCase());
   }
 
   // Future<void> updateUsedLimit(int value) async {
@@ -179,7 +179,7 @@ class DownloadProvider with ChangeNotifier {
     if (plan != null && plan.isNotEmpty) {
       if (_plan == 'platinum') {
         return true;
-      } else if (_plan == 'gold') {
+      } else if (_plan == 'gold' || _plan == 'twoyear') {
         return current < 12;
       } else if (_plan == 'silver') {
         return current < 4;
@@ -263,7 +263,7 @@ class DownloadProvider with ChangeNotifier {
 
   static bool _isActive(String? plan) {
     if (plan == null) return false;
-    return ['platinum', 'gold', 'silver'].contains(plan.toLowerCase());
+    return ['platinum', 'gold', 'silver', 'twoyear'].contains(plan.toLowerCase());
   }
 
 // end eshop
