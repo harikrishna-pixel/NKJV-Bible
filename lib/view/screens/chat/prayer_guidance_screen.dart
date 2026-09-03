@@ -3000,7 +3000,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Release your worries. Breathe. Find peace \n in His presence.',
+                        'Release your worries. Breathe.\nFind peace in His presence.',
                         style: TextStyle(
                           fontSize: size.width > 450 ? 13 : 12,
                           height: 1.3,
