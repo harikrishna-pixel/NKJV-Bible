@@ -76,24 +76,26 @@ class BibleInfo {
 
   static bool get isAutoRenewablePaywallMode => paywallShows == 2;
 
-  /// When [paywallShows] is `2`, Chat & Prayer skip credit check/deduct
-  /// for AI Premium. Lifetime (`platinum`) still uses wallet credits.
+  /// When [paywallShows] is `2`, Chat & Prayer may skip credits for AI Premium.
+  /// Prefer [shouldSkipChatPrayerCredits] (checks plan). Free/Lifetime use coins.
   static bool get skipsChatPrayerCredits => isAutoRenewablePaywallMode;
 
   /// Same key as [DownloadProvider] subscription plan storage.
   static const String _subscriptionPlanPrefsKey = 'subscription_plan';
 
-  /// Prefer over [skipsChatPrayerCredits] when Lifetime may own the device.
-  /// AR + Lifetime (`platinum`) → use credits. AR + AI Premium → skip.
+  /// AR only: skip Chat/Prayer credits for AI Premium (`silver` / `gold` /
+  /// `twoyear`). Free users and Lifetime (`platinum`) always use wallet credits.
+  /// Classic paywall (`paywallShows != 2`) never skips — unchanged.
   static Future<bool> shouldSkipChatPrayerCredits() async {
     if (!isAutoRenewablePaywallMode) return false;
     try {
       final prefs = await SharedPreferences.getInstance();
       final plan =
           prefs.getString(_subscriptionPlanPrefsKey)?.toLowerCase().trim();
-      if (plan == 'platinum') return false;
+      // AI Premium only — unlimited AI. Everyone else spends credits.
+      return plan == 'silver' || plan == 'gold' || plan == 'twoyear';
     } catch (_) {}
-    return true;
+    return false;
   }
 
   static bool isClassicOneMonthProductId(String productId) {

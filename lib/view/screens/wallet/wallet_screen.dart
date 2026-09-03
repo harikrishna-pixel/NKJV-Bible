@@ -39,6 +39,9 @@ class _WalletScreenState extends State<WalletScreen> {
   bool _isAvailable = false;
   String? _loadingProductId; // Track which specific product is loading
   String? _selectedProductId; // Track which product is selected/tapped
+  /// Set only when user taps Buy for a coin pack; survives spinner timeout.
+  /// Used so open-wallet store `restored` events cannot add credits.
+  String? _activeCoinPackBuyProductId;
   int _currentCredits = 0;
   List<Map<String, dynamic>> _coinPacks = [];
   Timer? _creditsTimer;
@@ -790,12 +793,33 @@ class _WalletScreenState extends State<WalletScreen> {
       }
     }
 
-    // Listen to purchase updates
+    // Listen to purchase updates (replace any prior listen on re-init)
+    await _subscription?.cancel();
     _subscription = _inAppPurchase.purchaseStream.listen(
       (List<PurchaseDetails> purchaseDetailsList) {
         _listenToPurchaseUpdated(purchaseDetailsList);
       },
     );
+  }
+
+  /// True only while a coin-pack Buy was started for [productId] on this screen.
+  bool _isActiveCoinPackBuy(String productId) =>
+      _activeCoinPackBuyProductId == productId;
+
+  void _clearCoinPackBuyUi(String productId) {
+    if (_activeCoinPackBuyProductId == productId) {
+      _activeCoinPackBuyProductId = null;
+    }
+    if (mounted && _loadingProductId == productId) {
+      setState(() {
+        _loadingProductId = null;
+        _selectedProductId = null;
+      });
+    } else if (_selectedProductId == productId) {
+      _selectedProductId = null;
+    }
+    _purchaseTimeouts[productId]?.cancel();
+    _purchaseTimeouts.remove(productId);
   }
 
   void _listenToPurchaseUpdated(
@@ -805,6 +829,22 @@ class _WalletScreenState extends State<WalletScreen> {
       final productId = purchaseDetails.productID;
 
       if (purchaseDetails.status == PurchaseStatus.purchased) {
+        // Additive: only credit when user tapped Buy for this pack.
+        // Prevents unfinished store transactions from adding coins on Wallet open.
+        if (!_isActiveCoinPackBuy(productId)) {
+          debugPrint(
+            'WalletScreen: skip purchased credit grant (no active buy) $productId',
+          );
+          if (purchaseDetails.pendingCompletePurchase) {
+            try {
+              await _inAppPurchase.completePurchase(purchaseDetails);
+            } catch (e) {
+              debugPrint(
+                  'WalletScreen: complete skipped purchase failed: $e');
+            }
+          }
+          continue;
+        }
         // Additive UI only: keep Processing...... until success toast.
         _purchaseTimeouts[productId]?.cancel();
         _purchaseTimeouts.remove(productId);
@@ -820,63 +860,49 @@ class _WalletScreenState extends State<WalletScreen> {
           await EasyLoading.dismiss();
         }
 
-        if (mounted && _loadingProductId == productId) {
-          setState(() {
-            _loadingProductId = null; // Clear loading state for this product
-            _selectedProductId = null; // Clear selected state
-          });
-          // Cancel any pending timeout timer
-          _purchaseTimeouts[productId]?.cancel();
-          _purchaseTimeouts.remove(productId);
-        }
+        _clearCoinPackBuyUi(productId);
       } else if (purchaseDetails.status == PurchaseStatus.error) {
         await EasyLoading.dismiss();
-        if (mounted && _loadingProductId == productId) {
-          setState(() {
-            _loadingProductId = null; // Clear loading state on error
-            _selectedProductId = null; // Clear selected state
-          });
-          // Cancel timeout timer
-          _purchaseTimeouts[productId]?.cancel();
-          _purchaseTimeouts.remove(productId);
-        }
+        _clearCoinPackBuyUi(productId);
         Constants.showToast('Purchase failed. Please try again.');
       } else if (purchaseDetails.status == PurchaseStatus.pending) {
         // UI only: same Processing...... text while store is pending.
         EasyLoading.show(status: 'Processing......');
         debugPrint('Purchase pending...');
       } else if (purchaseDetails.status == PurchaseStatus.restored) {
-        // Some stores report "already owned" as restored; grant credits once.
+        // Some stores report "already owned" as restored; grant credits once —
+        // but only when the user actually tapped Buy for this pack.
+        // Opening Wallet alone must not add credits from store restores.
+        if (!_isActiveCoinPackBuy(productId)) {
+          debugPrint(
+            'WalletScreen: skip restored credit grant (no active buy) $productId',
+          );
+          if (purchaseDetails.pendingCompletePurchase) {
+            try {
+              await _inAppPurchase.completePurchase(purchaseDetails);
+            } catch (e) {
+              debugPrint('WalletScreen: complete skipped restore failed: $e');
+            }
+          }
+          continue;
+        }
         // UI only: same Processing...... as purchased (not "Please wait...").
         _purchaseTimeouts[productId]?.cancel();
         _purchaseTimeouts.remove(productId);
         EasyLoading.show(status: 'Processing......');
         try {
           await _grantCreditsForPurchase(purchaseDetails);
+          if (purchaseDetails.pendingCompletePurchase) {
+            await _inAppPurchase.completePurchase(purchaseDetails);
+          }
         } finally {
           await EasyLoading.dismiss();
         }
-        if (mounted && _loadingProductId == productId) {
-          setState(() {
-            _loadingProductId = null;
-            _selectedProductId = null; // Clear selected state
-          });
-          // Cancel timeout timer
-          _purchaseTimeouts[productId]?.cancel();
-          _purchaseTimeouts.remove(productId);
-        }
+        _clearCoinPackBuyUi(productId);
       } else {
         // Handle any other status or cancellation - clear loading state
         await EasyLoading.dismiss();
-        if (mounted && _loadingProductId == productId) {
-          setState(() {
-            _loadingProductId = null;
-            _selectedProductId = null; // Clear selected state
-          });
-          // Cancel timeout timer
-          _purchaseTimeouts[productId]?.cancel();
-          _purchaseTimeouts.remove(productId);
-        }
+        _clearCoinPackBuyUi(productId);
       }
     }
   }
@@ -893,6 +919,7 @@ class _WalletScreenState extends State<WalletScreen> {
     }
 
     final productId = product.id;
+    _activeCoinPackBuyProductId = productId;
     setState(() {
       _loadingProductId = productId; // Track which product is loading
     });
@@ -930,6 +957,9 @@ class _WalletScreenState extends State<WalletScreen> {
       _purchaseTimeouts[productId]?.cancel();
       _purchaseTimeouts.remove(productId);
       await EasyLoading.dismiss();
+      if (_activeCoinPackBuyProductId == productId) {
+        _activeCoinPackBuyProductId = null;
+      }
       if (mounted) {
         setState(() {
           _loadingProductId = null; // Clear loading state on error
