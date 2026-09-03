@@ -1137,7 +1137,8 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
           style: TextStyle(
             fontSize: isTablet ? 12 : 11,
             color: _inkSoft,
-            decoration: TextDecoration.none,
+            decoration: TextDecoration.underline,
+            decorationColor: _inkSoft,
           ),
         ),
       );

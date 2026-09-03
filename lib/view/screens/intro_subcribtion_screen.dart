@@ -2933,6 +2933,42 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   void _applyPaywallProductDisplayFilter() {
+    // Classic paywall only: short slot is `onemonthadsfree`. Preload may still
+    // return old `sixmonthadsfree` (and AR SKUs) — hide those from the plan row
+    // so "1 Month" is not shown twice. Auto-renewal / MultiSelect unchanged.
+    if (!BibleInfo.isAutoRenewablePaywallMode) {
+      final removed = <String>[];
+      _products.removeWhere((product) {
+        if (BibleInfo.isClassicOneMonthProductId(product.id)) return false;
+        final id = product.id.toLowerCase();
+        final hide = id.contains('sixmonth') ||
+            BibleInfo.isArSixMonthProductId(product.id) ||
+            BibleInfo.isArOneMonthProductId(product.id) ||
+            BibleInfo.isArOneYearProductId(product.id);
+        if (hide) removed.add(product.id);
+        return hide;
+      });
+      if (removed.isNotEmpty) {
+        debugPrint(
+          'Classic paywall: hid non-short-slot leftovers from plan row: '
+          '${removed.join(', ')}',
+        );
+      }
+      // If only old 6M was in store/cache, restore classic 1M fallback card.
+      final hasClassicOneMonth = _products.any(
+        (p) => BibleInfo.isClassicOneMonthProductId(p.id),
+      );
+      if (!hasClassicOneMonth) {
+        for (final fallback in _buildAllFallbackProducts()) {
+          if (fallback.id == _resolvedSixMonthPlanId ||
+              BibleInfo.isClassicOneMonthProductId(fallback.id)) {
+            _products.add(fallback);
+            break;
+          }
+        }
+      }
+    }
+
     final hasLifetime = _products.any((product) => _isLifetimeProductId(product.id));
     if (hasLifetime) {
       // Show Lifetime instead of 2-Year when Lifetime is available.

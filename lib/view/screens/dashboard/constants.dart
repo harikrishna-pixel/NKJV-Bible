@@ -72,7 +72,7 @@ class BibleInfo {
   static bool enableIAP = true;
 
   /// Paywall UI mode: `1` = classic single paywall, `2` = multi / auto-renewable.
-  static int paywallShows = 1;
+  static int paywallShows = 2;
 
   static bool get isAutoRenewablePaywallMode => paywallShows == 2;
 
