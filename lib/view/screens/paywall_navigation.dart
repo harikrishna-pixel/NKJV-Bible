@@ -11,9 +11,13 @@ class PaywallNavigation {
 
   static bool get _useMultiPaywall => BibleInfo.isAutoRenewablePaywallMode;
 
-  /// Paywall 2 uses AR 6M/1Y IDs; Paywall 1 keeps the IDs passed in.
+  /// Paywall 2 short slot → AR 1-month ID.
+  /// Paywall 1 short slot → classic 1-month ID (`onemonthadsfree`).
+  /// AR 6M / classic 6M stay in constants for fallback/restore only.
   static String _sixMonthIdForVisiblePaywall(String sixMonthPlan) =>
-      _useMultiPaywall ? BibleInfo.arSixMonthPlanid : sixMonthPlan;
+      _useMultiPaywall
+          ? BibleInfo.arOneMonthPlanid
+          : BibleInfo.oneMonthPlanid;
 
   static String _oneYearIdForVisiblePaywall(String oneYearPlan) =>
       _useMultiPaywall ? BibleInfo.arOneYearPlanid : oneYearPlan;

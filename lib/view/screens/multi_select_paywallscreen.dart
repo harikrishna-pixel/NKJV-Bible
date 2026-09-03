@@ -129,13 +129,13 @@ if (p != null && p.price.isNotEmpty) return p.price;
 return _dur == _AiDur.oneYear ? '\$59.99' : '\$34.99';
 }
 
-String get _aiPer => _dur == _AiDur.oneYear ? '/yr' : '/6 mo';
+String get _aiPer => _dur == _AiDur.oneYear ? '/yr' : '/mo';
 
 String get _aiNote {
 if (_dur == _AiDur.oneYear) {
 return 'billed yearly as $_aiPrice · auto-renews';
 }
-return 'billed every 6 months as $_aiPrice · auto-renews';
+return 'billed monthly as $_aiPrice · auto-renews';
 }
 
 String get _lifetimePrice {
@@ -707,11 +707,11 @@ final items = <(_AiDur, String, String, String?)>[
 if (_sixMonth != null || _loading)
 (
 _AiDur.sixMonth,
-'6 Months',
+'1 Month',
 _sixMonth != null && _sixMonth!.rawPrice > 0
 ? '${_sixMonth!.currencySymbol.isNotEmpty ? _sixMonth!.currencySymbol : '\$'}${(_sixMonth!.rawPrice / 6).toStringAsFixed(2)}/mo'
     : '\$5.83/mo',
-'SAVE 40%',
+null,
 ),
 if (_oneYear != null || _loading)
 (
@@ -720,14 +720,14 @@ _AiDur.oneYear,
 _oneYear != null && _oneYear!.rawPrice > 0
 ? '${_oneYear!.currencySymbol.isNotEmpty ? _oneYear!.currencySymbol : '\$'}${(_oneYear!.rawPrice / 12).toStringAsFixed(2)}/mo'
     : '\$4.99/mo',
-'POPULAR',
+'SAVE 40%',
 ),
 ];
 
 if (items.isEmpty) {
 items.addAll(const [
-(_AiDur.sixMonth, '6 Months', '\$5.83/mo', 'SAVE 40%'),
-(_AiDur.oneYear, '1 Year', '\$4.99/mo', 'POPULAR'),
+(_AiDur.sixMonth, '1 Month', '\$5.83/mo', null),
+(_AiDur.oneYear, '1 Year', '\$4.99/mo', 'SAVE 40%'),
 ]);
 }
 
@@ -821,7 +821,7 @@ color: _greenSoft,
 borderRadius: BorderRadius.circular(8),
 ),
 child: const Text(
-'One-time · Pay once',
+'One time Payment',
 style: TextStyle(
 fontSize: 10,
 fontWeight: FontWeight.w700,
@@ -1185,12 +1185,12 @@ child: Container(
 padding:
 const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
 decoration: BoxDecoration(
-gradient: badge == 'POPULAR'
+gradient: badge == 'SAVE 40%'
 ? const LinearGradient(
 colors: [Color(0xFFB4842E), Color(0xFFC9A35A)],
 )
     : null,
-color: badge == 'POPULAR' ? null : const Color(0xFF5E8F5A),
+color: badge == 'SAVE 40%' ? null : const Color(0xFF5E8F5A),
 borderRadius: BorderRadius.circular(8),
 boxShadow: [
 BoxShadow(

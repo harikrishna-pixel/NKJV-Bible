@@ -1,3 +1,5 @@
+import 'package:shared_preferences/shared_preferences.dart';
+
 class BibleInfo {
   static String apple_AppId = "6459794212";
 
@@ -12,9 +14,14 @@ class BibleInfo {
 //IAP
   static String sixMonthPlanid =
       'com.balaklrapps.newkingsjamesversion.sixmonthadsfree';
+  /// Paywall 1 classic short plan (1 Month card).
+  static String oneMonthPlanid =
+      'com.balaklrapps.newkingsjamesversion.onemonthadsfree';
   static String oneYearPlanid =
       'com.balaklrapps.newkingsjamesversion.oneyearadsfree';
-  /// Paywall 2 (`paywallShows == 2`) auto-renewable IDs. Paywall 1 keeps the IDs above.
+  /// Paywall 2 (`paywallShows == 2`) auto-renewable IDs. Paywall 1 keeps classic IDs.
+  static String arOneMonthPlanid =
+      'com.balaklrapps.newkingsjamesversion.aronemadfree';
   static String arSixMonthPlanid =
       'com.balaklrapps.newkingsjamesversion.arsixmadfree';
   static String arOneYearPlanid =
@@ -29,10 +36,15 @@ class BibleInfo {
 
   // IAP Discounts (for offline mode)
   static String sixMonthPlanDiscount = '0';
+  static String oneMonthPlanDiscount = '0';
   static String oneYearPlanDiscount = '30';
   static String twoYearPlanDiscount = '50';
   static String lifeTimePlanDiscount = 'Best Value';
   static String exitOfferPlanDiscount = '0';
+  /// Fallback display discount for AR one-month (paywall 2).
+  static String arOneMonthPlanDiscount = '0';
+  static String arSixMonthPlanDiscount = '0';
+  static String arOneYearPlanDiscount = '30';
 
   // Coin Pack IDs
   static String coinPack1Id =
@@ -60,12 +72,47 @@ class BibleInfo {
   static bool enableIAP = true;
 
   /// Paywall UI mode: `1` = classic single paywall, `2` = multi / auto-renewable.
-  static int paywallShows = 2;
+  static int paywallShows = 1;
 
   static bool get isAutoRenewablePaywallMode => paywallShows == 2;
 
-  /// When [paywallShows] is `2`, Chat & Prayer skip credit check/deduct.
+  /// When [paywallShows] is `2`, Chat & Prayer skip credit check/deduct
+  /// for AI Premium. Lifetime (`platinum`) still uses wallet credits.
   static bool get skipsChatPrayerCredits => isAutoRenewablePaywallMode;
+
+  /// Same key as [DownloadProvider] subscription plan storage.
+  static const String _subscriptionPlanPrefsKey = 'subscription_plan';
+
+  /// Prefer over [skipsChatPrayerCredits] when Lifetime may own the device.
+  /// AR + Lifetime (`platinum`) → use credits. AR + AI Premium → skip.
+  static Future<bool> shouldSkipChatPrayerCredits() async {
+    if (!isAutoRenewablePaywallMode) return false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final plan =
+          prefs.getString(_subscriptionPlanPrefsKey)?.toLowerCase().trim();
+      if (plan == 'platinum') return false;
+    } catch (_) {}
+    return true;
+  }
+
+  static bool isClassicOneMonthProductId(String productId) {
+    final id = productId.toLowerCase();
+    return productId == oneMonthPlanid || id.contains('onemonth');
+  }
+
+  /// Classic or AR 1-month product (short plan / silver duration ~1 month).
+  static bool isOneMonthProductId(String productId) =>
+      isClassicOneMonthProductId(productId) ||
+      isArOneMonthProductId(productId);
+
+  static bool isArOneMonthProductId(String productId) {
+    final id = productId.toLowerCase();
+    // `aronem` — do not use a prefix that also matches `aroney` (1Y).
+    return productId == arOneMonthPlanid ||
+        id.contains('aronemadfree') ||
+        id.contains('aronem.');
+  }
 
   static bool isArSixMonthProductId(String productId) {
     final id = productId.toLowerCase();

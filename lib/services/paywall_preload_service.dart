@@ -85,7 +85,12 @@ class PaywallPreloadService {
           twoYearPlan: twoYearPlanId,
           lifeTimePlan: lifeTimePlan,
         );
+        // Classic paywall 1-month SKU (always query so Paywall 1 can resolve it).
+        ids.addAll(AppApiConstant.subscriptionProductIdQueryVariants(
+            BibleInfo.oneMonthPlanid));
         if (BibleInfo.isAutoRenewablePaywallMode) {
+          ids.addAll(AppApiConstant.subscriptionProductIdQueryVariants(
+              BibleInfo.arOneMonthPlanid));
           ids.addAll(AppApiConstant.subscriptionProductIdQueryVariants(
               BibleInfo.arSixMonthPlanid));
           ids.addAll(AppApiConstant.subscriptionProductIdQueryVariants(
@@ -127,8 +132,16 @@ class PaywallPreloadService {
           }
           _preloadedProducts.sort((a, b) {
             int order(String id) {
-              if (id == sixMonthPlan || id.contains('sixmonth')) return 0;
-              if (id == oneYearPlan || id.contains('oneyear')) return 1;
+              if (id == sixMonthPlan ||
+                  BibleInfo.isOneMonthProductId(id) ||
+                  id.contains('sixmonth')) {
+                return 0;
+              }
+              if (id == oneYearPlan ||
+                  BibleInfo.isArOneYearProductId(id) ||
+                  id.contains('oneyear')) {
+                return 1;
+              }
               if (id == lifeTimePlan || id.contains('lifetime')) return 2;
               if (id == twoYearPlanId || id.contains('twoyear')) return 3;
               return 4;
@@ -146,15 +159,19 @@ class PaywallPreloadService {
                 'PaywallPreloadService: Preloaded ${_preloadedProducts.length} products');
             for (var i = 0; i < _preloadedProducts.length; i++) {
               final product = _preloadedProducts[i];
-              final slot = product.id.contains('sixmonth')
-                  ? '6M'
-                  : product.id.contains('oneyear')
-                      ? '1Y'
-                      : product.id.contains('lifetime')
-                          ? 'LT'
-                          : product.id.contains('twoyear')
-                              ? '2Y'
-                              : '?';
+              final slot = BibleInfo.isOneMonthProductId(product.id)
+                  ? '1M'
+                  : product.id.contains('sixmonth') ||
+                          BibleInfo.isArSixMonthProductId(product.id)
+                      ? '6M'
+                      : product.id.contains('oneyear') ||
+                              BibleInfo.isArOneYearProductId(product.id)
+                          ? '1Y'
+                          : product.id.contains('lifetime')
+                              ? 'LT'
+                              : product.id.contains('twoyear')
+                                  ? '2Y'
+                                  : '?';
               debugPrint(
                 '  preload[$i] slot=$slot | id=${product.id} | '
                 'price=${product.price} | rawPrice=${product.rawPrice} | '

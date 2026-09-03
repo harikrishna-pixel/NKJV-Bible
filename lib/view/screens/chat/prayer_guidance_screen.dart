@@ -521,8 +521,8 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
       return;
     }
 
-    // Credits check (same as Chat) — skipped in auto-renewable paywall mode.
-    if (!BibleInfo.skipsChatPrayerCredits) {
+    // Credits check (same as Chat) — AR AI Premium skips; Lifetime still uses credits.
+    if (!await BibleInfo.shouldSkipChatPrayerCredits()) {
       final chatCost = await WalletService.getChatCost();
       final hasCredits = await WalletService.getCredits() >= chatCost;
       if (!hasCredits) {
@@ -795,7 +795,7 @@ ${category.prompt}
               responseText.toLowerCase().startsWith('error:');
       if (!isErrorResponse) {
         await WidgetPromptService.notePrayerGenerated();
-        if (!BibleInfo.skipsChatPrayerCredits) {
+        if (!await BibleInfo.shouldSkipChatPrayerCredits()) {
           final chatCost = await WalletService.getChatCost();
           await WalletService.deductCredits(chatCost);
           if (mounted && requestId == _prayerRequestGeneration) {
@@ -955,7 +955,7 @@ ${category.prompt}
       return;
     }
 
-    if (!BibleInfo.skipsChatPrayerCredits) {
+    if (!await BibleInfo.shouldSkipChatPrayerCredits()) {
       final chatCost = await WalletService.getChatCost();
       final hasCredits = await WalletService.getCredits() >= chatCost;
       if (!hasCredits) {
@@ -1231,7 +1231,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
               responseText.toLowerCase().startsWith('error:');
       if (!isErrorResponse) {
         await WidgetPromptService.notePrayerGenerated();
-        if (!BibleInfo.skipsChatPrayerCredits) {
+        if (!await BibleInfo.shouldSkipChatPrayerCredits()) {
           final chatCost = await WalletService.getChatCost();
           await WalletService.deductCredits(chatCost);
           if (mounted && requestId == _prayerRequestGeneration) {

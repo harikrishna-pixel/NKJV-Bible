@@ -250,7 +250,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   String get _resolvedSixMonthPlanId => AppApiConstant.resolveSubscriptionProductId(
         widget.sixMonthPlan,
-        BibleInfo.sixMonthPlanid,
+        BibleInfo.isAutoRenewablePaywallMode
+            ? BibleInfo.arOneMonthPlanid
+            : BibleInfo.oneMonthPlanid,
       );
 
   String get _resolvedOneYearPlanId => AppApiConstant.resolveSubscriptionProductId(
@@ -282,7 +284,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   bool _cacheHasPaywallSlot(Iterable<String> productIds, String slot) =>
       productIds.any((id) {
-        if (slot == 'sixmonth' && BibleInfo.isArSixMonthProductId(id)) {
+        if (slot == 'sixmonth' &&
+            (BibleInfo.isOneMonthProductId(id) ||
+                BibleInfo.isArSixMonthProductId(id))) {
           return true;
         }
         if (slot == 'oneyear' && BibleInfo.isArOneYearProductId(id)) {
@@ -294,6 +298,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   bool _isSixMonthProductId(String productId) =>
       productId == _resolvedSixMonthPlanId ||
       productId == widget.sixMonthPlan ||
+      BibleInfo.isOneMonthProductId(productId) ||
       BibleInfo.isArSixMonthProductId(productId) ||
       (productId.contains('sixmonth') && _isPaywallProductForThisApp(productId));
 
@@ -715,6 +720,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   String _productPlanSlotLabel(String productId) {
     final id = productId.toLowerCase();
+    if (BibleInfo.isOneMonthProductId(productId)) {
+      return '1M';
+    }
     if (BibleInfo.isArSixMonthProductId(productId) || id.contains('sixmonth')) {
       return '6M';
     }
@@ -849,7 +857,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Future<void> _addLifetimeWalletBonus() async {
-    final amount = widget.invisiblePurchaseHost ? 1000 : 5000;
+    // MultiSelect / visible Lifetime: 5,000. Milestone invisible host: 1,000.
+    final isMilestoneHost = widget.checkad.startsWith('milestone_');
+    final amount =
+        (widget.invisiblePurchaseHost && isMilestoneHost) ? 1000 : 5000;
     await WalletService.addCredits(amount);
   }
 
@@ -868,8 +879,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Future<void> _addLifetimeWalletBonusOnce() async {
-    // Paywall 2 (auto-renewable): Chat/Prayer already skip credits — don't grant wallet bonus.
-    if (BibleInfo.skipsChatPrayerCredits) return;
+    // Always grant Lifetime welcome credits (including auto-renewal paywall).
+    // Chat/Prayer still skip credits for AI Premium only (see shouldSkipChatPrayerCredits).
     final shouldGrant = await _tryMarkLifetimeWalletBonusGrantedOnce();
     if (!shouldGrant) return;
     await _addLifetimeWalletBonus();
@@ -1012,6 +1023,33 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     return const Duration(days: 183);
   }
 
+  /// Additive: 1-month products (classic `onemonth` / AR `aronem`) use ~1 month;
+  /// classic / AR 6M unchanged.
+  Duration _resolveShortPlanAdFreeDuration(
+    String? productId, {
+    DateTime? anchorDate,
+  }) {
+    if (productId != null && BibleInfo.isOneMonthProductId(productId)) {
+      final base = anchorDate ?? DateTime.now();
+      var year = base.year;
+      var month = base.month + 1;
+      if (month > 12) {
+        year += 1;
+        month = 1;
+      }
+      var day = base.day;
+      final daysInNewMonth = DateTime(year, month + 1, 0).day;
+      if (day > daysInNewMonth) day = daysInNewMonth;
+      final computedExpiry = DateTime(year, month, day);
+      final diff = computedExpiry.difference(DateTime.now());
+      if (!diff.isNegative && diff.inHours >= 24) {
+        return diff;
+      }
+      return const Duration(days: 31);
+    }
+    return _resolveSixMonthAdFreeDuration(anchorDate: anchorDate);
+  }
+
   /// Additive: do not replace a longer existing premium expiry with a shorter one
   /// (e.g. fresh 6M purchase overwritten by an older restored 6M transaction).
   Future<bool> _shouldSkipShorterSixMonthExpiry(Duration incoming) async {
@@ -1035,12 +1073,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     return false;
   }
 
-  /// Additive: apply 6-month premium unlock without clobbering a better expiry.
+  /// Additive: apply short-plan premium unlock without clobbering a better expiry.
+  /// Classic / AR 6M → existing 6-month duration. AR 1M → ~1 month.
   Future<void> _applySixMonthPremium(
     DashBoardController controller, {
     DateTime? anchorDate,
+    String? productId,
   }) async {
-    final diff = _resolveSixMonthAdFreeDuration(anchorDate: anchorDate);
+    final diff = _resolveShortPlanAdFreeDuration(
+      productId,
+      anchorDate: anchorDate,
+    );
     if (await _shouldSkipShorterSixMonthExpiry(diff)) {
       await controller.refreshPremiumStatusFromPrefs();
       return;
@@ -2223,7 +2266,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           EasyLoading.dismiss();
           return;
         }
-        await _applySixMonthPremium(controller, anchorDate: dateTime);
+        await _applySixMonthPremium(
+          controller,
+          anchorDate: dateTime,
+          productId: productId,
+        );
         // Set subscription plan to silver for six month plan
         if (downloadProvider != null) {
           await downloadProvider.setSubscriptionPlan('silver');
@@ -2338,7 +2385,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 await _rememberLastIapProduct(purchaseDetails.productID);
                 await Future.delayed(Duration(seconds: 1));
                 if (_isSixMonthProductId(purchaseDetails.productID)) {
-                  await _applySixMonthPremium(controller);
+                  await _applySixMonthPremium(
+                    controller,
+                    productId: purchaseDetails.productID,
+                  );
                   DownloadProvider? downloadProvider = _myProvider;
                   downloadProvider ??= context.mounted
                       ? Provider.of<DownloadProvider>(context, listen: false)
@@ -2851,8 +2901,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
     fallbackProducts.add(ProductDetails(
       id: _resolvedSixMonthPlanId,
-      title: '6 Months Premium',
-      description: 'Get 6 months of premium access',
+      title: '1 Month Premium',
+      description: 'Get 1 month of premium access',
       price: '\$9.99',
       rawPrice: 9.99,
       currencyCode: 'USD',
@@ -3403,6 +3453,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       duration: const Duration(milliseconds: 200),
                       child: isPurchaseLoading
                           ? Padding(
+                              key: const ValueKey('paywall_plans_loading'),
                               padding: const EdgeInsets.symmetric(
                                   vertical: 24),
                               child: Column(
@@ -3419,7 +3470,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                 ],
                               ),
                             )
-                          : _buildPaywallPlanRow(controller),
+                          : KeyedSubtree(
+                              key: const ValueKey('paywall_plans_loaded'),
+                              child: _buildPaywallPlanRow(controller),
+                            ),
                     ),
                   ),
                   if (!isPurchaseLoading && _products.isNotEmpty) ...[
@@ -3689,6 +3743,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   static const double _kPlanBottomBannerHeight = 30;
   static const double _kPlanSubtitleBlockHeight = 33;
   static const double _kPlanPriceBlockHeight = 40;
+  static const Duration _kPlanSelectAnim = Duration(milliseconds: 220);
   /// Tablet-only side inset for full-bleed layout (phones unchanged).
   static const double _kPaywallTabletSidePad = 20;
 
@@ -4104,17 +4159,23 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       return _buildPlanCard(0, controller);
     }
     final isTablet = _isPaywallTablet(context);
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (int i = 0; i < _products.length; i++) ...[
-              if (i > 0) SizedBox(width: isTablet ? 12 : 8),
-              Expanded(child: _buildPlanCard(i, controller)),
+    return RepaintBoundary(
+      child: Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (int i = 0; i < _products.length; i++) ...[
+                if (i > 0) SizedBox(width: isTablet ? 12 : 8),
+                Expanded(
+                  child: RepaintBoundary(
+                    child: _buildPlanCard(i, controller),
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -4227,7 +4288,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   String _getPlanTitle(int index) {
-    if (_isSixMonthProductId(_products[index].id)) return '6 Months';
+    if (_isSixMonthProductId(_products[index].id)) return '1 Month';
     if (_isOneYearProductId(_products[index].id)) return '1 Year';
     if (_isTwoYearProductId(_products[index].id)) return '2 Years';
     if (_isLifetimeProductId(_products[index].id)) return 'Lifetime';
@@ -4373,13 +4434,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       bottomBanner = 'LOWEST COST';
     }
 
-    final borderWidth = isSelected ? 2.0 : 1.0;
     final hasBadge = badgeLabel.isNotEmpty;
     final bannerAccent = isTwoYear ? themedAccent : accent;
 
     Widget? badgeWidget;
     if (hasBadge) {
-      badgeWidget = Container(
+      badgeWidget = AnimatedContainer(
+        duration: _kPlanSelectAnim,
+        curve: Curves.easeOutCubic,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: accent,
@@ -4404,14 +4466,20 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       );
     }
 
-    return InkWell(
-      onTap: () {
-        setState(() {
-          selectedindex = index;
-        });
-      },
-      borderRadius: BorderRadius.circular(14),
-      child: Column(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        hoverColor: Colors.transparent,
+        onTap: () {
+          if (selectedindex == index) return;
+          setState(() {
+            selectedindex = index;
+          });
+        },
+        borderRadius: BorderRadius.circular(14),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
@@ -4419,11 +4487,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             child: hasBadge ? Center(child: badgeWidget) : null,
           ),
           Expanded(
-            child: Container(
+            child: AnimatedContainer(
+              duration: _kPlanSelectAnim,
+              curve: Curves.easeOutCubic,
               decoration: BoxDecoration(
                 color: bg,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: border, width: borderWidth),
+                border: Border.all(color: border, width: 2.0),
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
@@ -4432,7 +4502,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                           offset: const Offset(0, 3),
                         ),
                       ]
-                    : null,
+                    : const [],
               ),
               child: Column(
                 children: [
@@ -4442,9 +4512,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                           horizontal: 8, vertical: 14),
                       child: Column(
                         children: [
-                          Text(
-                            _getPlanTitle(index),
-                            textAlign: TextAlign.center,
+                          AnimatedDefaultTextStyle(
+                            duration: _kPlanSelectAnim,
+                            curve: Curves.easeOutCubic,
                             style: TextStyle(
                               fontSize: isSixMonth ? 14 : 15,
                               fontWeight: FontWeight.w800,
@@ -4452,15 +4522,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                   ? accent
                                   : _paywallInk,
                             ),
+                            child: Text(
+                              _getPlanTitle(index),
+                              textAlign: TextAlign.center,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           SizedBox(
                             height: _kPlanSubtitleBlockHeight,
-                            child: Text(
-                              _getPlanSubtitle(index),
-                              textAlign: TextAlign.center,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
+                            child: AnimatedDefaultTextStyle(
+                              duration: _kPlanSelectAnim,
+                              curve: Curves.easeOutCubic,
                               style: TextStyle(
                                 fontSize: 9,
                                 height: 1.2,
@@ -4468,6 +4540,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                     ? accent.withValues(alpha: 0.8)
                                     : Colors.grey.shade600,
                                 fontWeight: FontWeight.w500,
+                              ),
+                              child: Text(
+                                _getPlanSubtitle(index),
+                                textAlign: TextAlign.center,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ),
@@ -4488,9 +4566,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                 SizedBox(
                                   height: 14,
                                   child: discountedPrice.isNotEmpty
-                                      ? Text(
-                                          discountedPrice,
-                                          textAlign: TextAlign.center,
+                                      ? AnimatedDefaultTextStyle(
+                                          duration: _kPlanSelectAnim,
+                                          curve: Curves.easeOutCubic,
                                           style: TextStyle(
                                             fontSize: 10,
                                             height: 1.1,
@@ -4500,12 +4578,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                             decoration:
                                                 TextDecoration.lineThrough,
                                           ),
+                                          child: Text(
+                                            discountedPrice,
+                                            textAlign: TextAlign.center,
+                                          ),
                                         )
                                       : null,
                                 ),
-                                Text(
-                                  _products[index].price,
-                                  textAlign: TextAlign.center,
+                                AnimatedDefaultTextStyle(
+                                  duration: _kPlanSelectAnim,
+                                  curve: Curves.easeOutCubic,
                                   style: TextStyle(
                                     fontSize: 17,
                                     height: 1.1,
@@ -4513,6 +4595,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                     color: isSelected && !isSixMonth
                                         ? accent
                                         : _paywallInk,
+                                  ),
+                                  child: Text(
+                                    _products[index].price,
+                                    textAlign: TextAlign.center,
                                   ),
                                 ),
                               ],
@@ -4537,14 +4623,19 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               ),
                             ),
                             child: Center(
-                              child: Text(
-                                bottomBanner,
-                                textAlign: TextAlign.center,
+                              child: AnimatedDefaultTextStyle(
+                                duration: _kPlanSelectAnim,
+                                curve: Curves.easeOutCubic,
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w800,
-                                  color: isOneYear ? Colors.white : bannerAccent,
+                                  color:
+                                      isOneYear ? Colors.white : bannerAccent,
                                   letterSpacing: 0.5,
+                                ),
+                                child: Text(
+                                  bottomBanner,
+                                  textAlign: TextAlign.center,
                                 ),
                               ),
                             ),
@@ -4556,6 +4647,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

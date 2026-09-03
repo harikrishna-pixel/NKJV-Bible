@@ -754,7 +754,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   void _startListening() async {
-    if (!BibleInfo.skipsChatPrayerCredits) {
+    if (!await BibleInfo.shouldSkipChatPrayerCredits()) {
       final chatCost = await WalletService.getChatCost();
       final hasCredits = await WalletService.getCredits() >= chatCost;
       if (!hasCredits) {
@@ -1450,14 +1450,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   Future<bool> _checkChatLimit() async {
-    if (BibleInfo.skipsChatPrayerCredits) return true;
+    if (await BibleInfo.shouldSkipChatPrayerCredits()) return true;
     final chatCost = await WalletService.getChatCost();
     final credits = await WalletService.getCredits();
     return credits >= chatCost;
   }
 
   Future<void> _deductChatCredits() async {
-    if (BibleInfo.skipsChatPrayerCredits) return;
+    if (await BibleInfo.shouldSkipChatPrayerCredits()) return;
     final chatCost = await WalletService.getChatCost();
     final success = await WalletService.deductCredits(chatCost);
     if (success) {
@@ -1753,7 +1753,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       return;
     }
 
-    if (!BibleInfo.skipsChatPrayerCredits) {
+    if (!await BibleInfo.shouldSkipChatPrayerCredits()) {
       final chatCost = await WalletService.getChatCost();
       final hasCredits = await WalletService.getCredits() >= chatCost;
       if (!hasCredits) {

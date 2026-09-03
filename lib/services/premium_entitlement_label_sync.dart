@@ -40,8 +40,18 @@ class PremiumEntitlementLabelSync {
     final id = productId.toLowerCase();
     if (id.contains('lifetime')) return 'platinum';
     if (id.contains('twoyear')) return 'twoyear';
-    if (id.contains('oneyear') || id.contains('1year')) return 'gold';
-    if (id.contains('sixmonth') || id.contains('6month')) return 'silver';
+    if (id.contains('oneyear') ||
+        id.contains('1year') ||
+        BibleInfo.isArOneYearProductId(productId)) {
+      return 'gold';
+    }
+    if (id.contains('sixmonth') ||
+        id.contains('6month') ||
+        id.contains('onemonth') ||
+        BibleInfo.isOneMonthProductId(productId) ||
+        BibleInfo.isArSixMonthProductId(productId)) {
+      return 'silver';
+    }
     return null;
   }
 

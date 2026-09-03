@@ -151,7 +151,7 @@ String _subscriptionPeriodDisplayText(
   // Additive: trust stored plan key first so Restore info matches the plan
   // that was applied (silver/gold), not a lifetime day-threshold fallback.
   if (planKey == 'silver') {
-    return 'Your subscription period is 6 months';
+    return 'Your subscription period is 1 month';
   }
   if (planKey == 'twoyear') {
     return 'Your subscription period is 2 years';
