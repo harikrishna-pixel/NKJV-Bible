@@ -1417,6 +1417,7 @@ Future<String?> registerUser(
       await PrayerWallLocalStore.clearAccountScopedData();
       await PrayerWallService.resolveIdentityUser(
         email: '${data['data']['user']['email']}',
+        userName: '${data['data']['user']['name']}',
       );
       Constants.showToast("Account Created Successfully");
       return registeredReferralCode;
@@ -1536,6 +1537,7 @@ Future<UserModel> loginUser(
       await PrayerWallLocalStore.clearAccountScopedData();
       await PrayerWallService.resolveIdentityUser(
         email: '${data['data']['user']['email']}',
+        userName: '${data['data']['user']['name']}',
       );
 
       // Constants.showToast(

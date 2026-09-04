@@ -282,7 +282,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     final m = await PrayerWallLocalStore.loadPrayerAuthorUserIdMap();
     var changed = false;
     for (final p in prayers) {
-      final uid = (p.authorUserId ?? '').trim();
+      // Prefer resolve identityUserId (person id) when API sends it.
+      final uid = (p.identityUserId ?? p.authorUserId ?? '').trim();
       if (uid.isEmpty) continue;
       if (m[p.id] == uid) continue;
       m[p.id] = uid;
@@ -457,11 +458,20 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         email: email,
       );
       if (!mounted) return;
-      // Replace with this account's server list — do not union other accounts' ids.
-      await PrayerWallLocalStore.saveBlockedUserIds(fromApi, email: email);
+      // Additive: empty GET must not wipe local blocks (race after Block).
+      if (fromApi.isEmpty) {
+        print(
+          'PrayerWall restore blocked: GET empty — keep local '
+          '(${_blockedUserIds.length})',
+        );
+        return;
+      }
+      // Merge server + this account's local ids (do not drop local person ids).
+      final merged = <String>{..._blockedUserIds, ...fromApi};
+      await PrayerWallLocalStore.saveBlockedUserIds(merged, email: email);
       if (!mounted) return;
       setState(() {
-        _blockedUserIds = fromApi;
+        _blockedUserIds = merged;
         _blockedListAccountEmail = emailKey;
       });
     } catch (e) {
@@ -776,11 +786,12 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
 
   String? _blockPrayerId(PrayerWallItem item) => _mongoPrayerId(item.id);
 
-  /// Additive: block target for two-way feed — their resolve user id when present.
-  /// Falls back to prayer `_id` (existing POST shape).
+  /// Additive: block target = poster resolve id when present (person-level).
+  /// Falls back to cached map, then prayer `_id` (existing POST shape).
   String? _blockTargetId(PrayerWallItem item) {
     return _mongoPrayerId(item.identityUserId) ??
         _mongoPrayerId(item.authorUserId) ??
+        _mongoPrayerId(_prayerAuthorUserIdMap[item.id]) ??
         _blockPrayerId(item);
   }
 
@@ -789,6 +800,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     if (p.id == id) return true;
     if ((p.identityUserId ?? '').trim() == id) return true;
     if ((p.authorUserId ?? '').trim() == id) return true;
+    if ((_prayerAuthorUserIdMap[p.id] ?? '').trim() == id) return true;
     return false;
   }
 
@@ -1125,42 +1137,51 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
             );
           } catch (_) {}
         }
-        await PrayerWallLocalStore.unmarkBlockedUser(
-          blockedId,
-          email: _userEmail,
-        );
-        if (prayerId != null) {
+        // Additive: clear person id + related wall prayer ids from local set.
+        final relatedIds = <String>{blockedId};
+        if (prayerId != null) relatedIds.add(prayerId);
+        for (final p in _all) {
+          if (!_itemMatchesBlockedId(p, blockedId)) continue;
+          relatedIds.add(p.id);
+          final iid = (p.identityUserId ?? '').trim();
+          if (iid.isNotEmpty) relatedIds.add(iid);
+          final aid = (p.authorUserId ?? '').trim();
+          if (aid.isNotEmpty) relatedIds.add(aid);
+        }
+        for (final id in relatedIds) {
           await PrayerWallLocalStore.unmarkBlockedUser(
-            prayerId,
+            id,
             email: _userEmail,
           );
         }
         if (!mounted) return;
-        setState(() {
-          _blockedUserIds.remove(blockedId);
-          if (prayerId != null) _blockedUserIds.remove(prayerId);
-        });
+        setState(() => _blockedUserIds.removeAll(relatedIds));
         Constants.showToast('User unblocked', 2000);
       } else {
         await PrayerWallService.blockUser(
           userId: uid,
           blockedUserId: blockedId,
         );
-        await PrayerWallLocalStore.markBlockedUser(
-          blockedId,
-          email: _userEmail,
-        );
-        if (prayerId != null && prayerId != blockedId) {
+        // Additive: store person id + all their wall prayer ids so every
+        // post from them hides (not only the tapped card).
+        final relatedIds = <String>{blockedId};
+        if (prayerId != null) relatedIds.add(prayerId);
+        for (final p in _all) {
+          if (!_itemMatchesBlockedId(p, blockedId)) continue;
+          relatedIds.add(p.id);
+          final iid = (p.identityUserId ?? '').trim();
+          if (iid.isNotEmpty) relatedIds.add(iid);
+          final aid = (p.authorUserId ?? '').trim();
+          if (aid.isNotEmpty) relatedIds.add(aid);
+        }
+        for (final id in relatedIds) {
           await PrayerWallLocalStore.markBlockedUser(
-            prayerId,
+            id,
             email: _userEmail,
           );
         }
         if (!mounted) return;
-        setState(() {
-          _blockedUserIds.add(blockedId);
-          if (prayerId != null) _blockedUserIds.add(prayerId);
-        });
+        setState(() => _blockedUserIds.addAll(relatedIds));
         Constants.showToast('User blocked', 2000);
       }
     } catch (e) {

@@ -74,28 +74,87 @@ class PrayerWallService {
     return '';
   }
 
+  /// In-flight resolve so parallel callers share one POST (avoids race 500s).
+  static Future<String?>? _resolveInFlight;
+
   /// Additive: POST `/api/users/resolve` after login — does not change login.
-  static Future<String?> resolveIdentityUser({String? email}) async {
+  /// Logged-in: `app_id` + login `email` + `user_name` (Postman-safe; no device clash).
+  /// Guest: `app_id` + `device_id` (+ optional name).
+  static Future<String?> resolveIdentityUser({
+    String? email,
+    String? userName,
+  }) async {
+    if (_resolveInFlight != null) {
+      print('PrayerWall resolve: reuse in-flight request');
+      return _resolveInFlight;
+    }
+    _resolveInFlight = _resolveIdentityUserImpl(
+      email: email,
+      userName: userName,
+    );
+    try {
+      return await _resolveInFlight;
+    } finally {
+      _resolveInFlight = null;
+    }
+  }
+
+  static Future<String?> _resolveIdentityUserImpl({
+    String? email,
+    String? userName,
+  }) async {
     try {
       final deviceId = await _deviceUid();
-      final firebaseId =
-          (FirebaseAuth.instance.currentUser?.uid ?? '').trim();
-      final resolvedEmail = (email ?? '').trim();
+      var resolvedEmail = (email ?? '').trim();
+      var resolvedName = (userName ?? '').trim();
+      // Fallback: login/signup cache keys when caller did not pass them.
+      if (resolvedEmail.isEmpty || resolvedName.isEmpty) {
+        try {
+          if (resolvedEmail.isEmpty) {
+            resolvedEmail =
+                (await CacheNotifier().readCache(key: 'user') ?? '')
+                    .toString()
+                    .trim();
+          }
+          if (resolvedName.isEmpty) {
+            resolvedName =
+                (await CacheNotifier().readCache(key: 'name') ?? '')
+                    .toString()
+                    .trim();
+          }
+        } catch (_) {}
+      }
+
+      // Why real login got 500 while hardcode/Postman got 200:
+      // app sent email + real device_id together; that device_id was often
+      // already tied to another identity → server conflict 500.
+      // Fix: when login email exists, match Postman — email (+ user_name) only.
       final bodyMap = <String, dynamic>{
         'app_id': BibleInfo.ios_Bundle_Id,
       };
-      if (firebaseId.isNotEmpty) {
-        bodyMap['firebaseId'] = firebaseId;
-      }
       if (resolvedEmail.isNotEmpty) {
         bodyMap['email'] = resolvedEmail;
+        if (resolvedName.isNotEmpty) {
+          bodyMap['user_name'] = resolvedName;
+        }
+      } else {
+        // Guest / no email: identify by device only.
+        if (deviceId.isNotEmpty) {
+          bodyMap['device_id'] = deviceId;
+        }
+        if (resolvedName.isNotEmpty) {
+          bodyMap['user_name'] = resolvedName;
+        }
       }
-      if (deviceId.isNotEmpty) {
-        bodyMap['device_id'] = deviceId;
-      }
+
       final bodyJson = jsonEncode(bodyMap);
       print('========== POST /api/users/resolve ==========');
       print('URL  → ${PrayerWallApiConstant.usersResolve}');
+      print('email (login/signup) → $resolvedEmail');
+      print('user_name (login/signup) → $resolvedName');
+      print(
+        'device_id → ${resolvedEmail.isNotEmpty ? "(omitted; email login)" : deviceId}',
+      );
       print('body → $bodyJson');
       print('=============================================');
       final res = await http
@@ -135,17 +194,24 @@ class PrayerWallService {
     }
   }
 
-  /// Cached resolve id, or resolve now using login email + device UID.
+  /// Cached resolve id, or resolve now using login email + name + device UID.
   static Future<String?> ensureIdentityUserId() async {
     final cached = await PrayerWallLocalStore.loadIdentityUserId();
     if (cached != null && cached.isNotEmpty) return cached;
     var email = '';
+    var name = '';
     try {
       email = (await CacheNotifier().readCache(key: 'user') ?? '')
           .toString()
           .trim();
+      name = (await CacheNotifier().readCache(key: 'name') ?? '')
+          .toString()
+          .trim();
     } catch (_) {}
-    return resolveIdentityUser(email: email.isEmpty ? null : email);
+    return resolveIdentityUser(
+      email: email.isEmpty ? null : email,
+      userName: name.isEmpty ? null : name,
+    );
   }
 
   static Future<List<PrayerWallItem>> fetchPrayers() async {
@@ -204,13 +270,18 @@ class PrayerWallService {
   /// Additive: `GET /api/prayers?identityUserId=<resolve user_id>`.
   static Future<List<PrayerWallItem>> fetchPrayersByIdentityUserId() async {
     var email = '';
+    var name = '';
     try {
       email = (await CacheNotifier().readCache(key: 'user') ?? '')
+          .toString()
+          .trim();
+      name = (await CacheNotifier().readCache(key: 'name') ?? '')
           .toString()
           .trim();
     } catch (_) {}
     final identityUserId = await resolveIdentityUser(
           email: email.isEmpty ? null : email,
+          userName: name.isEmpty ? null : name,
         ) ??
         await PrayerWallLocalStore.loadIdentityUserId();
     if (identityUserId == null || identityUserId.isEmpty) {
