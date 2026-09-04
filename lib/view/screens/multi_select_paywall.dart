@@ -1154,24 +1154,24 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.verified_user_outlined,
-              size: isTablet ? 16 : 14, color: _inkSoft),
-          SizedBox(width: isTablet ? 6 : 4),
+              size: isTablet ? 14 : 12, color: _inkSoft),
+          SizedBox(width: isTablet ? 5 : 3),
           Text('Cancel anytime',
               style: TextStyle(
-                  fontSize: isTablet ? 13.5 : 12, color: _inkSoft)),
-          SizedBox(width: isTablet ? 14 : 10),
+                  fontSize: isTablet ? 12.5 : 11, color: _inkSoft)),
+          SizedBox(width: isTablet ? 12 : 8),
           Container(
             width: 1,
-            height: isTablet ? 14 : 12,
+            height: isTablet ? 12 : 10,
             color: _inkSoft.withOpacity(0.35),
           ),
-          SizedBox(width: isTablet ? 14 : 10),
+          SizedBox(width: isTablet ? 12 : 8),
           Icon(Icons.lock_outline_rounded,
-              size: isTablet ? 16 : 14, color: _inkSoft),
-          SizedBox(width: isTablet ? 6 : 4),
+              size: isTablet ? 14 : 12, color: _inkSoft),
+          SizedBox(width: isTablet ? 5 : 3),
           Text('Secure & trusted',
               style: TextStyle(
-                  fontSize: isTablet ? 13.5 : 12, color: _inkSoft)),
+                  fontSize: isTablet ? 12.5 : 11, color: _inkSoft)),
         ],
       ),
     );
@@ -1223,14 +1223,15 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     final hPad = isTablet ? (w * 0.08).clamp(36.0, 64.0) : 18.0;
     return SafeArea(
       top: false,
+      // UI only: ~25% tighter footer (button + spacing).
       child: Padding(
-        padding: EdgeInsets.fromLTRB(hPad, isTablet ? 10 : 8, hPad, 12),
+        padding: EdgeInsets.fromLTRB(hPad, isTablet ? 6 : 4, hPad, 8),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // UI only: slightly shorter CTA button.
             SizedBox(
               width: double.infinity,
-              height: isTablet ? 50 : 44,
+              height: isTablet ? 48 : 42,
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
@@ -1240,7 +1241,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                       Color(0xFFA9791F),
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(isTablet ? 14 : 12),
+                  borderRadius: BorderRadius.circular(isTablet ? 13 : 11),
                 ),
                 child: ElevatedButton(
                   onPressed: _startPurchase,
@@ -1251,13 +1252,13 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                     padding: EdgeInsets.zero,
                     shape: RoundedRectangleBorder(
                       borderRadius:
-                          BorderRadius.circular(isTablet ? 14 : 12),
+                          BorderRadius.circular(isTablet ? 13 : 11),
                     ),
                   ),
                   child: Text(
                     '$_ctaLabel ›',
                     style: TextStyle(
-                      fontSize: isTablet ? 17 : 15,
+                      fontSize: isTablet ? 16.5 : 15,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
                     ),
@@ -1265,22 +1266,21 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                 ),
               ),
             ),
-            // UI only: Continue above Cancel anytime + legal lines.
-            SizedBox(height: isTablet ? 10 : 8),
+            SizedBox(height: isTablet ? 6 : 5),
             GestureDetector(
               onTap: _continueLimited,
               child: Text(
                 'Continue with Limited Access',
                 style: TextStyle(
-                  fontSize: isTablet ? 14 : 13,
+                  fontSize: isTablet ? 13 : 12,
                   color: const Color(0xFF9A866A),
                   decoration: TextDecoration.none,
                 ),
               ),
             ),
-            SizedBox(height: isTablet ? 10 : 8),
+            SizedBox(height: isTablet ? 6 : 5),
             _buildTrustRow(isTablet: isTablet),
-            SizedBox(height: isTablet ? 10 : 8),
+            SizedBox(height: isTablet ? 6 : 5),
             _buildLegalRow(isTablet: isTablet),
           ],
         ),

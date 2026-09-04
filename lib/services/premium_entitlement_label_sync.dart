@@ -6,9 +6,10 @@ import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-/// Additive: corrects stale local plan labels from the last remembered IAP
-/// product (prefs + iOS Keychain). Does not change buy/charge/ad logic or
-/// overwrite a higher-tier local plan with a lower remembered product.
+/// Additive: home/drawer hook for premium plan labels.
+/// Does **not** auto-apply Keychain/last-IAP memory as a live plan.
+/// Plans are set only by Buy success or explicit Restore.
+/// Clears orphan `silver`/`gold`/`twoyear` when premium expiry is inactive.
 class PremiumEntitlementLabelSync {
   PremiumEntitlementLabelSync._();
 
@@ -87,47 +88,34 @@ class PremiumEntitlementLabelSync {
     }
   }
 
-  /// Rewrites local plan label when remembered product is more accurate.
-  /// Returns true when the stored plan was updated.
+  /// Home/drawer entry: never auto-grant a plan from Keychain/last IAP.
+  /// Buy success and explicit Restore still set `subscription_plan` themselves.
+  /// Clears orphan AI-Premium labels via [BibleInfo.clearOrphanAiPremiumCreditSkipIfNeeded].
   static Future<bool> syncPlanLabelFromRememberedProduct(
     DownloadProvider download,
   ) async {
     try {
-      final productId = await readLastProductId();
-      if (productId == null || productId.isEmpty) return false;
-
-      final expected = planKeyForProductId(productId);
-      if (expected == null) return false;
-
-      final current = (await download.getSubscriptionPlan())?.toLowerCase();
-      if (current == expected) return false;
-
-      final currentTier = _planTier(current);
-      final expectedTier = _planTier(expected);
-
-      if (expectedTier < currentTier) {
+      final before =
+          (await download.getSubscriptionPlan())?.toLowerCase().trim();
+      await BibleInfo.clearOrphanAiPremiumCreditSkipIfNeeded();
+      // Keep DownloadProvider in-memory plan in sync if prefs were cleared.
+      final after =
+          (await download.getSubscriptionPlan())?.toLowerCase().trim();
+      if ((before == 'silver' || before == 'gold' || before == 'twoyear') &&
+          (after == null || after.isEmpty)) {
+        await download.setSubscriptionPlan('');
         debugPrint(
-          'PremiumEntitlementLabelSync: skip downgrade '
-          '$current → $expected ($productId)',
+          'PremiumEntitlementLabelSync: cleared orphan plan=$before '
+          '(Buy/Restore only)',
         );
-        return false;
+        return true;
       }
 
-      if (current == 'gold' && expected == 'twoyear') {
-        debugPrint(
-          'PremiumEntitlementLabelSync: skip stale twoyear over gold '
-          '($productId) — aligning memory to 1Y',
-        );
-        await _alignRememberedProductToOneYear();
-        return false;
-      }
-
-      await download.setSubscriptionPlan(expected);
       debugPrint(
-        'PremiumEntitlementLabelSync: plan $current → $expected '
-        'from $productId',
+        'PremiumEntitlementLabelSync: skip auto plan apply from memory '
+        '(Buy/Restore only)',
       );
-      return true;
+      return false;
     } catch (e) {
       debugPrint('PremiumEntitlementLabelSync error: $e');
       return false;

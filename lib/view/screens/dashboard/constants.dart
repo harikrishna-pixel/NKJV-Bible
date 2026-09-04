@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class BibleInfo {
@@ -83,17 +84,79 @@ class BibleInfo {
   /// Same key as [DownloadProvider] subscription plan storage.
   static const String _subscriptionPlanPrefsKey = 'subscription_plan';
 
-  /// AR only: skip Chat/Prayer credits for AI Premium (`silver` / `gold` /
-  /// `twoyear`). Free users and Lifetime (`platinum`) always use wallet credits.
-  /// Classic paywall (`paywallShows != 2`) never skips — unchanged.
-  static Future<bool> shouldSkipChatPrayerCredits() async {
-    if (!isAutoRenewablePaywallMode) return false;
+  /// Set only when Buy/Restore writes silver/gold/twoyear via [DownloadProvider].
+  /// v2: invalidates older broad grants that unlocked AI without Buy/Restore.
+  static const String aiPremiumCreditSkipGrantedKey =
+      'ai_premium_credit_skip_granted_v2';
+
+  /// Keep grant flag in sync with plan writes.
+  /// [granted] true only for Buy/Restore of silver/gold/twoyear.
+  static Future<void> setAiPremiumCreditSkipGranted(bool granted) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(aiPremiumCreditSkipGrantedKey, granted);
+    } catch (_) {}
+  }
+
+  /// Clears orphan AI-premium plan/grant when not a live Buy/Restore entitlement.
+  static Future<void> clearOrphanAiPremiumCreditSkipIfNeeded() async {
+    if (!isAutoRenewablePaywallMode) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       final plan =
           prefs.getString(_subscriptionPlanPrefsKey)?.toLowerCase().trim();
-      // AI Premium only — unlimited AI. Everyone else spends credits.
-      return plan == 'silver' || plan == 'gold' || plan == 'twoyear';
+      if (plan != 'silver' && plan != 'gold' && plan != 'twoyear') {
+        // Drop stale grant if plan is no longer AI Premium.
+        if (prefs.getBool(aiPremiumCreditSkipGrantedKey) == true) {
+          await prefs.setBool(aiPremiumCreditSkipGrantedKey, false);
+        }
+        return;
+      }
+      final granted = prefs.getBool(aiPremiumCreditSkipGrantedKey) == true;
+      final expiryRaw =
+          prefs.getString('isRewardAdViewTime');
+      final expiry = (expiryRaw != null && expiryRaw.isNotEmpty)
+          ? DateTime.tryParse(expiryRaw)
+          : null;
+      final hasActivePremium =
+          expiry != null && expiry.isAfter(DateTime.now());
+      if (granted && hasActivePremium) return;
+      await prefs.setString(_subscriptionPlanPrefsKey, '');
+      await prefs.setBool(aiPremiumCreditSkipGrantedKey, false);
+      debugPrint(
+        'BibleInfo: cleared orphan AI premium plan=$plan '
+        'granted=$granted hasActivePremium=$hasActivePremium',
+      );
+    } catch (_) {}
+  }
+
+  /// AR only: skip Chat/Prayer credits for AI Premium (`silver` / `gold` /
+  /// `twoyear`) **after** Buy or explicit Restore granted that plan, and only
+  /// while premium expiry is still active.
+  /// Free users and Lifetime (`platinum`) always use wallet credits.
+  /// Classic paywall (`paywallShows != 2`) never skips — unchanged.
+  static Future<bool> shouldSkipChatPrayerCredits() async {
+    if (!isAutoRenewablePaywallMode) return false;
+    try {
+      await clearOrphanAiPremiumCreditSkipIfNeeded();
+      final prefs = await SharedPreferences.getInstance();
+      final plan =
+          prefs.getString(_subscriptionPlanPrefsKey)?.toLowerCase().trim();
+      if (plan != 'silver' && plan != 'gold' && plan != 'twoyear') {
+        return false;
+      }
+      if (prefs.getBool(aiPremiumCreditSkipGrantedKey) != true) {
+        return false;
+      }
+      final expiryRaw =
+          prefs.getString('isRewardAdViewTime');
+      final expiry = (expiryRaw != null && expiryRaw.isNotEmpty)
+          ? DateTime.tryParse(expiryRaw)
+          : null;
+      if (expiry == null || !expiry.isAfter(DateTime.now())) {
+        return false;
+      }
+      return true;
     } catch (_) {}
     return false;
   }

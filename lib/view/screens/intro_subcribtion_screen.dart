@@ -216,7 +216,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   /// Additive: product the user tapped Buy for — ignore other StoreKit
   /// history items in the same buy session (e.g. stale 2Y).
   String? _activeBuyProductId;
-  Timer? _loadingTimeoutTimer; // Timer for 6-second loading timeout
+  /// Survives Processing UI timeout so a late matching StoreKit event can unlock.
+  String? _lastBuyAttemptProductId;
+  /// True after Buy until success / cancel / error — not cleared on UI timeout.
+  bool _awaitingLateMatchingBuy = false;
+  Timer? _loadingTimeoutTimer; // Buy: short tap unlock + 10s Processing safety
+  /// Additive: 10s cap so unrelated store history cannot leave Processing forever.
+  static const Duration _kBuyProcessingSafetyTimeout = Duration(seconds: 10);
   bool _autoPurchaseTriggered = false;
   bool _autoRestoreTriggered = false;
   Set<String> _lastQueriedProductIds = {};
@@ -321,9 +327,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   /// Additive: during Buy, accept the tapped product by exact ID or same plan
   /// family (6M/1Y/2Y/LT). Only skip clearly different plans (e.g. historic 2Y
   /// while buying 1Y). Does not change apply/charge logic.
+  /// Prefers `_activeBuyProductId`; after Processing UI timeout falls back to
+  /// `_lastBuyAttemptProductId` while `_awaitingLateMatchingBuy` is true.
   bool _isActiveBuyTargetProduct(String productId) {
-    final target = _activeBuyProductId;
-    if (target == null || target.isEmpty) return true;
+    final target = (_activeBuyProductId != null &&
+            _activeBuyProductId!.isNotEmpty)
+        ? _activeBuyProductId
+        : (_awaitingLateMatchingBuy ? _lastBuyAttemptProductId : null);
+    if (target == null || target.isEmpty) return false;
     if (productId == target) return true;
     if (_isSixMonthProductId(target) && _isSixMonthProductId(productId)) {
       return true;
@@ -338,6 +349,95 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       return true;
     }
     return false;
+  }
+
+  void _clearBuyAttemptTracking() {
+    _activeBuyProductId = null;
+    _lastBuyAttemptProductId = null;
+    _awaitingLateMatchingBuy = false;
+  }
+
+  /// Finish store txn for ignored/skipped events without unlocking premium.
+  Future<void> _completeStoreTransactionIfNeeded(
+    PurchaseDetails purchaseDetails,
+  ) async {
+    if (!purchaseDetails.pendingCompletePurchase) return;
+    try {
+      await _inAppPurchase.completePurchase(purchaseDetails);
+      debugPrint(
+        'IAP: completed ignored store txn ${purchaseDetails.productID}',
+      );
+    } catch (e) {
+      debugPrint('IAP: complete ignored txn failed: $e');
+    }
+  }
+
+  /// Buy session only: unrelated product — finish txn if needed, keep waiting.
+  Future<void> _ignoreUnrelatedBuyStoreEvent(
+    PurchaseDetails purchaseDetails, {
+    required String reason,
+  }) async {
+    debugPrint(
+      'IAP Buy: ignored unrelated product '
+      'received=${purchaseDetails.productID} '
+      'status=${purchaseDetails.status} '
+      'activeBuy=$_activeBuyProductId '
+      'reason=$reason',
+    );
+    await _completeStoreTransactionIfNeeded(purchaseDetails);
+  }
+
+  /// Clear buy flags; never unlocks. Used on cancel / error (not UI timeout).
+  Future<void> _endBuySessionWithoutUnlock({
+    required String reason,
+    bool dismissProcessing = true,
+    bool popInvisibleHost = true,
+  }) async {
+    debugPrint(
+      'IAP Buy: end session without unlock '
+      'reason=$reason activeBuy=$_activeBuyProductId',
+    );
+    _loadingTimeoutTimer?.cancel();
+    _clearBuyAttemptTracking();
+    await SharPreferences.setBoolean('startpurches', false);
+    if (dismissProcessing) {
+      try {
+        EasyLoading.dismiss();
+      } catch (_) {}
+    }
+    if (mounted) {
+      setState(() {
+        userTap = false;
+      });
+    }
+    if (popInvisibleHost) {
+      _popInvisiblePurchaseHost(false);
+    }
+  }
+
+  /// 10s Processing UI safety — hide loader only; never unlock; keep buy intent
+  /// so a late matching StoreKit event can still complete the purchase.
+  void _startBuyProcessingSafetyTimeout() {
+    _loadingTimeoutTimer?.cancel();
+    _loadingTimeoutTimer = Timer(_kBuyProcessingSafetyTimeout, () {
+      debugPrint(
+        'IAP Buy: processing UI timeout (10s) — dismiss loader only; '
+        'keep buy intent for late matching '
+        'activeBuy=$_activeBuyProductId '
+        'lastBuy=$_lastBuyAttemptProductId',
+      );
+      _loadingTimeoutTimer = null;
+      try {
+        EasyLoading.dismiss();
+      } catch (_) {}
+      if (mounted) {
+        setState(() {
+          userTap = false;
+        });
+      }
+      // Keep startpurches + buy product ids. Do not pop invisible host.
+      // Do not unlock premium.
+    });
   }
 
   /// Additive: restore plan rank so a later 6M restore cannot overwrite Lifetime/1Y.
@@ -673,6 +773,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     if (best == null) {
       EasyLoading.dismiss();
       Constants.showToast('No active subscription available');
+      await SharPreferences.setBoolean('restorepurches', false);
       if (widget.invisiblePurchaseHost && widget.autoStartRestore && mounted) {
         _popInvisiblePurchaseHost(false);
       }
@@ -693,6 +794,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       );
     } finally {
       _forceApplyCollectedRestoreBest = false;
+      // E: clear so late restored events cannot re-apply / overwrite plan.
+      await SharPreferences.setBoolean('restorepurches', false);
       // Do not EasyLoading.dismiss() here — restorePurchaseHandle already
       // dismissed the Restoring loader and shows the success toast; another
       // dismiss would clear "Purchase restored successfully" before redirect.
@@ -867,9 +970,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   Future<bool> _tryMarkLifetimeWalletBonusGrantedOnce() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final key = 'lifetime_wallet_bonus_granted_v1_${widget.checkad}';
-      final already = prefs.getBool(key) ?? false;
-      if (already) return false;
+      // Stable once-key (not per checkad) so Lifetime 5k is granted once app-wide.
+      const key = 'lifetime_wallet_bonus_granted_v1';
+      if (prefs.getBool(key) == true) return false;
+      // Honor legacy per-checkad marks so existing users are not granted again.
+      for (final existing in prefs.getKeys()) {
+        if (existing.startsWith('lifetime_wallet_bonus_granted_v1_') &&
+            prefs.getBool(existing) == true) {
+          await prefs.setBool(key, true);
+          return false;
+        }
+      }
       await prefs.setBool(key, true);
       return true;
     } catch (_) {
@@ -890,6 +1001,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     required bool invisibleHostPopValue,
   }) async {
     if (!mounted) return;
+    _loadingTimeoutTimer?.cancel();
+    _clearBuyAttemptTracking();
+    await SharPreferences.setBoolean('startpurches', false);
+    debugPrint(
+      'IAP Buy: final purchase result=success '
+      'invisibleHost=$invisibleHostPopValue',
+    );
     if (Get.isRegistered<DashBoardController>()) {
       await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
     }
@@ -922,10 +1040,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Future<void> _navigateAfterNonLifetimePurchaseSuccess() async {
-    _activeBuyProductId = null;
-    if (widget.invisiblePurchaseHost) {
-      await _addLifetimeWalletBonusOnce();
-    }
+    _loadingTimeoutTimer?.cancel();
+    _clearBuyAttemptTracking();
+    await SharPreferences.setBoolean('startpurches', false);
+    // Lifetime 5k bonus must never run for 1M/1Y/2Y (incl. AR invisible host).
     await _navigateToHomeAfterPurchaseSuccess(invisibleHostPopValue: true);
   }
 
@@ -935,7 +1053,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     bool lifetimeWalletBonus = false,
     bool invisiblePopSuccess = false,
   }) async {
-    _activeBuyProductId = null;
+    _loadingTimeoutTimer?.cancel();
+    _clearBuyAttemptTracking();
+    if (startFlag) {
+      await SharPreferences.setBoolean('startpurches', false);
+      debugPrint('IAP Buy: final purchase result=success (navigation)');
+    }
     if (lifetimeWalletBonus) {
       await _addLifetimeWalletBonusOnce();
     }
@@ -1250,23 +1373,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         // (success / error / cancel) — do not leave a blank gap.
         EasyLoading.show(status: 'Processing......');
 
-        // Start 6-second timeout timer for loading
-        _loadingTimeoutTimer?.cancel(); // Cancel any existing timer
-        _loadingTimeoutTimer = Timer(const Duration(seconds: 6), () {
-          if (mounted) {
-            // UI only: allow another tap; do NOT dismiss Processing...... —
-            // Apple sheet often outlives 6s; stream will dismiss the loader.
-            debugPrint(
-                'IAP Loading timeout - keep Processing...... until stream result');
-            setState(() {
-              userTap = false;
-            });
-          }
-        });
-
         await SharPreferences.setString('OpenAd', '1');
         await SharPreferences.setBoolean('startpurches', true);
         _activeBuyProductId = prod.id;
+        _lastBuyAttemptProductId = prod.id;
+        _awaitingLateMatchingBuy = true;
+        debugPrint(
+          'IAP Buy: started Processing activeBuy=$_activeBuyProductId',
+        );
+        // 10s safety: if matching product never arrives, clear Processing (no unlock).
+        _startBuyProcessingSafetyTimeout();
 
         // Check again before purchase (in case subscription status changed)
         final hasActiveSubscriptionCheck =
@@ -1287,6 +1403,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           // Reset flags if user cancels
           _shouldShowRestoreDialog = false;
           _pendingRestoreProductId = null;
+          _clearBuyAttemptTracking();
+          await SharPreferences.setBoolean('startpurches', false);
           return;
         }
 
@@ -1297,7 +1415,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         // });
       } catch (e) {
         debugPrint('Error: $e');
-        _loadingTimeoutTimer?.cancel(); // Cancel timeout timer on error
+        await _endBuySessionWithoutUnlock(
+          reason: 'buy initiation error',
+          dismissProcessing: true,
+          popInvisibleHost: widget.invisiblePurchaseHost,
+        );
       } finally {
         // Don't reset userTap here immediately - let timeout or purchase completion handle it
         // This prevents premature reset if user closes system dialog
@@ -2082,6 +2204,18 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       }
     }
 
+    // Buy session: ignore unrelated products before claiming/unlocking.
+    // Do not block explicit Restore (`restorepurches`).
+    if (startFlagEarly == true &&
+        dataEarly != true &&
+        !_isActiveBuyTargetProduct(productId)) {
+      debugPrint(
+        'Buy session early: ignored unrelated product=$productId '
+        'status=restoreHandle activeBuy=$_activeBuyProductId',
+      );
+      return;
+    }
+
     // Additive: claim/skip before the existing delay so parallel restores
     // keep the newest transaction (and tier only as a same-date tiebreaker).
     if (dataEarly == true || startFlagEarly == true) {
@@ -2098,18 +2232,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         return;
       }
       _claimRestoreCandidate(productId, transactionDate: date);
-    }
-
-    // Additive: during Buy, ignore non-target StoreKit history early.
-    if (startFlagEarly == true &&
-        _activeBuyProductId != null &&
-        _activeBuyProductId!.isNotEmpty &&
-        !_isActiveBuyTargetProduct(productId)) {
-      debugPrint(
-        'Buy session early: skip non-target $productId '
-        '(buying $_activeBuyProductId)',
-      );
-      return;
     }
 
     final dateTime = _parseRestoreTransactionDate(date) ?? DateTime.now();
@@ -2156,12 +2278,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
       // Additive: during Buy, only apply the product the user tapped — ignore
       // other StoreKit history (stale 2Y must not label a 6M/1Y buy).
+      // Explicit Restore (`data`) is not blocked.
       if (startFlag == true &&
-          _activeBuyProductId != null &&
-          _activeBuyProductId!.isNotEmpty &&
+          data != true &&
           !_isActiveBuyTargetProduct(productId)) {
         debugPrint(
-          'Buy session: skip non-target $productId '
+          'Buy session: ignored unrelated product=$productId '
           '(buying $_activeBuyProductId)',
         );
         return;
@@ -2201,7 +2323,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         await SharPreferences.setBoolean('closead', true);
         await _completePaywallSubscriptionNavigation(
           startFlag: startFlag == true,
-          lifetimeWalletBonus: startFlag == true,
+          // Bonus already granted above when startFlag — avoid duplicate call (H).
+          lifetimeWalletBonus: false,
           invisiblePopSuccess: true,
         );
         return;
@@ -2215,9 +2338,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           EasyLoading.dismiss();
           return;
         }
-        final dur = DateTime(dateTime.year + 1, dateTime.month, dateTime.day);
-        final diff = dur.difference(DateTime.now());
-        await controller.disableAd(diff);
+        // Match Buy path (Duration 366 from now). Using transactionDate+1Y can
+        // leave ~30 days when the StoreKit date is near end of period, while
+        // plan label is still gold ("1 year") — Subscription Info mismatch.
+        await controller.disableAd(const Duration(days: 366));
         // Set subscription plan to gold for one year plan
         if (downloadProvider != null) {
           await downloadProvider.setSubscriptionPlan('gold');
@@ -2228,8 +2352,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         await SharPreferences.setBoolean('closead', true);
         await _completePaywallSubscriptionNavigation(
           startFlag: startFlag == true,
-          lifetimeWalletBonus:
-              startFlag == true && widget.invisiblePurchaseHost,
+          // 1Y must never receive Lifetime 5k bonus (D).
+          lifetimeWalletBonus: false,
           invisiblePopSuccess: true,
         );
         return;
@@ -2310,45 +2434,72 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       DashBoardController controller) {
     // ignore: avoid_function_literals_in_foreach_calls
     purchaseDetailsList.forEach((PurchaseDetails purchaseDetails) async {
-      debugPrint("Purchase State: ${purchaseDetails.status}");
+      debugPrint(
+        'IAP stream: status=${purchaseDetails.status} '
+        'productId=${purchaseDetails.productID} '
+        'activeBuy=$_activeBuyProductId',
+      );
       await SharPreferences.setString('OpenAd', '1');
       if (purchaseDetails.status == PurchaseStatus.pending) {
         // UI only: keep Processing...... while store payment is pending.
         EasyLoading.show(status: 'Processing......');
       } else {
-        // Cancel loading timeout timer when purchase completes (success or error)
-        _loadingTimeoutTimer?.cancel();
-
         if (purchaseDetails.status == PurchaseStatus.error) {
           debugPrint('Error: ${purchaseDetails.error}');
           DebugConsole.log(" purchases error - $purchaseDetails");
-          _activeBuyProductId = null;
-          // Reset userTap on error
-          if (mounted) {
-            EasyLoading.dismiss();
-            setState(() {
-              userTap = false;
-            });
-            _popInvisiblePurchaseHost(false);
-          }
+          await _endBuySessionWithoutUnlock(
+            reason: 'purchase error',
+            dismissProcessing: true,
+            popInvisibleHost: true,
+          );
         } else if (purchaseDetails.status == PurchaseStatus.purchased ||
             purchaseDetails.status == PurchaseStatus.restored) {
           final startFlagGate =
               await SharPreferences.getBoolean('startpurches');
-          if (startFlagGate == true &&
-              _activeBuyProductId != null &&
-              _activeBuyProductId!.isNotEmpty &&
+          final restoreFlagGate =
+              await SharPreferences.getBoolean('restorepurches');
+
+          // Buy session: only the tapped product may unlock. Old restored
+          // history is finished (if needed) and ignored — keep waiting.
+          // Explicit Restore (`restorepurches`) must never be blocked by Buy.
+          // Also accept late matching after Processing UI timeout while
+          // `_awaitingLateMatchingBuy` is still true.
+          final inBuySession = startFlagGate == true ||
+              (_awaitingLateMatchingBuy &&
+                  _lastBuyAttemptProductId != null &&
+                  _lastBuyAttemptProductId!.isNotEmpty);
+          if (inBuySession &&
+              restoreFlagGate != true &&
               !_isActiveBuyTargetProduct(purchaseDetails.productID)) {
-            debugPrint(
-              'Buy session stream: skip non-target '
-              '${purchaseDetails.productID} (buying $_activeBuyProductId)',
+            await _ignoreUnrelatedBuyStoreEvent(
+              purchaseDetails,
+              reason: 'non-matching during buy',
             );
             return;
           }
+
+          // Buy + restored for a different plan already handled above.
+          // Buy + restored for matching product: continue (already-owned buy).
+          // Restore button only: restorepurches true without requiring buy match.
           if (purchaseDetails.status == PurchaseStatus.purchased) {
             final data1 = await SharPreferences.getBoolean('startpurches');
-            debugPrint("purchase data 5 is $data1");
-            if (data1 == true) {
+            // After Processing UI timeout, startpurches may still be true; if it
+            // was cleared elsewhere, still accept a matching late Buy attempt.
+            final acceptBuyEvent = data1 == true ||
+                (_awaitingLateMatchingBuy &&
+                    _isActiveBuyTargetProduct(purchaseDetails.productID));
+            debugPrint(
+              "purchase data 5 is $data1 acceptBuy=$acceptBuyEvent "
+              "awaitingLate=$_awaitingLateMatchingBuy",
+            );
+            if (acceptBuyEvent) {
+              if (data1 != true) {
+                await SharPreferences.setBoolean('startpurches', true);
+              }
+              debugPrint(
+                'IAP Buy: matching product received '
+                '${purchaseDetails.productID} (purchased)',
+              );
               // Keep UI busy until "Purchase Successful" — payment sheet
               // can leave a gap after the buy-tap loader times out.
               _loadingTimeoutTimer?.cancel();
@@ -2470,7 +2621,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   debugPrint("restore data 3b (2 year)");
                   await _navigateAfterNonLifetimePurchaseSuccess();
                   return;
-                } else if (purchaseDetails.productID == widget.lifeTimePlan) {
+                } else if (_isLifetimeProductId(purchaseDetails.productID)) {
                   await controller.disableAd(const Duration(days: 3650012345));
                   // Set subscription plan to platinum for lifetime plan
                   DownloadProvider? downloadProvider = _myProvider;
@@ -2495,7 +2646,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   await _addLifetimeWalletBonusOnce();
                   Constants.showToast('Purchase Successful');
                   await SharPreferences.setBoolean('closead', true);
-                  debugPrint("restore data 4 ");
+                  debugPrint(
+                    'IAP Buy: final purchase result=success platinum '
+                    'product=${purchaseDetails.productID}',
+                  );
                   await _finishAfterLifetimePurchaseSuccess();
                   return;
                 } else {
@@ -2537,24 +2691,18 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     await _finishAfterLifetimePurchaseSuccess();
                     return;
                   } else {
-                    // Fallback: If product ID doesn't match any known plan, treat as lifetime purchase
-                    // This ensures loader stops and redirects even for unexpected product IDs
+                    // Fail closed: unknown product must never unlock Lifetime/credits.
                     debugPrint(
-                        "Unknown product ID: ${purchaseDetails.productID}, treating as lifetime purchase");
-                    await controller
-                        .disableAd(const Duration(days: 3650012345));
-                    await Future.delayed(Duration(seconds: 2));
-                    // Complete the purchase for iOS - critical to prevent infinite loading
-                    if (Platform.isIOS) {
-                      await _inAppPurchase.completePurchase(purchaseDetails);
-                    }
-                    EasyLoading.dismiss();
-                    await _addLifetimeWalletBonusOnce();
-                    Constants.showToast('Purchase Successful');
-                    await SharPreferences.setBoolean('closead', true);
-                    debugPrint(
-                        "purchase success (fallback) - redirecting to home");
-                    await _finishAfterLifetimePurchaseSuccess();
+                      'IAP Buy: unknown product ID '
+                      '${purchaseDetails.productID} — fail closed (no unlock)',
+                    );
+                    await _completeStoreTransactionIfNeeded(purchaseDetails);
+                    await _endBuySessionWithoutUnlock(
+                      reason: 'unknown product id',
+                      dismissProcessing: true,
+                      popInvisibleHost: true,
+                    );
+                    Constants.showToast('Something went wrong');
                     return;
                   }
                 }
@@ -2564,20 +2712,41 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             final restoreFlag =
                 await SharPreferences.getBoolean('restorepurches');
             final startFlag = await SharPreferences.getBoolean('startpurches');
-            // UI only: Buy flow often returns "restored" on iOS — keep
-            // Processing...... until Purchase Successful (don't clear gap).
-            if (startFlag == true) {
+            final lateBuyMatch = _awaitingLateMatchingBuy &&
+                _isActiveBuyTargetProduct(purchaseDetails.productID);
+            // Buy session: non-matching restored already ignored above.
+            // Explicit Restore (restorepurches) may apply old plans.
+            // Buy + matching restored = already-owned tap for that product only.
+            if ((startFlag == true || lateBuyMatch) &&
+                restoreFlag != true &&
+                !_isActiveBuyTargetProduct(purchaseDetails.productID)) {
+              await _ignoreUnrelatedBuyStoreEvent(
+                purchaseDetails,
+                reason: 'restored non-matching during buy',
+              );
+              return;
+            }
+            if (startFlag == true || lateBuyMatch) {
+              if (startFlag != true) {
+                await SharPreferences.setBoolean('startpurches', true);
+              }
+              debugPrint(
+                'IAP Buy: matching product received '
+                '${purchaseDetails.productID} (restored/already owned)',
+              );
               _loadingTimeoutTimer?.cancel();
               EasyLoading.show(status: 'Processing......');
             } else if (!_restoreCollecting) {
               // Additive: keep Restoring… loader while collecting StoreKit products.
               EasyLoading.dismiss();
             }
-            debugPrint("restore data 5 is $restoreFlag");
+            debugPrint(
+              "restore data 5 is $restoreFlag | startFlag=$startFlag | "
+              "restoreButton=${restoreFlagGate == true} lateBuy=$lateBuyMatch",
+            );
 
-            // If Apple reports "restored" during a Buy flow (already subscribed),
-            // check if we should show restore dialog first
-            if (restoreFlag == true || startFlag == true) {
+            // Restore button / collection, OR buy of matching already-owned product.
+            if (restoreFlag == true || startFlag == true || lateBuyMatch) {
               // Check if user tapped on a plan they already own (should show dialog)
               if (_shouldShowRestoreDialog &&
                   _pendingRestoreProductId == purchaseDetails.productID) {
@@ -2589,14 +2758,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 // Reset flags
                 _shouldShowRestoreDialog = false;
                 _pendingRestoreProductId = null;
-              } else {
-                // Normal restore flow (from restore button)
-                if (restoreFlag != true) {
-                  await SharPreferences.setBoolean('restorepurches', true);
+              } else if (restoreFlag == true) {
+                // Explicit Restore tap only — may apply old plans from store history.
+                if (mounted) {
+                  _handleRestore(purchaseDetails, controller);
                 }
-                // debugPrint("restore data 6 is $data");
-                // await restorePurchaseHandle(purchaseDetails.productID,
-                //     purchaseDetails.transactionDate ?? '', controller);
+              } else if ((startFlag == true || lateBuyMatch) &&
+                  _isActiveBuyTargetProduct(purchaseDetails.productID)) {
+                // Buy of matching already-owned product — do NOT flip restorepurches
+                // (that would let later old store events unlock wrong plans).
                 if (mounted) {
                   _handleRestore(purchaseDetails, controller);
                 }
@@ -2607,16 +2777,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           await InAppPurchase.instance.completePurchase(purchaseDetails);
           EasyLoading.dismiss();
         } else if (purchaseDetails.status == PurchaseStatus.canceled) {
-          EasyLoading.dismiss();
-          _activeBuyProductId = null;
-          if (widget.invisiblePurchaseHost) {
-            if (mounted) {
-              setState(() {
-                userTap = false;
-              });
-              _popInvisiblePurchaseHost(false);
-            }
-          } else {
+          await _endBuySessionWithoutUnlock(
+            reason: 'purchase canceled',
+            dismissProcessing: true,
+            popInvisibleHost: widget.invisiblePurchaseHost,
+          );
+          if (!widget.invisiblePurchaseHost) {
             Constants.showToast('Something went wrong');
 
             // Check if this is the first time showing paywall and user canceled
@@ -3118,10 +3284,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     debugPrint("iap ad - WidgetsBinding");
 
     _purchaseUpdatedStream = InAppPurchase.instance.purchaseStream;
-    _purchaseUpdatedStream.listen(
+    // A: single listener — cancel any prior subscription before attaching.
+    unawaited(_subscription?.cancel() ?? Future.value());
+    _subscription = _purchaseUpdatedStream.listen(
       (purchases) => _listenToPurchaseUpdated(purchases, controller),
       onDone: () {
-        // _subscription?.cancel();
+        _subscription?.cancel();
+        _subscription = null;
       },
       onError: (error) {
         debugPrint("Purchase Stream Error: $error");
@@ -3216,7 +3385,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       EasyLoading.dismiss();
     }
     _subscription?.cancel();
+    _subscription = null;
     _loadingTimeoutTimer?.cancel(); // Cancel loading timeout timer
+    // Leaving the paywall: drop buy intent so stale startpurches cannot linger.
+    if (_awaitingLateMatchingBuy) {
+      unawaited(SharPreferences.setBoolean('startpurches', false));
+    }
+    _clearBuyAttemptTracking();
     // Reset exit offer flag on dispose
     _isExitOfferShowing = false;
     // Call async clean-up without awaiting
@@ -3359,6 +3534,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     final hasInternet = await InternetConnection().hasInternetAccess;
     if (!hasInternet) {
       _restoreCollecting = false;
+      await SharPreferences.setBoolean('restorepurches', false);
       Constants.showToast("No Internet Connection");
       return; // Return early - don't show loader or proceed
     }
@@ -3394,6 +3570,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       await _applyBestCollectedRestore(controller);
     } catch (e) {
       _restoreCollecting = false;
+      await SharPreferences.setBoolean('restorepurches', false);
       EasyLoading.dismiss();
       DebugConsole.log("restore No active subscription available error - $e");
       Constants.showToast('No active subscription available');

@@ -227,6 +227,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         await _syncBlockedUserIdsForAccount(email);
         await _syncMyPrayerIdsForAccount(email);
         await _hydrateResolveUserId();
+        // Rebuild again once resolve user_id is ready (re-login ownership).
+        await _rebuildMyPrayerIdsForCurrentAccount();
       } else {
         await _syncBlockedUserIdsForAccount(null);
         await _syncMyPrayerIdsForAccount(null);
@@ -300,7 +302,46 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     return prayerEmail.isNotEmpty && prayerEmail == want;
   }
 
-  /// Drop previous account's posted-id cache when login email changes.
+  /// Additive: rebuild My Prayer ids for this login from device-owned + wall
+  /// email/identity matches (fixes empty My Prayers after logout → login).
+  Future<void> _rebuildMyPrayerIdsForCurrentAccount() async {
+    final want = (_userEmail ?? '').trim().toLowerCase();
+    if (want.isEmpty) {
+      await PrayerWallLocalStore.saveMyPrayerIds({});
+      if (!mounted) return;
+      setState(() => _myPrayerIds = {});
+      return;
+    }
+
+    final owned = await PrayerWallLocalStore.loadOwnedPrayerIds();
+    final merged = <String>{...owned};
+    final resolveId = (_resolveUserId ?? '').trim();
+
+    for (final p in _all) {
+      final prayerEmail = (p.email ?? '').trim().toLowerCase();
+      if (prayerEmail.isNotEmpty && prayerEmail == want) {
+        merged.add(p.id);
+        continue;
+      }
+      if (resolveId.isEmpty) continue;
+      if ((p.identityUserId ?? '').trim() == resolveId) {
+        merged.add(p.id);
+        continue;
+      }
+      final mapped = (_prayerAuthorUserIdMap[p.id] ?? '').trim();
+      final authorUid = (p.authorUserId ?? '').trim();
+      if (mapped == resolveId || authorUid == resolveId) {
+        merged.add(p.id);
+      }
+    }
+
+    await PrayerWallLocalStore.saveMyPrayerIds(merged);
+    if (!mounted) return;
+    setState(() => _myPrayerIds = merged);
+  }
+
+  /// Drop previous account's posted-id cache when login email changes,
+  /// then rebuild for the current account (do not leave My Prayers empty).
   Future<void> _syncMyPrayerIdsForAccount(String? email) async {
     final key = (email ?? '').trim().toLowerCase();
     if (key.isEmpty) {
@@ -312,30 +353,24 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       await PrayerWallLocalStore.saveMyPrayerIds({});
       return;
     }
-    if (_myPrayerListAccountEmail == key) return;
-    await PrayerWallLocalStore.saveMyPrayerIds({});
+    final switched = _myPrayerListAccountEmail != key;
     if (!mounted) return;
-    setState(() {
-      _myPrayerIds = {};
-      _myPrayerListAccountEmail = key;
-    });
+    setState(() => _myPrayerListAccountEmail = key);
+    if (switched) {
+      await PrayerWallLocalStore.saveMyPrayerIds({});
+      if (!mounted) return;
+      setState(() => _myPrayerIds = {});
+    }
+    await _rebuildMyPrayerIdsForCurrentAccount();
   }
 
   Future<void> _hydrateMyPrayerIdsFromDisk() async {
     final want = (_userEmail ?? '').trim().toLowerCase();
     if (want.isNotEmpty && _myPrayerListAccountEmail != want) {
       await _syncMyPrayerIdsForAccount(_userEmail);
-      if (!mounted) return;
       return;
     }
-    // Owner ids = only prayers this device posted (meta/author on create).
-    final owned = await PrayerWallLocalStore.loadOwnedPrayerIds();
-    final raw = await PrayerWallLocalStore.loadMyPrayerIds();
-    if (owned.length != raw.length || !owned.containsAll(raw)) {
-      await PrayerWallLocalStore.saveMyPrayerIds(owned);
-    }
-    if (!mounted) return;
-    setState(() => _myPrayerIds = owned);
+    await _rebuildMyPrayerIdsForCurrentAccount();
   }
 
   Future<void> _hydrateReportedPrayerIdsFromDisk() async {
@@ -467,6 +502,10 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         _prayerAuthorUserIdMap = mergedAuthorUserIdMap;
         _loading = false;
       });
+      // Additive: after wall load, restore My Prayer ids for this login email.
+      if (_isLoggedIn && (_userEmail ?? '').trim().isNotEmpty) {
+        await _rebuildMyPrayerIdsForCurrentAccount();
+      }
       unawaited(_restoreBlockedUserIdsFromApi(prayers: prayers));
       await _maybeShowExpiredStatusPrompt();
     } catch (e) {
@@ -2082,17 +2121,23 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
 
       if (!mounted) return;
       await _syncMyPrayerIdsForAccount(_userEmail);
+      if ((_resolveUserId ?? '').trim().isEmpty) {
+        await _hydrateResolveUserId();
+      }
+      if (!mounted) return;
 
-      final postedIds = await PrayerWallLocalStore.loadOwnedPrayerIds();
-      await PrayerWallLocalStore.saveMyPrayerIds(postedIds);
+      // Prefer rebuilt ids (wall email/identity + device-owned) after re-login.
+      final postedIds = await PrayerWallLocalStore.loadMyPrayerIds();
+      final ownedFallback = await PrayerWallLocalStore.loadOwnedPrayerIds();
+      final effectiveOwned = postedIds.isNotEmpty
+          ? postedIds
+          : ownedFallback;
+      await PrayerWallLocalStore.saveMyPrayerIds(effectiveOwned);
       if (!mounted) return;
 
       final fromIdentity =
           await PrayerWallService.fetchPrayersByIdentityUserId();
       if (!mounted) return;
-      if ((_resolveUserId ?? '').trim().isEmpty) {
-        await _hydrateResolveUserId();
-      }
       final myEmail = (_userEmail ?? '').trim().toLowerCase();
       final mine = myEmail.isEmpty
           ? fromIdentity
@@ -2101,12 +2146,39 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
               .toList();
       final historyItemsRaw = await _mergeDevicePostedIntoHistory(
         fromIdentity: mine,
-        ownedIds: postedIds,
+        ownedIds: effectiveOwned,
         accountEmail: myEmail.isEmpty ? null : myEmail,
       );
+      // Additive: include wall posts matching this login (visible on Wall but
+      // missing from identity GET after logout → login).
+      var wallForMerge = _all;
+      if (wallForMerge.isEmpty && myEmail.isNotEmpty) {
+        try {
+          wallForMerge = await PrayerWallService.fetchPrayers();
+          if (mounted && wallForMerge.isNotEmpty) {
+            setState(() => _all = wallForMerge);
+            await _rebuildMyPrayerIdsForCurrentAccount();
+          }
+        } catch (_) {}
+      }
+      final seen = historyItemsRaw.map((p) => p.id).toSet();
+      final mergedHistory = List<PrayerWallItem>.from(historyItemsRaw);
+      if (myEmail.isNotEmpty) {
+        for (final p in wallForMerge) {
+          if (seen.contains(p.id)) continue;
+          if (!_prayerMatchesLoginEmail(p, myEmail)) continue;
+          mergedHistory.add(p);
+          seen.add(p.id);
+        }
+      }
+      mergedHistory.sort((a, b) {
+        final am = a.createdAt?.millisecondsSinceEpoch ?? 0;
+        final bm = b.createdAt?.millisecondsSinceEpoch ?? 0;
+        return bm.compareTo(am);
+      });
       final historyItems = myEmail.isEmpty
-          ? historyItemsRaw
-          : historyItemsRaw
+          ? mergedHistory
+          : mergedHistory
               .where((p) => _prayerMatchesLoginEmail(p, myEmail))
               .toList();
       final ids = historyItems.map((p) => p.id).toSet();

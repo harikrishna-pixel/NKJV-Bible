@@ -168,6 +168,32 @@ String _subscriptionPeriodDisplayText(
   return 'Your subscription expires on ${DateFormat('dd-MM-yyyy').format(expiryDate)}';
 }
 
+/// If plan is 1Y (`gold`) but stored expiry looks like a 1-month leftover
+/// (~30 days), realign expiry to the same ~1 year window used on Buy.
+Future<void> _alignOneYearPlanExpiryIfMismatched(
+  DashBoardController controller,
+  DownloadProvider downloadProvider,
+) async {
+  try {
+    final plan =
+        (await downloadProvider.getSubscriptionPlan())?.toLowerCase().trim();
+    if (plan != 'gold') return;
+    final expiryRaw = '${controller.RewardAdExpireDate}';
+    final expiry = DateTime.tryParse(expiryRaw);
+    if (expiry == null) return;
+    final daysLeft = _subscriptionDaysRemaining(expiry);
+    if (daysLeft < 0 || daysLeft > 40) return;
+    debugPrint(
+      'Subscription Info: gold plan with short expiry ($daysLeft days) — '
+      'realigning to 366 days (match Buy)',
+    );
+    await controller.disableAd(const Duration(days: 366));
+    await controller.refreshPremiumStatusFromPrefs();
+  } catch (e) {
+    debugPrint('alignOneYearPlanExpiryIfMismatched error: $e');
+  }
+}
+
 Widget _buildSubscriptionInfoDetails({
   required BuildContext context,
   required DateTime expiryDate,
@@ -6174,6 +6200,10 @@ class _HomeScreenState extends State<HomeScreen>
         final downloadProvider =
             Provider.of<DownloadProvider>(context, listen: false);
         await PremiumEntitlementLabelSync.syncPlanLabelFromRememberedProduct(
+          downloadProvider,
+        );
+        await _alignOneYearPlanExpiryIfMismatched(
+          controller,
           downloadProvider,
         );
       } catch (e) {

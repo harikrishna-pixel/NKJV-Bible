@@ -121,6 +121,17 @@ class DownloadProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_planKey, plan);
     _plan = plan;
+    // Additive: unlimited AI skip only when plan is written during Buy or Restore.
+    final p = plan.toLowerCase().trim();
+    if (p == 'silver' || p == 'gold' || p == 'twoyear') {
+      final buying =
+          await SharPreferences.getBoolean('startpurches') == true;
+      final restoring =
+          await SharPreferences.getBoolean('restorepurches') == true;
+      await BibleInfo.setAiPremiumCreditSkipGranted(buying || restoring);
+    } else {
+      await BibleInfo.setAiPremiumCreditSkipGranted(false);
+    }
     notifyListeners();
   }
 
@@ -161,6 +172,8 @@ class DownloadProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_usedLimitKey, 0);
     await prefs.setString(_planKey, '');
+    _plan = '';
+    await BibleInfo.setAiPremiumCreditSkipGranted(false);
     notifyListeners();
   }
 

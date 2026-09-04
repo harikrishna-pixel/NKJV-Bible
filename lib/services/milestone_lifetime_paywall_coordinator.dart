@@ -1,7 +1,9 @@
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
+import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
 import 'package:biblebookapp/view/screens/milestone/milestone_journey_dialog.dart';
 import 'package:biblebookapp/view/screens/milestone/milestone_lifetime_iap_screen.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,15 +18,37 @@ class MilestoneLifetimePaywallCoordinator {
   static const _kPrayerCount = 'milestone_prayer_ai_success_count_v1';
   static const _kChatFlowDone = 'milestone_chat_50_flow_done_v1';
   static const _kPrayerFlowDone = 'milestone_prayer_10_flow_done_v1';
+  /// One-time heal when flow was marked done due to a leftover plan label.
+  static const _kPrayerFalseDoneHealed =
+      'milestone_prayer_10_false_done_healed_v1';
 
   static const int chatThreshold = 50;
   static const int prayerThreshold = 10;
 
+  /// True only for a live premium entitlement (plan + active ad-free expiry).
+  /// Orphan plan strings alone must not block the milestone offer.
   static Future<bool> _isSubscribed(BuildContext context) async {
-    final download = Provider.of<DownloadProvider>(context, listen: false);
-    final plan = await download.getSubscriptionPlan();
-    if (plan == null || plan.isEmpty) return false;
-    return ['platinum', 'gold', 'silver', 'twoyear'].contains(plan.toLowerCase());
+    try {
+      await BibleInfo.clearOrphanAiPremiumCreditSkipIfNeeded();
+      final download = Provider.of<DownloadProvider>(context, listen: false);
+      final plan = (await download.getSubscriptionPlan())?.toLowerCase().trim();
+      if (plan == null || plan.isEmpty) return false;
+      if (!['platinum', 'gold', 'silver', 'twoyear'].contains(plan)) {
+        return false;
+      }
+      final prefs = await SharedPreferences.getInstance();
+      final expiryRaw = prefs.getString('isRewardAdViewTime');
+      final expiry = (expiryRaw != null && expiryRaw.isNotEmpty)
+          ? DateTime.tryParse(expiryRaw)
+          : null;
+      if (expiry == null || !expiry.isAfter(DateTime.now())) {
+        return false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('MilestoneLifetimePaywallCoordinator _isSubscribed: $e');
+      return false;
+    }
   }
 
   /// Bump success count up to [threshold]. Returns current count after update.
@@ -44,6 +68,8 @@ class MilestoneLifetimePaywallCoordinator {
 
   /// Shared gates after threshold: IAP on, not subscribed, then [showFlow].
   /// [showFlow] must set [flowDoneKey] only after the offer was presented.
+  /// Do not mark done when skipping for subscribed — leftover plans must not
+  /// permanently suppress the milestone.
   static Future<void> _runMilestoneOfferIfEligible(
     BuildContext context, {
     required SharedPreferences prefs,
@@ -52,18 +78,12 @@ class MilestoneLifetimePaywallCoordinator {
   }) async {
     if (!context.mounted) return;
     if (!await SubscriptionScreen.isDashboardIapEnabled()) return;
-    if (await _isSubscribed(context)) {
-      await prefs.setBool(flowDoneKey, true);
-      return;
-    }
+    if (await _isSubscribed(context)) return;
 
     await Future<void>.delayed(const Duration(milliseconds: 400));
     if (!context.mounted) return;
     if (!await SubscriptionScreen.isDashboardIapEnabled()) return;
-    if (await _isSubscribed(context)) {
-      await prefs.setBool(flowDoneKey, true);
-      return;
-    }
+    if (await _isSubscribed(context)) return;
 
     if (!context.mounted) return;
     await showFlow(context);
@@ -106,14 +126,33 @@ class MilestoneLifetimePaywallCoordinator {
   }
 
   /// Call after a successful prayer guidance AI response (not errors).
-  static Future<void> onPrayerGuidanceAiResponseSuccess(BuildContext context) async {
+  static Future<void> onPrayerGuidanceAiResponseSuccess(
+      BuildContext context) async {
     if (!context.mounted) return;
     // Same dashboard IAP gate as Home paywall — skip milestone when IAP is off.
     if (!await SubscriptionScreen.isDashboardIapEnabled()) return;
     if (await _isSubscribed(context)) return;
 
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool(_kPrayerFlowDone) == true) return;
+
+    // One-time recovery: flowDone was set while a leftover plan looked
+    // "subscribed", so free users never saw the 10-prayer offer.
+    if (prefs.getBool(_kPrayerFlowDone) == true) {
+      final count = prefs.getInt(_kPrayerCount) ?? 0;
+      final healed = prefs.getBool(_kPrayerFalseDoneHealed) == true;
+      if (!healed &&
+          count >= prayerThreshold &&
+          !await _isSubscribed(context)) {
+        await prefs.setBool(_kPrayerFlowDone, false);
+        await prefs.setBool(_kPrayerFalseDoneHealed, true);
+        debugPrint(
+          'Milestone: healed false prayer flowDone '
+          '(count=$count, free user)',
+        );
+      } else {
+        return;
+      }
+    }
 
     final count = await _bumpCountTowardThreshold(
       prefs,
@@ -137,6 +176,7 @@ class MilestoneLifetimePaywallCoordinator {
           ),
         );
         await prefs.setBool(_kPrayerFlowDone, true);
+        await prefs.setBool(_kPrayerFalseDoneHealed, true);
       },
     );
   }
