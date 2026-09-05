@@ -360,12 +360,13 @@ bottom: false,
 child: Align(
 alignment: Alignment.topLeft,
 child: Padding(
-padding: const EdgeInsets.only(left: 16, top: 6),
+padding: EdgeInsets.only(left: 16, top: isTablet ? 8 : 6),
 child: Row(
 children: [
+if (!isTablet)
 Image.asset(
 'assets/paywall_icons/premium.png',
-height: isTablet ? 58 : 52,
+height: 52,
 fit: BoxFit.contain,
 errorBuilder: (_, __, ___) =>
 const SizedBox.shrink(),
@@ -398,6 +399,77 @@ color: Color(0xFF3A2B18),
 ),
 ),
 ),
+if (isTablet)
+Positioned(
+left: 16,
+right: size.width * 0.40,
+top: topPadding + 20,
+bottom: (imageHeight * 0.22).clamp(80.0, 140.0),
+child: Align(
+// iPad UI only: vertically center on left side of hero.
+alignment: Alignment.centerLeft,
+child: Column(
+crossAxisAlignment: CrossAxisAlignment.start,
+mainAxisSize: MainAxisSize.min,
+children: [
+Image.asset(
+'assets/paywall_icons/premium.png',
+height: 58,
+fit: BoxFit.contain,
+errorBuilder: (_, __, ___) =>
+const SizedBox.shrink(),
+),
+const SizedBox(height: 12),
+RichText(
+textAlign: TextAlign.left,
+text: TextSpan(
+style: TextStyle(
+fontSize: 38,
+fontWeight: FontWeight.w800,
+color: paywallInk,
+height: 1.12,
+letterSpacing: -0.3,
+shadows: heroShadows,
+),
+children: const [
+TextSpan(text: 'Grow Closer\n'),
+TextSpan(text: 'to '),
+TextSpan(
+text: 'God',
+style: TextStyle(
+color: paywallTitleGold,
+fontWeight: FontWeight.w800,
+shadows: heroShadows,
+),
+),
+TextSpan(
+text: ' Daily',
+style: TextStyle(
+color: paywallTitleGold,
+fontWeight: FontWeight.w800,
+shadows: heroShadows,
+),
+),
+],
+),
+),
+const SizedBox(height: 10),
+Text(
+'Guidance, prayer, and encouragement\n whenever you need it.',
+textAlign: TextAlign.left,
+style: TextStyle(
+fontSize: 15,
+height: 1.4,
+color: paywallSubtitle,
+fontWeight: FontWeight.w500,
+shadows: heroShadows,
+),
+),
+],
+),
+),
+)
+else
 Positioned(
 left: 16,
 right: 16,
@@ -410,7 +482,7 @@ RichText(
 textAlign: TextAlign.left,
 text: TextSpan(
 style: TextStyle(
-fontSize: isTablet ? 38 : 34,
+fontSize: 34,
 fontWeight: FontWeight.w800,
 color: paywallInk,
 height: 1.12,
@@ -444,7 +516,7 @@ Text(
 'Guidance, prayer, and encouragement\n whenever you need it.',
 textAlign: TextAlign.left,
 style: TextStyle(
-fontSize: isTablet ? 15 : 14,
+fontSize: 14,
 height: 1.4,
 color: paywallSubtitle,
 fontWeight: FontWeight.w500,

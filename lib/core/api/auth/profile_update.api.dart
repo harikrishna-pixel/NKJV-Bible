@@ -494,6 +494,82 @@ class ProfileUpdateApi {
     );
   }
 
+  /// Additive: POST dedicated apply (Account). Does not change profile-update
+  /// action 1/3/4. Returns body when endpoint exists; null on 404/network miss.
+  Future<String?> tryPostApplyReferralCode({
+    required String referralCode,
+  }) async {
+    final code = referralCode.trim();
+    if (code.isEmpty) return null;
+    final userid = await cacheNotifier.readCache(key: 'userid');
+    final authtoken = await cacheNotifier.readCache(key: 'authtoken');
+    if (authtoken == null || authtoken.toString().trim().isEmpty) return null;
+
+    final appId = BibleInfo.appID.toString();
+    final userIdCandidates = <String>[
+      authtoken.toString().trim(),
+      if (userid != null && userid.toString().trim().isNotEmpty)
+        userid.toString().trim(),
+    ].toSet().toList();
+
+    final paths = <String>[
+      AppApiConstant.applyReferralCodeApi,
+      'api/referral/apply',
+      'api/referrals/redeem',
+    ];
+
+    String? lastBody;
+    for (final path in paths) {
+      final uri = Uri.parse(AppApiConstant.baseurl + path);
+      for (final userId in userIdCandidates) {
+        try {
+          final payloads = <Map<String, String>>[
+            {
+              'referral_code': code,
+              'app_id': appId,
+              'user_id': userId,
+            },
+            {
+              'referred_by': code,
+              'referral_code': code,
+              'app_id': appId,
+              'user_id': userId,
+            },
+          ];
+          for (var i = 0; i < payloads.length; i++) {
+            final body = await _postProfileUpdate(
+              uri: uri,
+              authtoken: authtoken,
+              logLabel: 'dedicated-apply $path attempt ${i + 1}',
+              payload: payloads[i],
+            );
+            lastBody = body;
+            if (body == null || body.isEmpty) continue;
+            // Skip hard 404 HTML/JSON miss — try next path.
+            final lower = body.toLowerCase();
+            if (lower.contains('page not found') ||
+                lower.contains('"status_code":404') ||
+                lower.contains('"status_code": 404')) {
+              continue;
+            }
+            if (_profileResponseSucceeded(body) ||
+                _referredByUpdateLooksSuccessful(body)) {
+              return body;
+            }
+            // Explicit invalid code from dedicated API — stop early.
+            if (lower.contains('invalid referral') ||
+                (lower.contains('invalid') && lower.contains('code'))) {
+              return body;
+            }
+          }
+        } catch (e) {
+          debugPrint('tryPostApplyReferralCode $path: $e');
+        }
+      }
+    }
+    return lastBody;
+  }
+
   Future<String?> updateReferredBy({
     required String referralCode,
     String? email,
@@ -507,69 +583,81 @@ class ProfileUpdateApi {
 
     try {
       final code = referralCode.trim();
-      final userId = userid.toString();
       final appId = BibleInfo.appID.toString();
       final identity = await _cachedNameAndEmail(name: name, email: email);
 
+      // Same as action 4: AuthHub often needs login token as user_id.
+      // Cached userid alone can return Decryption Error → false "Invalid".
+      final userIdCandidates = <String>[
+        if (authtoken != null && authtoken.toString().trim().isNotEmpty)
+          authtoken.toString().trim(),
+        if (userid != null && userid.toString().trim().isNotEmpty)
+          userid.toString().trim(),
+      ].toSet().toList();
+      if (userIdCandidates.isEmpty) return null;
+
       String? lastBody;
 
-      // Same pattern as referral_reward_claimed: prime with email+name, then
-      // set referred_by WITHOUT email. Sending email on that update returns
-      // 400 "Email already exists" (seen when applying after Login).
-      if (identity.email.isNotEmpty && identity.name.isNotEmpty) {
-        await _postProfileUpdate(
-          uri: uri,
-          authtoken: authtoken,
-          logLabel: 'referred_by prime',
-          payload: {
+      for (final userId in userIdCandidates) {
+        // Same pattern as referral_reward_claimed: prime with email+name, then
+        // set referred_by WITHOUT email. Sending email on that update returns
+        // 400 "Email already exists" (seen when applying after Login).
+        if (identity.email.isNotEmpty && identity.name.isNotEmpty) {
+          await _postProfileUpdate(
+            uri: uri,
+            authtoken: authtoken,
+            logLabel: 'referred_by prime',
+            payload: {
+              'action': '1',
+              'email': identity.email,
+              'name': identity.name,
+              'user_id': userId,
+              'app_id': appId,
+            },
+          );
+        }
+
+        // Do NOT send email. Prefer referred_by (existing); also try referral_code
+        // (PDF invite field) as an extra attempt only.
+        final profileAttempts = <Map<String, String>>[
+          {
             'action': '1',
-            'email': identity.email,
-            'name': identity.name,
+            'key': 'referred_by',
+            'value': code,
             'user_id': userId,
             'app_id': appId,
+            if (identity.name.isNotEmpty) 'name': identity.name,
           },
-        );
-      }
+          {
+            'action': '1',
+            'user_id': userId,
+            'app_id': appId,
+            'referred_by': code,
+            if (identity.name.isNotEmpty) 'name': identity.name,
+          },
+          // Additive PDF-aligned attempt (does not remove prior attempts).
+          {
+            'action': '1',
+            'user_id': userId,
+            'app_id': appId,
+            'referred_by': code,
+            'referral_code': code,
+            if (identity.name.isNotEmpty) 'name': identity.name,
+          },
+        ];
 
-      // Do NOT send email. Prefer referred_by (existing); also try referral_code
-      // (PDF invite field) as an extra attempt only.
-      final profileAttempts = <Map<String, String>>[
-        {
-          'action': '1',
-          'key': 'referred_by',
-          'value': code,
-          'user_id': userId,
-          'app_id': appId,
-          if (identity.name.isNotEmpty) 'name': identity.name,
-        },
-        {
-          'action': '1',
-          'user_id': userId,
-          'app_id': appId,
-          'referred_by': code,
-          if (identity.name.isNotEmpty) 'name': identity.name,
-        },
-        // Additive PDF-aligned attempt (does not remove prior attempts).
-        {
-          'action': '1',
-          'user_id': userId,
-          'app_id': appId,
-          'referred_by': code,
-          'referral_code': code,
-          if (identity.name.isNotEmpty) 'name': identity.name,
-        },
-      ];
-
-      for (var i = 0; i < profileAttempts.length; i++) {
-        final body = await _postProfileUpdate(
-          uri: uri,
-          authtoken: authtoken,
-          logLabel: 'referred_by profile attempt ${i + 1}',
-          payload: profileAttempts[i],
-        );
-        lastBody = body;
-        if (_profileResponseSucceeded(body)) {
-          return body;
+        for (var i = 0; i < profileAttempts.length; i++) {
+          final body = await _postProfileUpdate(
+            uri: uri,
+            authtoken: authtoken,
+            logLabel: 'referred_by profile attempt ${i + 1}',
+            payload: profileAttempts[i],
+          );
+          lastBody = body;
+          if (_profileResponseSucceeded(body) ||
+              _referredByUpdateLooksSuccessful(body)) {
+            return body;
+          }
         }
       }
 
@@ -580,5 +668,97 @@ class ProfileUpdateApi {
       devtools.log('profile update referred_by error: $e');
       return null;
     }
+  }
+
+  /// Additive: AuthHub often returns status true + "Account Updated Successfully"
+  /// when referred_by was set — treat as success for Account apply.
+  bool _referredByUpdateLooksSuccessful(String? body) {
+    if (body == null || body.isEmpty) return false;
+    try {
+      final parsed = jsonDecode(body) as Map<String, dynamic>;
+      final status = parsed['status'];
+      final statusTrue =
+          status == true || status == 1 || status == '1' || status == 'true';
+      final code = parsed['status_code'] ?? parsed['statusCode'];
+      final codeOk = code == 200 || code == '200' || code == null;
+      final message = parsed['message']?.toString().toLowerCase() ?? '';
+      if (message.contains('invalid') &&
+          (message.contains('referral') || message.contains('referred'))) {
+        return false;
+      }
+      if (!statusTrue && !codeOk) return false;
+      return message.contains('updated') ||
+          message.contains('success') ||
+          statusTrue;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Additive: profile-update action=4 — backup [walletBalance] to AuthHub.
+  /// Does not change action 1/3 or referral flows.
+  Future<bool> updateWalletBalanceAction4(int walletBalance) async {
+    final Uri uri =
+        Uri.parse(AppApiConstant.baseurl + AppApiConstant.updateprofleapi);
+    final userid = await cacheNotifier.readCache(key: 'userid');
+    final authtoken = await cacheNotifier.readCache(key: 'authtoken');
+    if (authtoken == null || authtoken.toString().trim().isEmpty) {
+      print('profile-update (action 4) skipped: not logged in');
+      return false;
+    }
+    // Postman / AuthHub: user_id is login token; also try cached user_id.
+    final candidates = <String>[
+      authtoken.toString().trim(),
+      if (userid != null && userid.toString().trim().isNotEmpty)
+        userid.toString().trim(),
+    ];
+    final balance = walletBalance < 0 ? 0 : walletBalance;
+
+    for (final userId in candidates.toSet()) {
+      final payload = <String, String>{
+        'action': '4',
+        'user_id': userId,
+        'app_id': BibleInfo.appID.toString(),
+        'wallet_balance': balance.toString(),
+      };
+      print('========== profile-update Data (action 4) ==========');
+      print('URL: $uri');
+      print('fields: $payload');
+      print('========== End profile-update Data ==========');
+      try {
+        final plain = await CustomHttp().postwithtoken(
+          path: uri,
+          token: authtoken,
+          data: payload,
+        );
+        if (plain == null) continue;
+        print(
+          'profile-update (action 4) response: '
+          '${plain.statusCode} - ${plain.body}',
+        );
+        if (plain.statusCode >= 200 &&
+            plain.statusCode < 300 &&
+            _profileResponseSucceeded(plain.body)) {
+          return true;
+        }
+        // Some AuthHub responses are 200 with status_code in JSON only.
+        if (plain.statusCode >= 200 && plain.statusCode < 300) {
+          try {
+            final decoded = jsonDecode(plain.body);
+            if (decoded is Map) {
+              final code = decoded['status_code'] ?? decoded['statusCode'];
+              if (code == 200 || code == '200') return true;
+              final msg = decoded['message']?.toString().toLowerCase() ?? '';
+              if (msg.contains('success') || msg.contains('updated')) {
+                return true;
+              }
+            }
+          } catch (_) {}
+        }
+      } catch (e) {
+        print('profile-update (action 4) error: $e');
+      }
+    }
+    return false;
   }
 }

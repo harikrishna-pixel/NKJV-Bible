@@ -15,6 +15,8 @@ class AppApiConstant {
   static const forgotverifyotp = 'api/forgot-pwd/verify-otp';
   static const forgotrestpwd = 'api/forgot-pwd/reset-pwd';
   static const updateprofleapi = 'api/profile-update';
+  /// Additive: logged-in Account apply (if AuthHub deploys it).
+  static const applyReferralCodeApi = 'api/apply-referral-code';
   static const userBackupUploadApi = 'api/user-backup/upload';
   static String get userBackupUploadUrl => '$baseurl$userBackupUploadApi';
   static const userBackupDownloadApi = 'api/user-backup/download';

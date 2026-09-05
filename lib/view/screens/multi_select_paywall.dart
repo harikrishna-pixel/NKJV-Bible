@@ -533,16 +533,19 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                     alignment: Alignment.topLeft,
                     child: Padding(
                       padding: EdgeInsets.only(
-                          left: heroSidePad, top: isTablet ? 10 : 6),
+                          left: heroSidePad, top: isTablet ? 8 : 6),
                       child: Row(
                         children: [
-                          Image.asset(
-                            'assets/paywall_icons/premium.png',
-                            height: isTablet ? 60 : 52,
-                            fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) =>
-                                const SizedBox.shrink(),
-                          ),
+                          // iPad: PREMIUM sits with title (centered left).
+                          // Phone: badge stays top-left (unchanged).
+                          if (!isTablet)
+                            Image.asset(
+                              'assets/paywall_icons/premium.png',
+                              height: 52,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) =>
+                                  const SizedBox.shrink(),
+                            ),
                           const Spacer(),
                           Padding(
                             padding: EdgeInsets.only(
@@ -576,65 +579,137 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                     ),
                   ),
                 ),
-                Positioned(
-                  left: heroSidePad,
-                  right: heroSidePad,
-                  top: topPadding + (isTablet ? 54 : 48),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      RichText(
-                        textAlign: TextAlign.left,
-                        text: TextSpan(
+                if (isTablet)
+                  Positioned(
+                    left: heroSidePad,
+                    // Keep copy on the left side of the scenic hero.
+                    right: size.width * 0.40,
+                    top: topPadding + 20,
+                    bottom: (imageHeight * 0.22).clamp(80.0, 140.0),
+                    child: Align(
+                      // iPad UI only: vertically center on left side of hero.
+                      alignment: Alignment.centerLeft,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Image.asset(
+                            'assets/paywall_icons/premium.png',
+                            height: 60,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) =>
+                                const SizedBox.shrink(),
+                          ),
+                          const SizedBox(height: 12),
+                          RichText(
+                            textAlign: TextAlign.left,
+                            text: TextSpan(
+                              style: const TextStyle(
+                                fontFamily: 'Georgia',
+                                fontSize: 40,
+                                fontWeight: FontWeight.w800,
+                                color: paywallInk,
+                                height: 1.12,
+                                letterSpacing: -0.3,
+                                shadows: heroShadows,
+                              ),
+                              children: [
+                                const TextSpan(text: 'Grow Closer\n'),
+                                const TextSpan(text: 'to '),
+                                TextSpan(
+                                  text: 'God',
+                                  style: TextStyle(
+                                    fontFamily: 'Georgia',
+                                    color: paywallTitleGold,
+                                    fontWeight: FontWeight.w800,
+                                    shadows: heroShadows,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: ' Daily',
+                                  style: TextStyle(
+                                    fontFamily: 'Georgia',
+                                    color: paywallTitleGold,
+                                    fontWeight: FontWeight.w800,
+                                    shadows: heroShadows,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'Guidance, prayer, and encouragement\n whenever you need it.',
+                            textAlign: TextAlign.left,
+                            style: TextStyle(
+                              fontSize: 16.5,
+                              height: 1.4,
+                              color: paywallSubtitle,
+                              fontWeight: FontWeight.w500,
+                              shadows: heroShadows,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  Positioned(
+                    left: heroSidePad,
+                    right: heroSidePad,
+                    top: topPadding + 48,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        RichText(
+                          textAlign: TextAlign.left,
+                          text: TextSpan(
+                            style: TextStyle(
+                              fontSize: 34,
+                              fontWeight: FontWeight.w800,
+                              color: paywallInk,
+                              height: 1.12,
+                              letterSpacing: -0.3,
+                              shadows: heroShadows,
+                            ),
+                            children: [
+                              const TextSpan(text: 'Grow Closer\n'),
+                              const TextSpan(text: 'to '),
+                              TextSpan(
+                                text: 'God',
+                                style: TextStyle(
+                                  color: paywallTitleGold,
+                                  fontWeight: FontWeight.w800,
+                                  shadows: heroShadows,
+                                ),
+                              ),
+                              TextSpan(
+                                text: ' Daily',
+                                style: TextStyle(
+                                  color: paywallTitleGold,
+                                  fontWeight: FontWeight.w800,
+                                  shadows: heroShadows,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Guidance, prayer, and encouragement\n whenever you need it.',
+                          textAlign: TextAlign.left,
                           style: TextStyle(
-                            fontFamily: isTablet ? 'Georgia' : null,
-                            fontSize: isTablet ? 40 : 34,
-                            fontWeight: FontWeight.w800,
-                            color: paywallInk,
-                            height: 1.12,
-                            letterSpacing: -0.3,
+                            fontSize: 14,
+                            height: 1.4,
+                            color: paywallSubtitle,
+                            fontWeight: FontWeight.w500,
                             shadows: heroShadows,
                           ),
-                          children: [
-                            const TextSpan(text: 'Grow Closer\n'),
-                            const TextSpan(text: 'to '),
-                            TextSpan(
-                              text: 'God',
-                              style: TextStyle(
-                                fontFamily: isTablet ? 'Georgia' : null,
-                                color: paywallTitleGold,
-                                fontWeight: FontWeight.w800,
-                                shadows: heroShadows,
-                              ),
-                            ),
-                            TextSpan(
-                              text: ' Daily',
-                              style: TextStyle(
-                                fontFamily: isTablet ? 'Georgia' : null,
-                                color: paywallTitleGold,
-                                fontWeight: FontWeight.w800,
-                                shadows: heroShadows,
-                              ),
-                            ),
-                          ],
                         ),
-                      ),
-                      SizedBox(height: isTablet ? 10 : 8),
-                      Text(
-                        'Guidance, prayer, and encouragement\n whenever you need it.',
-                        textAlign: TextAlign.left,
-                        style: TextStyle(
-                          fontSize: isTablet ? 16.5 : 14,
-                          height: 1.4,
-                          color: paywallSubtitle,
-                          fontWeight: FontWeight.w500,
-                          shadows: heroShadows,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
               ],
             ),
           ),

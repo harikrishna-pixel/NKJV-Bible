@@ -41,9 +41,12 @@ class _CustomTextFormFieldState extends State<CustomTextFormField> {
   @override
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
-    return SizedBox(
-      height: screenWidth > 450 ? 70 : 50,
-      width: screenWidth,
+    // UI-only: min height (not fixed) so error text / keyboard don't clip
+    // taps on phone and iPad.
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        minHeight: screenWidth > 450 ? 70 : 50,
+      ),
       child: TextFormField(
         onTap: widget.onTap,
         controller: widget.controller,
@@ -73,7 +76,7 @@ class _CustomTextFormFieldState extends State<CustomTextFormField> {
               : null,
           contentPadding: EdgeInsets.symmetric(
               horizontal: screenWidth > 450 ? 17 : 12,
-              vertical: screenWidth > 450 ? 20 : 1),
+              vertical: screenWidth > 450 ? 20 : 12),
           hintText: widget.hintText,
           hintStyle: const TextStyle(fontWeight: FontWeight.w300),
           focusedErrorBorder: OutlineInputBorder(

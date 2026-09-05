@@ -47,7 +47,12 @@ class ForgetPasswordScreen extends HookConsumerWidget {
                   children: [
                     InkWell(
                       onTap: () {
-                        Get.back();
+                        // UI-only: works for Navigator.push (PW Login) and Get.to.
+                        if (Navigator.of(context).canPop()) {
+                          Navigator.of(context).pop();
+                        } else {
+                          Get.back();
+                        }
                       },
                       child: Padding(
                         padding: const EdgeInsets.only(left: 15.0),

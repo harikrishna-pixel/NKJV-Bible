@@ -285,6 +285,13 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
     }
     final lower = message.toLowerCase();
 
+    if (lower.contains('cannot be updated via profile update') ||
+        lower.contains('referral and wallet fields cannot be updated') ||
+        (lower.contains('sign up') && lower.contains('referral'))) {
+      return message.trim().isNotEmpty
+          ? message.trim()
+          : 'Referral codes can only be applied during Sign Up.';
+    }
     if (lower.contains('already applied') || lower.contains('already used')) {
       return 'Referral code already applied';
     }
@@ -301,6 +308,19 @@ class _ReferralCodeBottomSheetState extends State<ReferralCodeBottomSheet> {
     if (lower.contains('please enter a referral') ||
         lower.contains('please enter')) {
       return 'Please enter a referral code';
+    }
+    // Account (logged-in): keep specific apply errors — don't force Invalid.
+    if (widget.useLoggedInSession) {
+      if (lower.contains('invalid referral') ||
+          (lower.contains('invalid') && lower.contains('code'))) {
+        return 'Invalid Referral code';
+      }
+      if (message.trim().isNotEmpty &&
+          !lower.contains('exception') &&
+          !lower.startsWith('error')) {
+        return message.trim();
+      }
+      return 'Unable to apply referral code. Please try again.';
     }
     if (lower.contains('invalid') ||
         lower.contains('not found') ||

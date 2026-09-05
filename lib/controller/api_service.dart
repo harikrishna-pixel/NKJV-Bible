@@ -719,15 +719,16 @@ UserModel? _userModelFromApiPayload(
   return null;
 }
 
-/// Additive: check referrer [referral_count] (logged-in session).
-/// Credits are claimed via Home popup — no silent credit here.
+/// Additive: sync referrer wallet when [referral_count] grew (logged-in session).
+/// Credits User 1 (+100 per new referral). User 2 join bonus path unchanged.
 Future<void> syncReferrerCreditsFromSession() async {
   try {
     final pending = await fetchPendingReferrerReward();
     if (pending == null || pending.pendingCount <= 0) return;
+    final ok = await claimPendingReferrerReward(pending);
     debugPrint(
         'syncReferrerCreditsFromSession: pending ${pending.pendingCount} '
-        'referral(s) → ${pending.credits} credits (claim on Home)');
+        '→ credited=${ok ? pending.credits : 0}');
   } catch (e) {
     debugPrint('syncReferrerCreditsFromSession: $e');
   }
@@ -739,11 +740,15 @@ class PendingReferrerReward {
     required this.userId,
     required this.referralCount,
     required this.alreadyCredited,
+    this.email = '',
   });
 
   final String userId;
   final int referralCount;
   final int alreadyCredited;
+
+  /// Additive: stable account key (email) so logout/login does not re-grant.
+  final String email;
 
   static const rewardPerReferral = 100;
 
@@ -755,6 +760,40 @@ class PendingReferrerReward {
   String get _prefsKey => 'local_referral_count_credited_$userId';
 }
 
+/// Additive: watermark by email survives logout; still read old userId key.
+String _referrerCreditedEmailKey(String email) =>
+    'local_referral_count_credited_email_${email.trim().toLowerCase()}';
+
+Future<int> _readReferrerAlreadyCredited({
+  required String userId,
+  required String email,
+}) async {
+  final prefs = await SharedPreferences.getInstance();
+  final byUser = prefs.getInt('local_referral_count_credited_$userId') ?? 0;
+  final em = email.trim().toLowerCase();
+  final byEmail =
+      em.isEmpty ? 0 : (prefs.getInt(_referrerCreditedEmailKey(em)) ?? 0);
+  final already = byUser > byEmail ? byUser : byEmail;
+  // Additive: copy userId watermark → email so next login (new user_id) keeps it.
+  if (em.isNotEmpty && byUser > byEmail) {
+    await prefs.setInt(_referrerCreditedEmailKey(em), byUser);
+  }
+  return already;
+}
+
+Future<void> _writeReferrerAlreadyCredited({
+  required String userId,
+  required String email,
+  required int count,
+}) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setInt('local_referral_count_credited_$userId', count);
+  final em = email.trim().toLowerCase();
+  if (em.isNotEmpty) {
+    await prefs.setInt(_referrerCreditedEmailKey(em), count);
+  }
+}
+
 int? _parseReferralInt(dynamic value) {
   if (value == null) return null;
   if (value is int) return value;
@@ -764,8 +803,15 @@ int? _parseReferralInt(dynamic value) {
 /// Persist referral fields from login / auth (profile snapshot often omits them).
 Future<void> cacheReferralFieldsFromUser(UserModel user) async {
   if (user.referralCount != null) {
-    await cacheNotifier.writeCache(
-        key: 'referral_count', value: '${user.referralCount}');
+    // Additive: never let a stale login count (0) wipe a higher /api/profile count.
+    final existing = _parseReferralInt(
+            await cacheNotifier.readCache(key: 'referral_count')) ??
+        0;
+    final next = user.referralCount!;
+    if (next >= existing) {
+      await cacheNotifier.writeCache(
+          key: 'referral_count', value: '$next');
+    }
   }
   if (user.referralRewardClaimed != null) {
     await cacheNotifier.writeCache(
@@ -783,8 +829,14 @@ Future<void> cacheReferralFieldsFromUser(UserModel user) async {
         value: '${user.referralRewardCredits}');
   }
   if (user.totalReferredCount != null) {
-    await cacheNotifier.writeCache(
-        key: 'total_referred_count', value: '${user.totalReferredCount}');
+    final existing = _parseReferralInt(
+            await cacheNotifier.readCache(key: 'total_referred_count')) ??
+        0;
+    final next = user.totalReferredCount!;
+    if (next >= existing) {
+      await cacheNotifier.writeCache(
+          key: 'total_referred_count', value: '$next');
+    }
   }
   if (user.totalClaimedCount != null) {
     await cacheNotifier.writeCache(
@@ -793,6 +845,8 @@ Future<void> cacheReferralFieldsFromUser(UserModel user) async {
   if (user.walletBalance != null) {
     await cacheNotifier.writeCache(
         key: 'wallet_balance', value: '${user.walletBalance}');
+    // Additive: restore cloud wallet into local credits after login/profile.
+    await WalletService.applyServerWalletBalance(user.walletBalance);
   }
 }
 
@@ -848,7 +902,44 @@ Future<void> syncReferralFieldsFromAuthHubProfile() async {
   final token = (await cacheNotifier.readCache(key: 'authtoken'))?.toString() ??
       '';
   try {
-    if (userMap['user_id'] == null) return;
+    // Even if user_id shape is odd, still cache referral counts (PDF fields).
+    final count = _parseReferralInt(userMap['referral_count']);
+    final totalRef = _parseReferralInt(userMap['total_referred_count']);
+    final claimed = _parseReferralInt(userMap['referral_reward_claimed']);
+    final credits = _parseReferralInt(userMap['referral_reward_credits']);
+    if (count != null) {
+      final existing = _parseReferralInt(
+              await cacheNotifier.readCache(key: 'referral_count')) ??
+          0;
+      if (count >= existing) {
+        await cacheNotifier.writeCache(
+            key: 'referral_count', value: count.toString());
+      }
+    }
+    if (totalRef != null) {
+      final existing = _parseReferralInt(
+              await cacheNotifier.readCache(key: 'total_referred_count')) ??
+          0;
+      if (totalRef >= existing) {
+        await cacheNotifier.writeCache(
+            key: 'total_referred_count', value: totalRef.toString());
+      }
+    }
+    if (claimed != null) {
+      await cacheNotifier.writeCache(
+          key: 'referral_reward_claimed', value: claimed.toString());
+    }
+    if (credits != null) {
+      await cacheNotifier.writeCache(
+          key: 'referral_reward_credits', value: credits.toString());
+    }
+
+    if (userMap['user_id'] == null) {
+      debugPrint(
+          'syncReferralFieldsFromAuthHubProfile: no user_id, cached counts '
+          'count=$count total=$totalRef credits=$credits');
+      return;
+    }
     final user = UserModel.fromJson(userMap, token);
     await cacheReferralFieldsFromUser(user);
     debugPrint(
@@ -882,6 +973,8 @@ Future<PendingReferrerReward?> fetchPendingReferrerReward() async {
     }
 
     final stableUserId = userid.toString();
+    final loginEmail =
+        (await cacheNotifier.readCache(key: 'user'))?.toString().trim() ?? '';
 
     // Existing snapshot (name+email required by API). Response may omit
     // referral fields — Login cache is the fallback.
@@ -919,14 +1012,22 @@ Future<PendingReferrerReward?> fetchPendingReferrerReward() async {
       final hub = await fetchAuthHubProfile();
       final hubUser = hub != null ? _userFromAuthResponse(hub) : null;
       final hubCount = _parseReferralInt(hubUser?['referral_count']);
+      final hubTotalRef =
+          _parseReferralInt(hubUser?['total_referred_count']);
       final hubClaimed =
           _parseReferralInt(hubUser?['referral_reward_claimed']);
       debugPrint(
-          'fetchPendingReferrerReward /api/profile referral_count → $hubCount');
-      if (hubCount != null) {
-        apiCount = hubCount;
+          'fetchPendingReferrerReward /api/profile referral_count → $hubCount '
+          'total_referred_count → $hubTotalRef');
+      // PDF: both fields track referrals; use the higher when present.
+      final hubEffective = [
+        if (hubCount != null) hubCount,
+        if (hubTotalRef != null) hubTotalRef,
+      ].fold<int?>(null, (m, v) => m == null ? v : (v > m ? v : m));
+      if (hubEffective != null) {
+        apiCount = hubEffective;
         await cacheNotifier.writeCache(
-            key: 'referral_count', value: hubCount.toString());
+            key: 'referral_count', value: hubEffective.toString());
       }
       if (hubClaimed != null) {
         apiClaimed = hubClaimed;
@@ -953,6 +1054,8 @@ Future<PendingReferrerReward?> fetchPendingReferrerReward() async {
         if (wallet != null) {
           await cacheNotifier.writeCache(
               key: 'wallet_balance', value: wallet.toString());
+          // Additive: keep local wallet in sync with /api/profile.
+          await WalletService.applyServerWalletBalance(wallet);
         }
       }
     } catch (e) {
@@ -977,10 +1080,21 @@ Future<PendingReferrerReward?> fetchPendingReferrerReward() async {
         count = claimedHint;
       }
     }
+    // Doc: use total_referred_count when present. Do NOT invent count=1 from
+    // referral_reward_credits alone (that field is reward size; caused +100
+    // every login when profile count was null).
+    if (count <= 0) {
+      final cachedTotal = _parseReferralInt(
+          await cacheNotifier.readCache(key: 'total_referred_count'));
+      if ((cachedTotal ?? 0) > 0) {
+        count = cachedTotal!;
+      }
+    }
 
-    final prefs = await SharedPreferences.getInstance();
-    final watermarkKey = 'local_referral_count_credited_$stableUserId';
-    final alreadyCredited = prefs.getInt(watermarkKey) ?? 0;
+    final alreadyCredited = await _readReferrerAlreadyCredited(
+      userId: stableUserId,
+      email: loginEmail,
+    );
 
     debugPrint(
         'fetchPendingReferrerReward RESULT count=$count '
@@ -993,6 +1107,7 @@ Future<PendingReferrerReward?> fetchPendingReferrerReward() async {
       userId: stableUserId,
       referralCount: count,
       alreadyCredited: alreadyCredited,
+      email: loginEmail,
     );
   } catch (e) {
     debugPrint('fetchPendingReferrerReward: $e');
@@ -1005,21 +1120,28 @@ Future<PendingReferrerReward?> pendingReferrerRewardFromProfile(
 ) async {
   await cacheReferralFieldsFromUser(user);
 
-  final count = user.referralCount ?? 0;
+  final count = [
+    user.referralCount ?? 0,
+    user.totalReferredCount ?? 0,
+  ].fold<int>(0, (m, v) => v > m ? v : m);
   if (count <= 0) return null;
 
   final userid = await cacheNotifier.readCache(key: 'userid');
   final stableUserId = (userid ?? user.uid).toString();
+  final loginEmail =
+      (await cacheNotifier.readCache(key: 'user'))?.toString().trim() ?? '';
 
-  final prefs = await SharedPreferences.getInstance();
-  final key = 'local_referral_count_credited_$stableUserId';
-  final alreadyCredited = prefs.getInt(key) ?? 0;
+  final alreadyCredited = await _readReferrerAlreadyCredited(
+    userId: stableUserId,
+    email: loginEmail,
+  );
   if (count <= alreadyCredited) return null;
 
   return PendingReferrerReward(
     userId: stableUserId,
     referralCount: count,
     alreadyCredited: alreadyCredited,
+    email: loginEmail,
   );
 }
 
@@ -1027,29 +1149,46 @@ Future<PendingReferrerReward?> pendingReferrerRewardFromProfile(
 Future<bool> claimPendingReferrerReward(PendingReferrerReward pending) async {
   if (pending.pendingCount <= 0) return false;
 
-  final prefs = await SharedPreferences.getInstance();
-  final key = pending._prefsKey;
-  final alreadyCredited = prefs.getInt(key) ?? 0;
+  final email = pending.email.trim().isNotEmpty
+      ? pending.email
+      : ((await cacheNotifier.readCache(key: 'user'))?.toString().trim() ??
+          '');
+  final alreadyCredited = await _readReferrerAlreadyCredited(
+    userId: pending.userId,
+    email: email,
+  );
   if (pending.referralCount <= alreadyCredited) return false;
 
   final delta = pending.referralCount - alreadyCredited;
   final credits = delta * PendingReferrerReward.rewardPerReferral;
   await WalletService.addCredits(credits);
-  await prefs.setInt(key, pending.referralCount);
+  await _writeReferrerAlreadyCredited(
+    userId: pending.userId,
+    email: email,
+    count: pending.referralCount,
+  );
   debugPrint(
       'claimPendingReferrerReward: claimed $credits for $delta referral(s) '
       '(count=${pending.referralCount})');
   return true;
 }
 
-/// Note pending referrer credits for Home claim popup (no silent credit).
+/// Sync referrer credits from login/profile user (User 1 +100 per referral).
+/// Falls back to PDF `/api/profile` count when login payload omits it.
 Future<void> syncReferrerCreditsFromProfile(UserModel user) async {
+  // Hub profile first (doc: referral_count lives here), then merge login fields.
+  await syncReferralFieldsFromAuthHubProfile();
   await cacheReferralFieldsFromUser(user);
-  final pending = await pendingReferrerRewardFromProfile(user);
-  if (pending == null || pending.pendingCount <= 0) return;
+  // Single source: fetchPending merges snapshot + /api/profile + cache.
+  final pending = await fetchPendingReferrerReward();
+  if (pending == null || pending.pendingCount <= 0) {
+    debugPrint('syncReferrerCreditsFromProfile: no pending referrer credits');
+    return;
+  }
+  final ok = await claimPendingReferrerReward(pending);
   debugPrint(
       'syncReferrerCreditsFromProfile: pending ${pending.pendingCount} '
-      'referral(s) → ${pending.credits} credits (claim on Home)');
+      '→ credited=${ok ? pending.credits : 0}');
 }
 
 String? _referralCodeFromAuthResponse(dynamic response) {
@@ -1147,6 +1286,15 @@ String _referralApplyFailureMessage(
     return genericFallback;
   }
   final lower = profileError.toLowerCase();
+  // Root cause: AuthHub blocks referral on profile-update — not an invalid code.
+  if (lower.contains('cannot be updated via profile update') ||
+      lower.contains('referral and wallet fields cannot be updated') ||
+      (lower.contains('cannot be updated') && lower.contains('referral'))) {
+    return forLoggedInSession
+        ? 'Referral codes can only be applied during Sign Up. '
+            'Create the account with this code, or ask backend for Account apply API.'
+        : signUpFallback;
+  }
   if (lower.contains('already applied') ||
       lower.contains('already used')) {
     return 'Referral code already applied';
@@ -1155,22 +1303,35 @@ String _referralApplyFailureMessage(
       (lower.contains('own') && lower.contains('referral'))) {
     return 'You cannot use your own referral code';
   }
-  if (lower.contains('invalid') ||
+  if (lower.contains('invalid referral') ||
+      (lower.contains('invalid') &&
+          (lower.contains('referral') || lower.contains('referred'))) ||
       lower.contains('not found') ||
-      lower.contains('does not exist') ||
-      lower.contains('referred') ||
-      lower.contains('referral')) {
+      lower.contains('does not exist')) {
+    return invalidFallback;
+  }
+  // Account path: generic "referral" in message ≠ invalid code.
+  if (!forLoggedInSession &&
+      (lower.contains('referred') || lower.contains('referral'))) {
     return invalidFallback;
   }
   if (lower.contains('email already exists') ||
       lower.contains('validation failed') ||
       lower.contains('page not found') ||
       lower.contains('password') ||
+      lower.contains('decrypt') ||
       lower.contains('the email field') ||
       lower.contains('the name field')) {
-    return genericFallback;
+    // Account path: don't label decrypt/email profile errors as Invalid code.
+    return forLoggedInSession
+        ? 'Unable to apply referral code. Please try again.'
+        : genericFallback;
   }
-  return forLoggedInSession ? invalidFallback : profileError;
+  return forLoggedInSession
+      ? (lower.contains('invalid')
+          ? invalidFallback
+          : 'Unable to apply referral code. Please try again.')
+      : profileError;
 }
 
 String? _profileUpdateErrorMessage(String? body) {
@@ -1178,6 +1339,19 @@ String? _profileUpdateErrorMessage(String? body) {
   try {
     final parsed = jsonDecode(body) as Map<String, dynamic>;
     if (parsed['status'] == true) return null;
+
+    final message = parsed['message']?.toString().trim();
+    // Prefer AuthHub policy message over bare field names like "referred_by".
+    if (message != null &&
+        message.isNotEmpty &&
+        message.toLowerCase() != 'validation failed') {
+      final ml = message.toLowerCase();
+      if (ml.contains('cannot be updated') ||
+          ml.contains('invalid referral') ||
+          ml.contains('referral')) {
+        return message;
+      }
+    }
 
     final errors = parsed['errors'];
     if (errors is Map) {
@@ -1193,6 +1367,8 @@ String? _profileUpdateErrorMessage(String? body) {
         }
       }
       for (final entry in errors.entries) {
+        // Skip meta keys that only list field names (e.g. fields: [referred_by]).
+        if (entry.key.toString() == 'fields') continue;
         final fieldErrors = entry.value;
         if (fieldErrors is List && fieldErrors.isNotEmpty) {
           return fieldErrors.first.toString();
@@ -1200,7 +1376,6 @@ String? _profileUpdateErrorMessage(String? body) {
       }
     }
 
-    final message = parsed['message']?.toString().trim();
     if (message != null &&
         message.isNotEmpty &&
         message.toLowerCase() != 'validation failed') {
@@ -1564,7 +1739,7 @@ Future<UserModel> loginUser(
       await cacheReferralFieldsFromUser(user);
       // Additive: sync PDF /api/profile fields (does not change claim rules).
       await syncReferralFieldsFromAuthHubProfile();
-      // Pending credits claimed via Home popup (no silent credit).
+      // Pending referrer credits → grant User 1 wallet (+100 each).
       await syncReferrerCreditsFromProfile(user);
       return user;
     } else {
@@ -1636,16 +1811,87 @@ Future<void> applyReferralWhileLoggedIn({
     throw 'Referral code already applied';
   }
 
-  final profileResult = await ProfileUpdateApi().updateReferredBy(
-    referralCode: code,
-  );
-  if (!_profileUpdateSucceeded(profileResult)) {
+  final profileResult = await () async {
+    // Additive root-cause fix: prefer dedicated apply API (PDF Account path),
+    // then existing profile-update attempts. Sign Up register path unchanged.
+    final dedicated = await ProfileUpdateApi().tryPostApplyReferralCode(
+      referralCode: code,
+    );
+    if (dedicated != null &&
+        dedicated.isNotEmpty &&
+        (_profileUpdateSucceeded(dedicated) ||
+            _accountReferralUpdateLooksSuccessful(dedicated))) {
+      return dedicated;
+    }
+    final profile = await ProfileUpdateApi().updateReferredBy(
+      referralCode: code,
+    );
+    // If profile-update is blocked but dedicated returned a body, keep it for
+    // clearer error mapping (invalid vs cannot-update).
+    if (!_profileUpdateSucceeded(profile) &&
+        !_accountReferralUpdateLooksSuccessful(profile) &&
+        dedicated != null &&
+        dedicated.isNotEmpty) {
+      return dedicated;
+    }
+    return profile;
+  }();
+  var applied = _profileUpdateSucceeded(profileResult) ||
+      _accountReferralUpdateLooksSuccessful(profileResult);
+
+  // Additive: confirm via /api/profile when response shape is ambiguous.
+  if (!applied) {
+    applied = await _verifyLoggedInReferralApplied(code);
+  }
+
+  if (!applied) {
     throw _referralApplyFailureMessage(
       profileResult,
       forLoggedInSession: true,
     );
   }
   await cacheNotifier.writeCache(key: 'referred_by', value: code);
+}
+
+/// Additive: Account apply — treat AuthHub "Account Updated" as success.
+bool _accountReferralUpdateLooksSuccessful(String? body) {
+  if (body == null || body.isEmpty) return false;
+  try {
+    final parsed = jsonDecode(body) as Map<String, dynamic>;
+    if (_hasReferralErrorInResponse(parsed)) return false;
+    final status = parsed['status'];
+    final statusTrue =
+        status == true || status == 1 || status == '1' || status == 'true';
+    final code = parsed['status_code'] ?? parsed['statusCode'];
+    final message = parsed['message']?.toString().toLowerCase() ?? '';
+    if (message.contains('invalid') &&
+        (message.contains('referral') || message.contains('referred'))) {
+      return false;
+    }
+    if (statusTrue || code == 200 || code == '200') {
+      return message.contains('updated') ||
+          message.contains('success') ||
+          statusTrue;
+    }
+  } catch (_) {}
+  return false;
+}
+
+/// Additive: after Account apply, confirm referred_by on profile.
+Future<bool> _verifyLoggedInReferralApplied(String code) async {
+  try {
+    final hub = await fetchAuthHubProfile();
+    final user = hub != null ? _userFromAuthResponse(hub) : null;
+    final by =
+        (user?['referred_by'] ?? user?['referredBy'] ?? '').toString().trim();
+    if (by.isEmpty) return false;
+    // Backend may store code or referrer name — any non-empty means applied.
+    if (by.toUpperCase() == code.trim().toUpperCase()) return true;
+    return by.isNotEmpty;
+  } catch (e) {
+    debugPrint('_verifyLoggedInReferralApplied: $e');
+    return false;
+  }
 }
 
 Future<void> applyReferralViaLogin({

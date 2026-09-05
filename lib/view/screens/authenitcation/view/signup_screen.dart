@@ -18,8 +18,6 @@ import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referra
 import 'package:biblebookapp/utils/email_validator.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/login_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
-import 'package:biblebookapp/view/screens/prayer_wall/post_prayer_screen.dart';
-import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/social_auth_widget.dart';
 import 'package:biblebookapp/view/screens/authenitcation/widgets/text_form_field.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
@@ -55,12 +53,11 @@ class SignupScreen extends HookConsumerWidget {
       return null;
     }, const []);
     double screenWidth = MediaQuery.of(context).size.width;
+    // UI-only: do not wrap fields in opaque GestureDetector+unfocus —
+    // that steals focus (Prayer Wall → Login → Sign Up can't type).
     return Scaffold(
         resizeToAvoidBottomInset: false,
-        body: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => FocusScope.of(context).unfocus(),
-            child: Stack(
+        body: Stack(
               children: [
                 Positioned.fill(
                   child: p.Provider.of<ThemeProvider>(context)
@@ -87,7 +84,15 @@ class SignupScreen extends HookConsumerWidget {
                           children: [
                             InkWell(
                               onTap: () {
-                                Get.back();
+                                if (popOnSuccess || openPostPrayerOnSuccess) {
+                                  if (Navigator.of(context).canPop()) {
+                                    Navigator.of(context).pop();
+                                  } else {
+                                    Get.back();
+                                  }
+                                } else {
+                                  Get.back();
+                                }
                               },
                               child: Padding(
                                 padding: const EdgeInsets.only(left: 15.0),
@@ -339,26 +344,20 @@ class SignupScreen extends HookConsumerWidget {
                                               // UI only: Prayer Wall embedded
                                               // signup returns to Wall (or Post),
                                               // not Reading. Register logic unchanged.
-                                              if (openPostPrayerOnSuccess) {
-                                                Get.offAll(
-                                                  () => const PrayerWallScreen(),
-                                                );
-                                                WidgetsBinding.instance
-                                                    .addPostFrameCallback((_) {
-                                                  Get.to(
-                                                    () =>
-                                                        const PostPrayerScreen(),
-                                                    routeName:
-                                                        PostPrayerScreen
-                                                            .routeName,
-                                                    preventDuplicates: true,
-                                                  );
-                                                });
-                                              } else if (popOnSuccess) {
-                                                Get.offAll(
-                                                  () =>
-                                                      const PrayerWallScreen(),
-                                                );
+                                              // Same Navigator as PW→Login→Signup.
+                                              if (openPostPrayerOnSuccess ||
+                                                  popOnSuccess) {
+                                                // Pop Signup then Login → original PW.
+                                                // Sync double-pop is more reliable
+                                                // across iPhone/iPad than delayed pop.
+                                                final nav =
+                                                    Navigator.of(context);
+                                                if (nav.canPop()) {
+                                                  nav.pop(); // Signup
+                                                }
+                                                if (nav.canPop()) {
+                                                  nav.pop(true); // Login
+                                                }
                                               } else {
                                                 Get.offAll(() => HomeScreen(
                                                       From: "splash",
@@ -450,6 +449,22 @@ class SignupScreen extends HookConsumerWidget {
                                                 recognizer:
                                                     TapGestureRecognizer()
                                                       ..onTap = () {
+                                                        // Prayer Wall embedded:
+                                                        // go back to existing Login
+                                                        // (don't stack another Login).
+                                                        if (popOnSuccess ||
+                                                            openPostPrayerOnSuccess) {
+                                                          if (Navigator.of(
+                                                                  context)
+                                                              .canPop()) {
+                                                            Navigator.of(
+                                                                    context)
+                                                                .pop();
+                                                          } else {
+                                                            Get.back();
+                                                          }
+                                                          return;
+                                                        }
                                                         Get.to(() =>
                                                             LoginScreen(
                                                               hasSkip: false,
@@ -569,6 +584,7 @@ class SignupScreen extends HookConsumerWidget {
                   ),
                 ),
               ],
-            )));
+            ),
+        );
   }
 }

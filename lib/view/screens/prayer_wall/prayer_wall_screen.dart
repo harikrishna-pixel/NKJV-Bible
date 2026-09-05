@@ -114,6 +114,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
 
   /// True when keyboard is up or a text field is focused (hide FAB overlay).
   bool get _hideFabForInput {
+    if (_suspendFocusFabListener) return false;
     final mqBottom = MediaQuery.viewInsetsOf(context).bottom;
     if (mqBottom > 0) return true;
     final view = View.maybeOf(context);
@@ -128,7 +129,11 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         focusCtx.widget is EditableText;
   }
 
+  /// UI-only: pause FAB focus rebuilds while Login/Sign Up covers the Wall.
+  bool _suspendFocusFabListener = false;
+
   void _onFocusOrMetricsChanged() {
+    if (_suspendFocusFabListener) return;
     if (mounted) setState(() {});
   }
 
@@ -646,6 +651,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   static bool _embeddedLoginGateBusy = false;
 
   /// UI gate only: show Login Required, then open LoginScreen. No API changes.
+  /// Uses Navigator.push (not Get.to) so Block/Like/Comment/Post/My Prayers
+  /// login shares one stack with Prayer Wall — Login always pops cleanly.
   Future<bool> _ensureLoggedIn({
     required String message,
     VoidCallback? replaceOnSuccess,
@@ -660,22 +667,29 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     if (goLogin != true || !mounted) return false;
 
     _embeddedLoginGateBusy = true;
+    // UI-only: Wall under Login must not rebuild on Sign Up field focus.
+    _suspendFocusFabListener = true;
     try {
-      final result = await Get.to<bool>(
-        () => LoginScreen(
-          hasSkip: false,
-          popOnSuccess: true,
-          replaceOnSuccess: replaceOnSuccess,
+      FocusManager.instance.primaryFocus?.unfocus();
+      final result = await Navigator.of(context).push<bool>(
+        MaterialPageRoute<bool>(
+          settings: const RouteSettings(name: LoginScreen.embeddedRouteName),
+          builder: (_) => LoginScreen(
+            hasSkip: false,
+            popOnSuccess: true,
+            replaceOnSuccess: replaceOnSuccess,
+          ),
         ),
-        routeName: LoginScreen.embeddedRouteName,
-        preventDuplicates: true,
       );
       if (!mounted) return false;
       ReferralCodeBottomSheet.resetPresentationLock();
+      FocusManager.instance.primaryFocus?.unfocus();
       await _loadAuthAndLocalName();
       return _isLoggedIn || result == true;
     } finally {
+      _suspendFocusFabListener = false;
       _embeddedLoginGateBusy = false;
+      if (mounted) setState(() {});
     }
   }
 
@@ -812,13 +826,54 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   }
 
   /// Resolve `user_id` from POST /api/users/resolve (used as block API `user_id`).
+  /// Additive: one retry when cache is empty (iPhone after login) — same resolve
+  /// API / block body; does not change block/unblock request shape.
   Future<String?> _resolveUserIdForBlock() async {
-    final id = await PrayerWallService.ensureIdentityUserId();
-    final trimmed = (id ?? '').trim();
-    if (trimmed.isNotEmpty) return trimmed;
-    // Additive: Unblock can run before disk cache is ready; reuse session id.
-    final fallback = (_resolveUserId ?? '').trim();
-    return fallback.isEmpty ? null : fallback;
+    Future<String?> readOnce() async {
+      final id = await PrayerWallService.ensureIdentityUserId();
+      final trimmed = (id ?? '').trim();
+      if (trimmed.isNotEmpty) return trimmed;
+      // Additive: Unblock can run before disk cache is ready; reuse session id.
+      final fallback = (_resolveUserId ?? '').trim();
+      return fallback.isEmpty ? null : fallback;
+    }
+
+    var uid = await readOnce();
+    if (uid != null && uid.isNotEmpty) {
+      if (mounted && (_resolveUserId ?? '').trim() != uid) {
+        setState(() => _resolveUserId = uid);
+      }
+      return uid;
+    }
+
+    // Retry once: slower phones often miss resolve right after login.
+    await Future<void>.delayed(const Duration(milliseconds: 450));
+    if (!mounted) return null;
+    try {
+      final email =
+          (await _cacheNotifier.readCache(key: 'user') ?? '').toString().trim();
+      final name =
+          (await _cacheNotifier.readCache(key: 'name') ?? '').toString().trim();
+      if (email.isNotEmpty) {
+        final again = await PrayerWallService.resolveIdentityUser(
+          email: email,
+          userName: name.isEmpty ? null : name,
+        );
+        final t = (again ?? '').trim();
+        if (t.isNotEmpty) {
+          if (mounted) setState(() => _resolveUserId = t);
+          return t;
+        }
+      }
+    } catch (e) {
+      print('PrayerWall _resolveUserIdForBlock retry error: $e');
+    }
+
+    uid = await readOnce();
+    if (uid != null && uid.isNotEmpty && mounted) {
+      setState(() => _resolveUserId = uid);
+    }
+    return uid;
   }
 
   List<PrayerWallItem> get _blockedItemsOnWall =>
@@ -2279,23 +2334,14 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       }
       if (!mounted) return;
 
+      // Login first (same as Like/Block), then one Post a Prayer push.
+      // Do not Get.off Login → Post (that left stacked routes).
       if (!_isLoggedIn) {
         final allowed = await _ensureLoggedIn(
           message:
               'Please log in to support this prayer request and leave a comment.',
-          replaceOnSuccess: () {
-            Get.off(
-              () => const PostPrayerScreen(),
-              routeName: PostPrayerScreen.routeName,
-              preventDuplicates: true,
-              transition: Transition.noTransition,
-              duration: Duration.zero,
-            );
-          },
         );
         if (!allowed || !mounted) return;
-        // Login was replaced with Post a Prayer — do not push it again.
-        return;
       }
 
       if (!mounted) return;
@@ -2419,7 +2465,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                         });
                         return;
                       }
-                      Navigator.of(context).pop();
+                      // Opened via Get.to from Home — same stack (avoids blank).
+                      Get.back();
                     },
                   ),
                   Expanded(

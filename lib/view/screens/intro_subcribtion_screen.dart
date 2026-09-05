@@ -4097,58 +4097,113 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   alignment: Alignment.topLeft,
                   child: Padding(
                     padding: EdgeInsets.only(
-                        left: heroSidePad, top: isTablet ? 10 : 6),
-                    child: Image.asset(
-                      _paywallIconPremium,
-                      height: isTablet
-                          ? _kPaywallPremiumBadgeHeight + 6
-                          : _kPaywallPremiumBadgeHeight,
-                      fit: BoxFit.contain,
-                    ),
+                        left: heroSidePad, top: isTablet ? 8 : 6),
+                    // iPad: PREMIUM moves with centered-left title block.
+                    child: isTablet
+                        ? const SizedBox.shrink()
+                        : Image.asset(
+                            _paywallIconPremium,
+                            height: _kPaywallPremiumBadgeHeight,
+                            fit: BoxFit.contain,
+                          ),
                   ),
                 ),
               ),
-              Positioned(
-                left: heroSidePad,
-                right: heroSidePad,
-                top: topPadding + (isTablet ? 56 : 48),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    RichText(
-                      textAlign: TextAlign.left,
-                      text: TextSpan(
-                        style: heroTitleStyle,
-                        children: [
-                          const TextSpan(text: 'Grow Closer\n'),
-                          const TextSpan(text: 'to '),
-                          TextSpan(
-                            text: 'God',
-                            style: heroHighlightStyle,
+              if (isTablet)
+                Positioned(
+                  left: heroSidePad,
+                  right: size.width * 0.40,
+                  top: topPadding + 20,
+                  bottom: (imageHeight * 0.22).clamp(80.0, 140.0),
+                  child: Align(
+                    // iPad UI only: vertically center on left side of hero.
+                    alignment: Alignment.centerLeft,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Image.asset(
+                          _paywallIconPremium,
+                          height: _kPaywallPremiumBadgeHeight + 6,
+                          fit: BoxFit.contain,
+                        ),
+                        const SizedBox(height: 12),
+                        RichText(
+                          textAlign: TextAlign.left,
+                          text: TextSpan(
+                            style: heroTitleStyle,
+                            children: [
+                              const TextSpan(text: 'Grow Closer\n'),
+                              const TextSpan(text: 'to '),
+                              TextSpan(
+                                text: 'God',
+                                style: heroHighlightStyle,
+                              ),
+                              TextSpan(
+                                text: ' Daily',
+                                style: heroHighlightStyle,
+                              ),
+                            ],
                           ),
-                          TextSpan(
-                            text: ' Daily',
-                            style: heroHighlightStyle,
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          'Guidance, prayer, and encouragement\n whenever you need it.',
+                          textAlign: TextAlign.left,
+                          style: TextStyle(
+                            fontSize: heroSubtitleSize,
+                            height: 1.4,
+                            color: _paywallSubtitle,
+                            fontWeight: FontWeight.w500,
+                            shadows: _paywallHeroTextShadow,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    SizedBox(height: isTablet ? 10 : 8),
-                    Text(
-                      'Guidance, prayer, and encouragement\n whenever you need it.',
-                      textAlign: TextAlign.left,
-                      style: TextStyle(
-                        fontSize: heroSubtitleSize,
-                        height: 1.4,
-                        color: _paywallSubtitle,
-                        fontWeight: FontWeight.w500,
-                        shadows: _paywallHeroTextShadow,
+                  ),
+                )
+              else
+                Positioned(
+                  left: heroSidePad,
+                  right: heroSidePad,
+                  top: topPadding + 48,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      RichText(
+                        textAlign: TextAlign.left,
+                        text: TextSpan(
+                          style: heroTitleStyle,
+                          children: [
+                            const TextSpan(text: 'Grow Closer\n'),
+                            const TextSpan(text: 'to '),
+                            TextSpan(
+                              text: 'God',
+                              style: heroHighlightStyle,
+                            ),
+                            TextSpan(
+                              text: ' Daily',
+                              style: heroHighlightStyle,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      Text(
+                        'Guidance, prayer, and encouragement\n whenever you need it.',
+                        textAlign: TextAlign.left,
+                        style: TextStyle(
+                          fontSize: heroSubtitleSize,
+                          height: 1.4,
+                          color: _paywallSubtitle,
+                          fontWeight: FontWeight.w500,
+                          shadows: _paywallHeroTextShadow,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
           ),

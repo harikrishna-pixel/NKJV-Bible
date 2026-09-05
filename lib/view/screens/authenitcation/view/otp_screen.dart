@@ -81,7 +81,11 @@ class _OtpScreenState extends State<OtpScreen> {
                   children: [
                     InkWell(
                       onTap: () {
-                        Get.back();
+                        if (Navigator.of(context).canPop()) {
+                          Navigator.of(context).pop();
+                        } else {
+                          Get.back();
+                        }
                       },
                       child: Padding(
                         padding: const EdgeInsets.only(left: 15.0),

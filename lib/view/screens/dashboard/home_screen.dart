@@ -1606,14 +1606,17 @@ class _HomeScreenState extends State<HomeScreen>
       });
   }
 
-  /// When backend [referral_count] grew, show one claim popup (100 credits each).
+  /// When backend [referral_count] grew, credit User 1 (+100 each).
+  /// Additive: auto-claim on Home open so referrer does not depend on Claim tap.
   Future<void> _maybeShowReferrerRewardClaimDialog() async {
     try {
+      await syncReferrerCreditsFromSession();
       final pending = await fetchPendingReferrerReward();
       debugPrint(
           '_maybeShowReferrerRewardClaimDialog pending → '
           'count=${pending?.referralCount} already=${pending?.alreadyCredited} '
           'claimCredits=${pending?.credits}');
+      // Already granted above; dialog only if something remains unclaimed.
       if (!mounted || pending == null || pending.pendingCount <= 0) return;
 
       final pendingCount = pending.pendingCount;
@@ -1682,7 +1685,13 @@ class _HomeScreenState extends State<HomeScreen>
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: Text('Claim $credits Credits'),
+                      child: const Text(
+                        'Claim',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                   ),
                   TextButton(
