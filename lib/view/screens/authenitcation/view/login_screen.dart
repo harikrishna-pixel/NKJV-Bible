@@ -1,3 +1,4 @@
+import 'package:biblebookapp/main.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/images.dart';
@@ -26,12 +27,17 @@ class LoginScreen extends HookConsumerWidget {
     required this.hasSkip,
     this.popOnSuccess = false,
     this.replaceOnSuccess,
+    this.onOpenSignUp,
   });
   final bool hasSkip;
   final bool popOnSuccess;
 
   /// UI-only: Prayer Wall + path — replace Login with Post a Prayer (no pop-then-push).
   final VoidCallback? replaceOnSuccess;
+
+  /// UI-only: Prayer Wall auth host — switch to Sign Up in the same route
+  /// (avoids Login under Sign Up stealing keyboard). Null = existing push/Get.
+  final VoidCallback? onOpenSignUp;
 
   /// Route name for Prayer Wall embedded login ([Navigator.push] settings).
   static const embeddedRouteName = '/prayer-wall-embedded-login';
@@ -85,7 +91,10 @@ class LoginScreen extends HookConsumerWidget {
       });
     });
     // debugPrint("sz current width - $screenWidth ");
-    return Scaffold(
+    // UI-only: when Sign Up (or any route) covers Login, drop Login focus so
+    // Prayer Wall → Login → Sign Up fields can type (no auth/API change).
+    return _LoginFocusWhenCovered(
+      child: Scaffold(
       resizeToAvoidBottomInset: false,
       body: Container(
         height: MediaQuery.of(context).size.height,
@@ -356,10 +365,17 @@ class LoginScreen extends HookConsumerWidget {
                                         color: CommanColor.whiteBlack(context)),
                                     recognizer: TapGestureRecognizer()
                                       ..onTap = () {
+                                        FocusManager.instance.primaryFocus
+                                            ?.unfocus();
+                                        // UI-only: same-route Sign Up when host
+                                        // provided (Prayer Wall keyboard fix).
+                                        if (onOpenSignUp != null) {
+                                          onOpenSignUp!();
+                                          return;
+                                        }
                                         final embedded = popOnSuccess ||
                                             replaceOnSuccess != null;
                                         if (embedded) {
-                                          // Same Navigator stack as PW Login.
                                           Navigator.of(context).push(
                                             MaterialPageRoute<void>(
                                               settings: const RouteSettings(
@@ -396,6 +412,11 @@ class LoginScreen extends HookConsumerWidget {
                   children: [
                     GestureDetector(
                       onTap: () {
+                        FocusManager.instance.primaryFocus?.unfocus();
+                        if (onOpenSignUp != null) {
+                          onOpenSignUp!();
+                          return;
+                        }
                         final embedded = popOnSuccess ||
                             replaceOnSuccess != null;
                         if (embedded) {
@@ -445,6 +466,116 @@ class LoginScreen extends HookConsumerWidget {
           ],
         ),
       ),
+    ),
+    );
+  }
+}
+
+/// UI-only: one Navigator route for Prayer Wall Login ↔ Sign Up.
+/// Avoids stacking Sign Up on Login (that blocked the keyboard).
+class PrayerWallEmbeddedAuthHost extends StatefulWidget {
+  const PrayerWallEmbeddedAuthHost({
+    super.key,
+    this.replaceOnSuccess,
+  });
+
+  final VoidCallback? replaceOnSuccess;
+
+  static const routeName = '/prayer-wall-embedded-auth';
+
+  @override
+  State<PrayerWallEmbeddedAuthHost> createState() =>
+      _PrayerWallEmbeddedAuthHostState();
+}
+
+class _PrayerWallEmbeddedAuthHostState
+    extends State<PrayerWallEmbeddedAuthHost> {
+  bool _showSignUp = false;
+
+  void _openSignUp() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _showSignUp = true);
+  }
+
+  void _backToLogin() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _showSignUp = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_showSignUp) {
+      return SignupScreen(
+        key: const ValueKey('prayer-wall-embedded-signup'),
+        popOnSuccess: true,
+        openPostPrayerOnSuccess: widget.replaceOnSuccess != null,
+        onBackToEmbeddedLogin: _backToLogin,
+      );
+    }
+    return LoginScreen(
+      key: const ValueKey('prayer-wall-embedded-login'),
+      hasSkip: false,
+      popOnSuccess: true,
+      replaceOnSuccess: widget.replaceOnSuccess,
+      onOpenSignUp: _openSignUp,
+    );
+  }
+}
+
+/// UI-only: while another route covers Login (Prayer Wall → Sign Up), prevent
+/// Login TextFields from holding keyboard/caret focus. Auth logic unchanged.
+class _LoginFocusWhenCovered extends StatefulWidget {
+  const _LoginFocusWhenCovered({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_LoginFocusWhenCovered> createState() => _LoginFocusWhenCoveredState();
+}
+
+class _LoginFocusWhenCoveredState extends State<_LoginFocusWhenCovered>
+    with RouteAware {
+  bool _covered = false;
+  ModalRoute<dynamic>? _route;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route == _route) return;
+    if (_route != null) {
+      routeObserver.unsubscribe(this);
+    }
+    _route = route;
+    if (_route != null) {
+      routeObserver.subscribe(this, _route!);
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_route != null) {
+      routeObserver.unsubscribe(this);
+    }
+    super.dispose();
+  }
+
+  @override
+  void didPushNext() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (mounted) setState(() => _covered = true);
+  }
+
+  @override
+  void didPopNext() {
+    if (mounted) setState(() => _covered = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeFocus(
+      excluding: _covered,
+      child: widget.child,
     );
   }
 }

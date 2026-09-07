@@ -60,6 +60,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   Set<String> _reportedPrayerIds = {};
   /// UI-only: prayer `_id`s blocked on this device (hide those prayers).
   Set<String> _blockedUserIds = {};
+  /// UI-only: blocked id → display name for Blocked list (local cache).
+  Map<String, String> _blockedDisplayNames = {};
   String _filter = 'All';
   String _sort = 'Latest';
   /// Inside My Prayers: Current (active) vs Expired (prayer-history).
@@ -114,7 +116,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
 
   /// True when keyboard is up or a text field is focused (hide FAB overlay).
   bool get _hideFabForInput {
-    if (_suspendFocusFabListener) return false;
+    // While Login/Sign Up covers Wall, keep FAB hidden and ignore underlaid focus.
+    if (_suspendFocusFabListener) return true;
     final mqBottom = MediaQuery.viewInsetsOf(context).bottom;
     if (mqBottom > 0) return true;
     final view = View.maybeOf(context);
@@ -131,6 +134,10 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
 
   /// UI-only: pause FAB focus rebuilds while Login/Sign Up covers the Wall.
   bool _suspendFocusFabListener = false;
+
+  /// UI-only: freeze Wall MediaQuery while auth is open so keyboard insets
+  /// on Sign Up do not rebuild Wall and dismiss the keypad.
+  MediaQueryData? _frozenMediaQueryDuringAuth;
 
   void _onFocusOrMetricsChanged() {
     if (_suspendFocusFabListener) return;
@@ -403,7 +410,10 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   Future<void> _hydrateBlockedUserIdsFromDisk() async {
     // Account-scoped list loads in [_loadAuthAndLocalName]; avoid stale device-wide ids.
     if (!mounted) return;
-    setState(() => _blockedUserIds = {});
+    setState(() {
+      _blockedUserIds = {};
+      _blockedDisplayNames = {};
+    });
   }
 
   /// Load blocked ids for the current login email only (not other accounts).
@@ -413,15 +423,19 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       if (!mounted) return;
       setState(() {
         _blockedUserIds = {};
+        _blockedDisplayNames = {};
         _blockedListAccountEmail = null;
       });
       return;
     }
     final forAccount =
         await PrayerWallLocalStore.loadBlockedUserIdsForEmail(key);
+    final names =
+        await PrayerWallLocalStore.loadBlockedDisplayNamesForEmail(key);
     if (!mounted) return;
     setState(() {
       _blockedUserIds = forAccount;
+      _blockedDisplayNames = names;
       _blockedListAccountEmail = key;
     });
   }
@@ -459,12 +473,13 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     if (_blockedApiRestoreBusy) return;
     _blockedApiRestoreBusy = true;
     try {
-      final fromApi = await PrayerWallService.fetchBlockedUserIdsForAccount(
+      final fromApi =
+          await PrayerWallService.fetchBlockedUsersDetailedForAccount(
         email: email,
       );
       if (!mounted) return;
       // Additive: empty GET must not wipe local blocks (race after Block).
-      if (fromApi.isEmpty) {
+      if (fromApi.ids.isEmpty) {
         print(
           'PrayerWall restore blocked: GET empty — keep local '
           '(${_blockedUserIds.length})',
@@ -472,11 +487,24 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         return;
       }
       // Merge server + this account's local ids (do not drop local person ids).
-      final merged = <String>{..._blockedUserIds, ...fromApi};
+      final merged = <String>{..._blockedUserIds, ...fromApi.ids};
       await PrayerWallLocalStore.saveBlockedUserIds(merged, email: email);
+      // Additive: persist names from GET for Blocked list (after reinstall).
+      final mergedNames = Map<String, String>.from(_blockedDisplayNames);
+      for (final e in fromApi.names.entries) {
+        final n = e.value.trim();
+        if (n.isEmpty) continue;
+        mergedNames[e.key] = n;
+        await PrayerWallLocalStore.rememberBlockedDisplayName(
+          e.key,
+          displayName: n,
+          email: email,
+        );
+      }
       if (!mounted) return;
       setState(() {
         _blockedUserIds = merged;
+        _blockedDisplayNames = mergedNames;
         _blockedListAccountEmail = emailKey;
       });
     } catch (e) {
@@ -668,15 +696,19 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
 
     _embeddedLoginGateBusy = true;
     // UI-only: Wall under Login must not rebuild on Sign Up field focus.
+    _frozenMediaQueryDuringAuth = MediaQuery.of(context).copyWith(
+      viewInsets: EdgeInsets.zero,
+    );
     _suspendFocusFabListener = true;
+    if (mounted) setState(() {});
     try {
       FocusManager.instance.primaryFocus?.unfocus();
       final result = await Navigator.of(context).push<bool>(
         MaterialPageRoute<bool>(
-          settings: const RouteSettings(name: LoginScreen.embeddedRouteName),
-          builder: (_) => LoginScreen(
-            hasSkip: false,
-            popOnSuccess: true,
+          settings: const RouteSettings(
+            name: PrayerWallEmbeddedAuthHost.routeName,
+          ),
+          builder: (_) => PrayerWallEmbeddedAuthHost(
             replaceOnSuccess: replaceOnSuccess,
           ),
         ),
@@ -688,6 +720,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       return _isLoggedIn || result == true;
     } finally {
       _suspendFocusFabListener = false;
+      _frozenMediaQueryDuringAuth = null;
       _embeddedLoginGateBusy = false;
       if (mounted) setState(() {});
     }
@@ -888,6 +921,11 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     }).toList();
   }
 
+  /// UI-only: count of Blocked list rows (not raw stored ids).
+  /// Hide/block APIs still use [_blockedUserIds] unchanged.
+  int get _blockedListDisplayCount =>
+      _blockedItemsOnWall.length + _blockedIdsNotOnWall.length;
+
   Future<void> _openBlockedList() async {
     // Blocked list lives inside My Prayer — open that section first.
     if (!_showingHistory) {
@@ -902,9 +940,13 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         _historyError = null;
       });
       await _reloadMyPrayerHistory();
+      unawaited(_backfillBlockedDisplayNamesFromWall());
       return;
     }
     setState(() => _showingBlocked = !_showingBlocked);
+    if (_showingBlocked) {
+      unawaited(_backfillBlockedDisplayNamesFromWall());
+    }
   }
 
   void _selectMyPrayerTab({required bool blocked}) {
@@ -913,6 +955,37 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       _showingBlocked = blocked;
       if (!blocked) _myPrayerSort = 'Current';
     });
+    // Additive UI: fill missing Blocked-list names from wall cards (no API change).
+    if (blocked) {
+      unawaited(_backfillBlockedDisplayNamesFromWall());
+    }
+  }
+
+  /// Additive: when a blocked person still has a wall card, copy that name onto
+  /// matching blocked ids that have no cached label yet.
+  Future<void> _backfillBlockedDisplayNamesFromWall() async {
+    if (_blockedUserIds.isEmpty) return;
+    final next = Map<String, String>.from(_blockedDisplayNames);
+    var changed = false;
+    for (final item in _all) {
+      if (!_isItemBlocked(item)) continue;
+      final name = _cardDisplayName(item).trim();
+      if (name.isEmpty || name.toLowerCase() == 'blocked prayer') continue;
+      for (final id in _blockedUserIds) {
+        if (!_itemMatchesBlockedId(item, id)) continue;
+        if ((next[id] ?? '').trim().isNotEmpty) continue;
+        next[id] = name;
+        await PrayerWallLocalStore.rememberBlockedDisplayName(
+          id,
+          displayName: name,
+          email: _userEmail,
+        );
+        changed = true;
+      }
+    }
+    if (changed && mounted) {
+      setState(() => _blockedDisplayNames = next);
+    }
   }
 
   String _avatarInitialsForName(String value) {
@@ -1130,12 +1203,31 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         userId: uid,
         blockedUserId: blockedId,
       );
-      await PrayerWallLocalStore.unmarkBlockedUser(
-        blockedId,
-        email: _userEmail,
-      );
+      // Same as card unblock: clear person id + related local ids so the
+      // Blocked list row disappears (toast alone left siblings in the set).
+      final relatedIds = _relatedLocalBlockedIds(blockedId);
+      for (final id in relatedIds) {
+        if (id == blockedId) continue;
+        try {
+          await PrayerWallService.unblockUser(
+            userId: uid,
+            blockedUserId: id,
+          );
+        } catch (_) {}
+      }
+      for (final id in relatedIds) {
+        await PrayerWallLocalStore.unmarkBlockedUser(
+          id,
+          email: _userEmail,
+        );
+      }
       if (!mounted) return;
-      setState(() => _blockedUserIds.remove(blockedId));
+      setState(() {
+        _blockedUserIds.removeAll(relatedIds);
+        for (final id in relatedIds) {
+          _blockedDisplayNames.remove(id);
+        }
+      });
       Constants.showToast('User unblocked', 2000);
     } catch (e) {
       print('PrayerWall _unblockByPrayerId error: $e');
@@ -1144,6 +1236,49 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
           ? 'No internet connection. Please try again.'
           : 'Could not update block. Please try again.');
     }
+  }
+
+  /// Local ids stored for one blocked person (person id + prayer ids + namesakes).
+  /// Used so Blocked-list Unblock clears the whole row, not one leftover id.
+  Set<String> _relatedLocalBlockedIds(String seedId) {
+    final seed = seedId.trim();
+    if (seed.isEmpty) return {};
+    final related = <String>{seed};
+
+    var changed = true;
+    while (changed) {
+      changed = false;
+      for (final p in _all) {
+        final touches = related.any((id) => _itemMatchesBlockedId(p, id));
+        if (!touches) continue;
+        for (final raw in <String?>[
+          p.id,
+          p.identityUserId,
+          p.authorUserId,
+          _prayerAuthorUserIdMap[p.id],
+        ]) {
+          final c = (raw ?? '').trim();
+          if (c.isNotEmpty && related.add(c)) changed = true;
+        }
+        for (final id in _blockedUserIds) {
+          if (_itemMatchesBlockedId(p, id) && related.add(id)) changed = true;
+        }
+      }
+    }
+
+    // Leftover list rows: sibling ids often share the cached display name.
+    final names = <String>{};
+    for (final id in related) {
+      final n = (_blockedDisplayNames[id] ?? '').trim().toLowerCase();
+      if (n.isNotEmpty) names.add(n);
+    }
+    if (names.isNotEmpty) {
+      for (final id in _blockedUserIds) {
+        final n = (_blockedDisplayNames[id] ?? '').trim().toLowerCase();
+        if (names.contains(n)) related.add(id);
+      }
+    }
+    return related;
   }
 
   Future<void> _openBlockUser(PrayerWallItem item) async {
@@ -1210,12 +1345,18 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
           );
         }
         if (!mounted) return;
-        setState(() => _blockedUserIds.removeAll(relatedIds));
+        setState(() {
+          _blockedUserIds.removeAll(relatedIds);
+          for (final id in relatedIds) {
+            _blockedDisplayNames.remove(id);
+          }
+        });
         Constants.showToast('User unblocked', 2000);
       } else {
         await PrayerWallService.blockUser(
           userId: uid,
           blockedUserId: blockedId,
+          blockedUserName: _cardDisplayName(item),
         );
         // Additive: store person id + all their wall prayer ids so every
         // post from them hides (not only the tapped card).
@@ -1229,14 +1370,28 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
           final aid = (p.authorUserId ?? '').trim();
           if (aid.isNotEmpty) relatedIds.add(aid);
         }
+        final displayName = _cardDisplayName(item);
         for (final id in relatedIds) {
           await PrayerWallLocalStore.markBlockedUser(
             id,
             email: _userEmail,
           );
+          // Additive UI: cache name for Blocked list (APIs unchanged).
+          await PrayerWallLocalStore.rememberBlockedDisplayName(
+            id,
+            displayName: displayName,
+            email: _userEmail,
+          );
         }
         if (!mounted) return;
-        setState(() => _blockedUserIds.addAll(relatedIds));
+        setState(() {
+          _blockedUserIds.addAll(relatedIds);
+          for (final id in relatedIds) {
+            if (displayName.trim().isNotEmpty) {
+              _blockedDisplayNames[id] = displayName.trim();
+            }
+          }
+        });
         Constants.showToast('User blocked', 2000);
       }
     } catch (e) {
@@ -1856,7 +2011,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   }) {
     final items = _blockedItemsOnWall;
     final leftover = _blockedIdsNotOnWall;
-    final count = _blockedUserIds.length;
+    // UI-only: match tab/header count to visible rows (ids may be > people).
+    final count = _blockedListDisplayCount;
     final cardBg = isDark ? const Color(0xFF2C2118) : const Color(0xFFFFF9F3);
     final border = isDark ? const Color(0xFF5A4638) : const Color(0xFFE2D2C0);
     final ink = isDark ? Colors.white : const Color(0xFF3D2914);
@@ -2083,9 +2239,16 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
           );
         }),
         ...leftover.map((id) {
+          final cached = (_blockedDisplayNames[id] ?? '').trim();
+          final fromAuthor = (_prayerAuthorMap[id] ?? '').trim();
+          final name = cached.isNotEmpty
+              ? cached
+              : (fromAuthor.isNotEmpty ? fromAuthor : 'Blocked prayer');
           return blockedCard(
-            name: 'Blocked prayer',
-            subtitle: 'This prayer is hidden from your wall.',
+            name: name,
+            subtitle: name == 'Blocked prayer'
+                ? 'This prayer is hidden from your wall.'
+                : 'This profile is hidden from your wall.',
             onUnblock: () => _unblockByPrayerId(id),
           );
         }),
@@ -2408,7 +2571,11 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       );
     }
 
-    return Scaffold(
+    // UI-only: while Login/Sign Up is open, Wall must not resize for keyboard
+    // insets (that steals/dismisses Sign Up keypad under the auth route).
+    final wallIgnoresKeyboard = _suspendFocusFabListener;
+    Widget page = Scaffold(
+      resizeToAvoidBottomInset: !wallIgnoresKeyboard,
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -2421,6 +2588,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
               )
             : BoxDecoration(color: cream),
         child: Scaffold(
+          resizeToAvoidBottomInset: !wallIgnoresKeyboard,
           backgroundColor: Colors.transparent,
       floatingActionButton: (_hideFabForInput || _showingBlocked)
           ? null
@@ -2513,9 +2681,9 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                     const SizedBox(width: 10),
                     Expanded(
                       child: _myPrayerSegmentChip(
-                        label: _blockedUserIds.isEmpty
+                        label: _blockedListDisplayCount == 0
                             ? 'Blocked'
-                            : 'Blocked (${_blockedUserIds.length})',
+                            : 'Blocked ($_blockedListDisplayCount)',
                         selected: _showingBlocked,
                         brown: brown,
                         isDark: isDark,
@@ -2805,6 +2973,13 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         )
       )
     );
+    // Freeze MediaQuery while auth is open — do not re-read live viewInsets
+    // (that rebuilds Wall when Sign Up keyboard opens and closes the keypad).
+    final frozen = _frozenMediaQueryDuringAuth;
+    if (wallIgnoresKeyboard && frozen != null) {
+      return MediaQuery(data: frozen, child: page);
+    }
+    return page;
   }
 }
 

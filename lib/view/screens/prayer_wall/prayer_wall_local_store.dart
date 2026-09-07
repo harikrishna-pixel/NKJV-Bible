@@ -21,6 +21,10 @@ class PrayerWallLocalStore {
   static const _kBlockedUserIds = 'prayer_wall_blocked_user_ids_v1';
   static const _kBlockedUserIdsByEmail =
       'prayer_wall_blocked_user_ids_by_email_v1';
+  /// UI-only: blocked id → display name (Account Blocked list). Does not
+  /// change block/unblock APIs or hide rules.
+  static const _kBlockedDisplayNamesByEmail =
+      'prayer_wall_blocked_display_names_by_email_v1';
   static const _kReporterId = 'prayer_wall_reporter_id_v1';
   static const _kBannerDismissKeys = 'prayer_wall_home_banner_dismiss_v1';
   static const _kIdentityUserIdField =
@@ -428,6 +432,87 @@ class PrayerWallLocalStore {
     final s = await loadBlockedUserIds();
     s.remove(uid);
     await saveBlockedUserIds(s, email: email);
+    // Additive UI: drop cached label for this id (block/unblock path unchanged).
+    await forgetBlockedDisplayNames([uid], email: email);
+  }
+
+  static Future<Map<String, Map<String, String>>>
+      _loadBlockedDisplayNamesByEmailMap() async {
+    final p = await SharedPreferences.getInstance();
+    final s = p.getString(_kBlockedDisplayNamesByEmail);
+    if (s == null || s.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(s);
+      if (decoded is! Map) return {};
+      final out = <String, Map<String, String>>{};
+      decoded.forEach((k, v) {
+        if (v is! Map) return;
+        out[k.toString()] = v.map(
+          (ik, iv) => MapEntry(ik.toString(), iv.toString()),
+        );
+      });
+      return out;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// UI-only names for Blocked list rows (per login email).
+  static Future<Map<String, String>> loadBlockedDisplayNamesForEmail(
+    String? email,
+  ) async {
+    final key = _emailKey(email);
+    if (key.isEmpty) return {};
+    final map = await _loadBlockedDisplayNamesByEmailMap();
+    return Map<String, String>.from(map[key] ?? const {});
+  }
+
+  static Future<void> _saveBlockedDisplayNamesForEmail(
+    String? email,
+    Map<String, String> names,
+  ) async {
+    final key = _emailKey(email);
+    if (key.isEmpty) return;
+    final p = await SharedPreferences.getInstance();
+    final map = await _loadBlockedDisplayNamesByEmailMap();
+    if (names.isEmpty) {
+      map.remove(key);
+    } else {
+      map[key] = names;
+    }
+    await p.setString(_kBlockedDisplayNamesByEmail, jsonEncode(map));
+  }
+
+  /// Additive: remember display name when blocking (same ids as markBlockedUser).
+  static Future<void> rememberBlockedDisplayName(
+    String userId, {
+    required String displayName,
+    String? email,
+  }) async {
+    final uid = userId.trim();
+    final name = displayName.trim();
+    if (uid.isEmpty || name.isEmpty) return;
+    if (name.toLowerCase() == 'blocked prayer') return;
+    final names = await loadBlockedDisplayNamesForEmail(email);
+    names[uid] = name;
+    await _saveBlockedDisplayNamesForEmail(email, names);
+  }
+
+  static Future<void> forgetBlockedDisplayNames(
+    Iterable<String> userIds, {
+    String? email,
+  }) async {
+    final names = await loadBlockedDisplayNamesForEmail(email);
+    if (names.isEmpty) return;
+    var changed = false;
+    for (final raw in userIds) {
+      final uid = raw.trim();
+      if (uid.isEmpty) continue;
+      if (names.remove(uid) != null) changed = true;
+    }
+    if (changed) {
+      await _saveBlockedDisplayNamesForEmail(email, names);
+    }
   }
 
   /// UI-only dismiss keys for home expiry banners (e.g. `ends_today:<id>:<ymd>`).

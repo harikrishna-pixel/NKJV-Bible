@@ -27,6 +27,7 @@ class SignupScreen extends HookConsumerWidget {
     super.key,
     this.popOnSuccess = false,
     this.openPostPrayerOnSuccess = false,
+    this.onBackToEmbeddedLogin,
   });
 
   /// UI-only: opened from Prayer Wall embedded Login — return to Wall, not Reading.
@@ -35,11 +36,16 @@ class SignupScreen extends HookConsumerWidget {
   /// UI-only: Login had replaceOnSuccess for Post a Prayer.
   final bool openPostPrayerOnSuccess;
 
-  final _formKey = GlobalKey<FormState>();
+  /// UI-only: Prayer Wall auth host — return to Login in the same route.
+  /// Null = existing Navigator.pop / Get behavior.
+  final VoidCallback? onBackToEmbeddedLogin;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final agree = useState(false);
     final signupState = ref.watch(signupBloc);
+    // Stable key — recreating GlobalKey on each Widget() remount closes keyboard.
+    final formKey = useMemoized(() => GlobalKey<FormState>());
 
     // Fresh form each time this screen is opened (bloc controllers outlive the route).
     useEffect(() {
@@ -52,27 +58,31 @@ class SignupScreen extends HookConsumerWidget {
       agree.value = false;
       return null;
     }, const []);
-    double screenWidth = MediaQuery.of(context).size.width;
-    // UI-only: do not wrap fields in opaque GestureDetector+unfocus —
-    // that steals focus (Prayer Wall → Login → Sign Up can't type).
-    return Scaffold(
+    // sizeOf: do not rebuild Sign Up when only keyboard insets change
+    // (MediaQuery.of + keyboard open/close was dismissing the keypad).
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final keyboardBottom = MediaQuery.viewInsetsOf(context).bottom;
+    // UI-only: do not wrap fields in opaque GestureDetector+unfocus.
+    final hostedInAuthHost = onBackToEmbeddedLogin != null;
+    final scaffold = Scaffold(
+        // Match Login: false + manual inset pad. true causes open→close flash.
         resizeToAvoidBottomInset: false,
         body: Stack(
               children: [
                 Positioned.fill(
-                  child: p.Provider.of<ThemeProvider>(context)
-                              .currentCustomTheme ==
-                          AppCustomTheme.vintage
-                      ? Image.asset(
-                          Images.bgImage(context), // Path to your image
-                          fit: BoxFit.cover,
-                        )
-                      : SizedBox(),
+                  child: IgnorePointer(
+                    child: p.Provider.of<ThemeProvider>(context)
+                                .currentCustomTheme ==
+                            AppCustomTheme.vintage
+                        ? Image.asset(
+                            Images.bgImage(context), // Path to your image
+                            fit: BoxFit.cover,
+                          )
+                        : const SizedBox(),
+                  ),
                 ),
                 Padding(
-                  padding: EdgeInsets.only(
-                    bottom: MediaQuery.of(context).viewInsets.bottom,
-                  ),
+                  padding: EdgeInsets.only(bottom: keyboardBottom),
                   child: SafeArea(
                     child: Column(
                       children: [
@@ -84,6 +94,10 @@ class SignupScreen extends HookConsumerWidget {
                           children: [
                             InkWell(
                               onTap: () {
+                                if (onBackToEmbeddedLogin != null) {
+                                  onBackToEmbeddedLogin!();
+                                  return;
+                                }
                                 if (popOnSuccess || openPostPrayerOnSuccess) {
                                   if (Navigator.of(context).canPop()) {
                                     Navigator.of(context).pop();
@@ -112,7 +126,7 @@ class SignupScreen extends HookConsumerWidget {
                           child: SingleChildScrollView(
                             padding: const EdgeInsets.symmetric(horizontal: 20),
                             child: Form(
-                              key: _formKey,
+                              key: formKey,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
@@ -287,7 +301,7 @@ class SignupScreen extends HookConsumerWidget {
                                   GestureDetector(
                                     onTap: () async {
                                       if (agree.value) {
-                                        if (_formKey.currentState?.validate() ??
+                                        if (formKey.currentState?.validate() ??
                                             false) {
                                           FocusScope.of(context).unfocus();
                                           try {
@@ -344,8 +358,11 @@ class SignupScreen extends HookConsumerWidget {
                                               // UI only: Prayer Wall embedded
                                               // signup returns to Wall (or Post),
                                               // not Reading. Register logic unchanged.
-                                              // Same Navigator as PW→Login→Signup.
-                                              if (openPostPrayerOnSuccess ||
+                                              if (onBackToEmbeddedLogin !=
+                                                  null) {
+                                                // Auth host: one route — pop once.
+                                                Navigator.of(context).pop(true);
+                                              } else if (openPostPrayerOnSuccess ||
                                                   popOnSuccess) {
                                                 // Pop Signup then Login → original PW.
                                                 // Sync double-pop is more reliable
@@ -449,6 +466,11 @@ class SignupScreen extends HookConsumerWidget {
                                                 recognizer:
                                                     TapGestureRecognizer()
                                                       ..onTap = () {
+                                                        if (onBackToEmbeddedLogin !=
+                                                            null) {
+                                                          onBackToEmbeddedLogin!();
+                                                          return;
+                                                        }
                                                         // Prayer Wall embedded:
                                                         // go back to existing Login
                                                         // (don't stack another Login).
@@ -586,5 +608,10 @@ class SignupScreen extends HookConsumerWidget {
               ],
             ),
         );
+    if (hostedInAuthHost) return scaffold;
+    return FocusScope(
+      autofocus: popOnSuccess || openPostPrayerOnSuccess,
+      child: scaffold,
+    );
   }
 }

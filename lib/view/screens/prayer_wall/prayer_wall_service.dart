@@ -865,11 +865,21 @@ class PrayerWallService {
     throw Exception('Report prayer failed (${res.statusCode}): ${res.body}');
   }
 
-  static Set<String> _parseBlockedUserIds(dynamic decoded) {
+  /// Additive: ids + optional display names from GET /api/blocked-users.
+  static ({Set<String> ids, Map<String, String> names}) _parseBlockedUsers(
+    dynamic decoded,
+  ) {
     final out = <String>{};
-    void addId(dynamic v) {
-      final s = v?.toString().trim() ?? '';
-      if (s.isNotEmpty) out.add(s);
+    final names = <String, String>{};
+
+    void addEntry(String id, String? name) {
+      final sid = id.trim();
+      if (sid.isEmpty) return;
+      out.add(sid);
+      final n = (name ?? '').trim();
+      if (n.isNotEmpty && n.toLowerCase() != 'blocked prayer') {
+        names[sid] = n;
+      }
     }
 
     void addFromList(dynamic list) {
@@ -877,9 +887,23 @@ class PrayerWallService {
       for (final e in list) {
         if (e is Map) {
           final m = Map<String, dynamic>.from(e);
-          addId(m['blocked_user_id'] ?? m['blockedUserId']);
+          final id = (m['blocked_user_id'] ??
+                  m['blockedUserId'] ??
+                  m['user_id'] ??
+                  m['id'] ??
+                  '')
+              .toString();
+          final name = (m['name'] ??
+                  m['blocked_user_name'] ??
+                  m['blockedUserName'] ??
+                  m['user_name'] ??
+                  m['display_name'] ??
+                  m['displayName'] ??
+                  '')
+              .toString();
+          addEntry(id, name);
         } else {
-          addId(e);
+          addEntry(e.toString(), null);
         }
       }
     }
@@ -905,7 +929,7 @@ class PrayerWallService {
     } else if (decoded is List) {
       addFromList(decoded);
     }
-    return out;
+    return (ids: out, names: names);
   }
 
   /// Additive: `GET /api/blocked-users?user_id=` — same ids POST stored.
@@ -913,8 +937,17 @@ class PrayerWallService {
   static Future<Set<String>> fetchBlockedUserIds({
     required String userId,
   }) async {
+    final detailed = await fetchBlockedUsersDetailed(userId: userId);
+    return detailed.ids;
+  }
+
+  /// Additive: GET blocked users including optional `name` (for Blocked list).
+  static Future<({Set<String> ids, Map<String, String> names})>
+      fetchBlockedUsersDetailed({
+    required String userId,
+  }) async {
     final uid = userId.trim();
-    if (uid.isEmpty) return {};
+    if (uid.isEmpty) return (ids: <String>{}, names: <String, String>{});
     try {
       final url = PrayerWallApiConstant.blockedUsersForUser(uid);
       print('========== GET /api/blocked-users ==========');
@@ -931,12 +964,16 @@ class PrayerWallService {
         'GET /api/blocked-users response → '
         '${res.statusCode} ${res.body}',
       );
-      if (res.statusCode < 200 || res.statusCode >= 300) return {};
-      if (res.body.isEmpty) return {};
-      return _parseBlockedUserIds(jsonDecode(res.body));
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        return (ids: <String>{}, names: <String, String>{});
+      }
+      if (res.body.isEmpty) {
+        return (ids: <String>{}, names: <String, String>{});
+      }
+      return _parseBlockedUsers(jsonDecode(res.body));
     } catch (e) {
-      print('PrayerWallService.fetchBlockedUserIds error: $e');
-      return {};
+      print('PrayerWallService.fetchBlockedUsersDetailed error: $e');
+      return (ids: <String>{}, names: <String, String>{});
     }
   }
 
@@ -946,25 +983,45 @@ class PrayerWallService {
     List<PrayerWallItem> wallPrayers = const [],
     Iterable<String> extraActorIds = const [],
   }) async {
+    final detailed = await fetchBlockedUsersDetailedForAccount(email: email);
+    return detailed.ids;
+  }
+
+  /// Additive: ids + names for Account Blocked list after reinstall.
+  static Future<({Set<String> ids, Map<String, String> names})>
+      fetchBlockedUsersDetailedForAccount({
+    required String email,
+  }) async {
     final identity = await ensureIdentityUserId();
-    if (identity == null || identity.isEmpty) return {};
-    return fetchBlockedUserIds(userId: identity);
+    if (identity == null || identity.isEmpty) {
+      return (ids: <String>{}, names: <String, String>{});
+    }
+    return fetchBlockedUsersDetailed(userId: identity);
   }
 
   /// POST `/api/blocked-users` — block a prayer poster for this user.
+  /// Additive [blockedUserName]: sent as `name` for backend to store/return.
   static Future<void> blockUser({
     required String userId,
     required String blockedUserId,
+    String? blockedUserName,
   }) async {
     final uid = userId.trim();
     final blocked = blockedUserId.trim();
     if (uid.isEmpty || blocked.isEmpty) {
       throw Exception('blockUser: user_id and blocked_user_id required');
     }
-    final body = jsonEncode({
+    final payload = <String, dynamic>{
       'user_id': uid,
       'blocked_user_id': blocked,
-    });
+    };
+    final name = (blockedUserName ?? '').trim();
+    if (name.isNotEmpty) {
+      // Additive: backend should persist and return this on GET.
+      payload['name'] = name;
+      payload['blocked_user_name'] = name;
+    }
+    final body = jsonEncode(payload);
     print('PrayerWallService.blockUser body: $body');
     final res = await http.post(
       Uri.parse(PrayerWallApiConstant.blockedUsers),

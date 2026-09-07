@@ -352,9 +352,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
             : themeProvider.backgroundColor);
     final dateFmt = DateFormat('MMMM d, yyyy');
 
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      behavior: HitTestBehavior.opaque,
+    return FocusScope(
       child: Scaffold(
         resizeToAvoidBottomInset: false,
         body: Container(
