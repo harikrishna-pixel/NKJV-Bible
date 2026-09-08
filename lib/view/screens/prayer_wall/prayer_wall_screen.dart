@@ -859,8 +859,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   }
 
   /// Resolve `user_id` from POST /api/users/resolve (used as block API `user_id`).
-  /// Additive: one retry when cache is empty (iPhone after login) — same resolve
-  /// API / block body; does not change block/unblock request shape.
+  /// Additive retries when cache is empty (iPad/iPhone after login) — same resolve
+  /// API / JSON body; does not change block/unblock request shape.
   Future<String?> _resolveUserIdForBlock() async {
     Future<String?> readOnce() async {
       final id = await PrayerWallService.ensureIdentityUserId();
@@ -871,6 +871,27 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       return fallback.isEmpty ? null : fallback;
     }
 
+    Future<String?> forceResolveOnce() async {
+      try {
+        final email = (await _cacheNotifier.readCache(key: 'user') ?? '')
+            .toString()
+            .trim();
+        final name = (await _cacheNotifier.readCache(key: 'name') ?? '')
+            .toString()
+            .trim();
+        if (email.isEmpty) return null;
+        final again = await PrayerWallService.resolveIdentityUser(
+          email: email,
+          userName: name.isEmpty ? null : name,
+        );
+        final t = (again ?? '').trim();
+        return t.isEmpty ? null : t;
+      } catch (e) {
+        print('PrayerWall _resolveUserIdForBlock forceResolve error: $e');
+        return null;
+      }
+    }
+
     var uid = await readOnce();
     if (uid != null && uid.isNotEmpty) {
       if (mounted && (_resolveUserId ?? '').trim() != uid) {
@@ -879,34 +900,23 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       return uid;
     }
 
-    // Retry once: slower phones often miss resolve right after login.
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-    if (!mounted) return null;
-    try {
-      final email =
-          (await _cacheNotifier.readCache(key: 'user') ?? '').toString().trim();
-      final name =
-          (await _cacheNotifier.readCache(key: 'name') ?? '').toString().trim();
-      if (email.isNotEmpty) {
-        final again = await PrayerWallService.resolveIdentityUser(
-          email: email,
-          userName: name.isEmpty ? null : name,
-        );
-        final t = (again ?? '').trim();
-        if (t.isNotEmpty) {
-          if (mounted) setState(() => _resolveUserId = t);
-          return t;
-        }
+    // Retries: slower devices (esp. iPad) often miss resolve right after login.
+    for (final delayMs in <int>[450, 900]) {
+      await Future<void>.delayed(Duration(milliseconds: delayMs));
+      if (!mounted) return null;
+      final forced = await forceResolveOnce();
+      if (forced != null && forced.isNotEmpty) {
+        if (mounted) setState(() => _resolveUserId = forced);
+        return forced;
       }
-    } catch (e) {
-      print('PrayerWall _resolveUserIdForBlock retry error: $e');
+      uid = await readOnce();
+      if (uid != null && uid.isNotEmpty) {
+        if (mounted) setState(() => _resolveUserId = uid);
+        return uid;
+      }
     }
 
-    uid = await readOnce();
-    if (uid != null && uid.isNotEmpty && mounted) {
-      setState(() => _resolveUserId = uid);
-    }
-    return uid;
+    return null;
   }
 
   List<PrayerWallItem> get _blockedItemsOnWall =>
@@ -957,6 +967,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     });
     // Additive UI: fill missing Blocked-list names from wall cards (no API change).
     if (blocked) {
+      // Warm resolve so Unblock on iPad works without app restart.
+      unawaited(_resolveUserIdForBlock());
       unawaited(_backfillBlockedDisplayNamesFromWall());
     }
   }
@@ -1199,21 +1211,39 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     );
     if (!confirmed || !mounted) return;
     try {
-      await PrayerWallService.unblockUser(
-        userId: uid,
-        blockedUserId: blockedId,
-      );
-      // Same as card unblock: clear person id + related local ids so the
-      // Blocked list row disappears (toast alone left siblings in the set).
+      // Same DELETE API. Try seed id first, then related local ids (iPad often
+      // has prayer id in the list while server row used person id at Block).
       final relatedIds = _relatedLocalBlockedIds(blockedId);
-      for (final id in relatedIds) {
-        if (id == blockedId) continue;
+      final candidates = <String>[
+        blockedId,
+        ...relatedIds.where((id) => id != blockedId),
+      ];
+      Object? lastError;
+      var apiOk = false;
+      for (final id in candidates) {
         try {
           await PrayerWallService.unblockUser(
             userId: uid,
             blockedUserId: id,
           );
-        } catch (_) {}
+          apiOk = true;
+          for (final other in candidates) {
+            if (other == id) continue;
+            try {
+              await PrayerWallService.unblockUser(
+                userId: uid,
+                blockedUserId: other,
+              );
+            } catch (_) {}
+          }
+          break;
+        } catch (e) {
+          lastError = e;
+          if (_looksOffline(e)) rethrow;
+        }
+      }
+      if (!apiOk) {
+        throw lastError ?? Exception('Unblock user failed');
       }
       for (final id in relatedIds) {
         await PrayerWallLocalStore.unmarkBlockedUser(
@@ -1315,19 +1345,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
 
     try {
       if (already) {
-        await PrayerWallService.unblockUser(
-          userId: uid,
-          blockedUserId: blockedId,
-        );
-        if (prayerId != null && prayerId != blockedId) {
-          try {
-            await PrayerWallService.unblockUser(
-              userId: uid,
-              blockedUserId: prayerId,
-            );
-          } catch (_) {}
-        }
-        // Additive: clear person id + related wall prayer ids from local set.
+        // Same DELETE API; try person id then related ids (iPad id mismatch).
         final relatedIds = <String>{blockedId};
         if (prayerId != null) relatedIds.add(prayerId);
         for (final p in _all) {
@@ -1337,6 +1355,37 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
           if (iid.isNotEmpty) relatedIds.add(iid);
           final aid = (p.authorUserId ?? '').trim();
           if (aid.isNotEmpty) relatedIds.add(aid);
+        }
+        final candidates = <String>[
+          blockedId,
+          ...relatedIds.where((id) => id != blockedId),
+        ];
+        Object? lastError;
+        var apiOk = false;
+        for (final id in candidates) {
+          try {
+            await PrayerWallService.unblockUser(
+              userId: uid,
+              blockedUserId: id,
+            );
+            apiOk = true;
+            for (final other in candidates) {
+              if (other == id) continue;
+              try {
+                await PrayerWallService.unblockUser(
+                  userId: uid,
+                  blockedUserId: other,
+                );
+              } catch (_) {}
+            }
+            break;
+          } catch (e) {
+            lastError = e;
+            if (_looksOffline(e)) rethrow;
+          }
+        }
+        if (!apiOk) {
+          throw lastError ?? Exception('Unblock user failed');
         }
         for (final id in relatedIds) {
           await PrayerWallLocalStore.unmarkBlockedUser(
