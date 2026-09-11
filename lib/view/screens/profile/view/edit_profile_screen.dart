@@ -363,6 +363,9 @@ class EditProfileScreenState extends State<EditProfileScreen>
     emailCon = TextEditingController();
     nameCon = TextEditingController();
     addressCon = TextEditingController();
+    nameCon.addListener(() {
+      if (mounted) setState(() {});
+    });
     checkuserloggedin(context);
     super.initState();
   }
@@ -375,8 +378,93 @@ class EditProfileScreenState extends State<EditProfileScreen>
     super.dispose();
   }
 
+  static const Color _editBrown = Color(0xFF5C4033);
+  static const Color _editCream = Color(0xFFFFFBF5);
+  static const Color _editEmailFill = Color(0xFFE8DFD2);
+  static const Color _editDelete = Color(0xFF8B3A3A);
+
+  Widget _editFieldLabel(String label, {String? trailing}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: CommanColor.isDarkTheme(context)
+                    ? Colors.white
+                    : _editBrown,
+              ),
+            ),
+          ),
+          if (trailing != null)
+            Text(
+              trailing,
+              style: TextStyle(
+                fontSize: 12,
+                color: CommanColor.isDarkTheme(context)
+                    ? Colors.white70
+                    : _editBrown.withOpacity(0.65),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _editFieldDecoration({
+    required IconData prefixIcon,
+    IconData? suffixIcon,
+    required bool muted,
+  }) {
+    final isDark = CommanColor.isDarkTheme(context);
+    final fill = muted
+        ? (isDark ? Colors.white12 : _editEmailFill)
+        : (isDark ? Colors.white10 : _editCream);
+    final iconColor = isDark ? Colors.white70 : _editBrown;
+    return InputDecoration(
+      filled: true,
+      fillColor: fill,
+      prefixIcon: Icon(prefixIcon, color: iconColor, size: 22),
+      suffixIcon: suffixIcon != null
+          ? Icon(suffixIcon, color: iconColor, size: 20)
+          : null,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark ? Colors.white24 : _editBrown.withOpacity(0.18),
+        ),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark ? Colors.white24 : _editBrown.withOpacity(0.18),
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark ? Colors.white54 : _editBrown.withOpacity(0.45),
+          width: 1.4,
+        ),
+      ),
+      disabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark ? Colors.white12 : _editBrown.withOpacity(0.12),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isDark = CommanColor.isDarkTheme(context);
+    final nameLen = nameCon.text.characters.length.clamp(0, 40);
     return Scaffold(
         resizeToAvoidBottomInset: false,
         body: GestureDetector(
@@ -386,14 +474,14 @@ class EditProfileScreenState extends State<EditProfileScreen>
           child: Container(
             height: MediaQuery.of(context).size.height,
             width: MediaQuery.of(context).size.width,
-            decoration:
-                p.Provider.of<ThemeProvider>(context).currentCustomTheme ==
-                        AppCustomTheme.vintage
-                    ? BoxDecoration(
-                        image: DecorationImage(
-                            image: AssetImage(Images.bgImage(context)),
-                            fit: BoxFit.fill))
-                    : null,
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage(
+                  'assets/prayer_wall/edit_bible_profile_bg.jpg',
+                ),
+                fit: BoxFit.cover,
+              ),
+            ),
             child: isLoading
                 ? const Center(
                     child: CircularProgressIndicator.adaptive(),
@@ -405,9 +493,8 @@ class EditProfileScreenState extends State<EditProfileScreen>
                     child: Column(
                       children: [
                         const SafeArea(
-                          child: SizedBox(
-                            height: 12,
-                          ),
+                          bottom: false,
+                          child: SizedBox(height: 4),
                         ),
                         Row(
                           children: [
@@ -430,14 +517,21 @@ class EditProfileScreenState extends State<EditProfileScreen>
                               ),
                             ),
                             Expanded(
-                                flex: 2,
-                                child: Text("Profile",
-                                    textAlign: TextAlign.center,
-                                    style: CommanStyle.appBarStyle(context))),
+                                flex: 3,
+                                child: Text(
+                                  'Edit Bible Profile',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontFamily: 'Georgia',
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark ? Colors.white : _editBrown,
+                                  ),
+                                )),
                             const Expanded(child: SizedBox.shrink())
                           ],
                         ),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 20),
                         Expanded(
                             child: SingleChildScrollView(
                           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -461,16 +555,14 @@ class EditProfileScreenState extends State<EditProfileScreen>
                                               shape: BoxShape.circle,
                                               border: Border.all(
                                                   width: 2,
-                                                  color: CommanColor
-                                                      .lightDarkPrimary200(
-                                                          context))),
+                                                  color: const Color(
+                                                      0xFFC9A86A))),
                                           decoration: BoxDecoration(
                                               shape: BoxShape.circle,
                                               border: Border.all(
                                                   width: 2,
-                                                  color: CommanColor
-                                                      .lightDarkPrimary200(
-                                                          context))),
+                                                  color: const Color(
+                                                      0xFFC9A86A))),
                                           child: pickedImage != null
                                               ? Image.file(
                                                   File(pickedImage!.path),
@@ -565,21 +657,19 @@ class EditProfileScreenState extends State<EditProfileScreen>
                                                 ),
                                         ),
                                         Positioned(
-                                          bottom: -5,
-                                          right: 10,
+                                          bottom: 0,
+                                          right: 4,
                                           child: Container(
                                             clipBehavior: Clip.hardEdge,
-                                            padding: const EdgeInsets.all(4),
-                                            decoration: BoxDecoration(
+                                            padding: const EdgeInsets.all(6),
+                                            decoration: const BoxDecoration(
                                               shape: BoxShape.circle,
-                                              color: CommanColor
-                                                  .lightDarkPrimary200(context),
+                                              color: _editBrown,
                                             ),
-                                            child: Icon(
-                                              Icons.camera_alt_outlined,
-                                              color: CommanColor.Blackwhite(
-                                                  context),
-                                              size: 20,
+                                            child: const Icon(
+                                              Icons.camera_alt,
+                                              color: Colors.white,
+                                              size: 16,
                                             ),
                                           ),
                                         ),
@@ -588,22 +678,68 @@ class EditProfileScreenState extends State<EditProfileScreen>
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 48),
-                              CustomTextFormField(
+                              const SizedBox(height: 32),
+                              _editFieldLabel('Name',
+                                  trailing: '$nameLen/40'),
+                              TextFormField(
                                 controller: nameCon,
-                                hintText: 'Full Name',
+                                maxLength: 40,
+                                inputFormatters: [
+                                  LengthLimitingTextInputFormatter(40),
+                                ],
+                                style: TextStyle(
+                                  color: isDark ? Colors.white : _editBrown,
+                                  fontSize: 15,
+                                ),
+                                decoration: _editFieldDecoration(
+                                  prefixIcon: Icons.person_outline,
+                                  muted: false,
+                                ).copyWith(counterText: ''),
                                 validator: FormBuilderValidators.required(
                                     errorText: 'Full Name is required'),
                               ),
-                              const SizedBox(height: 20),
-                              CustomTextFormField(
-                                controller: emailCon,
-                                hintText: 'Email',
+                              const SizedBox(height: 6),
+                              Text(
+                                'Use 2–40 characters',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark
+                                      ? Colors.white60
+                                      : _editBrown.withOpacity(0.65),
+                                ),
                               ),
-                              const SizedBox(height: 20),
-                              CustomTextFormField(
+                              const SizedBox(height: 18),
+                              _editFieldLabel('Email'),
+                              TextFormField(
+                                controller: emailCon,
+                                readOnly: true,
+                                enableInteractiveSelection: false,
+                                style: TextStyle(
+                                  color: isDark
+                                      ? Colors.white70
+                                      : _editBrown.withOpacity(0.85),
+                                  fontSize: 15,
+                                ),
+                                decoration: _editFieldDecoration(
+                                  prefixIcon: Icons.mail_outline,
+                                  suffixIcon: Icons.lock_outline,
+                                  muted: true,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Email cannot be changed',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark
+                                      ? Colors.white60
+                                      : _editBrown.withOpacity(0.65),
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+                              _editFieldLabel('Country'),
+                              TextFormField(
                                 controller: addressCon,
-                                hintText: 'Country',
                                 readOnly: true,
                                 onTap: () {
                                   showCountryPicker(
@@ -614,8 +750,17 @@ class EditProfileScreenState extends State<EditProfileScreen>
                                     },
                                   );
                                 },
+                                style: TextStyle(
+                                  color: isDark ? Colors.white : _editBrown,
+                                  fontSize: 15,
+                                ),
+                                decoration: _editFieldDecoration(
+                                  prefixIcon: Icons.location_on_outlined,
+                                  suffixIcon: Icons.keyboard_arrow_down,
+                                  muted: false,
+                                ),
                               ),
-                              const SizedBox(height: 40),
+                              const SizedBox(height: 36),
                               GestureDetector(
                                 onTap: () async {
                                   final authnotifier =
@@ -658,47 +803,35 @@ class EditProfileScreenState extends State<EditProfileScreen>
                                 child: Container(
                                   width: double.infinity,
                                   padding: const EdgeInsets.symmetric(
-                                      vertical: 12),
+                                      vertical: 14),
                                   decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: Colors.white,
-                                      width: 1,
-                                    ),
+                                    color: _editBrown,
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: Row(
+                                  child: const Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(
                                         Icons.edit_outlined,
                                         size: 18,
-                                        color: CommanColor.isDarkTheme(context)
-                                            ? Colors.white
-                                            : const Color(0xFF8B5A5A),
+                                        color: Colors.white,
                                       ),
-                                      const SizedBox(width: 8),
+                                      SizedBox(width: 8),
                                       Text(
-                                        "Update Profile",
+                                        'Update Profile',
                                         textAlign: TextAlign.center,
-                                        style: CommanStyle
-                                                .inDarkPrimaryInLightWhite12400(
-                                                    context)
-                                            .copyWith(
-                                          letterSpacing: BibleInfo.letterSpacing,
-                                          fontSize:
-                                              BibleInfo.fontSizeScale * 16,
-                                          color: CommanColor.isDarkTheme(context)
-                                              ? Colors.white
-                                              : const Color(0xFF8B5A5A),
+                                        style: TextStyle(
+                                          fontSize: 16,
                                           fontWeight: FontWeight.w600,
+                                          color: Colors.white,
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 20),
+                              const SizedBox(height: 14),
                               GestureDetector(
                                 onTap: () {
                                   confirmDeleteAccount(context);
@@ -706,46 +839,43 @@ class EditProfileScreenState extends State<EditProfileScreen>
                                 child: Container(
                                   width: double.infinity,
                                   padding: const EdgeInsets.symmetric(
-                                      vertical: 12),
+                                      vertical: 14),
                                   decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(10),
+                                    color: isDark
+                                        ? Colors.white10
+                                        : _editCream,
+                                    borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: Colors.white,
+                                      color: isDark
+                                          ? Colors.white38
+                                          : _editBrown.withOpacity(0.45),
                                       width: 1,
                                     ),
                                   ),
-                                  child: Row(
+                                  child: const Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(
                                         Icons.delete_outline,
                                         size: 18,
-                                        color: CommanColor.isDarkTheme(context)
-                                            ? Colors.white
-                                            : const Color(0xFF8B5A5A),
+                                        color: _editDelete,
                                       ),
-                                      const SizedBox(width: 8),
+                                      SizedBox(width: 8),
                                       Text(
-                                        "Delete Account",
+                                        'Delete Account',
                                         textAlign: TextAlign.center,
-                                        style: CommanStyle
-                                                .inDarkPrimaryInLightWhite12400(
-                                                    context)
-                                            .copyWith(
-                                          letterSpacing: BibleInfo.letterSpacing,
-                                          fontSize:
-                                              BibleInfo.fontSizeScale * 16,
-                                          color: CommanColor.isDarkTheme(context)
-                                              ? Colors.white
-                                              : const Color(0xFF8B5A5A),
+                                        style: TextStyle(
+                                          fontSize: 16,
                                           fontWeight: FontWeight.w600,
+                                          color: _editDelete,
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
                               ),
+                              const SizedBox(height: 24),
                             ],
                           ),
                         ))
@@ -814,14 +944,14 @@ class EditProfileScreen1 extends HookConsumerWidget with ImagePickerMixin {
           child: Container(
             height: MediaQuery.of(context).size.height,
             width: MediaQuery.of(context).size.width,
-            decoration:
-                p.Provider.of<ThemeProvider>(context).currentCustomTheme ==
-                        AppCustomTheme.vintage
-                    ? BoxDecoration(
-                        image: DecorationImage(
-                            image: AssetImage(Images.bgImage(context)),
-                            fit: BoxFit.fill))
-                    : null,
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage(
+                  'assets/prayer_wall/edit_bible_profile_bg.jpg',
+                ),
+                fit: BoxFit.cover,
+              ),
+            ),
             child: editProfileState.isLoading
                 ? const Center(
                     child: CircularProgressIndicator.adaptive(),

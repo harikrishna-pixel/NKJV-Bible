@@ -182,18 +182,48 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     ProductDetails? six;
     ProductDetails? year;
     ProductDetails? life;
-    for (final p in products) {
-      final id = p.id.toLowerCase();
-      // Paywall shows AR 1-month in the short slot (not AR 6-month).
-      if (p.id == _resolvedSixMonth ||
-          BibleInfo.isArOneMonthProductId(p.id)) {
-        six ??= p;
-      } else if (p.id == _resolvedOneYear ||
-          BibleInfo.isArOneYearProductId(p.id)) {
-        year ??= p;
-      } else if (p.id == _resolvedLifetime ||
-          (id.contains('lifetime') && !id.contains('exit'))) {
-        life ??= p;
+
+    void assignFrom(Iterable<ProductDetails> list) {
+      for (final p in list) {
+        final id = p.id.toLowerCase();
+        // Paywall shows AR 1-month in the short slot (not AR 6-month).
+        if (six == null &&
+            (p.id == _resolvedSixMonth ||
+                BibleInfo.isArOneMonthProductId(p.id))) {
+          six = p;
+        } else if (year == null &&
+            (p.id == _resolvedOneYear ||
+                BibleInfo.isArOneYearProductId(p.id))) {
+          year = p;
+        } else if (life == null &&
+            (p.id == _resolvedLifetime ||
+                (id.contains('lifetime') && !id.contains('exit')))) {
+          life = p;
+        }
+      }
+    }
+
+    assignFrom(products);
+
+    // Display-only: if a slot is still empty, requery StoreKit using the
+    // same constant / resolved product IDs (buy / restore path unchanged).
+    if (six == null || year == null || life == null) {
+      try {
+        if (await InAppPurchase.instance.isAvailable()) {
+          final ids = <String>{
+            ...AppApiConstant.subscriptionProductIdQueryVariants(
+                _resolvedSixMonth),
+            ...AppApiConstant.subscriptionProductIdQueryVariants(
+                _resolvedOneYear),
+            ...AppApiConstant.subscriptionProductIdQueryVariants(
+                _resolvedLifetime),
+          };
+          final response =
+              await InAppPurchase.instance.queryProductDetails(ids);
+          assignFrom(response.productDetails);
+        }
+      } catch (e) {
+        debugPrint('MultiSelectPaywall: store requery failed: $e');
       }
     }
 
@@ -226,6 +256,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   String get _aiPrice {
     final p = _selectedAiProduct;
     if (p != null && p.price.isNotEmpty) return p.price;
+    // Existing fallback when StoreKit product is not bound yet.
     return _dur == _AiDur.oneYear ? '\$59.99' : '\$34.99';
   }
 
@@ -263,6 +294,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   String get _lifetimePrice {
     final p = _lifetime;
     if (p != null && p.price.isNotEmpty) return p.price;
+    // Existing fallback when StoreKit product is not bound yet.
     return '\$79.99';
   }
 

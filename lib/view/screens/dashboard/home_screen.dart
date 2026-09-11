@@ -30,7 +30,7 @@ import 'package:biblebookapp/view/screens/books/books_screen.dart';
 import 'package:biblebookapp/view/screens/calendar_screen/view/calendar_screen.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/add_widget_intro_screen.dart';
-import 'package:biblebookapp/home_widget/widget_how_to_add_screen.dart';
+
 import 'package:biblebookapp/home_widget/widget_prompt_service.dart';
 import 'package:biblebookapp/view/screens/dashboard/ios_style_app_drawer.dart';
 import 'package:biblebookapp/view/screens/dashboard/social_link_screen.dart';
@@ -6427,14 +6427,10 @@ class _HomeScreenState extends State<HomeScreen>
           );
         },
         onWidgetsTap: () {
-          Future.microtask(() async {
-            final seen = await WidgetPromptService.galleryViewedCount();
-            if (seen > 0) {
-              final label = seen == 1 ? 'widget' : 'widgets';
-              Constants.showToast('You saw $seen $label', 2500);
-            }
+          // Drawer hub only — no "You saw N widgets" toast (multi_screeen).
+          Future.microtask(() {
             Get.to(
-              () => const WidgetHowToAddScreen(),
+              () => const AddWidgetIntroScreen(),
               transition: Transition.cupertino,
               duration: const Duration(milliseconds: 350),
             );

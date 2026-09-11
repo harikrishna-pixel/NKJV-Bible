@@ -126,6 +126,7 @@ return _dur == _AiDur.oneYear ? 1 : 0;
 String get _aiPrice {
 final p = _selectedAiProduct;
 if (p != null && p.price.isNotEmpty) return p.price;
+// Existing fallback when StoreKit product is not bound yet.
 return _dur == _AiDur.oneYear ? '\$59.99' : '\$34.99';
 }
 
@@ -141,6 +142,7 @@ return 'billed monthly as $_aiPrice · auto-renews';
 String get _lifetimePrice {
 final p = _lifetime;
 if (p != null && p.price.isNotEmpty) return p.price;
+// Existing fallback when StoreKit product is not bound yet.
 return '\$79.99';
 }
 

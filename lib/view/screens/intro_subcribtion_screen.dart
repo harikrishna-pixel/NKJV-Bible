@@ -435,8 +435,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           userTap = false;
         });
       }
-      // Keep startpurches + buy product ids. Do not pop invisible host.
-      // Do not unlock premium.
+      // Keep startpurches + buy product ids. Do not unlock premium.
+      // Pop invisible AR host so paywall is not stuck after cancel/background.
+      if (widget.invisiblePurchaseHost) {
+        _popInvisiblePurchaseHost(false);
+      }
     });
   }
 

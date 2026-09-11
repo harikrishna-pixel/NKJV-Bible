@@ -295,7 +295,7 @@ class _LifecycleWrapperState extends State<LifecycleWrapper>
             ad.show();
           },
           onAdFailedToLoad: (error) {
-            SharPreferences.setBoolean(SharPreferences.isAdsEnabled, false);
+            // Skip this attempt only — do not disable ads permanently.
           },
         ),
       );

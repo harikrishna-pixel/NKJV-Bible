@@ -136,20 +136,48 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _leaveSplash() async {
     if (_hasNavigated || !mounted) return;
     _hasNavigated = true;
-    // UI: hold at 98% → open ad on splash → then 100% → Home.
+    // UI: hold at 98% → open ad → 100% → Home.
     setState(() {
       _progress = 0.98;
     });
     await Future.delayed(const Duration(milliseconds: 250));
     if (!mounted) return;
+
+    // UI-only: warm reading data while open ad shows so dismiss→Home is ready.
+    var didWarmForHome = false;
+    Future<void> warmFuture = Future<void>.value();
+    if (await _willNavigateToHomeAfterSplash()) {
+      try {
+        final provider =
+            Provider.of<DownloadProvider>(context, listen: false);
+        didWarmForHome = true;
+        warmFuture = provider.warmDataBeforeHomeScreen().timeout(
+          const Duration(seconds: 4),
+          onTimeout: () {
+            debugPrint(
+                'warmDataBeforeHomeScreen timed out — continuing to Home');
+          },
+        );
+      } catch (e) {
+        debugPrint('warmDataBeforeHomeScreen error: $e');
+      }
+    }
+
     await _maybeShowColdStartOpenAdOnSplash();
     if (!mounted) return;
+
+    try {
+      await warmFuture;
+    } catch (_) {}
+    if (!mounted) return;
+
+    // After ad completes (or skip): show 100%, then go Home.
     setState(() {
       _progress = 1.0;
     });
     await Future.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
-    await handleNavigation();
+    await handleNavigation(skipHomeWarm: didWarmForHome);
   }
 
   /// Same destination check as [handleNavigation] Home path — no ad on Welcome/restore.
@@ -281,7 +309,7 @@ class _SplashScreenState extends State<SplashScreen>
         },
         onAdFailedToLoad: (error) {
           debugPrint('Splash AppOpenAd failed to load: $error');
-          SharPreferences.setBoolean(SharPreferences.isAdsEnabled, false);
+          // Skip this launch only — do not disable ads permanently.
           finish();
         },
       ),
@@ -356,7 +384,7 @@ class _SplashScreenState extends State<SplashScreen>
           },
           onAdFailedToLoad: (error) {
             debugPrint('AppOpenAd failed to load: $error');
-            SharPreferences.setBoolean(SharPreferences.isAdsEnabled, false);
+            // Skip this attempt only — do not disable ads permanently.
           },
         ),
       );
@@ -784,7 +812,8 @@ class _SplashScreenState extends State<SplashScreen>
     }
   }
 
-  handleNavigation() async {
+  /// [skipHomeWarm]: when true, warm already ran during open-ad handoff (UI only).
+  handleNavigation({bool skipHomeWarm = false}) async {
     await NotificationsServices.storeLaunchPayloadIfFromNotification();
     await _updateWelcomeLogoComparisonFlag();
 
@@ -857,18 +886,20 @@ class _SplashScreenState extends State<SplashScreen>
     _schedulePostSplashAtt();
     await SharPreferences.setBoolean(SharPreferences.isLoadBookContent, true);
     // UI-only: finish warm before route swap so splash→Home does not flash empty.
-    try {
-      final provider =
-          Provider.of<DownloadProvider>(context, listen: false);
-      await provider.warmDataBeforeHomeScreen().timeout(
-        const Duration(seconds: 4),
-        onTimeout: () {
-          debugPrint(
-              'warmDataBeforeHomeScreen timed out — continuing to Home');
-        },
-      );
-    } catch (e) {
-      debugPrint('warmDataBeforeHomeScreen error: $e');
+    if (!skipHomeWarm) {
+      try {
+        final provider =
+            Provider.of<DownloadProvider>(context, listen: false);
+        await provider.warmDataBeforeHomeScreen().timeout(
+          const Duration(seconds: 4),
+          onTimeout: () {
+            debugPrint(
+                'warmDataBeforeHomeScreen timed out — continuing to Home');
+          },
+        );
+      } catch (e) {
+        debugPrint('warmDataBeforeHomeScreen error: $e');
+      }
     }
     if (!mounted) return;
     await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
@@ -1588,7 +1619,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Widget _splashProgressBar(bool isCompact) {
-    // UI-only: loading caps at 98%; after ad phase _progress becomes 1.0 → 100%.
+    // UI-only: loading caps at 98% until leave; after ad, _progress → 100%.
     final percent = _hasNavigated
         ? (_progress * 100).clamp(0, 100).round()
         : ((_progress * 100).clamp(0, 98).round());
@@ -2209,7 +2240,7 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
           },
           onAdFailedToLoad: (error) {
             debugPrint('AppOpenAd failed to load: $error');
-            SharPreferences.setBoolean(SharPreferences.isAdsEnabled, false);
+            // Skip this attempt only — do not disable ads permanently.
             _markOpenAdFlowComplete();
           },
         ),

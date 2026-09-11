@@ -1,5 +1,6 @@
 import 'package:biblebookapp/home_widget/widget_preview_gallery_screen.dart';
 import 'package:biblebookapp/home_widget/widget_prompt_service.dart';
+import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -15,27 +16,31 @@ class WidgetHowToAddScreen extends StatelessWidget {
   static const _paper = Color(0xFFF5F0E6);
   static const _bar = Color(0xFF4A3424);
 
-  static const _steps = [
-    (
-      'Go to Home Screen',
-      'Touch and hold an empty area on your Home Screen.'
-    ),
-    (
-      'Tap Edit',
-      'Tap Edit at the top left, then choose "Add Widget".'
-    ),
-    (
-      'Find Old Paper Bible',
-      'Search for "Old Paper Bible" in the widget list.'
-    ),
-    (
-      'Choose Your Widget',
-      'Select your preferred widget and tap "Add Widget".'
-    ),
-  ];
+  List<(String, String)> get _steps {
+    final appName = BibleInfo.bible_shortName;
+    return [
+      (
+        'Go to Home Screen',
+        'Touch and hold an empty area on your Home Screen.'
+      ),
+      (
+        'Tap Edit',
+        'Tap Edit at the top left, then choose "Add Widget".'
+      ),
+      (
+        'Find $appName',
+        'Search for "$appName" in the widget list.'
+      ),
+      (
+        'Choose Your Widget',
+        'Select your preferred widget and tap "Add Widget".'
+      ),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
+    final steps = _steps;
     return Scaffold(
       backgroundColor: _paper,
       appBar: AppBar(

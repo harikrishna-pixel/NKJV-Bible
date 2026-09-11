@@ -214,6 +214,48 @@ class PrayerWallService {
     );
   }
 
+  /// Additive: `GET /api/prayer-queue` — full rotating wait list.
+  static Future<PrayerQueueListResult> fetchPrayerQueue() async {
+    final url = PrayerWallApiConstant.prayerQueue;
+    print('========== GET /api/prayer-queue ==========');
+    print('URL → $url');
+    print('==========================================');
+    final res = await http.get(Uri.parse(url), headers: _jsonHeaders);
+    print(
+      'GET /api/prayer-queue response → ${res.statusCode} ${res.body}',
+    );
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw Exception('Prayer queue failed (${res.statusCode}): ${res.body}');
+    }
+    final parsed = PrayerQueueListResult.fromResponseBody(res.body);
+    if (parsed == null) {
+      throw Exception('Prayer queue parse failed');
+    }
+    return parsed;
+  }
+
+  /// Additive: `GET /api/prayer-queue/current` — active hotspot slot.
+  static Future<PrayerQueueCurrentResult> fetchPrayerQueueCurrent() async {
+    final url = PrayerWallApiConstant.prayerQueueCurrent;
+    print('========== GET /api/prayer-queue/current ==========');
+    print('URL → $url');
+    print('==================================================');
+    final res = await http.get(Uri.parse(url), headers: _jsonHeaders);
+    print(
+      'GET /api/prayer-queue/current response → ${res.statusCode} ${res.body}',
+    );
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw Exception(
+        'Prayer queue current failed (${res.statusCode}): ${res.body}',
+      );
+    }
+    final parsed = PrayerQueueCurrentResult.fromResponseBody(res.body);
+    if (parsed == null) {
+      throw Exception('Prayer queue current parse failed');
+    }
+    return parsed;
+  }
+
   static Future<List<PrayerWallItem>> fetchPrayers() async {
     // Wall feed stays GET /api/prayers. When logged in, also pass
     // excludeBlockedForUserId (viewer resolve user_id). Guest = full list.
@@ -1064,6 +1106,130 @@ class PrayerWallService {
     throw Exception('Unblock user failed (${res.statusCode}): ${res.body}');
   }
 
+  /// Additive: POST `/api/follows` — [userId] follows [followingUserId].
+  static Future<void> followUser({
+    required String userId,
+    required String followingUserId,
+  }) async {
+    final uid = userId.trim();
+    final following = followingUserId.trim();
+    if (uid.isEmpty || following.isEmpty) {
+      throw Exception('followUser: user_id and following_user_id required');
+    }
+    final body = jsonEncode({
+      'user_id': uid,
+      'following_user_id': following,
+    });
+    final res = await http.post(
+      Uri.parse(PrayerWallApiConstant.follows),
+      headers: _jsonHeaders,
+      body: body,
+    );
+    print(
+      'PrayerWallService.followUser status=${res.statusCode} body=${res.body}',
+    );
+    if (res.statusCode >= 200 && res.statusCode < 300) return;
+    // Already followed is still success for UI.
+    final lower = res.body.toLowerCase();
+    if (lower.contains('already followed')) return;
+    throw Exception('Follow failed (${res.statusCode}): ${res.body}');
+  }
+
+  /// Additive: DELETE `/api/follows` — unfollow.
+  static Future<void> unfollowUser({
+    required String userId,
+    required String followingUserId,
+  }) async {
+    final uid = userId.trim();
+    final following = followingUserId.trim();
+    if (uid.isEmpty || following.isEmpty) {
+      throw Exception('unfollowUser: user_id and following_user_id required');
+    }
+    final body = jsonEncode({
+      'user_id': uid,
+      'following_user_id': following,
+    });
+    final res = await http.delete(
+      Uri.parse(PrayerWallApiConstant.follows),
+      headers: _jsonHeaders,
+      body: body,
+    );
+    print(
+      'PrayerWallService.unfollowUser status=${res.statusCode} body=${res.body}',
+    );
+    if (res.statusCode >= 200 && res.statusCode < 300) return;
+    throw Exception('Unfollow failed (${res.statusCode}): ${res.body}');
+  }
+
+  /// Additive: GET `/api/follows?user_id=` — who this user follows.
+  static Future<({int count, List<String> followingUserIds})>
+      fetchFollowing({required String userId}) async {
+    final uid = userId.trim();
+    if (uid.isEmpty) return (count: 0, followingUserIds: <String>[]);
+    final res = await http.get(
+      Uri.parse(PrayerWallApiConstant.followsFollowingForUser(uid)),
+      headers: _jsonHeaders,
+    );
+    print(
+      'PrayerWallService.fetchFollowing status=${res.statusCode} body=${res.body}',
+    );
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      return (count: 0, followingUserIds: <String>[]);
+    }
+    try {
+      final decoded = jsonDecode(res.body);
+      if (decoded is! Map) return (count: 0, followingUserIds: <String>[]);
+      final map = Map<String, dynamic>.from(decoded);
+      final ids = <String>[];
+      final rawIds = map['following_user_ids'];
+      if (rawIds is List) {
+        for (final e in rawIds) {
+          final s = e?.toString().trim() ?? '';
+          if (s.isNotEmpty) ids.add(s);
+        }
+      }
+      final count = int.tryParse('${map['count']}') ?? ids.length;
+      return (count: count, followingUserIds: ids);
+    } catch (_) {
+      return (count: 0, followingUserIds: <String>[]);
+    }
+  }
+
+  /// Additive: GET `/api/follows/followers?user_id=` — followers of this user.
+  static Future<({int count, List<String> followerUserIds})> fetchFollowers({
+    required String userId,
+  }) async {
+    final uid = userId.trim();
+    if (uid.isEmpty) return (count: 0, followerUserIds: <String>[]);
+    final res = await http.get(
+      Uri.parse(PrayerWallApiConstant.followsFollowersForUser(uid)),
+      headers: _jsonHeaders,
+    );
+    print(
+      'PrayerWallService.fetchFollowers status=${res.statusCode} body=${res.body}',
+    );
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      return (count: 0, followerUserIds: <String>[]);
+    }
+    try {
+      final decoded = jsonDecode(res.body);
+      if (decoded is! Map) return (count: 0, followerUserIds: <String>[]);
+      final map = Map<String, dynamic>.from(decoded);
+      final ids = <String>[];
+      final rawIds = map['follower_user_ids'];
+      if (rawIds is List) {
+        for (final e in rawIds) {
+          final s = e?.toString().trim() ?? '';
+          if (s.isNotEmpty) ids.add(s);
+        }
+      }
+      final count = int.tryParse('${map['count']}') ?? ids.length;
+      return (count: count, followerUserIds: ids);
+    } catch (_) {
+      return (count: 0, followerUserIds: <String>[]);
+    }
+  }
+
   /// Same Gemini endpoint used by Chat / Prayer Guidance.
   static const String _aiBaseUrl =
       'https://combine-api-ruby.vercel.app/api/chat';
@@ -1072,6 +1238,50 @@ class PrayerWallService {
       'Please keep your prayer respectful. Inappropriate language is not allowed.';
   static const String _toastNotPrayer =
       'Please share a genuine prayer request only.';
+
+  /// Additive: rewrite any-language prayer need into English prayer text.
+  /// Does not change validate/create/moderation paths. Returns null on failure.
+  static Future<String?> formatPrayerInEnglish({
+    required String userWords,
+  }) async {
+    final words = userWords.trim();
+    if (words.isEmpty) return null;
+
+    final prompt = '''
+You are a respectful Christian prayer writer for a Bible app (${BibleInfo.bible_shortName}).
+The user wrote a prayer need in any language (including informal / mixed languages).
+
+Task:
+1) Understand their meaning.
+2) Rewrite it as one clear English prayer suitable for a Prayer Wall community post.
+3) Keep it sincere and SHORT — about 35–55 words, 2–4 sentences max.
+4) Start in a natural prayer style (e.g. Heavenly Father / Lord) and end with Amen when appropriate.
+5) Do NOT include markdown, bullet points, titles, quotes around the whole prayer, or explanations.
+6) Output ONLY the English prayer text. Keep it brief.
+
+User words:
+$words
+''';
+
+    try {
+      final res = await http.post(
+        Uri.parse(_aiBaseUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'input': prompt}),
+      );
+      if (res.statusCode != 200) return null;
+      final text = _extractAiText(res.body).trim();
+      if (text.isEmpty) return null;
+      final lower = text.toLowerCase();
+      if (lower.contains('sorry, i could not') ||
+          lower.contains('could not generate')) {
+        return null;
+      }
+      return text;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// AI validation before publish. Returns [isValid]=true when content may post.
   /// On AI/network failure returns valid=true so existing publish path still works.

@@ -15,6 +15,14 @@ class PrayerWallApiConstant {
   static String get blockedUsers => _path('/api/blocked-users');
   static String get usersResolve => _path('/api/users/resolve');
   static String get prayerHistory => _path('/api/prayer-history');
+  /// Additive: follow / unfollow — `POST|DELETE /api/follows`.
+  static String get follows => _path('/api/follows');
+  /// Additive: followers of a user — `GET /api/follows/followers?user_id=`.
+  static String followsFollowersForUser(String userId) =>
+      '$follows/followers?user_id=${Uri.encodeQueryComponent(userId)}';
+  /// Additive: who a user follows — `GET /api/follows?user_id=`.
+  static String followsFollowingForUser(String userId) =>
+      '$follows?user_id=${Uri.encodeQueryComponent(userId)}';
 
   /// Additive: expired / past prayers — `GET /api/prayer-history?user_id=`.
   /// Does not change GET /api/prayers (wall) or identity GET (active My Prayers).
@@ -44,4 +52,10 @@ class PrayerWallApiConstant {
   /// `GET /api/prayers?excludeBlockedForUserId=`.
   static String prayersExcludingBlockedForUser(String userId) =>
       '$prayers?excludeBlockedForUserId=${Uri.encodeQueryComponent(userId)}';
+
+  /// Additive: rotating spotlight queue — `GET /api/prayer-queue`.
+  static String get prayerQueue => _path('/api/prayer-queue');
+
+  /// Additive: current hotspot prayer — `GET /api/prayer-queue/current`.
+  static String get prayerQueueCurrent => _path('/api/prayer-queue/current');
 }
