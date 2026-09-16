@@ -28,6 +28,8 @@ import 'package:biblebookapp/view/widget/bible_upgrade_alert.dart';
 import 'package:biblebookapp/view/screens/bible_select_screen.dart';
 import 'package:biblebookapp/view/screens/books/books_screen.dart';
 import 'package:biblebookapp/view/screens/calendar_screen/view/calendar_screen.dart';
+import 'package:biblebookapp/view/screens/journey/connection_insights_screen.dart';
+import 'package:biblebookapp/view/screens/journey/reading_progress_screen.dart';
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/add_widget_intro_screen.dart';
 
@@ -6324,6 +6326,20 @@ class _HomeScreenState extends State<HomeScreen>
               transition: Transition.cupertino,
               duration: const Duration(milliseconds: 350));
         },
+        onReadingProgressTap: () {
+          Get.to(
+            () => const ReadingProgressScreen(),
+            transition: Transition.cupertino,
+            duration: const Duration(milliseconds: 350),
+          );
+        },
+        onConnectionInsightsTap: () {
+          Get.to(
+            () => const ConnectionInsightsScreen(),
+            transition: Transition.cupertino,
+            duration: const Duration(milliseconds: 350),
+          );
+        },
         onWallpapersTap: () async {
           if (controller.adFree.value == false) {
             Future(() {
@@ -7100,48 +7116,14 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     // Still empty after DB + in-memory/provider fallbacks.
-    final book = controller.selectedBook.value.toString().trim();
-    final chapter = controller.selectedChapter.value.toString().trim();
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.menu_book_outlined,
-              size: 56,
-              color: CommanColor.lightDarkPrimary(context).withOpacity(0.7),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No content for this chapter',
-              style: CommanStyle.bw16500(context),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Book: ${book.isEmpty ? "Selected Bible" : book} • Chapter: ${chapter.isEmpty ? "1" : chapter}',
-              style: CommanStyle.placeholderText(context),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'If verses are missing, the selected Bible file may not be synced to this device yet. Please try again.',
-              style: CommanStyle.placeholderText(context),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            TextButton(
-              onPressed: () {
-                _attemptedProviderChapterFallback = false;
-                controller.getSelectedChapterAndBook();
-                if (mounted) setState(() {});
-              },
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
+    // UI-only: never show the empty-chapter message; keep fallback logic above.
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Loader(),
+        ],
       ),
     );
   }

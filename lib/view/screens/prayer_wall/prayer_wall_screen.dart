@@ -3004,6 +3004,44 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
             ),
           ),
         Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'COMING UP NEXT',
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      letterSpacing: 0.4,
+                      color: ink,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Next in fair rotation',
+                    style: TextStyle(fontSize: 12, color: muted),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (comingNext == null)
+          Text('No upcoming prayer.', style: TextStyle(color: muted))
+        else
+          _buildQueueWaitingCard(
+            item: comingNext,
+            badge: 'UP NEXT',
+            brown: brown,
+            isDark: isDark,
+            upNext: true,
+          ),
+        const SizedBox(height: 18),
+        Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
@@ -3067,44 +3105,6 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
               isDark: isDark,
             );
           }),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'COMING UP NEXT',
-                    style: TextStyle(
-                      fontFamily: 'Georgia',
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                      letterSpacing: 0.4,
-                      color: ink,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Next in fair rotation',
-                    style: TextStyle(fontSize: 12, color: muted),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (comingNext == null)
-          Text('No upcoming prayer.', style: TextStyle(color: muted))
-        else
-          _buildQueueWaitingCard(
-            item: comingNext,
-            badge: 'UP NEXT',
-            brown: brown,
-            isDark: isDark,
-            upNext: true,
-          ),
       ],
     );
   }

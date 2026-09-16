@@ -239,6 +239,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
   List<String>? _drawerGalleryImages;
   int _hubRefreshToken = 0;
   late final PageController _galleryPageController;
+  late final ScrollController _bodyScrollController;
   int _galleryDotIndex = 0;
 
   Future<Map<String, Set<String>>> _loadDrawerHubKinds() async {
@@ -270,6 +271,15 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
     return widget.widgetTitle ?? 'Available Widgets';
   }
 
+  void _scrollBodyToTop() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_bodyScrollController.hasClients) {
+        _bodyScrollController.jumpTo(0);
+      }
+    });
+  }
+
   /// Available widgets: open How to add steps (old flow) for this widget.
   Future<void> _openDrawerWidgetHowTo(_DrawerWidgetCatalogItem item) async {
     await WidgetPromptService.noteWidgetPreviewed(
@@ -285,6 +295,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
       _showHowToGuide = true;
       _hubRefreshToken++;
     });
+    _scrollBodyToTop();
   }
 
   /// Already-added widgets: swipe preview only (no How to add).
@@ -303,6 +314,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
       _galleryDotIndex = 0;
       _hubRefreshToken++;
     });
+    _scrollBodyToTop();
     if (_galleryPageController.hasClients) {
       _galleryPageController.jumpToPage(0);
     }
@@ -317,6 +329,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
       _showHowToGuide = false;
       _hubRefreshToken++;
     });
+    _scrollBodyToTop();
   }
 
   void _handleAppBarBack() {
@@ -327,6 +340,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
         _drawerGalleryTitle = null;
         _drawerGalleryImages = null;
       });
+      _scrollBodyToTop();
       return;
     }
     if (_showHowToGuide && _isDrawerEntry) {
@@ -337,6 +351,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
         _drawerGalleryImages = null;
         _hubRefreshToken++;
       });
+      _scrollBodyToTop();
       return;
     }
     if (_hubPreviewActive) {
@@ -370,6 +385,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _galleryPageController = PageController();
+    _bodyScrollController = ScrollController();
     _showAvailableWidgets = widget.initialShowGallery &&
         widget.previewImages != null &&
         widget.previewImages!.isNotEmpty;
@@ -378,6 +394,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
   @override
   void dispose() {
     _galleryPageController.dispose();
+    _bodyScrollController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -519,7 +536,8 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
   }
 
   double _galleryPreviewHeight(String path) {
-    return _isWidePreviewAsset(path) ? 120 : 420;
+    // Wider Continue Reading / Favorite previews need more height to avoid empty gaps.
+    return _isWidePreviewAsset(path) ? 172 : 420;
   }
 
   Widget _previewImage(String path, {double? height, double? width}) {
@@ -950,30 +968,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
     final appName = BibleInfo.bible_shortName;
     return Column(
       children: [
-        if (_isDrawerEntry && _showHowToGuide) ...[
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => setState(() {
-                _showHowToGuide = false;
-                _hubPreviewActive = false;
-                _drawerGalleryTitle = null;
-                _drawerGalleryImages = null;
-                _hubRefreshToken++;
-              }),
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 14),
-              label: const Text(
-                'Back to widget list',
-                style: TextStyle(
-                  fontFamily: 'Georgia',
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              style: TextButton.styleFrom(foregroundColor: _titleInk),
-            ),
-          ),
-          const SizedBox(height: 4),
-        ],
+        // Single back: AppBar leading only (removed duplicate "Back to widget list").
         const SizedBox(height: 8),
         Icon(Icons.menu_book_rounded, size: 48, color: _titleInk),
         const SizedBox(height: 16),
@@ -1044,9 +1039,9 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
         const SizedBox(height: 18),
         Align(
           alignment: Alignment.centerLeft,
-          child: Text(
+              child: Text(
             'WIDGET PREVIEW',
-            style: TextStyle(
+                style: TextStyle(
               fontFamily: 'Georgia',
               fontWeight: FontWeight.w700,
               fontSize: 13,
@@ -1056,22 +1051,30 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
           ),
         ),
         const SizedBox(height: 14),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: const Color(0xFFEFE4D4).withOpacity(0.9),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: _brown.withOpacity(0.18)),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: _previewImage(
-              _previewImages.first,
-              height: _isWidePreviewAsset(_previewImages.first) ? 96 : 140,
-              width: double.infinity,
-            ),
-          ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final path = _previewImages.first;
+            final isWide = _isWidePreviewAsset(path);
+            // Maximize widget art; reduce empty padding around wide previews.
+            final previewHeight = isWide ? 172.0 : 220.0;
+            return SizedBox(
+              width: constraints.maxWidth,
+              height: previewHeight,
+              child: Image.asset(
+                path,
+                width: constraints.maxWidth,
+                height: previewHeight,
+                fit: isWide ? BoxFit.fitWidth : BoxFit.contain,
+                alignment: Alignment.center,
+                gaplessPlayback: true,
+                errorBuilder: (_, __, ___) => _previewImage(
+                  path,
+                  height: previewHeight,
+                  width: constraints.maxWidth,
+                ),
+              ),
+            );
+          },
         ),
         const SizedBox(height: 10),
         Text(
@@ -1093,13 +1096,24 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
                 widgetTitle: _activeWidgetTitle,
               );
               if (!mounted) return;
-              setState(() {
-                _showAvailableWidgets = true;
-                _galleryDotIndex = 0;
-              });
-              if (_galleryPageController.hasClients) {
-                _galleryPageController.jumpToPage(0);
+              // Show ALL widgets (full hub), not only this prompt's one widget.
+              if (_isDrawerEntry) {
+                // Additive: same hub as prompt. In-place setState was this
+                // route already, so the tap looked like no action.
+                await Get.off(
+                  () => const AddWidgetIntroScreen(),
+                  transition: Transition.cupertino,
+                  duration: const Duration(milliseconds: 350),
+                  preventDuplicates: false,
+                );
+                return;
               }
+              // Prompt flow (e.g. Bookmarks alert): replace with full Widgets hub.
+              await Get.off(
+                () => const AddWidgetIntroScreen(),
+                transition: Transition.cupertino,
+                duration: const Duration(milliseconds: 350),
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: _brown,
@@ -1131,6 +1145,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
                 _drawerGalleryImages = null;
                 _hubRefreshToken++;
               });
+              _scrollBodyToTop();
               return;
             }
             Get.back();
@@ -1188,25 +1203,13 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
               final pageHeight = _galleryPreviewHeight(imagePath);
               return Align(
                 alignment: Alignment.center,
-                child: Container(
+                child: SizedBox(
                   width: pageWidth,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEFE4D4).withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: _brown.withOpacity(0.18)),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: SizedBox(
-                      width: pageWidth - 24,
-                      height: pageHeight,
-                      child: _previewImage(
-                        imagePath,
-                        width: pageWidth - 24,
-                        height: pageHeight,
-                      ),
-                    ),
+                  height: pageHeight,
+                  child: _previewImage(
+                    imagePath,
+                    width: pageWidth,
+                    height: pageHeight,
                   ),
                 ),
               );
@@ -1276,6 +1279,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
             : BoxDecoration(color: bg),
         child: SafeArea(
           child: SingleChildScrollView(
+            controller: _bodyScrollController,
             padding: const EdgeInsets.fromLTRB(22, 8, 22, 20),
             child: _bodyContent(),
           ),

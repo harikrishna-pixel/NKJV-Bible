@@ -212,8 +212,7 @@ class SignupScreen extends HookConsumerWidget {
                                       Expanded(
                                         child: RichText(
                                           text: TextSpan(
-                                            text:
-                                                'By creating an account, you agree to our ',
+                                            text: 'I agree to the ',
                                             style: CommanStyle.appBarStyle(
                                                     context)
                                                 .copyWith(
@@ -231,7 +230,7 @@ class SignupScreen extends HookConsumerWidget {
                                                         FontWeight.w400),
                                             children: [
                                               TextSpan(
-                                                text: 'Terms and Condition, ',
+                                                text: 'Terms & Conditions',
                                                 style: CommanStyle.appBarStyle(
                                                         context)
                                                     .copyWith(
@@ -260,10 +259,10 @@ class SignupScreen extends HookConsumerWidget {
                                                       },
                                               ),
                                               const TextSpan(
-                                                text: 'and ',
+                                                text: ' and ',
                                               ),
                                               TextSpan(
-                                                text: 'Privacy and Policy ',
+                                                text: 'Privacy Policy',
                                                 style: CommanStyle.appBarStyle(
                                                         context)
                                                     .copyWith(

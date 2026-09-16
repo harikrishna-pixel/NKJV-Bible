@@ -16,7 +16,13 @@ import '../../constants/share_preferences.dart';
 import '../../../controller/dashboard_controller.dart';
 
 class BookListScreen extends StatefulWidget {
-  const BookListScreen({super.key});
+  const BookListScreen({
+    super.key,
+    this.showCompletedChapters = false,
+  });
+
+  /// Display-only: show completed/total chapters from existing read_per.
+  final bool showCompletedChapters;
 
   @override
   State<BookListScreen> createState() => _BookListScreenState();
@@ -66,6 +72,16 @@ class _BookListScreenState extends State<BookListScreen> {
   List<MainBookListModel> get _oldTestamentBooks => bookList
       .where((book) => (book.bookNum ?? 0) < testament_num)
       .toList();
+
+  String _chapterCountLabel(MainBookListModel data) {
+    final total = (data.chapterCount ?? 0).round();
+    if (total <= 0) return '';
+    // Display-only from existing read_per. Unread books keep total only.
+    final raw = double.tryParse((data.readPer ?? '0').trim()) ?? 0.0;
+    final done = (raw * total / 100.0).round().clamp(0, total);
+    if (done <= 0) return '$total';
+    return '$done/$total';
+  }
 
   Future<void> _loadBooksFromDatabase() async {
     final db = await DBHelper().db;
@@ -334,7 +350,7 @@ class _BookListScreenState extends State<BookListScreen> {
                                       Spacer(),
                                       SizedBox(
                                         width:
-                                        screenWidth > 450 ? 120 : 100,
+                                        screenWidth > 450 ? 140 : 118,
                                         child: Row(
                                           mainAxisAlignment:
                                           MainAxisAlignment
@@ -346,7 +362,7 @@ class _BookListScreenState extends State<BookListScreen> {
                                               screenWidth: screenWidth,
                                             ),
                                             Text(
-                                              "${data.chapterCount}",
+                                              _chapterCountLabel(data),
                                               style: CommanStyle.bw16500(
                                                   context)
                                                   .copyWith(
@@ -408,7 +424,7 @@ class _BookListScreenState extends State<BookListScreen> {
                                       Spacer(),
                                       SizedBox(
                                         width:
-                                        screenWidth > 450 ? 120 : 100,
+                                        screenWidth > 450 ? 140 : 118,
                                         child: Row(
                                           mainAxisAlignment:
                                           MainAxisAlignment
@@ -420,7 +436,7 @@ class _BookListScreenState extends State<BookListScreen> {
                                               screenWidth: screenWidth,
                                             ),
                                             Text(
-                                              "${data.chapterCount}",
+                                              _chapterCountLabel(data),
                                               style: CommanStyle.bw16500(
                                                   context)
                                                   .copyWith(

@@ -1650,7 +1650,22 @@ PODS:
   - IronSourceSDK/AdQuality (9.4.0.0):
     - IronSourceAdQualitySDK (~> 9.4.0)
   - IronSourceSDK/Ads (9.4.0.0)
+  - json-enum (1.2.3)
+  - jsonlogic (1.2.4):
+    - json-enum (~> 1.2.3)
   - leveldb-library (1.22.6)
+  - Mixpanel-swift (6.5.1):
+    - jsonlogic (~> 1.2.0)
+    - Mixpanel-swift/Complete (= 6.5.1)
+    - MixpanelSwiftCommon (~> 1.0.0)
+  - Mixpanel-swift/Complete (6.5.1):
+    - jsonlogic (~> 1.2.0)
+    - MixpanelSwiftCommon (~> 1.0.0)
+  - mixpanel_flutter (2.13.0):
+    - Flutter
+    - Mixpanel-swift (= 6.5.1)
+    - MixpanelSwiftCommon (~> 1.0.1)
+  - MixpanelSwiftCommon (1.0.1)
   - nanopb (3.30910.0):
     - nanopb/decode (= 3.30910.0)
     - nanopb/encode (= 3.30910.0)
@@ -1741,6 +1756,7 @@ DEPENDENCIES:
   - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
   - in_app_purchase_storekit (from `.symlinks/plugins/in_app_purchase_storekit/darwin`)
   - in_app_review (from `.symlinks/plugins/in_app_review/ios`)
+  - mixpanel_flutter (from `.symlinks/plugins/mixpanel_flutter/ios`)
   - open_file_manager (from `.symlinks/plugins/open_file_manager/ios`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
@@ -1804,7 +1820,11 @@ SPEC REPOS:
     - GTMSessionFetcher
     - IronSourceAdQualitySDK
     - IronSourceSDK
+    - json-enum
+    - jsonlogic
     - leveldb-library
+    - Mixpanel-swift
+    - MixpanelSwiftCommon
     - nanopb
     - OrderedSet
     - PromisesObjC
@@ -1875,6 +1895,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/in_app_purchase_storekit/darwin"
   in_app_review:
     :path: ".symlinks/plugins/in_app_review/ios"
+  mixpanel_flutter:
+    :path: ".symlinks/plugins/mixpanel_flutter/ios"
   open_file_manager:
     :path: ".symlinks/plugins/open_file_manager/ios"
   package_info_plus:
@@ -1982,7 +2004,12 @@ SPEC CHECKSUMS:
   in_app_review: 436034b18594851a7328d7f1c2ed5ec235b79cfc
   IronSourceAdQualitySDK: 7414cf810bdfbc67c3d58536469a923a3a452ac5
   IronSourceSDK: 8112211f22915d2633a2a152d327b184fe80bf05
+  json-enum: 57ad746d2f0d7852796e9aa50267bd84a778222e
+  jsonlogic: 006f892470384401b8ca5b5d8d4cdadb3a0d5c9b
   leveldb-library: cc8b8f8e013647a295ad3f8cd2ddf49a6f19be19
+  Mixpanel-swift: 7b6cea07c32e688c90442b83f4ecfd79a9332d00
+  mixpanel_flutter: ab258d3f6bfd712f96b5ef2c8b15d321a459f5fe
+  MixpanelSwiftCommon: 6fc461403945422a2e1d0989d712c0db2c26ecdb
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   open_file_manager: c83c8bb39a2e410959aed4d52f502857a4e4b52c
   OrderedSet: e539b66b644ff081c73a262d24ad552a69be3a94

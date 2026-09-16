@@ -47,3 +47,129 @@ Automatic uploads require a logged-in user (`userid` and `authtoken` in cache). 
 ### What is stored on the server?
 
 Each successful upload replaces the user’s cloud backup for that app/account. Use **IMPORT FROM CLOUD** on a new device or after reinstall to restore the latest stored backup.
+
+---
+
+## Work log — 15 Sep 2026 (port to other apps)
+
+Use this section when copying today’s work into another Bible app from the same Flutter source. Prefer **UI / analytics wiring only** unless the other app has the same bug.
+
+### 1) Analytics Phase 1 — Firebase + Mixpanel (common service)
+
+**Goal:** One `AnalyticsService` so screens never call Firebase / Mixpanel SDKs directly. Both providers optional per app.
+
+**Files to copy / mirror**
+
+| File | Role |
+|------|------|
+| `lib/services/analytics/analytics_config.dart` | Per-app ON/OFF + Mixpanel project token |
+| `lib/services/analytics/analytics_events.dart` | Central event + property names (Phase 2 ready) |
+| `lib/services/analytics/analytics_service.dart` | Dual fan-out: Firebase Analytics + Mixpanel |
+| `pubspec.yaml` | Add `mixpanel_flutter` (Firebase Analytics already used) |
+
+**Config (per app)** — edit `AnalyticsConfig`:
+
+```dart
+static bool enableFirebaseAnalytics = true;   // or false
+static bool enableMixpanelAnalytics = true;   // or false
+static String mixpanelToken = '...';          // project token ONLY
+static bool sendPhase1TestEvent = true;       // set false after verified
+```
+
+**Old Paper Bible (this app):** both Firebase + Mixpanel **enabled**.
+
+**Security**
+
+- Put **Mixpanel project token** in the app only.
+- **Never** put Mixpanel **API Secret** in the client (server/API use only).
+
+**Init (already in this app)**
+
+- `lib/main.dart` → `_bootstrapBackgroundStartup()` calls `AnalyticsService.initialize()`.
+- On init, Phase 1 sends `analytics_phase1_test` to enabled providers and Mixpanel `flush()`.
+
+**Verify**
+
+1. Run app once.
+2. Mixpanel Live View → `analytics_phase1_test`.
+3. Firebase DebugView → same event.
+
+**Not done yet (Phase 2+)** — do **not** invent random events in screens. Use names in `analytics_events.dart` later for:
+
+- Onboarding (`onboarding_started`, step viewed/completed/skipped/completed + durations)
+- Screen / feature (`screen_viewed`, `screen_exited`, `feature_used` — exclude background time)
+- Paywall (`paywall_viewed` / closed / plan / purchase_* + `paywall_source`)
+- No private content (chat text, notes, search text, etc.)
+
+**Port checklist**
+
+1. Add `mixpanel_flutter` + copy the three analytics files.
+2. Set `AnalyticsConfig` flags/token for that app.
+3. Ensure `AnalyticsService.initialize()` runs at startup (same as `main.dart` here).
+4. Keep existing `trackHomeScreen` / `trackPaywallScreen` etc. — they now dual-send when enabled.
+5. Confirm Phase 1 test event, then turn `sendPhase1TestEvent = false` if desired.
+
+---
+
+### 2) Bugs fixed today (UI / display — keep existing business logic)
+
+#### A) Paywall price display (multi / AR paywall)
+
+**Problem:** Other-country stores showed wrong high USD hardcodes, or blank `/month` when hardcodes were removed. Buy path was fine; UI price binding was wrong.
+
+**Fix (display only):** Prefer StoreKit `product.price`; if missing, keep previous hardcode fallbacks; requery products when preload misses a plan. “Works out to …” monthly line uses **rounded** whole number (display only).
+
+**Files:** `lib/view/screens/multi_select_paywall.dart` (and related price getters on `multi_select_paywallscreen.dart` if that app uses it).
+
+**Port:** Copy the `_loadProducts` requery + `_aiPrice` / `_lifetimePrice` / `_aiNote` display fallbacks — do **not** change purchase / product ID logic.
+
+#### B) “No content for this chapter” empty UI
+
+**Problem:** Home showed empty-chapter message + Retry when verses were empty after fetch/fallback (e.g. Mark 2).
+
+**Fix (UI only):** Keep provider/DB fallback logic in `_buildEmptyContentWithChapters`; replace empty message UI with the same **Loader** as loading state. Users no longer see that empty screen.
+
+**File:** `lib/view/screens/dashboard/home_screen.dart`
+
+**Note:** If verses never load, loader can stay a long time — root cause is still sync/DB/index, not the UI swap.
+
+#### C) Verse image share — branding alignment
+
+**Problem:** Share/Save action bar reserve pushed branding mid-image in Screenshot capture.
+
+**Fix:** `actionBarReserve: 0` so Share/Save/Close stay outside the screenshot.
+
+**File:** `lib/view/widget/home_content_edit_bottom_sheet.dart`
+
+#### D) Widgets hub / how-to UX
+
+**Fixes (UI / navigation presentation):**
+
+- Larger Continue Reading preview; removed outer beige boxes.
+- Single AppBar back; scroll to top when opening how-to/gallery.
+- “View Available Widgets” from prompt opens full Widgets hub (all widgets), not a single-widget path.
+
+**Files:** `lib/view/screens/dashboard/add_widget_intro_screen.dart`, `lib/home_widget/widget_how_to_add_screen.dart`
+
+#### E) Prayer share custom bottom sheet
+
+**Status:** Custom prayer share sheet was tried, then **undone** on request. Share is back to original system `Share.share` text flow. Do **not** port the custom sheet unless product asks again.
+
+---
+
+### 3) Explicitly out of scope today
+
+- Full onboarding / screen-time / paywall funnel event wiring (Phase 2).
+- Mixpanel API Secret in client.
+- Changing Amen / credits / IAP purchase logic.
+- Removing empty-chapter **loading** forever (only the empty **message** UI was removed).
+
+---
+
+### 4) Quick “copy to other app” order
+
+1. Analytics Phase 1 files + `mixpanel_flutter` + config flags/token + init.
+2. Paywall price display helpers (if same multi paywall).
+3. Home empty-chapter UI → loader (if same `_buildEmptyContentWithChapters`).
+4. Verse share `actionBarReserve: 0` (if same share screenshot).
+5. Widgets hub UX (if same widget intro screens).

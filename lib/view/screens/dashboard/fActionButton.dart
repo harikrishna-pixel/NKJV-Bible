@@ -86,6 +86,12 @@ class floatingButtonState extends State<floatingButton>
   String? _storedBookName;
   // Only newest audio→reader sync may apply (rapid next/prev race).
   int _readingChapterSyncGeneration = 0;
+  // Additive: skip reader-swipe MP3 load while audio itself is moving the reader.
+  bool _audioDrivenReaderSync = false;
+  // Additive: only the latest reader-swipe MP3 load may apply (rapid swipe).
+  int _readerSwipeAudioGeneration = 0;
+  // Additive: follow controller chapter even when the player sheet is a separate route.
+  Worker? _readerChapterAudioWorker;
 
   // Add this for background audio
   late AudioHandler _audioHandler;
@@ -156,9 +162,78 @@ class floatingButtonState extends State<floatingButton>
 
     // Additive: keep auto-next alive while FAB State is alive (sheet dismiss safe).
     _ensureMp3CompletionListener();
+    _bindReaderChapterAudioSync();
 
     // Store initial book name
     _storedBookName = widget.bookName;
+  }
+
+  void _bindReaderChapterAudioSync() {
+    if (_readerChapterAudioWorker != null) return;
+    if (!Get.isRegistered<DashBoardController>()) return;
+    final controller = Get.find<DashBoardController>();
+    _readerChapterAudioWorker = everAll(
+      [controller.selectedChapter, controller.selectedBookNum],
+      (_) => _syncPlayingMp3ToReaderChapter(),
+    );
+  }
+
+  /// Reader chapter/book changed while MP3 is playing — swap the file only.
+  /// Skips player next/prev/auto-next (_audioDrivenReaderSync).
+  void _syncPlayingMp3ToReaderChapter() {
+    if (!mounted) return;
+    if (_audioDrivenReaderSync) return;
+    if (!(isAudioPlaying || audioPlayer.state == PlayerState.playing)) return;
+    if (!Get.isRegistered<DashBoardController>()) return;
+
+    final controller = Get.find<DashBoardController>();
+    final chapter = int.tryParse(controller.selectedChapter.value.trim()) ?? 0;
+    if (chapter <= 0) return;
+    final bookNum0 = int.tryParse(controller.selectedBookNum.value.trim());
+    if (bookNum0 == null) return;
+    final urlBook = bookNum0 + 1;
+    final basePath =
+        widget.audioData?.data?.bibleAudioInfo?.audioBasepath;
+    if (basePath == null || basePath.isEmpty) return;
+
+    final url = "$basePath/$urlBook/$chapter.mp3";
+    // Already on this file (player next/auto-next already loaded it).
+    if (audioBaseUrl == url) return;
+
+    audioChapterNum = chapter;
+    audioBookNum = urlBook;
+    audioBaseUrl = url;
+    selectedChapter = chapter;
+    currentBookChapterCount =
+        int.tryParse(controller.selectedBookChapterCount.value.trim()) ??
+            currentBookChapterCount;
+    if (controller.selectedBook.value.isNotEmpty) {
+      _storedBookName = controller.selectedBook.value;
+    }
+
+    final swipeGen = ++_readerSwipeAudioGeneration;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || swipeGen != _readerSwipeAudioGeneration) return;
+      _mp3UiSetState(() {});
+    });
+    Future(() async {
+      if (!mounted || swipeGen != _readerSwipeAudioGeneration) return;
+      if (_audioDrivenReaderSync) return;
+      try {
+        await audioPlayer.setSourceUrl(url);
+        if (!mounted || swipeGen != _readerSwipeAudioGeneration) return;
+        await audioPlayer.seek(Duration.zero);
+        _audioResumePosition = Duration.zero;
+        await audioPlayer.resume();
+        if (!mounted || swipeGen != _readerSwipeAudioGeneration) return;
+        _mp3UiSetState(() {
+          isAudioPlaying = true;
+          position = Duration.zero;
+        });
+      } catch (e) {
+        debugPrint("Error loading reader-chapter MP3: $e");
+      }
+    });
   }
 
   /// Rebuild FAB and open audio sheet (if any) from the same State fields.
@@ -1293,6 +1368,8 @@ class floatingButtonState extends State<floatingButton>
 
   // Helper method to update reading screen when audio chapter changes
   Future<void> updateReadingScreenChapter(int chapterNum) async {
+    // Additive: so didUpdateWidget does not reload MP3 on audio-driven reader moves.
+    _audioDrivenReaderSync = true;
     // Newest sync wins — older in-flight syncs must not overwrite the reader.
     final syncId = ++_readingChapterSyncGeneration;
     try {
@@ -1423,6 +1500,10 @@ class floatingButtonState extends State<floatingButton>
     } catch (e, stackTrace) {
       debugPrint("Error updating reading screen chapter: $e");
       debugPrint("Stack trace: $stackTrace");
+    } finally {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _audioDrivenReaderSync = false;
+      });
     }
   }
 
@@ -1454,6 +1535,8 @@ class floatingButtonState extends State<floatingButton>
   // Helper method to update reading screen for next book
   Future<void> updateReadingScreenForNextBook(
       int bookNum, int chapterNum, String bookName, int chapterCount) async {
+    // Additive: so didUpdateWidget does not reload MP3 on audio-driven book moves.
+    _audioDrivenReaderSync = true;
     try {
       // Update shared preferences for book and chapter - ensure all are saved
       await SharPreferences.setString(SharPreferences.selectedBook, bookName);
@@ -1530,6 +1613,10 @@ class floatingButtonState extends State<floatingButton>
     } catch (e, stackTrace) {
       debugPrint("Error updating reading screen for next book: $e");
       debugPrint("Stack trace: $stackTrace");
+    } finally {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _audioDrivenReaderSync = false;
+      });
     }
   }
 
@@ -1666,6 +1753,8 @@ class floatingButtonState extends State<floatingButton>
   @override
   void dispose() {
     // Cancel all stream subscriptions to prevent setState after dispose
+    _readerChapterAudioWorker?.dispose();
+    _readerChapterAudioWorker = null;
     _playerStateSubscription?.cancel();
     _durationSubscription?.cancel();
     _completeSubscription?.cancel();

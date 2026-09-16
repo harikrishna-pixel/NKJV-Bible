@@ -22,6 +22,8 @@ class IosStyleAppDrawer extends StatefulWidget {
     required this.onPrayerGuidanceTap,
     required this.onMyLibraryTap,
     required this.onCalendarTap,
+    required this.onReadingProgressTap,
+    required this.onConnectionInsightsTap,
     required this.onWallpapersTap,
     required this.onQuotesTap,
     required this.onShareTap,
@@ -65,6 +67,8 @@ class IosStyleAppDrawer extends StatefulWidget {
   final VoidCallback onPrayerGuidanceTap;
   final VoidCallback onMyLibraryTap;
   final VoidCallback onCalendarTap;
+  final VoidCallback onReadingProgressTap;
+  final VoidCallback onConnectionInsightsTap;
   final VoidCallback onWallpapersTap;
   final VoidCallback onQuotesTap;
   final VoidCallback onShareTap;
@@ -290,6 +294,16 @@ class _IosStyleAppDrawerState extends State<IosStyleAppDrawer>
         icon: Icons.calendar_month_outlined,
         asset: 'assets/home icons/Artboard – 35.png',
         onTap: widget.onCalendarTap,
+      ),
+      _DrawerSubItem(
+        label: 'Reading Progress',
+        icon: Icons.insights_outlined,
+        onTap: widget.onReadingProgressTap,
+      ),
+      _DrawerSubItem(
+        label: 'Connection Insights',
+        icon: Icons.favorite_outline_rounded,
+        onTap: widget.onConnectionInsightsTap,
       ),
     ];
 

@@ -239,30 +239,13 @@ class _PreviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final assets = WidgetPromptService.previewAssetsFor(promptId);
     final hero = assets.isNotEmpty ? assets.first : null;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEFE6D6),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: hero == null
-          ? const SizedBox(height: 80)
-          : ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.asset(
-                hero,
-                height: 120,
-                width: double.infinity,
-                fit: BoxFit.contain,
-              ),
-            ),
-    );
+    return hero == null
+        ? const SizedBox(height: 80)
+        : Image.asset(
+            hero,
+            height: 120,
+            width: double.infinity,
+            fit: BoxFit.contain,
+          );
   }
 }

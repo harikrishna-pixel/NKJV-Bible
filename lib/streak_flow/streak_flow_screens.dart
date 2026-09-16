@@ -13,6 +13,7 @@ import 'package:biblebookapp/home_widget/bible_home_widget.dart';
 import 'package:biblebookapp/home_widget/widget_prompt_cards.dart';
 import 'package:biblebookapp/home_widget/widget_prompt_service.dart';
 import 'package:biblebookapp/live_activity/live_activity_queue.dart';
+import 'package:biblebookapp/services/connection_checkin_store.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
@@ -3457,6 +3458,11 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                         await _storeActiveStreakFlowItem(
                           item.copyWith(connectionSliderValue: _value),
                         );
+                        // Additive Insights log — streak steps / persist above unchanged.
+                        await ConnectionCheckinStore.record(
+                          dayKey: dayKey,
+                          level: _activeLabelIndex,
+                        );
                         await SharPreferences.setInt(
                             SharPreferences.streakFlowStepsCompletedToday,
                             1);
@@ -4714,6 +4720,12 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                                         () => const StreakConnectionScreen());
                                 return;
                               }
+                              // Later: clear leftover restore progress from the
+                              // shared today counter so today's 4 steps stay open.
+                              await SharPreferences.setInt(
+                                  SharPreferences
+                                      .streakFlowStepsCompletedToday,
+                                  0);
                               _goToHome(context);
                               return;
                             }

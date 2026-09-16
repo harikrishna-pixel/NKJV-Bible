@@ -6,6 +6,7 @@ import 'package:biblebookapp/ads/levelplay_ads.dart';
 import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/constant/size_config.dart';
 import 'package:biblebookapp/services/background_api_service.dart';
+import 'package:biblebookapp/services/reading_activity_service.dart';
 import 'package:biblebookapp/utils/book_apps_helper.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
@@ -1065,6 +1066,8 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     );
     await DBHelper().updateBookData(bookId, 'read_per', stored);
     bookReadPer.value = stored;
+    // Additive: Recent Activity log only. Does not change read_per / is_read.
+    unawaited(ReadingActivityService.recordFromController(this));
   }
 
   /// Persist −1 chapter from this book's read_per (unmark).

@@ -85,6 +85,46 @@ class TakeMomentCompleteScreen extends StatelessWidget {
                 ),
                 const Spacer(flex: 2),
                 Padding(
+                  padding: const EdgeInsets.fromLTRB(28, 0, 28, 28),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _careItem(
+                          icon: Icons.favorite_border,
+                          label: 'He Cares',
+                          color: softText,
+                          isTablet: isTablet,
+                        ),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 44,
+                        color: softText.withOpacity(0.28),
+                      ),
+                      Expanded(
+                        child: _careItem(
+                          icon: Icons.shield_outlined,
+                          label: 'He Strengthens',
+                          color: softText,
+                          isTablet: isTablet,
+                        ),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 44,
+                        color: softText.withOpacity(0.28),
+                      ),
+                      Expanded(
+                        child: _doveCareItem(
+                          label: 'He Gives Peace',
+                          color: softText,
+                          isTablet: isTablet,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 32),
                   child: Material(
                     color: Colors.transparent,
@@ -135,4 +175,58 @@ class TakeMomentCompleteScreen extends StatelessWidget {
     );
   }
 
+  Widget _careItem({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required bool isTablet,
+  }) {
+    return Column(
+      children: [
+        Icon(icon, size: isTablet ? 26 : 22, color: color),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: isTablet ? 12 : 11,
+            color: color,
+            fontFamily: 'Georgia',
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _doveCareItem({
+    required String label,
+    required Color color,
+    required bool isTablet,
+  }) {
+    return Column(
+      children: [
+        ColorFiltered(
+          colorFilter: ColorFilter.mode(color, BlendMode.srcATop),
+          child: Image.asset(
+            'assets/dove.png',
+            width: isTablet ? 26 : 22,
+            height: isTablet ? 26 : 22,
+            fit: BoxFit.contain,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: isTablet ? 12 : 11,
+            color: color,
+            fontFamily: 'Georgia',
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
 }

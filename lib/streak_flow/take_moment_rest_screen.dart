@@ -74,6 +74,9 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
   _BreathPhase _phase = _BreathPhase.inhale;
   Timer? _timer;
   bool _isHolding = false;
+  /// UI only: after 5 cycles, show bottom slide bar (nav still goes to Pray).
+  bool _allCyclesDone = false;
+  double _slideProgress = 0;
   late AnimationController _glowController;
   late AnimationController _orbController;
   late Animation<double> _glowAnimation;
@@ -92,6 +95,10 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
       case _BreathPhase.exhale:
         return _exhaleDuration;
     }
+  }
+
+  int _secondsForPhase(_BreathPhase phase) {
+    return _durationForPhase(phase).inSeconds;
   }
 
   void _vibrateForPhase(_BreathPhase phase) {
@@ -140,9 +147,9 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
             _timer?.cancel();
             _isHolding = false;
             _orbController.value = 0;
-            Get.off(
-              () => TakeMomentPrayScreen(worryText: widget.worryText),
-            );
+            // UI: show slide bar; existing Pray destination unchanged.
+            _allCyclesDone = true;
+            _slideProgress = 0;
             return;
           }
           _breathNumber++;
@@ -165,6 +172,7 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
   }
 
   void _stopCountdown() {
+    if (_allCyclesDone) return;
     _timer?.cancel();
     _timer = null;
     _orbController.stop();
@@ -176,6 +184,12 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
         _phase = _BreathPhase.inhale;
       });
     }
+  }
+
+  void _goToPray() {
+    Get.off(
+      () => TakeMomentPrayScreen(worryText: widget.worryText),
+    );
   }
 
   @override
@@ -217,14 +231,28 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
     super.dispose();
   }
 
-  String get _phaseLabel {
+  String get _phaseSecondsLabel {
+    final secs = _secondsForPhase(_phase);
     switch (_phase) {
       case _BreathPhase.inhale:
-        return 'Breathe in';
+        return 'Breathe in for $secs seconds';
       case _BreathPhase.hold:
-        return 'Hold';
+        return 'Hold for $secs seconds';
       case _BreathPhase.exhale:
-        return 'Breathe out';
+        return 'Breathe out for $secs seconds';
+    }
+  }
+
+  /// 0..1 fill for the current cycle's top dot (UI only).
+  double get _currentCycleFill {
+    if (!_isHolding || _allCyclesDone) return _allCyclesDone ? 1.0 : 0.0;
+    switch (_phase) {
+      case _BreathPhase.inhale:
+        return (0.15 + 0.35 * _orbController.value).clamp(0.0, 1.0);
+      case _BreathPhase.hold:
+        return 0.55;
+      case _BreathPhase.exhale:
+        return (0.6 + 0.4 * (1.0 - _orbController.value)).clamp(0.0, 1.0);
     }
   }
 
@@ -238,12 +266,6 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
     final Color accentColor = isDark ? const Color(0xFFC9A227) : _softGold;
     final Color textColor = isDark ? Colors.white : _warmTan;
     final Color secondaryText = isDark ? Colors.white70 : _warmTan;
-    // UI only: "Keep going..." once at breath 5 (top), then usual phase labels.
-    final keepGoingOnce = _isHolding && _breathNumber == 5;
-    // This screen is step 2; step 3 lights only on the next page.
-    const dot1 = false;
-    const dot2 = true;
-    const dot3 = false;
 
     return Scaffold(
       body: TakeMomentRestScreen.peaceBackgroundStack(
@@ -254,22 +276,38 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
             children: [
               Padding(
                 padding: const EdgeInsets.only(top: 12, bottom: 18),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _progressDot(dot1, accentColor),
-                    const SizedBox(width: 14),
-                    _progressDot(dot2, accentColor),
-                    const SizedBox(width: 14),
-                    _progressDot(dot3, accentColor),
-                  ],
+                child: AnimatedBuilder(
+                  animation: _orbController,
+                  builder: (context, _) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(_maxBreaths, (i) {
+                        final completedCount =
+                            _allCyclesDone ? _maxBreaths : (_breathNumber - 1);
+                        double fill = 0;
+                        if (i < completedCount) {
+                          fill = 1;
+                        } else if (!_allCyclesDone &&
+                            _isHolding &&
+                            i == _breathNumber - 1) {
+                          fill = _currentCycleFill;
+                        }
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            left: i == 0 ? 0 : 10,
+                          ),
+                          child: _cycleDot(fill: fill, accentColor: accentColor),
+                        );
+                      }),
+                    );
+                  },
                 ),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: _isHolding
+                child: _allCyclesDone
                     ? Text(
-                        keepGoingOnce ? 'Keep going...' : _phaseLabel,
+                        'Well done',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: isTablet ? 30 : 26,
@@ -278,47 +316,62 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
                           fontFamily: 'Georgia',
                         ),
                       )
-                    : Column(
-                        children: [
-                          Text(
-                            'Rest in',
-                            style: TextStyle(
-                              fontSize: isTablet ? 24 : 20,
-                              fontWeight: FontWeight.w400,
-                              color: secondaryText.withOpacity(0.9),
-                              fontFamily: 'Georgia',
-                              letterSpacing: 0.5,
+                    : _isHolding
+                        ? Padding(
+                            padding: const EdgeInsets.only(top: 18),
+                            child: Text(
+                              _phaseSecondsLabel,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: isTablet ? 28 : 24,
+                                fontWeight: FontWeight.w500,
+                                color: textColor,
+                                fontFamily: 'Georgia',
+                              ),
                             ),
+                          )
+                        : Column(
+                            children: [
+                              Text(
+                                'Rest in',
+                                style: TextStyle(
+                                  fontSize: isTablet ? 24 : 20,
+                                  fontWeight: FontWeight.w400,
+                                  color: secondaryText.withOpacity(0.9),
+                                  fontFamily: 'Georgia',
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'His presence',
+                                style: TextStyle(
+                                  fontSize: isTablet ? 40 : 34,
+                                  fontWeight: FontWeight.w600,
+                                  color: textColor,
+                                  fontFamily: 'Georgia',
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'A moment to breathe and find peace',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: isTablet ? 17 : 15,
+                                  color: secondaryText.withOpacity(0.85),
+                                  fontFamily: 'Georgia',
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'His presence',
-                            style: TextStyle(
-                              fontSize: isTablet ? 40 : 34,
-                              fontWeight: FontWeight.w600,
-                              color: textColor,
-                              fontFamily: 'Georgia',
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'A moment to breathe and find peace',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: isTablet ? 17 : 15,
-                              color: secondaryText.withOpacity(0.85),
-                              fontFamily: 'Georgia',
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ],
-                      ),
               ),
               const SizedBox(height: 20),
               Expanded(
                 child: Center(
                   child: Listener(
                     onPointerDown: (_) {
+                      if (_allCyclesDone) return;
                       if (!_isHolding && mounted) {
                         HapticFeedback.heavyImpact();
                         setState(() {
@@ -337,36 +390,28 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
                         _orbController,
                       ]),
                       builder: (context, _) {
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _buildBreathGraphic(
-                              isTablet: isTablet,
-                              isDark: isDark,
-                              accentColor: accentColor,
-                              textColor: textColor,
-                            ),
-                            if (_isHolding) ...[
-                              const SizedBox(height: 26),
-                              Text(
-                                'Breath $_breathNumber of $_maxBreaths',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: isTablet ? 18 : 16,
-                                  color: textColor.withOpacity(0.95),
-                                  fontFamily: 'Georgia',
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ],
+                        return _buildBreathGraphic(
+                          isTablet: isTablet,
+                          isDark: isDark,
+                          accentColor: accentColor,
+                          textColor: textColor,
                         );
                       },
                     ),
                   ),
                 ),
               ),
-              if (!_isHolding)
+              if (_allCyclesDone)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(28, 0, 28, 28),
+                  child: _buildSlideBar(
+                    isTablet: isTablet,
+                    accentColor: accentColor,
+                    textColor: textColor,
+                    isDark: isDark,
+                  ),
+                )
+              else if (!_isHolding)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(28, 0, 28, 28),
                   child: Container(
@@ -407,12 +452,119 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
     );
   }
 
+  Widget _buildSlideBar({
+    required bool isTablet,
+    required Color accentColor,
+    required Color textColor,
+    required bool isDark,
+  }) {
+    const trackH = 56.0;
+    const thumb = 48.0;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final trackW = constraints.maxWidth;
+        final maxDx = (trackW - thumb - 8).clamp(0.0, trackW);
+        final dx = _slideProgress * maxDx;
+        return GestureDetector(
+          onHorizontalDragUpdate: (details) {
+            final next = ((_slideProgress * maxDx) + details.delta.dx)
+                .clamp(0.0, maxDx);
+            setState(() => _slideProgress = maxDx <= 0 ? 0 : next / maxDx);
+          },
+          onHorizontalDragEnd: (_) {
+            if (_slideProgress >= 0.92) {
+              HapticFeedback.mediumImpact();
+              _goToPray();
+            } else {
+              setState(() => _slideProgress = 0);
+            }
+          },
+          child: Container(
+            height: trackH,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.black.withOpacity(0.4)
+                  : Colors.white.withOpacity(0.55),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(
+                color: accentColor.withOpacity(0.55),
+                width: 1.5,
+              ),
+            ),
+            child: Stack(
+              alignment: Alignment.centerLeft,
+              children: [
+                // Fill trail
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: dx + thumb / 2,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: accentColor.withOpacity(0.22),
+                      borderRadius: BorderRadius.circular(28),
+                    ),
+                  ),
+                ),
+                Center(
+                  child: Text(
+                    'Slide to continue',
+                    style: TextStyle(
+                      fontSize: isTablet ? 16 : 14,
+                      color: textColor.withOpacity(0.85),
+                      fontFamily: 'Georgia',
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 4 + dx,
+                  child: Container(
+                    width: thumb,
+                    height: thumb,
+                    decoration: BoxDecoration(
+                      color: accentColor,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.18),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.chevron_right,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildBreathGraphic({
     required bool isTablet,
     required bool isDark,
     required Color accentColor,
     required Color textColor,
   }) {
+    if (_allCyclesDone) {
+      return _outlinedCountCircle(
+        isTablet: isTablet,
+        accentColor: accentColor,
+        textColor: textColor,
+        countLabel: '$_maxBreaths',
+        phaseLabel: 'Complete',
+      );
+    }
     // Idle: outlined circle with remaining count (matches start UI).
     if (!_isHolding) {
       return _outlinedCountCircle(
@@ -612,16 +764,28 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
     );
   }
 
-  Widget _progressDot(bool active, Color accentColor) {
-    return Container(
-      width: active ? 12 : 8,
-      height: active ? 12 : 8,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: active ? accentColor : Colors.transparent,
-        border: Border.all(
-          color: accentColor.withOpacity(active ? 1.0 : 0.4),
-          width: active ? 0 : 1.5,
+  Widget _cycleDot({required double fill, required Color accentColor}) {
+    const size = 12.0;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: accentColor.withOpacity(fill >= 1 ? 1.0 : 0.45),
+            width: 1.5,
+          ),
+        ),
+        child: ClipOval(
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: FractionallySizedBox(
+              heightFactor: fill.clamp(0.0, 1.0),
+              widthFactor: 1,
+              child: ColoredBox(color: accentColor),
+            ),
+          ),
         ),
       ),
     );

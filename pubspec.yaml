@@ -41,6 +41,7 @@ dependencies:
   firebase_in_app_messaging: ^0.8.1+2
   firebase_messaging: ^15.2.2
   firebase_storage: ^12.4.2
+  mixpanel_flutter: ^2.4.4
   workmanager: ^0.5.2
   flutter:
     sdk: flutter
@@ -172,6 +173,7 @@ flutter:
     - assets/streak_completed_icons/
     - assets/take_moment/
     - assets/prayer_wall/
+    - assets/journey/
     - assets/home-widgets/widget Mockup 1.png
     - assets/home-widgets/widget Mockup 2.png
     - assets/home-widgets/widget Mockup 3.png

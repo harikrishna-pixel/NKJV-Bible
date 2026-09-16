@@ -280,10 +280,8 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       final p = _oneYear;
       if (p != null && p.rawPrice > 0) {
         final sym = p.currencySymbol.isNotEmpty ? p.currencySymbol : '\$';
-        final mo = p.rawPrice / 12;
-        final moText = mo == mo.roundToDouble()
-            ? mo.toStringAsFixed(0)
-            : mo.toStringAsFixed(2);
+        // Display-only: yearly ÷ 12 as whole number (e.g. ₹208.25 → ₹208).
+        final moText = (p.rawPrice / 12).round().toString();
         return 'Works out to $sym$moText a month';
       }
       return 'Works out to a lower monthly cost';
