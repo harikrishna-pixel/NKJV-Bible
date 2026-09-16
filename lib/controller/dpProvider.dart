@@ -122,6 +122,226 @@ class DBHelper {
     );
   }
 
+  /// Keep the 128 open path first. Only if that fails on an existing encrypted
+  /// file, use [openSqlCipherDatabase] (SQLCipher 3/4 + key candidates).
+  /// Existing files are opened without onCreate so a false SQLCipher 4 open
+  /// cannot wipe 101/128 library tables.
+  static Future<dynamic> openLiveOrRecoverEncrypted(
+    String path, {
+    String? password,
+    int? version,
+    bool singleInstance = true,
+    Future<void> Function(dynamic db, int version)? onCreate,
+    Future<void> Function(dynamic db, int oldVersion, int newVersion)?
+        onUpgrade,
+  }) async {
+    final exists = await File(path).exists();
+    try {
+      final db = await openLike128(
+        path,
+        password: password,
+        version: exists ? null : version,
+        singleInstance: singleInstance,
+        onCreate: exists ? null : onCreate,
+        onUpgrade: exists ? null : onUpgrade,
+      );
+      if (exists && !await _openedDbHasUserTables(db, path)) {
+        try {
+          await db.close();
+        } catch (_) {}
+        throw StateError('openLike128 false-open (no tables) for $path');
+      }
+      return db;
+    } catch (e) {
+      debugPrint('DBHelper.openLike128 failed: $e');
+      if (!exists || await _fileHasPlainSqliteHeader(path)) {
+        rethrow;
+      }
+      debugPrint('DBHelper trying SQLCipher recovery open for $path');
+      return await openSqlCipherDatabase(
+        path,
+        password: password,
+      );
+    }
+  }
+
+  /// Large existing files that open with zero app tables are a false SQLCipher
+  /// open (wrong compat/key). Treat as failure so we do not keep an empty DB.
+  static Future<bool> _openedDbHasUserTables(dynamic db, String path) async {
+    try {
+      final tables = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'android_metadata'",
+      );
+      if (tables.isNotEmpty) return true;
+    } catch (_) {
+      return false;
+    }
+    try {
+      if (await File(path).length() >= 4096) return false;
+    } catch (_) {}
+    return true;
+  }
+
+  static Future<void> _copySqliteSidecars(String fromPath, String toPath) async {
+    for (final suffix in <String>['-wal', '-shm']) {
+      try {
+        final src = File('$fromPath$suffix');
+        if (await src.exists()) {
+          await src.copy('$toPath$suffix');
+        }
+      } catch (e) {
+        debugPrint('DBHelper sidecar copy $suffix failed: $e');
+      }
+    }
+  }
+
+  static sqlcipher.Database? _cipherDefaultHolder;
+
+  /// Keep a live SQLCipher connection so cipher_default_* applies to the next
+  /// open. :memory: pragmas do not affect other connections on iOS, so 128
+  /// SQLCipher 3 files were opened as SQLCipher 4 ("file is not a database").
+  static Future<void> _setSqlCipherDefaultCompat(int? compatibility) async {
+    try {
+      await _cipherDefaultHolder?.close();
+    } catch (_) {}
+    _cipherDefaultHolder = null;
+    final tmpDir = await getTemporaryDirectory();
+    final tmp = p.join(tmpDir.path, 'cipher_defaults_${compatibility ?? 0}.db');
+    try {
+      await File(tmp).delete();
+    } catch (_) {}
+    final holder = await sqlcipher.openDatabase(
+      tmp,
+      password: 'compat-holder',
+      singleInstance: false,
+    );
+    _cipherDefaultHolder = holder;
+    if (compatibility != null) {
+      await _runPragma(
+          holder, 'PRAGMA cipher_default_compatibility = $compatibility');
+    }
+    if (compatibility != null && compatibility <= 3) {
+      await _runPragma(holder, 'PRAGMA cipher_default_kdf_iter = 64000');
+      await _runPragma(holder, 'PRAGMA cipher_default_page_size = 1024');
+    }
+  }
+
+  /// Open a 128 on-disk file without creating a new empty DB.
+  /// 128 used ENCRYPTION_KEY via SQLCipher, then plain sqlite.
+  static Future<dynamic?> tryOpenExisting128File(
+    String path, {
+    String? password,
+    bool singleInstance = false,
+  }) async {
+    if (!await File(path).exists()) return null;
+
+    if (await _fileHasPlainSqliteHeader(path)) {
+      debugPrint('tryOpenExisting128File plain sqlite $path');
+      return await plain.openDatabase(path, singleInstance: true);
+    }
+
+    final keys = <String>[];
+    final seen = <String>{};
+    void addKey(String? key) {
+      if (key == null || key.isEmpty) return;
+      if (seen.add(key)) keys.add(key);
+    }
+
+    addKey(password);
+    addKey(encryptionPassword());
+    addKey(encryptionPassword(keepRawWhitespace: true));
+    for (final extra in encryptionPasswordCandidates()) {
+      addKey(extra);
+    }
+
+    for (final compat in <int?>[null, 4, 3, 2, 1]) {
+      try {
+        await _setSqlCipherDefaultCompat(compat);
+      } catch (e) {
+        debugPrint('tryOpenExisting128File compat setup $compat: $e');
+      }
+      for (final key in keys) {
+        try {
+          final db = await sqlcipher.openDatabase(
+            path,
+            password: key,
+            singleInstance: singleInstance,
+          );
+          if (!await _openedDbHasUserTables(db, path)) {
+            debugPrint(
+                'tryOpenExisting128File false-open compat=$compat keyLen=${key.length}');
+            try {
+              await db.close();
+            } catch (_) {}
+            continue;
+          }
+          debugPrint(
+              'tryOpenExisting128File ok compat=$compat keyLen=${key.length}');
+          return db;
+        } catch (e) {
+          debugPrint(
+              'tryOpenExisting128File fail compat=$compat keyLen=${key.length}: $e');
+        }
+      }
+    }
+    return null;
+  }
+
+  static Future<void> _keepPreUpgradeCopy(String path) async {
+    try {
+      final file = File(path);
+      if (!await file.exists() || await file.length() < 4096) return;
+      final keep = '$path.pre-upgrade.bak';
+      if (await File(keep).exists()) return;
+      await file.copy(keep);
+      await _copySqliteSidecars(path, keep);
+      debugPrint('DBHelper saved pre-upgrade copy $keep');
+    } catch (e) {
+      debugPrint('DBHelper pre-upgrade copy failed: $e');
+    }
+  }
+
+  /// Additive schema only. Safe on 101/128 files that already have tables.
+  static Future<void> ensureCurrentSchema(dynamic db) async {
+    Future<void> tryExec(String sql) async {
+      try {
+        await db.execute(sql);
+      } catch (e) {
+        debugPrint('ensureCurrentSchema: $e');
+      }
+    }
+
+    await tryExec(
+        'CREATE TABLE IF NOT EXISTS "calendar" (id INTEGER PRIMARY KEY AUTOINCREMENT,"title" TEXT,"date" DATETIME)');
+    await tryExec(
+        'CREATE TABLE IF NOT EXISTS "verse" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER,"content" TEXT,"is_read" TEXT,"is_bookmarked" TEXT,"is_underlined" TEXT,"is_highlighted" TEXT,"is_noted" TEXT)');
+    await tryExec(
+        'CREATE TABLE IF NOT EXISTS "bookmark" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER, "content" VARCHAR, "plaincontent" VARCHAR,"bookName" VARCHAR, "timestamp" DATETIME DEFAULT CURRENT_TIMESTAMP)');
+    await tryExec(
+        'CREATE TABLE IF NOT EXISTS "save_notes" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER, "content" VARCHAR,"book_name" VARCHAR, "notes" VARCHAR, "plaincontent" VARCHAR, "timestamp" DATETIME DEFAULT CURRENT_TIMESTAMP)');
+    await tryExec(
+        'CREATE TABLE IF NOT EXISTS "highlight" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER, "content" VARCHAR, "plain_content" VARCHAR, verse_id VARCHAR, "book_name" VARCHAR,"color" VARCHAR, "timestamp" DATETIME DEFAULT CURRENT_TIMESTAMP)');
+    await tryExec(
+        'CREATE TABLE IF NOT EXISTS "underline" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER, "chapter_num" INTEGER, "verse_num" INTEGER, "content" VARCHAR, "plaincontent" VARCHAR, "bookName" VARCHAR, "timestamp" DATETIME DEFAULT CURRENT_TIMESTAMP)');
+    await tryExec(
+        'CREATE TABLE IF NOT EXISTS "book" (id INTEGER PRIMARY KEY AUTOINCREMENT,"book_num" INTEGER,"title" TEXT,"short_title" TEXT,"chapter_count" INTEGER,"read_per" TEXT)');
+    await tryExec(
+        'CREATE TABLE IF NOT EXISTS "save_images" (id INTEGER PRIMARY KEY AUTOINCREMENT,"image_path" TEXT)');
+    await tryExec(
+        'CREATE TABLE IF NOT EXISTS "dailyVersesMainList" (id INTEGER PRIMARY KEY AUTOINCREMENT,"Category_Name" TEXT,"Category_Id" INTEGER,"Book" TEXT,"Book_Id" INTEGER,"Chapter" INTEGER, "Verse" TEXT)');
+    await tryExec(
+        'CREATE TABLE IF NOT EXISTS "dailyVerses" (id INTEGER PRIMARY KEY AUTOINCREMENT,"Category_Name" TEXT,"Category_Id" INTEGER,"Book" TEXT,"Book_Id" INTEGER,"Chapter" INTEGER, "Verse" TEXT,"Date" TEXT,"Verse_Num" INTEGER )');
+    await tryExec(
+        'CREATE TABLE IF NOT EXISTS "dailyVersesnew" (id INTEGER PRIMARY KEY AUTOINCREMENT,"Category_Name" TEXT,"Category_Id" INTEGER,"Book" TEXT,"Book_Id" INTEGER,"Chapter" INTEGER, "Verse" TEXT,"Date" TEXT,"Verse_Num" INTEGER )');
+    await tryExec('ALTER TABLE bookmark ADD COLUMN plaincontent VARCHAR');
+    await tryExec('ALTER TABLE save_notes ADD COLUMN plaincontent VARCHAR');
+    await tryExec('ALTER TABLE highlight ADD COLUMN plain_content VARCHAR');
+    await tryExec('ALTER TABLE highlight ADD COLUMN verse_id VARCHAR');
+    try {
+      await db.execute('PRAGMA user_version = 3');
+    } catch (_) {}
+  }
+
   /// SQLCipher key from `.env`. Always trim: a trailing space is a different key
   /// (`file is not a database`). 128 used the key with no trailing space.
   static String? encryptionPassword({bool keepRawWhitespace = false}) {
@@ -279,7 +499,12 @@ class DBHelper {
           for (final useHex in <bool>[false, true]) {
             if (useHex && attachKey.isEmpty) continue;
             try {
+              await _setSqlCipherDefaultCompat(compat);
               await _runPragma(db, 'PRAGMA cipher_default_compatibility = $compat');
+              if (compat <= 3) {
+                await _runPragma(db, 'PRAGMA cipher_default_kdf_iter = 64000');
+                await _runPragma(db, 'PRAGMA cipher_default_page_size = 1024');
+              }
               final keySql = _attachKeySql(attachKey, useHex: useHex);
               await db.execute(
                   'ATTACH DATABASE ${_sqlQuote(path)} AS legacy KEY $keySql');
@@ -369,6 +594,7 @@ class DBHelper {
   }) async {
     await _logDbFileHeader(path);
 
+    final fileExists = await File(path).exists();
     final passwords = <String>[
       if (password != null && password.isNotEmpty) password,
       ...encryptionPasswordCandidates(),
@@ -378,7 +604,7 @@ class DBHelper {
       for (final p in passwords)
         if (seen.add(p)) p,
     ];
-    if (await File(path).exists()) {
+    if (fileExists) {
       uniquePasswords.add('');
     }
     if (uniquePasswords.isEmpty) {
@@ -386,60 +612,57 @@ class DBHelper {
     }
 
     Object? lastError;
-    const compatModes = <int?>[null, 4, 3, 2];
+    const compatModes = <int?>[null, 4, 3, 2, 1];
     for (final compat in compatModes) {
-      sqlcipher.Database? probe;
       try {
-        if (compat != null) {
-          probe = await sqlcipher.openDatabase(
-            ':memory:',
-            password: 'compat',
+        await _setSqlCipherDefaultCompat(compat);
+      } catch (e) {
+        debugPrint('DBHelper SQLCipher compat setup $compat: $e');
+      }
+      for (final candidate in uniquePasswords) {
+        try {
+          final db = await sqlcipher.openDatabase(
+            path,
+            version: fileExists ? null : version,
+            password: candidate,
+            onCreate: fileExists ? null : onCreate,
+            onUpgrade: fileExists ? null : onUpgrade,
             singleInstance: false,
           );
-          await _runPragma(probe, 'PRAGMA cipher_default_compatibility = $compat');
-        }
-        for (final candidate in uniquePasswords) {
-          try {
-            final db = await sqlcipher.openDatabase(
-              path,
-              version: version,
-              password: candidate,
-              onCreate: onCreate,
-              onUpgrade: onUpgrade,
-              singleInstance: false,
-            );
+          if (fileExists && !await _openedDbHasUserTables(db, path)) {
             debugPrint(
-                'DBHelper SQLCipher open ok compat=${compat ?? "default"} keyLen=${candidate.length}');
-            return db;
-          } catch (e) {
-            lastError = e;
-            debugPrint(
-                'DBHelper SQLCipher open failed compat=${compat ?? "default"} keyLen=${candidate.length}: $e');
+                'DBHelper SQLCipher false-open compat=${compat ?? "default"} keyLen=${candidate.length}');
+            try {
+              await db.close();
+            } catch (_) {}
+            continue;
           }
+          debugPrint(
+              'DBHelper SQLCipher open ok compat=${compat ?? "default"} keyLen=${candidate.length}');
+          return db;
+        } catch (e) {
+          lastError = e;
+          debugPrint(
+              'DBHelper SQLCipher open failed compat=${compat ?? "default"} keyLen=${candidate.length}: $e');
         }
-      } finally {
-        try {
-          await probe?.close();
-        } catch (_) {}
       }
     }
 
     final rewritePassword = uniquePasswords.firstWhere((p) => p.isNotEmpty,
         orElse: () => encryptionPassword() ?? '');
-    if (rewritePassword.isNotEmpty && await File(path).exists()) {
+    if (rewritePassword.isNotEmpty && fileExists) {
       final recovered = await _rekeyExistingDbViaAttach(
         path: path,
         outputPassword: rewritePassword,
       );
       if (recovered) {
-        return sqlcipher.openDatabase(
+        final db = await sqlcipher.openDatabase(
           path,
-          version: version,
           password: rewritePassword,
-          onCreate: onCreate,
-          onUpgrade: onUpgrade,
           singleInstance: false,
         );
+        await ensureCurrentSchema(db);
+        return db;
       }
     }
 
@@ -545,10 +768,33 @@ class DBHelper {
     debugPrint(
         'DBHelper.initDatabase opening: $path encryptedPasswordPresent=${password != null && password.isNotEmpty}');
 
-    // 128 open path: SQLCipher with ENCRYPTION_KEY, then plain sqlite.
-    // If this file already has My Library, we keep it as-is.
+    await _keepPreUpgradeCopy(path);
+    await DBMigrationHelper.copyLegacyBibleEncIntoLiveIfMissing(path);
+
+    final exists = await File(path).exists();
+    if (exists) {
+      try {
+        final db = await tryOpenExisting128File(
+          path,
+          password: password,
+          singleInstance: true,
+        );
+        if (db != null) {
+          await ensureCurrentSchema(db);
+          await DBMigrationHelper.restoreLibraryFrom128Backups(
+            liveDb: db,
+            password: password,
+          );
+          return db;
+        }
+      } catch (e) {
+        debugPrint('DBHelper.initDatabase existing-file open failed: $e');
+      }
+    }
+
+    // New install, or existing file could not be opened yet.
     try {
-      final db = await openLike128(
+      final db = await openLiveOrRecoverEncrypted(
         path,
         password: password,
         version: 3,
@@ -557,6 +803,7 @@ class DBHelper {
         },
         onUpgrade: onUpgrade,
       );
+      await ensureCurrentSchema(db);
       await DBMigrationHelper.restoreLibraryFrom128Backups(
         liveDb: db,
         password: password,
@@ -568,7 +815,6 @@ class DBHelper {
 
     // Plain sqlite only if the file really is unencrypted. Encrypted SQLCipher
     // files always fail here with code 26 and used to crash into the category screen.
-    final exists = await File(path).exists();
     if (!exists || await _fileHasPlainSqliteHeader(path)) {
       try {
         return await plain.openDatabase(
@@ -585,8 +831,8 @@ class DBHelper {
       }
     }
 
-    // Keep the unreadable 128/133 file, then create a new DB so splash /
-    // category restore can run (same last-resort that unblocked the app).
+    // Last resort: keep the 128 file on disk (never delete it), then create a
+    // new live DB only so splash can continue. Restore copies library back.
     if (exists) {
       final adoptPassword = encryptionPassword() ?? password;
       if (adoptPassword != null && adoptPassword.isNotEmpty) {
@@ -601,14 +847,22 @@ class DBHelper {
         );
         if (adopted != null) return adopted;
 
-        final bak =
-            '$path.undecryptable.${DateTime.now().millisecondsSinceEpoch}.bak';
+        final keep =
+            '$path.128-keep.${DateTime.now().millisecondsSinceEpoch}.bak';
         try {
-          await File(path).copy(bak);
-          await File(path).delete();
+          await File(path).copy(keep);
+          await _copySqliteSidecars(path, keep);
           debugPrint(
-              'DBHelper quarantined unreadable bible_enc.db to $bak; creating a new encrypted DB');
-          return await sqlcipher.openDatabase(
+              'DBHelper kept original bible_enc.db at $keep; creating a new live DB');
+          try {
+            await File(path).delete();
+          } catch (_) {}
+          for (final suffix in <String>['-wal', '-shm']) {
+            try {
+              await File('$path$suffix').delete();
+            } catch (_) {}
+          }
+          final db = await sqlcipher.openDatabase(
             path,
             version: 3,
             password: adoptPassword,
@@ -618,8 +872,13 @@ class DBHelper {
             onUpgrade: onUpgrade,
             singleInstance: false,
           );
+          await DBMigrationHelper.restoreLibraryFrom128Backups(
+            liveDb: db,
+            password: adoptPassword,
+          );
+          return db;
         } catch (e) {
-          debugPrint('DBHelper quarantine/create-new failed: $e');
+          debugPrint('DBHelper keep-original/create-new failed: $e');
         }
       }
     }
@@ -1325,26 +1584,70 @@ class DBMigrationHelper {
     },
   };
 
-  /// Rename legacy `.bible.db` → `bible2.db`
+  /// Rename legacy `.bible.db` → `bible2.db` only when the target is missing.
+  /// Never delete `.bible.db` — 101/121 library may still be in that file.
   static Future<void> _renameLegacyEncryptedIfAny() async {
     final dir = await getApplicationDocumentsDirectory();
     final legacyPath = p.join(dir.path, _legacyEncryptedName);
     final newNamePath = p.join(dir.path, _encryptedDbName);
 
-    if (await File(legacyPath).exists()) {
+    if (await File(legacyPath).exists() && !await File(newNamePath).exists()) {
       try {
-        if (await File(newNamePath).exists()) {
-          await File(legacyPath).delete();
-          print(
-              "copyUserDataFromLegacyIfNeeded: removed legacy $_legacyEncryptedName (target exists).");
-        } else {
-          await File(legacyPath).rename(newNamePath);
-          print(
-              "copyUserDataFromLegacyIfNeeded: renamed $_legacyEncryptedName → $_encryptedDbName");
-        }
+        await File(legacyPath).rename(newNamePath);
+        print(
+            "copyUserDataFromLegacyIfNeeded: renamed $_legacyEncryptedName → $_encryptedDbName");
       } catch (e) {
         print("copyUserDataFromLegacyIfNeeded: rename error: $e");
       }
+    }
+  }
+
+  static Future<List<String>> _librarySearchDirs() async {
+    final dirs = <String>{};
+    Future<void> addDir(Future<Directory> Function() fn) async {
+      try {
+        dirs.add((await fn()).path);
+      } catch (_) {}
+    }
+
+    await addDir(getApplicationDocumentsDirectory);
+    await addDir(getApplicationSupportDirectory);
+    try {
+      dirs.add(await plain.getDatabasesPath());
+    } catch (_) {}
+    try {
+      dirs.add((await getLibraryDirectory()).path);
+    } catch (_) {}
+    return dirs.toList();
+  }
+
+  /// If Documents has no live `bible_enc.db`, copy one from an older location
+  /// (sqflite default path / support dir). Does not overwrite a real live file.
+  static Future<void> copyLegacyBibleEncIntoLiveIfMissing(String livePath) async {
+    try {
+      final live = File(livePath);
+      if (await live.exists() && await live.length() >= 4096) return;
+
+      for (final dir in await _librarySearchDirs()) {
+        final candidate = p.join(dir, BibleEncryptedDbPaths.fileName);
+        if (p.equals(candidate, livePath)) continue;
+        final src = File(candidate);
+        if (!await src.exists() || await src.length() < 4096) continue;
+        if (await live.exists()) {
+          final keep =
+              '$livePath.pre-missing-copy.${DateTime.now().millisecondsSinceEpoch}.bak';
+          try {
+            await live.copy(keep);
+            await live.delete();
+          } catch (_) {}
+        }
+        await src.copy(livePath);
+        debugPrint(
+            'copyLegacyBibleEncIntoLiveIfMissing: copied $candidate → $livePath');
+        return;
+      }
+    } catch (e) {
+      debugPrint('copyLegacyBibleEncIntoLiveIfMissing: $e');
     }
   }
 
@@ -1385,20 +1688,28 @@ class DBMigrationHelper {
   /// Newest first. Never includes the live bible_enc.db.
   static Future<List<String>> _encryptedBackupDbPaths() async {
     final livePath = await getNewDbPath();
-    final dir = await getApplicationDocumentsDirectory();
     final files = <File>[];
-    try {
-      await for (final entity in dir.list()) {
-        if (entity is! File) continue;
-        if (entity.path == livePath) continue;
-        final name = p.basename(entity.path);
-        if (!name.startsWith(BibleEncryptedDbPaths.fileName)) continue;
-        if (name.contains('undecryptable') || name.contains('.bak')) {
+    final seen = <String>{};
+    for (final dirPath in await _librarySearchDirs()) {
+      try {
+        await for (final entity in Directory(dirPath).list()) {
+          if (entity is! File) continue;
+          if (entity.path == livePath) continue;
+          final name = p.basename(entity.path);
+          final isBibleEncBak = name.startsWith(BibleEncryptedDbPaths.fileName) &&
+              (name.contains('undecryptable') ||
+                  name.contains('.bak') ||
+                  name.contains('pre-upgrade') ||
+                  name.contains('pre-adopt') ||
+                  name.contains('pre-missing-copy') ||
+                  name.contains('128-keep'));
+          if (!isBibleEncBak) continue;
+          if (!seen.add(entity.path)) continue;
           files.add(entity);
         }
+      } catch (e) {
+        debugPrint('_encryptedBackupDbPaths list failed: $e');
       }
-    } catch (e) {
-      debugPrint('_encryptedBackupDbPaths list failed: $e');
     }
     files.sort((a, b) {
       try {
@@ -1417,12 +1728,26 @@ class DBMigrationHelper {
 
     Future<void> add(String? path) async {
       if (path == null || path.isEmpty) return;
-      if (path == livePath) return;
+      if (p.equals(path, livePath)) return;
       if (!seen.add(path)) return;
       if (!await File(path).exists()) return;
       paths.add(path);
     }
 
+    const names = [
+      'bible.db',
+      '.bible.db',
+      'bible2.db',
+      'bible_enc.db',
+      'bible_enc.db.bak',
+      'bible.db.bak',
+      '.bible.db.bak',
+    ];
+    for (final dirPath in await _librarySearchDirs()) {
+      for (final name in names) {
+        await add(p.join(dirPath, name));
+      }
+    }
     await add(await getSourceDbPath());
     for (final bak in await _encryptedBackupDbPaths()) {
       await add(bak);
@@ -1455,7 +1780,14 @@ class DBMigrationHelper {
     for (final bak in backups) {
       dynamic probe;
       try {
-        probe = await DBHelper.openLike128(bak, password: password);
+        probe = await DBHelper.tryOpenExisting128File(
+          bak,
+          password: password,
+        );
+        if (probe == null) {
+          debugPrint('tryAdopt skip $bak (could not open)');
+          continue;
+        }
         final libraryCount = await _libraryRowCount(probe);
         await probe.close();
         probe = null;
@@ -1467,15 +1799,15 @@ class DBMigrationHelper {
         final keep =
             '$livePath.pre-adopt.${DateTime.now().millisecondsSinceEpoch}.bak';
         await File(livePath).copy(keep);
+        await DBHelper._copySqliteSidecars(livePath, keep);
         await File(bak).copy(livePath);
+        await DBHelper._copySqliteSidecars(bak, livePath);
         debugPrint(
             'tryAdopt restored $bak → bible_enc.db; previous file kept at $keep');
-        return await DBHelper.openLike128(
+        return await DBHelper.tryOpenExisting128File(
           livePath,
           password: password,
-          version: version,
-          onCreate: onCreate,
-          onUpgrade: onUpgrade,
+          singleInstance: true,
         );
       } catch (e) {
         debugPrint('tryAdopt skip $bak: $e');
@@ -1967,6 +2299,50 @@ class DBMigrationHelper {
     }
   }
 
+  static Future<bool> _libraryRowAlreadyExists(
+      dynamic db, String table, Map<String, Object?> row) async {
+    try {
+      if (table == 'save_images') {
+        final imagePath = row['image_path'];
+        if (imagePath == null) return false;
+        final found = await db.rawQuery(
+          'SELECT 1 FROM save_images WHERE image_path = ? LIMIT 1',
+          [imagePath],
+        );
+        return found.isNotEmpty;
+      }
+      if (table == 'calendar') {
+        final title = row['title'];
+        final date = row['date'];
+        if (title == null) return false;
+        final found = await db.rawQuery(
+          'SELECT 1 FROM calendar WHERE title = ? AND date = ? LIMIT 1',
+          [title, date],
+        );
+        return found.isNotEmpty;
+      }
+      final book = row['book_num'];
+      final chapter = row['chapter_num'];
+      final verse = row['verse_num'];
+      final content = row['content'];
+      if (book == null || chapter == null || verse == null) return false;
+      if (content != null) {
+        final found = await db.rawQuery(
+          'SELECT 1 FROM $table WHERE book_num = ? AND chapter_num = ? AND verse_num = ? AND content = ? LIMIT 1',
+          [book, chapter, verse, content],
+        );
+        return found.isNotEmpty;
+      }
+      final found = await db.rawQuery(
+        'SELECT 1 FROM $table WHERE book_num = ? AND chapter_num = ? AND verse_num = ? LIMIT 1',
+        [book, chapter, verse],
+      );
+      return found.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Copy My Library tables from a source DB into the live bible_enc.db.
   /// Source files are never deleted. Inserts use IGNORE so existing rows stay.
   static Future<void> _copyLibraryTablesFrom({
@@ -1977,13 +2353,21 @@ class DBMigrationHelper {
 
     dynamic legacyDb;
     try {
-      legacyDb = await DBHelper.openLike128(
+      legacyDb = await DBHelper.tryOpenExisting128File(
+        sourceDbPath,
+        password: password,
+      );
+      legacyDb ??= await DBHelper.openLiveOrRecoverEncrypted(
         sourceDbPath,
         password: password,
         singleInstance: false,
       );
     } catch (e) {
       print('copyUserDataFromLegacyIfNeeded: could not open $sourceDbPath: $e');
+      return;
+    }
+    if (legacyDb == null) {
+      print('copyUserDataFromLegacyIfNeeded: could not open $sourceDbPath');
       return;
     }
 
@@ -2055,6 +2439,9 @@ class DBMigrationHelper {
             final mappedRow = _mapAndFilterRow(tableName, row, targetColumns);
             mappedRow.remove('id');
             if (mappedRow.isEmpty) continue;
+            if (await _libraryRowAlreadyExists(newDb, tableName, mappedRow)) {
+              continue;
+            }
             try {
               await newDb.insert(tableName, mappedRow,
                   conflictAlgorithm: sqlcipher.ConflictAlgorithm.ignore);
