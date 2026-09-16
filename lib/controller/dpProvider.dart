@@ -1792,6 +1792,169 @@ class DBMigrationHelper {
     return total;
   }
 
+  static String? _libraryMergeKey(String table, Map<String, Object?> row) {
+    final book = row['book_num'];
+    final chapter = row['chapter_num'];
+    final verse = row['verse_num'];
+    if (book == null || chapter == null || verse == null) return null;
+    if (table == 'highlight') {
+      return '$book|$chapter|$verse|${row['color']}';
+    }
+    if (table == 'save_notes') {
+      return '$book|$chapter|$verse|${row['content']}';
+    }
+    return '$book|$chapter|$verse';
+  }
+
+  static DateTime? _libraryTimestamp(Map<String, Object?> row) {
+    final value = row['timestamp'];
+    if (value == null) return null;
+    return DateTime.tryParse(value.toString());
+  }
+
+  static bool _libraryRowIsNewer(
+      Map<String, Object?> incoming, Map<String, Object?> existing) {
+    final incomingTs = _libraryTimestamp(incoming);
+    final existingTs = _libraryTimestamp(existing);
+    if (incomingTs == null) return false;
+    if (existingTs == null) return true;
+    return incomingTs.isAfter(existingTs);
+  }
+
+  static String _libraryMergeWhereSql(String table) {
+    if (table == 'highlight') {
+      return 'book_num = ? AND chapter_num = ? AND verse_num = ? AND color IS ?';
+    }
+    if (table == 'save_notes') {
+      return 'book_num = ? AND chapter_num = ? AND verse_num = ? AND content IS ?';
+    }
+    return 'book_num = ? AND chapter_num = ? AND verse_num = ?';
+  }
+
+  static List<Object?> _libraryMergeWhereArgs(
+      String table, Map<String, Object?> row) {
+    if (table == 'highlight') {
+      return [row['book_num'], row['chapter_num'], row['verse_num'], row['color']];
+    }
+    if (table == 'save_notes') {
+      return [
+        row['book_num'],
+        row['chapter_num'],
+        row['verse_num'],
+        row['content']
+      ];
+    }
+    return [row['book_num'], row['chapter_num'], row['verse_num']];
+  }
+
+  static Future<void> _collectLibraryRowsFromDb(
+    dynamic db,
+    Map<String, Map<String, Map<String, Object?>>> merged,
+  ) async {
+    const tables = ['bookmark', 'highlight', 'underline', 'save_notes'];
+    const aliases = {
+      'bookmark': ['bookmark', 'bookmarks', 'book_mark', 'bookMark'],
+      'highlight': ['highlight', 'highlights', 'high_light', 'highLight'],
+      'underline': ['underline', 'underlines', 'under_line', 'underLine'],
+      'save_notes': [
+        'save_notes',
+        'notes',
+        'note',
+        'saved_notes',
+        'saveNotes'
+      ],
+    };
+    for (final table in tables) {
+      String? sourceTable;
+      for (final name in aliases[table] ?? [table]) {
+        try {
+          final found = await db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
+            [name],
+          );
+          if (found.isNotEmpty) {
+            sourceTable = name;
+            break;
+          }
+        } catch (_) {}
+      }
+      if (sourceTable == null) continue;
+      List<Map<String, Object?>> rows;
+      try {
+        rows = await db.query(sourceTable);
+      } catch (_) {
+        continue;
+      }
+      final dest = merged.putIfAbsent(table, () => {});
+      for (final row in rows) {
+        final mapped = Map<String, Object?>.from(row);
+        if (table == 'highlight' &&
+            mapped.containsKey('plaincontent') &&
+            !mapped.containsKey('plain_content')) {
+          mapped['plain_content'] = mapped['plaincontent'];
+        }
+        final key = _libraryMergeKey(table, mapped);
+        if (key == null) continue;
+        final existing = dest[key];
+        if (existing == null || _libraryRowIsNewer(mapped, existing)) {
+          dest[key] = mapped;
+        }
+      }
+    }
+  }
+
+  static Future<void> _applyMergedLibraryRows(
+    dynamic liveDb,
+    Map<String, Map<String, Map<String, Object?>>> merged,
+  ) async {
+    for (final table in merged.keys) {
+      List<String> targetColumns;
+      try {
+        targetColumns = await _getTableColumns(liveDb, table);
+      } catch (_) {
+        continue;
+      }
+      if (targetColumns.isEmpty) continue;
+      for (final row in merged[table]!.values) {
+        final mapped = _mapAndFilterRow(table, row, targetColumns);
+        mapped.remove('id');
+        if (mapped.isEmpty) continue;
+        List<Map<String, Object?>> found;
+        try {
+          found = await liveDb.query(
+            table,
+            where: _libraryMergeWhereSql(table),
+            whereArgs: _libraryMergeWhereArgs(table, mapped),
+            limit: 1,
+          );
+        } catch (_) {
+          found = const [];
+        }
+        if (found.isEmpty) {
+          try {
+            await liveDb.insert(table, mapped);
+          } catch (e) {
+            debugPrint('restoreLibrary merge insert $table: $e');
+          }
+          continue;
+        }
+        if (!_libraryRowIsNewer(mapped, found.first)) continue;
+        final id = found.first['id'];
+        if (id == null) continue;
+        try {
+          await liveDb.update(
+            table,
+            mapped,
+            where: 'id = ?',
+            whereArgs: [id],
+          );
+        } catch (e) {
+          debugPrint('restoreLibrary merge update $table: $e');
+        }
+      }
+    }
+  }
+
   /// Bookmarks/highlights/underlines/notes only. Seeded calendar / images /
   /// dailyVersesMainList must not count as "library already restored".
   static Future<int> _libraryUserRowCount(dynamic db) async {
@@ -2505,51 +2668,78 @@ class DBMigrationHelper {
     }
   }
 
-  /// If live DB has no My Library rows, copy them from a 128 `.bak` / legacy
-  /// file that we can open. Never deletes backups. Never closes [liveDb].
+  /// Merge My Library rows from live bible_enc.db and every readable .bak /
+  /// legacy file. De-dupe by verse key and keep the newer timestamp.
   static Future<void> restoreLibraryFrom128Backups({
     required dynamic liveDb,
     String? password,
   }) async {
     if (liveDb == null) return;
-    try {
-      final existing = await _libraryUserRowCount(liveDb);
-      if (existing > 0) {
-        debugPrint(
-            'restoreLibraryFrom128Backups: live already has $existing library rows');
-        return;
-      }
-    } catch (e) {
-      debugPrint('restoreLibraryFrom128Backups: live library count failed: $e');
-      return;
-    }
-
+    final livePath = await getNewDbPath();
     final pass = (password != null && password.isNotEmpty)
         ? password
-        : DBHelper.encryptionPassword();
-    if (pass == null || pass.isEmpty) return;
+        : (dotenv.env[AssetsConstants.dbPasswordKey] ??
+            DBHelper.encryptionPassword() ??
+            '');
 
-    final sources = await _libraryCopySourcePaths();
-    if (sources.isEmpty) {
-      debugPrint('restoreLibraryFrom128Backups: no 128 backup/legacy DB');
+    final sources = <String>[];
+    final seen = <String>{};
+    Future<void> addSource(String? path) async {
+      if (path == null || path.isEmpty) return;
+      if (!seen.add(path)) return;
+      if (!await File(path).exists()) return;
+      sources.add(path);
+    }
+
+    await addSource(livePath);
+    for (final path in await _libraryCopySourcePaths()) {
+      await addSource(path);
+    }
+
+    final merged = <String, Map<String, Map<String, Object?>>>{};
+    for (final sourceDbPath in sources) {
+      final isLive = p.equals(sourceDbPath, livePath);
+      dynamic sourceDb;
+      try {
+        if (isLive) {
+          sourceDb = liveDb;
+        } else {
+          sourceDb = await DBHelper.tryOpenExisting128File(
+            sourceDbPath,
+            password: pass,
+          );
+          sourceDb ??= await DBHelper.openLiveOrRecoverEncrypted(
+            sourceDbPath,
+            password: pass,
+            singleInstance: false,
+          );
+        }
+        if (sourceDb == null) continue;
+        await _collectLibraryRowsFromDb(sourceDb, merged);
+      } catch (e) {
+        debugPrint('restoreLibraryFrom128Backups: skip $sourceDbPath: $e');
+      } finally {
+        if (!isLive) {
+          try {
+            await sourceDb?.close();
+          } catch (_) {}
+        }
+      }
+    }
+
+    var mergedTotal = 0;
+    for (final tableRows in merged.values) {
+      mergedTotal += tableRows.length;
+    }
+    if (mergedTotal == 0) {
+      debugPrint('restoreLibraryFrom128Backups: no library rows in any source');
       return;
     }
 
-    for (final sourceDbPath in sources) {
-      await _copyLibraryTablesFrom(
-        sourceDbPath: sourceDbPath,
-        password: pass,
-        newDb: liveDb,
-      );
-      try {
-        final copied = await _libraryUserRowCount(liveDb);
-        if (copied > 0) {
-          debugPrint(
-              'restoreLibraryFrom128Backups: restored $copied library rows from $sourceDbPath');
-          return;
-        }
-      } catch (_) {}
-    }
+    await _applyMergedLibraryRows(liveDb, merged);
+    final after = await _libraryUserRowCount(liveDb);
+    debugPrint(
+        'restoreLibraryFrom128Backups: merged $mergedTotal unique library rows; live now has $after');
   }
 
   /// If a 121/128 DB or a quarantined bible_enc.db backup still exists, copy
