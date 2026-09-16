@@ -2,38 +2,42 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class BibleInfo {
-  static String apple_AppId = "6459794212";
+  static String apple_AppId = "6459818399";
 
   // 6484270584  //6459793603
-  static String ios_Bundle_Id = "com.balaklrapps.newkingsjamesversion";
-  static String bible_shortName = "NKJV Bible";
-  static String current_Version = "1.0.115";
+  static String ios_Bundle_Id = "com.balaklrapps.newlivingtranslation";
+  static String bible_shortName = "NLT Bible";
+  static String current_Version = "1.0.133";
   static String android_Package_Name = "com.whitebibles.genevabible";
-  static String appID = '03a0762a-ed0b-11ef-b28e-fa163e8c011b';
+  static String appID = 'e8b91815-ed0a-11ef-b28e-fa163e8c011b';
   //static int surveyAppId = 3;
 
 //IAP
   static String sixMonthPlanid =
-      'com.balaklrapps.newkingsjamesversion.sixmonthadsfree';
+      'com.balaklrapps.newlivingtranslation.sixmonthadsfree';
+
   /// Paywall 1 classic short plan (1 Month card).
   static String oneMonthPlanid =
-      'com.balaklrapps.newkingsjamesversion.onemonthadsfree';
+      'com.balaklrapps.newlivingtranslation.onemonthadsfree';
+
   static String oneYearPlanid =
-      'com.balaklrapps.newkingsjamesversion.oneyearadsfree';
+      'com.balaklrapps.newlivingtranslation.oneyearadsfree';
+
   /// Paywall 2 (`paywallShows == 2`) auto-renewable IDs. Paywall 1 keeps classic IDs.
   static String arOneMonthPlanid =
-      'com.balaklrapps.newkingsjamesversion.aronemadfree';
+      'com.balaklrapps.newlivingtranslation.onemonthauto';
   static String arSixMonthPlanid =
-      'com.balaklrapps.newkingsjamesversion.arsixmadfree';
+      'com.balaklrapps.newlivingtranslation.arsixmadfree';
   static String arOneYearPlanid =
-      'com.balaklrapps.newkingsjamesversion.aroneyadfree';
+      'com.balaklrapps.newlivingtranslation.oneyearauto';
+
   static String twoYearPlanid =
-      'com.balaklrapps.newkingsjamesversion.twoyearadsfree';
+      'com.balaklrapps.newlivingtranslation.twoyearadsfree';
   static String lifeTimePlanid =
-      'com.balaklrapps.newkingsjamesversion.lifetimeadsfree';
+      'com.balaklrapps.newlivingtranslation.lifetimeadsfree';
   static String subIdentifierTwoYear = twoYearPlanid;
   static String exitOfferPlanid =
-      'com.balaklrapps.newkingsjamesversion.lifetime.exitoffer';
+      'com.balaklrapps.newlivingtranslation.lifetime.exitoffer';
 
   // IAP Discounts (for offline mode)
   static String sixMonthPlanDiscount = '0';
@@ -42,6 +46,7 @@ class BibleInfo {
   static String twoYearPlanDiscount = '50';
   static String lifeTimePlanDiscount = 'Best Value';
   static String exitOfferPlanDiscount = '0';
+
   /// Fallback display discount for AR one-month (paywall 2).
   static String arOneMonthPlanDiscount = '0';
   static String arSixMonthPlanDiscount = '0';
@@ -49,11 +54,11 @@ class BibleInfo {
 
   // Coin Pack IDs
   static String coinPack1Id =
-      'com.balaklrapps.newkingsjamesversion.creditpack1';
+      'com.balaklrapps.newlivingtranslation.creditpack1';
   static String coinPack2Id =
-      'com.balaklrapps.newkingsjamesversion.creditpack2';
+      'com.balaklrapps.newlivingtranslation.creditpack2';
   static String coinPack3Id =
-      'com.balaklrapps.newkingsjamesversion.creditpack3';
+      'com.balaklrapps.newlivingtranslation.creditpack3';
 
   // Coin Pack Credits (for offline mode)
   static String coinPack1Credits = '500';
@@ -105,24 +110,27 @@ class BibleInfo {
       final prefs = await SharedPreferences.getInstance();
       final plan =
           prefs.getString(_subscriptionPlanPrefsKey)?.toLowerCase().trim();
+
       if (plan != 'silver' && plan != 'gold' && plan != 'twoyear') {
-        // Drop stale grant if plan is no longer AI Premium.
         if (prefs.getBool(aiPremiumCreditSkipGrantedKey) == true) {
           await prefs.setBool(aiPremiumCreditSkipGrantedKey, false);
         }
         return;
       }
+
       final granted = prefs.getBool(aiPremiumCreditSkipGrantedKey) == true;
-      final expiryRaw =
-          prefs.getString('isRewardAdViewTime');
+      final expiryRaw = prefs.getString('isRewardAdViewTime');
       final expiry = (expiryRaw != null && expiryRaw.isNotEmpty)
           ? DateTime.tryParse(expiryRaw)
           : null;
-      final hasActivePremium =
-          expiry != null && expiry.isAfter(DateTime.now());
+
+      final hasActivePremium = expiry != null && expiry.isAfter(DateTime.now());
+
       if (granted && hasActivePremium) return;
+
       await prefs.setString(_subscriptionPlanPrefsKey, '');
       await prefs.setBool(aiPremiumCreditSkipGrantedKey, false);
+
       debugPrint(
         'BibleInfo: cleared orphan AI premium plan=$plan '
         'granted=$granted hasActivePremium=$hasActivePremium',
@@ -131,10 +139,8 @@ class BibleInfo {
   }
 
   /// AR only: skip Chat/Prayer credits for AI Premium (`silver` / `gold` /
-  /// `twoyear`) **after** Buy or explicit Restore granted that plan, and only
+  /// `twoyear`) after Buy or explicit Restore granted that plan, and only
   /// while premium expiry is still active.
-  /// Free users and Lifetime (`platinum`) always use wallet credits.
-  /// Classic paywall (`paywallShows != 2`) never skips — unchanged.
   static Future<bool> shouldSkipChatPrayerCredits() async {
     if (!isAutoRenewablePaywallMode) return false;
     try {
@@ -142,22 +148,27 @@ class BibleInfo {
       final prefs = await SharedPreferences.getInstance();
       final plan =
           prefs.getString(_subscriptionPlanPrefsKey)?.toLowerCase().trim();
+
       if (plan != 'silver' && plan != 'gold' && plan != 'twoyear') {
         return false;
       }
+
       if (prefs.getBool(aiPremiumCreditSkipGrantedKey) != true) {
         return false;
       }
-      final expiryRaw =
-          prefs.getString('isRewardAdViewTime');
+
+      final expiryRaw = prefs.getString('isRewardAdViewTime');
       final expiry = (expiryRaw != null && expiryRaw.isNotEmpty)
           ? DateTime.tryParse(expiryRaw)
           : null;
+
       if (expiry == null || !expiry.isAfter(DateTime.now())) {
         return false;
       }
+
       return true;
     } catch (_) {}
+
     return false;
   }
 
@@ -166,14 +177,12 @@ class BibleInfo {
     return productId == oneMonthPlanid || id.contains('onemonth');
   }
 
-  /// Classic or AR 1-month product (short plan / silver duration ~1 month).
+  /// Classic or AR 1-month product.
   static bool isOneMonthProductId(String productId) =>
-      isClassicOneMonthProductId(productId) ||
-      isArOneMonthProductId(productId);
+      isClassicOneMonthProductId(productId) || isArOneMonthProductId(productId);
 
   static bool isArOneMonthProductId(String productId) {
     final id = productId.toLowerCase();
-    // `aronem` — do not use a prefix that also matches `aroney` (1Y).
     return productId == arOneMonthPlanid ||
         id.contains('aronemadfree') ||
         id.contains('aronem.');
@@ -206,35 +215,36 @@ class BibleInfo {
   static String adsGoogleRewardInterstitialIdAndroid = "";
 
   // Ads IDs - iOS
-  static String adsGoogleBannerIdIos = "ca-app-pub-4194577750257069/3139244514";
+  static String adsGoogleBannerIdIos = "ca-app-pub-4194577750257069/6616901313";
   static String adsGoogleBannerId_2Ios = "";
   static String adsGoogleBannerId_3Ios = "";
   static String adsGoogleInterstitialIdIos =
-      "ca-app-pub-4194577750257069/4647434167";
-  static String adsGoogleRewardIdIos = "ca-app-pub-4194577750257069/5194562213";
+      "ca-app-pub-4194577750257069/9827735629";
+  static String adsGoogleRewardIdIos = "ca-app-pub-4194577750257069/8514653950";
   static String adsGoogleOpenAppIdIos =
-      "ca-app-pub-4194577750257069/5080965858";
-  static String adsGoogleNativeIdIos = "ca-app-pub-4194577750257069/5995854674";
+      "ca-app-pub-4194577750257069/9007260938";
+  static String adsGoogleNativeIdIos = "ca-app-pub-4194577750257069/5670984257";
   static String adsGoogleRewardInterstitialIdIos = "";
 
   // TEST Ads IDs - iOS
-  // static String adsGoogleBannerIdIos = "ca-app-pub-4194577750257069~7649128990";
+  // static String adsGoogleBannerIdIos = "ca-app-pub-3940256099942544/2934735716";
   // static String adsGoogleBannerId_2Ios =
-  //     "ca-app-pub-4194577750257069/8207532192";
+  //     "ca-app-pub-3940256099942544/2934735716";
   // static String adsGoogleBannerId_3Ios =
-  //     "ca-app-pub-4194577750257069/8207532192";
+  //     "ca-app-pub-3940256099942544/2934735716";
   // static String adsGoogleInterstitialIdIos =
-  //     "ca-app-pub-4194577750257069/4182309663";
-  // static String adsGoogleRewardIdIos = "ca-app-pub-4194577750257069/1556146326";
+  //     "ca-app-pub-3940256099942544/4411468910";
+  // static String adsGoogleRewardIdIos = "ca-app-pub-3940256099942544/1712485313";
   // static String adsGoogleOpenAppIdIos =
-  //     "ca-app-pub-4194577750257069/6029797702";
-  // static String adsGoogleNativeIdIos = "ca-app-pub-4194577750257069/1528575170";
+  //     "ca-app-pub-3940256099942544/5575463023";
+  // static String adsGoogleNativeIdIos = "ca-app-pub-3940256099942544/3986624511";
   // static String adsGoogleRewardInterstitialIdIos =
-  //     "ca-app-pub-4194577750257069/8842883017";
+  //     "ca-app-pub-3940256099942544/6978759866";
 
 // add folder names here  assets/zipped/
   static List<String> folders = [
-    "NKJV"
+    "NLT Bible"
+    // "Bengali Bible",
   ];
 
   static String emailVerify = "0";
@@ -269,15 +279,14 @@ class BibleInfo {
   // Audio and Text to Speech Constants (fallback when API data is not available)
   // Audio Settings
   static String audioBasePath =
-      "https://bibleoffice.com/BibleReplications/dev/v1/uploads/bible_audio/Portuguese/";
+      "https://bibleoffice.com/BibleReplications/dev/v1/uploads/bible_audio/English/";
   static String audioBasePathType = "3";
   static String isShowMp3Audio = "1";
 
   // Text to Speech Settings - iOS
-  static String isTextToSpeechAvailableIos = "1";
-  static String textToSpeechLanguageCodeIos = "en-GB";
-  static String textToSpeechIdentifierIos =
-      "com.apple.ttsbundle.siri_male_en-GB_compact";
+  static String isTextToSpeechAvailableIos = "0";
+  static String textToSpeechLanguageCodeIos = "";
+  static String textToSpeechIdentifierIos = "";
 
   // Text to Speech Settings - Android
   static String isTextToSpeechAvailableAndroid = "0";

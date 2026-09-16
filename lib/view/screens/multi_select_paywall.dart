@@ -1,26 +1,45 @@
 import 'dart:async';
 
 import 'package:biblebookapp/constant/app_api_constant.dart';
+
 import 'package:biblebookapp/controller/dashboard_controller.dart';
+
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
+
 import 'package:biblebookapp/services/paywall_preload_service.dart';
+
 import 'package:biblebookapp/streak_flow/streak_flow_screens.dart';
+
 import 'package:biblebookapp/view/constants/share_preferences.dart';
+
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
+
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
+
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
+
 import 'package:flutter/material.dart';
+
 import 'package:flutter_easyloading/flutter_easyloading.dart';
+
 import 'package:get/get.dart';
+
 import 'package:in_app_purchase/in_app_purchase.dart';
+
 import 'package:provider/provider.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:url_launcher/url_launcher.dart';
 
 /// Multi-select paywall matching OldPaper Design B (PAYWALL v8 APPROVED).
+
 /// Product IDs / prices come from the same sources as [SubscriptionScreen].
+
 /// Purchases run through the existing invisible [SubscriptionScreen] host —
+
 /// no changes to that purchase / restore logic.
+
 class MultiSelectPaywall extends StatefulWidget {
   const MultiSelectPaywall({
     super.key,
@@ -31,8 +50,11 @@ class MultiSelectPaywall extends StatefulWidget {
   });
 
   final String sixMonthPlan;
+
   final String oneYearPlan;
+
   final String lifeTimePlan;
+
   final String checkad;
 
   @override
@@ -45,20 +67,31 @@ enum _AiDur { sixMonth, oneYear }
 
 class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   // OldPaper v8 Design B palette (UI only).
+
   static const Color _cream = Color(0xFFEFE6D8);
+
   static const Color _paper = Color(0xFFFDFBF6);
+
   static const Color _ink = Color(0xFF101B2B);
+
   static const Color _line = Color(0xFFE2D6C0);
+
   static const Color _purple = Color(0xFF5B3FBF);
+
   static const Color _green = Color(0xFF1E7A45);
+
   static const Color _greenSoft = Color(0xFFDCEFE3);
 
   _PwCard _sel = _PwCard.ai;
+
   _AiDur _dur = _AiDur.oneYear;
 
   ProductDetails? _sixMonth;
+
   ProductDetails? _oneYear;
+
   ProductDetails? _lifetime;
+
   bool _loading = true;
 
   String get _resolvedSixMonth => AppApiConstant.resolveSubscriptionProductId(
@@ -83,82 +116,112 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   @override
   void initState() {
     super.initState();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_onPaywallOpen());
     });
+
     _loadProducts();
   }
 
   Future<void> _onPaywallOpen() async {
     if (!mounted) return;
+
     if (!await SubscriptionScreen.isDashboardIapEnabled()) {
       await _leaveIfDashboardIapDisabled();
+
       return;
     }
+
     await SubscriptionScreen.trackAndMarkVisiblePaywallOpen();
+
     try {
       Provider.of<DownloadProvider>(context, listen: false).disableAd();
     } catch (_) {}
+
     await SharPreferences.setBoolean('closead', false);
+
     await SharPreferences.setString('OpenAd', '1');
   }
 
   Future<void> _leaveIfDashboardIapDisabled() async {
     if (!mounted) return;
+
     try {
       EasyLoading.dismiss();
     } catch (_) {}
+
     await _navigateAwayFromPaywall();
   }
 
   Future<void> _navigateAwayFromPaywall() async {
     if (!mounted) return;
+
     try {
       Provider.of<DownloadProvider>(context, listen: false).enableAd();
     } catch (_) {}
+
     await SharPreferences.setBoolean('closead', true);
 
     if (!mounted) return;
+
     if (Navigator.of(context).canPop()) {
       Get.back();
+
       return;
     }
+
     await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
   }
 
   Future<void> _onInvisibleHostFinished(bool success,
       {required bool wasPurchase}) async {
     if (!success || !mounted) return;
+
     if (Get.isRegistered<DashBoardController>()) {
       await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
     }
+
     if (!mounted) return;
+
     if (!wasPurchase) {
       await _navigateAwayFromPaywall();
+
       return;
     }
 
     // AR purchase success (incl. onboard): show Premium Unlocked right away,
+
     // then go Home. Previously onboard skipped unlock and only left the paywall.
+
     try {
       EasyLoading.dismiss();
     } catch (_) {}
+
     await SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, true);
+
     try {
       final prefs = await SharedPreferences.getInstance();
+
       await prefs.setString('premiumalrt', '1');
     } catch (_) {}
+
     if (!mounted) return;
+
     await PremiumWelcomeAlert.show(context);
 
     try {
       final provider = Provider.of<DownloadProvider>(context, listen: false);
+
       await provider.warmDataBeforeHomeScreen();
     } catch (e) {
       debugPrint('warmDataBeforeHomeScreen error: $e');
     }
+
     if (!mounted) return;
+
     // Alert already shown (premiumalrt → 2); Home From premium keeps journey timing.
+
     Get.offAll(
       () => HomeScreen(
         From: "premium",
@@ -173,36 +236,82 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
   Future<void> _loadProducts() async {
     // Same data path as SubscriptionScreen / PaywallPreloadService.
+
     var products = PaywallPreloadService.getPreloadedProducts();
+
     if (products.isEmpty) {
       await PaywallPreloadService.preloadPaywallData();
+
       products = PaywallPreloadService.getPreloadedProducts();
     }
 
     ProductDetails? six;
+
     ProductDetails? year;
+
     ProductDetails? life;
-    for (final p in products) {
-      final id = p.id.toLowerCase();
-      // Paywall shows AR 1-month in the short slot (not AR 6-month).
-      if (p.id == _resolvedSixMonth ||
-          BibleInfo.isArOneMonthProductId(p.id)) {
-        six ??= p;
-      } else if (p.id == _resolvedOneYear ||
-          BibleInfo.isArOneYearProductId(p.id)) {
-        year ??= p;
-      } else if (p.id == _resolvedLifetime ||
-          (id.contains('lifetime') && !id.contains('exit'))) {
-        life ??= p;
+
+    void assignFrom(Iterable<ProductDetails> list) {
+      for (final p in list) {
+        final id = p.id.toLowerCase();
+
+        // Paywall shows AR 1-month in the short slot (not AR 6-month).
+
+        if (six == null &&
+            (p.id == _resolvedSixMonth ||
+                BibleInfo.isArOneMonthProductId(p.id))) {
+          six = p;
+        } else if (year == null &&
+            (p.id == _resolvedOneYear ||
+                BibleInfo.isArOneYearProductId(p.id))) {
+          year = p;
+        } else if (life == null &&
+            (p.id == _resolvedLifetime ||
+                (id.contains('lifetime') && !id.contains('exit')))) {
+          life = p;
+        }
+      }
+    }
+
+    assignFrom(products);
+
+    // Display-only: if a slot is still empty, requery StoreKit using the
+
+    // same constant / resolved product IDs (buy / restore path unchanged).
+
+    if (six == null || year == null || life == null) {
+      try {
+        if (await InAppPurchase.instance.isAvailable()) {
+          final ids = <String>{
+            ...AppApiConstant.subscriptionProductIdQueryVariants(
+                _resolvedSixMonth),
+            ...AppApiConstant.subscriptionProductIdQueryVariants(
+                _resolvedOneYear),
+            ...AppApiConstant.subscriptionProductIdQueryVariants(
+                _resolvedLifetime),
+          };
+
+          final response =
+              await InAppPurchase.instance.queryProductDetails(ids);
+
+          assignFrom(response.productDetails);
+        }
+      } catch (e) {
+        debugPrint('MultiSelectPaywall: store requery failed: $e');
       }
     }
 
     if (!mounted) return;
+
     setState(() {
       _sixMonth = six;
+
       _oneYear = year;
+
       _lifetime = life;
+
       _loading = false;
+
       if (_oneYear == null && _sixMonth != null) {
         _dur = _AiDur.sixMonth;
       }
@@ -214,55 +323,79 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
   String get _selectedProductId {
     if (_sel == _PwCard.lifetime) return _resolvedLifetime;
+
     return _dur == _AiDur.oneYear ? _resolvedOneYear : _resolvedSixMonth;
   }
 
   /// Slot for SubscriptionScreen: 0=6mo, 1=1yr, 2=lifetime.
+
   int get _selectedPlanSlot {
     if (_sel == _PwCard.lifetime) return 2;
+
     return _dur == _AiDur.oneYear ? 1 : 0;
   }
 
   String get _aiPrice {
     final p = _selectedAiProduct;
+
     if (p != null && p.price.isNotEmpty) return p.price;
+
+    // Existing fallback when StoreKit product is not bound yet.
+
     return _dur == _AiDur.oneYear ? '\$59.99' : '\$34.99';
   }
 
   String get _aiPer => _dur == _AiDur.oneYear ? '/year' : '/month';
 
   /// UI only: strikethrough “was” price for yearly (SAVE 50% visual).
+
   String? get _aiWasPrice {
     if (_dur != _AiDur.oneYear) return null;
+
     final p = _oneYear;
+
     if (p == null || p.rawPrice <= 0) return null;
+
     final sym = p.currencySymbol.isNotEmpty ? p.currencySymbol : '\$';
+
     final was = p.rawPrice * 2;
+
     final text = was == was.roundToDouble()
         ? was.toStringAsFixed(0)
         : was.toStringAsFixed(2);
+
     return '$sym$text';
   }
 
   String get _aiNote {
     if (_dur == _AiDur.oneYear) {
       final p = _oneYear;
+
       if (p != null && p.rawPrice > 0) {
         final sym = p.currencySymbol.isNotEmpty ? p.currencySymbol : '\$';
+
         final mo = p.rawPrice / 12;
+
         final moText = mo == mo.roundToDouble()
             ? mo.toStringAsFixed(0)
             : mo.toStringAsFixed(2);
+
         return 'Works out to $sym$moText a month';
       }
+
       return 'Works out to a lower monthly cost';
     }
+
     return 'Billed every month';
   }
 
   String get _lifetimePrice {
     final p = _lifetime;
+
     if (p != null && p.price.isNotEmpty) return p.price;
+
+    // Existing fallback when StoreKit product is not bound yet.
+
     return '\$79.99';
   }
 
@@ -278,15 +411,19 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     if (_sel == _PwCard.lifetime) {
       return 'No subscription · Yours on every device you sign in to.';
     }
+
     if (_dur == _AiDur.oneYear) {
       return 'Then $_aiPrice/year · Auto-renews · Cancel anytime.';
     }
+
     return 'Then $_aiPrice/month · Auto-renews · Cancel anytime.';
   }
 
   Future<void> _openLegal(String url) async {
     final uri = Uri.parse(url);
+
     if (!await canLaunchUrl(uri)) return;
+
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
@@ -299,8 +436,10 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   }
 
   /// Purchase via existing invisible SubscriptionScreen (unchanged IAP logic).
+
   Future<void> _startPurchase() async {
     if (!await SubscriptionScreen.isDashboardIapEnabled()) return;
+
     if (!mounted) return;
 
     final ok = await Navigator.of(context).push<bool>(
@@ -328,6 +467,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
   Future<void> _restorePurchases() async {
     if (!await SubscriptionScreen.isDashboardIapEnabled()) return;
+
     if (!mounted) return;
 
     final ok = await Navigator.of(context).push<bool>(
@@ -354,14 +494,18 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   @override
   Widget build(BuildContext context) {
     final w = MediaQuery.sizeOf(context).width;
+
     final isTablet = w > 600;
+
     // Tablet reference uses wider content (~8% inset); phone matches v8 16.
+
     final hPad = isTablet ? (w * 0.08).clamp(36.0, 64.0) : 16.0;
 
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
+
         await _navigateAwayFromPaywall();
       },
       child: Scaffold(
@@ -376,8 +520,10 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                     _buildHero(isTablet),
                     Padding(
                       // UI only: a little space between benefits → AI Premium.
+
                       padding: EdgeInsets.fromLTRB(
                           hPad, isTablet ? 12 : 10, hPad, 0),
+
                       child: Column(
                         children: [
                           _buildAiCard(isTablet),
@@ -400,10 +546,15 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
   Widget _buildHero(bool isTablet) {
     // Restored pre-v8 hero: full scenic img + text overlay positions (UI only).
+
     const paywallInk = Color(0xFF2D2D3A);
+
     const paywallTitleGold = Color(0xFF9E7340);
+
     const paywallCream = Color(0xFFFFFBF7);
+
     const paywallSubtitle = Color(0xFF5C534C);
+
     const heroShadows = <Shadow>[
       Shadow(
         color: Color(0x59FFFFFF),
@@ -411,26 +562,34 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
         offset: Offset(0, 1),
       ),
     ];
+
     final size = MediaQuery.sizeOf(context);
+
     final topPadding = MediaQuery.paddingOf(context).top;
+
     final isCompactHeight = size.height < 750;
+
     // Tablet: taller hero so scenic bg shows fully; phone unchanged.
+
     final imageHeight = isTablet
         ? (size.height * 0.46).clamp(380.0, 520.0)
         : isCompactHeight
             ? (size.height * 0.44).clamp(290.0, 340.0)
             : (size.height * 0.42).clamp(280.0, 340.0);
+
     // Compact benefits: pull box up toward subtitle (UI only).
+
     final cardLayoutHeight = isTablet ? 104.0 : 86.0;
+
     final cardOverlap = isTablet
         ? 88.0
         : isCompactHeight
             ? 72.0
             : 84.0;
-    final sectionHeight =
-        imageHeight + (cardLayoutHeight - cardOverlap) + 4.0;
-    final heroSidePad =
-        isTablet ? (size.width * 0.08).clamp(36.0, 64.0) : 16.0;
+
+    final sectionHeight = imageHeight + (cardLayoutHeight - cardOverlap) + 4.0;
+
+    final heroSidePad = isTablet ? (size.width * 0.08).clamp(36.0, 64.0) : 16.0;
 
     return SizedBox(
       width: double.infinity,
@@ -537,7 +696,9 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                       child: Row(
                         children: [
                           // iPad: PREMIUM sits with title (centered left).
+
                           // Phone: badge stays top-left (unchanged).
+
                           if (!isTablet)
                             Image.asset(
                               'assets/paywall_icons/premium.png',
@@ -546,16 +707,22 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                               errorBuilder: (_, __, ___) =>
                                   const SizedBox.shrink(),
                             ),
+
                           const Spacer(),
+
                           Padding(
-                            padding: EdgeInsets.only(
-                                right: isTablet ? 16 : 12),
+                            padding: EdgeInsets.only(right: isTablet ? 16 : 12),
                             child: Material(
                               // UI only: lightly visible close (readable, not heavy).
+
                               color: Colors.white.withValues(alpha: 0.52),
+
                               elevation: 0,
+
                               shadowColor: Colors.transparent,
+
                               shape: const CircleBorder(),
+
                               child: InkWell(
                                 customBorder: const CircleBorder(),
                                 onTap: _onClose,
@@ -582,13 +749,20 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                 if (isTablet)
                   Positioned(
                     left: heroSidePad,
+
                     // Keep copy on the left side of the scenic hero.
+
                     right: size.width * 0.40,
+
                     top: topPadding + 20,
+
                     bottom: (imageHeight * 0.22).clamp(80.0, 140.0),
+
                     child: Align(
                       // iPad UI only: vertically center on left side of hero.
+
                       alignment: Alignment.centerLeft,
+
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
@@ -765,6 +939,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     final side = isTablet
         ? (MediaQuery.sizeOf(context).width * 0.06).clamp(28.0, 48.0)
         : 16.0;
+
     return Container(
       margin: EdgeInsets.symmetric(horizontal: side),
       padding: EdgeInsets.symmetric(
@@ -814,11 +989,14 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
   Widget _buildAiCard(bool isTablet) {
     final selected = _sel == _PwCard.ai;
+
     final priceMuted = !selected;
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
         if (_sel == _PwCard.ai) return;
+
         setState(() => _sel = _PwCard.ai);
       },
       child: AnimatedContainer(
@@ -982,10 +1160,8 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
   Widget _buildDurationRow(bool isTablet) {
     final items = <(_AiDur, String, String?)>[
-      if (_sixMonth != null || _loading)
-        (_AiDur.sixMonth, '1 Month', null),
-      if (_oneYear != null || _loading)
-        (_AiDur.oneYear, '1 Year', 'SAVE 50%'),
+      if (_sixMonth != null || _loading) (_AiDur.sixMonth, '1 Month', null),
+      if (_oneYear != null || _loading) (_AiDur.oneYear, '1 Year', 'SAVE 50%'),
     ];
 
     if (items.isEmpty) {
@@ -1006,6 +1182,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
               badge: items[i].$3,
               onTap: () => setState(() {
                 _sel = _PwCard.ai;
+
                 _dur = items[i].$1;
               }),
             ),
@@ -1017,11 +1194,14 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
   Widget _buildLifetimeCard(bool isTablet) {
     final selected = _sel == _PwCard.lifetime;
+
     final priceMuted = !selected;
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
         if (_sel == _PwCard.lifetime) return;
+
         setState(() => _sel = _PwCard.lifetime);
       },
       child: AnimatedContainer(
@@ -1163,8 +1343,10 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     bool accentGreen = false,
   }) {
     final fontSize = isTablet ? 13.5 : 12.5;
+
     final checkColor =
         accentGreen ? const Color(0xFF1E7A45) : const Color(0xFF5B3FBF);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1258,12 +1440,16 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
   Widget _buildFooter(bool isTablet, double w) {
     final hPad = isTablet ? (w * 0.08).clamp(36.0, 64.0) : 16.0;
+
     final lifetimeCta = _sel == _PwCard.lifetime;
+
     return SafeArea(
       top: false,
       child: Padding(
         // UI only: tighter bottom CTA block spacing.
+
         padding: EdgeInsets.fromLTRB(hPad, isTablet ? 4 : 2, hPad, 4),
+
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1362,6 +1548,7 @@ class _RadioDot extends StatelessWidget {
   const _RadioDot({required this.selected, required this.color});
 
   final bool selected;
+
   final Color color;
 
   @override
@@ -1402,13 +1589,17 @@ class _DurChip extends StatelessWidget {
   });
 
   final bool selected;
+
   final String label;
+
   final String? badge;
+
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.sizeOf(context).width > 600;
+
     return GestureDetector(
       onTap: onTap,
       child: Stack(
@@ -1423,9 +1614,7 @@ class _DurChip extends StatelessWidget {
             decoration: BoxDecoration(
               color: selected
                   ? const Color(0xFFF1EAFE)
-                  : (badge != null
-                      ? const Color(0xFFF7F3FD)
-                      : Colors.white),
+                  : (badge != null ? const Color(0xFFF7F3FD) : Colors.white),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: selected

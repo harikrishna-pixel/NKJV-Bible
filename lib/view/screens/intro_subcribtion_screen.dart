@@ -437,6 +437,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       }
       // Keep startpurches + buy product ids. Do not pop invisible host.
       // Do not unlock premium.
+      if (widget.invisiblePurchaseHost) {
+        _popInvisiblePurchaseHost(false);
+      }
     });
   }
 

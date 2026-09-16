@@ -14,7 +14,6 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:path/path.dart' as p;
@@ -22,7 +21,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_sqlcipher/sqflite.dart';
 import 'package:biblebookapp/view/widget/bible_upgrade_alert.dart';
 import 'package:upgrader/upgrader.dart';
 
@@ -418,7 +417,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _initialize() async {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final password = dotenv.env[AssetsConstants.dbPasswordKey]!;
+      final password = DBHelper.encryptionPassword()!;
       // Additive safety net only: same init sequence, but never hang forever.
       _splashSafetyTimer?.cancel();
       _splashSafetyTimer = Timer(_splashSafetyTimeout, () {

@@ -10,7 +10,7 @@
 import SwiftUI
 import WidgetKit
 
-private let appGroupId = "group.com.balaklrapps.newkingsjamesversion"
+private let appGroupId = "group.com.balaklrapps.newlivingtranslation"
 
 // MARK: - Old Paper Theme
 

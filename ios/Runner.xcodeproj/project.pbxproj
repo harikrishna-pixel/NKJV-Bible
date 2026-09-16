@@ -16,10 +16,6 @@
 		B1D7E0010001000000010001 /* BibleHomeWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D7E0010001000000010002 /* BibleHomeWidget.swift */; };
 		B1D7E0010001000000050002 /* BibleHomeWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B1D7E0010001000000010003 /* BibleHomeWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B1D7E0020001000000010001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B1D7E0020001000000010002 /* Assets.xcassets */; };
-		C1EA71597E67699CD62D1CC5 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 413BDC41C4F0F89A62B893A3 /* Pods_Runner.framework */; };
-		D46DC1882CB8003400AC7AD7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = D46DC1872CB8003300AC7AD7 /* GoogleService-Info.plist */; };
-		D4A3F9352CA194B000866824 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D4A3F9332CA194B000866824 /* Main.storyboard */; };
-		D4A3F9362CA194B000866824 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D4A3F9342CA194B000866824 /* LaunchScreen.storyboard */; };
 		B1D7E0100001000000010003 /* StreakLiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D7E0100001000000010002 /* StreakLiveActivityAttributes.swift */; };
 		B1D7E0100001000000010004 /* StreakLiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D7E0100001000000010002 /* StreakLiveActivityAttributes.swift */; };
 		B1D7E0110001000000010003 /* StreakLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D7E0110001000000010002 /* StreakLiveActivityWidget.swift */; };
@@ -28,6 +24,10 @@
 		B1D7E0200001000000010004 /* ContentLiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D7E0200001000000010002 /* ContentLiveActivityAttributes.swift */; };
 		B1D7E0210001000000010003 /* ContentLiveActivityWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D7E0210001000000010002 /* ContentLiveActivityWidgets.swift */; };
 		B1D7E0220001000000010003 /* ContentLiveActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D7E0220001000000010002 /* ContentLiveActivityManager.swift */; };
+		C1EA71597E67699CD62D1CC5 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 413BDC41C4F0F89A62B893A3 /* Pods_Runner.framework */; };
+		D46DC1882CB8003400AC7AD7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = D46DC1872CB8003300AC7AD7 /* GoogleService-Info.plist */; };
+		D4A3F9352CA194B000866824 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D4A3F9332CA194B000866824 /* Main.storyboard */; };
+		D4A3F9362CA194B000866824 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D4A3F9342CA194B000866824 /* LaunchScreen.storyboard */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -87,17 +87,17 @@
 		B1D7E0010001000000010004 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B1D7E0010001000000010005 /* BibleHomeWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BibleHomeWidget.entitlements; sourceTree = "<group>"; };
 		B1D7E0020001000000010002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		D26F2C5DAD1D80C6510EDE6B /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
-		D46DC1872CB8003300AC7AD7 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
-		D4A3F9322CA1909300866824 /* Runner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
-		D4A3F9332CA194B000866824 /* Main.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; path = Main.storyboard; sourceTree = "<group>"; };
-		D4A3F9342CA194B000866824 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		B1D7E0100001000000010002 /* StreakLiveActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreakLiveActivityAttributes.swift; sourceTree = "<group>"; };
 		B1D7E0110001000000010002 /* StreakLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreakLiveActivityWidget.swift; sourceTree = "<group>"; };
 		B1D7E0120001000000010002 /* StreakLiveActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreakLiveActivityManager.swift; sourceTree = "<group>"; };
 		B1D7E0200001000000010002 /* ContentLiveActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentLiveActivityAttributes.swift; sourceTree = "<group>"; };
 		B1D7E0210001000000010002 /* ContentLiveActivityWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentLiveActivityWidgets.swift; sourceTree = "<group>"; };
 		B1D7E0220001000000010002 /* ContentLiveActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentLiveActivityManager.swift; sourceTree = "<group>"; };
+		D26F2C5DAD1D80C6510EDE6B /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
+		D46DC1872CB8003300AC7AD7 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		D4A3F9322CA1909300866824 /* Runner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
+		D4A3F9332CA194B000866824 /* Main.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; path = Main.storyboard; sourceTree = "<group>"; };
+		D4A3F9342CA194B000866824 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -513,20 +513,20 @@
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 115;
+				CURRENT_PROJECT_VERSION = 133;
 				DEVELOPMENT_TEAM = SX5458VF7R;
 				ENABLE_BITCODE = NO;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "NKJV Bible";
+				INFOPLIST_KEY_CFBundleDisplayName = "NLT Bible";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.115;
-				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.newkingsjamesversion;
+				MARKETING_VERSION = 1.0.133;
+				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.newlivingtranslation;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
@@ -667,20 +667,20 @@
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 115;
+				CURRENT_PROJECT_VERSION = 133;
 				DEVELOPMENT_TEAM = SX5458VF7R;
 				ENABLE_BITCODE = NO;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "NKJV Bible";
+				INFOPLIST_KEY_CFBundleDisplayName = "NLT Bible";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.115;
-				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.newkingsjamesversion;
+				MARKETING_VERSION = 1.0.133;
+				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.newlivingtranslation;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
@@ -704,20 +704,20 @@
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 115;
+				CURRENT_PROJECT_VERSION = 133;
 				DEVELOPMENT_TEAM = SX5458VF7R;
 				ENABLE_BITCODE = NO;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "NKJV Bible";
+				INFOPLIST_KEY_CFBundleDisplayName = "NLT Bible";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.115;
-				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.newkingsjamesversion;
+				MARKETING_VERSION = 1.0.133;
+				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.newlivingtranslation;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
@@ -736,7 +736,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = BibleHomeWidget/BibleHomeWidgetDebug.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 115;
+				CURRENT_PROJECT_VERSION = 133;
 				DEVELOPMENT_TEAM = SX5458VF7R;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BibleHomeWidget/Info.plist;
@@ -746,8 +746,8 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.115;
-				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.newkingsjamesversion.BibleHomeWidget;
+				MARKETING_VERSION = 1.0.133;
+				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.newlivingtranslation.BibleHomeWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -761,7 +761,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = BibleHomeWidget/BibleHomeWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 115;
+				CURRENT_PROJECT_VERSION = 133;
 				DEVELOPMENT_TEAM = SX5458VF7R;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BibleHomeWidget/Info.plist;
@@ -771,8 +771,8 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.115;
-				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.newkingsjamesversion.BibleHomeWidget;
+				MARKETING_VERSION = 1.0.133;
+				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.newlivingtranslation.BibleHomeWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -786,7 +786,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = BibleHomeWidget/BibleHomeWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 115;
+				CURRENT_PROJECT_VERSION = 133;
 				DEVELOPMENT_TEAM = SX5458VF7R;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BibleHomeWidget/Info.plist;
@@ -796,8 +796,8 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.115;
-				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.newkingsjamesversion.BibleHomeWidget;
+				MARKETING_VERSION = 1.0.133;
+				PRODUCT_BUNDLE_IDENTIFIER = com.balaklrapps.newlivingtranslation.BibleHomeWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;

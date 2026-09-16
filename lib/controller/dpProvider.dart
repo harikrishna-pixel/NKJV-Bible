@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io' as io;
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -50,16 +51,400 @@ class DBHelper {
     }
   }
 
+  static Future<dynamic>? _dbOpening;
+
   Future<dynamic> get db async {
     if (_db != null) {
-      return _db;
+      try {
+        await _db!.rawQuery('SELECT 1');
+        return _db;
+      } catch (_) {
+        try {
+          await _db!.close();
+        } catch (_) {}
+        _db = null;
+      }
     }
-    _db = await initDatabase();
-    return _db;
+    return _dbOpening ??= () async {
+      try {
+        _db = await initDatabase();
+        return _db;
+      } finally {
+        _dbOpening = null;
+      }
+    }();
   }
 
-  /// Same as [db] — useful for diagnostics snippets.
-  Future<dynamic> get database async => db;
+  /// 128 open path, with one safety: if the file header is plain SQLite,
+  /// open it as plain. SQLCipher+password on a plaintext file does not persist
+  /// library inserts. Encrypted files still use ENCRYPTION_KEY first.
+  static Future<dynamic> openLike128(
+    String path, {
+    String? password,
+    int? version,
+    bool singleInstance = true,
+    Future<void> Function(dynamic db, int version)? onCreate,
+    Future<void> Function(dynamic db, int oldVersion, int newVersion)?
+        onUpgrade,
+  }) async {
+    if (await File(path).exists() && await _fileHasPlainSqliteHeader(path)) {
+      return await plain.openDatabase(
+        path,
+        version: version,
+        onCreate: onCreate,
+        onUpgrade: onUpgrade,
+        singleInstance: singleInstance,
+      );
+    }
+    if (password != null && password.isNotEmpty) {
+      try {
+        return await sqlcipher.openDatabase(
+          path,
+          version: version,
+          password: password,
+          onCreate: onCreate,
+          onUpgrade: onUpgrade,
+          singleInstance: singleInstance,
+        );
+      } catch (e) {
+        debugPrint('DBHelper.initDatabase encrypted open failed: $e');
+      }
+    }
+    if (await File(path).exists() && !await _fileHasPlainSqliteHeader(path)) {
+      throw StateError('SQLCipher open failed for $path');
+    }
+    return await plain.openDatabase(
+      path,
+      version: version,
+      onCreate: onCreate,
+      onUpgrade: onUpgrade,
+      singleInstance: singleInstance,
+    );
+  }
+
+  /// SQLCipher key from `.env`. Always trim: a trailing space is a different key
+  /// (`file is not a database`). 128 used the key with no trailing space.
+  static String? encryptionPassword({bool keepRawWhitespace = false}) {
+    final raw = dotenv.env[AssetsConstants.dbPasswordKey];
+    if (raw == null) return null;
+    return keepRawWhitespace ? raw : raw.trim();
+  }
+
+  /// Drop null `id` so AUTOINCREMENT can assign. Null id was swallowed by
+  /// insert catch blocks, so "Marked Successfully" showed with an empty library.
+  static Map<String, Object?> _libraryInsertValues(Map<String, dynamic> raw) {
+    final map = <String, Object?>{};
+    raw.forEach((key, value) {
+      if (value != null) map[key] = value;
+    });
+    map.remove('id');
+    return map;
+  }
+
+  /// Trimmed key first, then raw `.env` value if it differed (133 builds that
+  /// accidentally encrypted with a trailing space). Also SQLCipher raw-key
+  /// forms (`x'<hex>'`) — ATTACH previously hex-encoded hashes twice, so the
+  /// 128 file never opened and My Library stayed empty.
+  static List<String> encryptionPasswordCandidates() {
+    final raw = dotenv.env[AssetsConstants.dbPasswordKey];
+    if (raw == null || raw.isEmpty) return const [];
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return const [];
+    final candidates = <String>[trimmed];
+    if (raw != trimmed) candidates.add(raw);
+
+    void addRawHexKey(String hex) {
+      if (hex.isEmpty) return;
+      final wrapped = "x'$hex'";
+      if (!candidates.contains(hex)) candidates.add(hex);
+      if (!candidates.contains(wrapped)) candidates.add(wrapped);
+    }
+
+    try {
+      addRawHexKey(sha256.convert(utf8.encode(trimmed)).toString());
+    } catch (_) {}
+    try {
+      addRawHexKey(md5.convert(utf8.encode(trimmed)).toString());
+    } catch (_) {}
+    try {
+      addRawHexKey(
+        utf8.encode(trimmed).map((b) => b.toRadixString(16).padLeft(2, '0')).join(),
+      );
+    } catch (_) {}
+    return candidates;
+  }
+
+  static bool _isHexKey(String value) {
+    if (value.length < 32 || value.length % 2 != 0) return false;
+    return RegExp(r'^[0-9a-fA-F]+$').hasMatch(value);
+  }
+
+  static String _sqlQuote(String value) => "'${value.replaceAll("'", "''")}'";
+
+  /// SQLCipher raw key: `x'<hex>'`. If [attachKey] is already hex (sha256/md5),
+  /// use it directly. Do not UTF-8-hex that hex string again.
+  static String _attachKeySql(String attachKey, {required bool useHex}) {
+    if (!useHex) return _sqlQuote(attachKey);
+    var hex = attachKey.trim();
+    final wrapped = RegExp(r"^x'([0-9a-fA-F]+)'$", caseSensitive: false);
+    final match = wrapped.firstMatch(hex);
+    if (match != null) hex = match.group(1)!;
+    if (_isHexKey(hex)) {
+      return '"x\'${hex.toLowerCase()}\'"';
+    }
+    hex = utf8.encode(attachKey).map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '"x\'$hex\'"';
+  }
+
+  static Future<bool> _fileHasPlainSqliteHeader(String path) async {
+    try {
+      final file = File(path);
+      if (!await file.exists()) return false;
+      final raf = await file.open();
+      try {
+        final bytes = await raf.read(16);
+        if (bytes.length < 16) return false;
+        return String.fromCharCodes(bytes) == 'SQLite format 3\x00';
+      } finally {
+        await raf.close();
+      }
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<void> _logDbFileHeader(String path) async {
+    try {
+      final file = File(path);
+      if (!await file.exists()) {
+        debugPrint('DB_HEADER missing $path');
+        return;
+      }
+      final raf = await file.open();
+      try {
+        final bytes = await raf.read(16);
+        final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+        final isPlain = bytes.length >= 16 &&
+            String.fromCharCodes(bytes) == 'SQLite format 3\x00';
+        debugPrint(
+            'DB_HEADER size=${await file.length()} hex=$hex plainSqlite=$isPlain');
+      } finally {
+        await raf.close();
+      }
+    } catch (e) {
+      debugPrint('DB_HEADER log failed: $e');
+    }
+  }
+
+  static Future<void> _runPragma(sqlcipher.Database db, String sql) async {
+    try {
+      await db.rawQuery(sql);
+    } catch (_) {
+      await db.execute(sql);
+    }
+  }
+
+  /// Native sqflite_sqlcipher keys immediately, so SQLCipher 3 / empty-key /
+  /// raw-key files fail `openDatabase`. ATTACH can apply compatibility first.
+  static Future<bool> _rekeyExistingDbViaAttach({
+    required String path,
+    required String outputPassword,
+  }) async {
+    if (!await File(path).exists()) return false;
+
+    final recoveredPath = '$path.recovered';
+    try {
+      if (await File(recoveredPath).exists()) {
+        await File(recoveredPath).delete();
+      }
+    } catch (_) {}
+
+    final outputKeys = <String>{
+      outputPassword,
+      ...encryptionPasswordCandidates(),
+    }.where((k) => k.isNotEmpty).toList();
+    final attachKeys = <String>[...outputKeys, ''];
+
+    sqlcipher.Database? newDb;
+    try {
+      newDb = await sqlcipher.openDatabase(
+        recoveredPath,
+        password: outputPassword,
+        singleInstance: false,
+      );
+      final db = newDb!;
+
+      for (final compat in <int>[4, 3, 2, 1]) {
+        for (final attachKey in attachKeys) {
+          for (final useHex in <bool>[false, true]) {
+            if (useHex && attachKey.isEmpty) continue;
+            try {
+              await _runPragma(db, 'PRAGMA cipher_default_compatibility = $compat');
+              final keySql = _attachKeySql(attachKey, useHex: useHex);
+              await db.execute(
+                  'ATTACH DATABASE ${_sqlQuote(path)} AS legacy KEY $keySql');
+              final tables = await db.rawQuery(
+                "SELECT name, sql FROM legacy.sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND sql IS NOT NULL",
+              );
+              if (tables.isEmpty) {
+                debugPrint(
+                    'DB recover ATTACH ok but no tables compat=$compat keyLen=${attachKey.length} hex=$useHex');
+                await db.execute('DETACH DATABASE legacy');
+                continue;
+              }
+
+              for (final row in tables) {
+                final name = row['name'] as String;
+                final sql = row['sql'] as String;
+                try {
+                  await db.execute(sql);
+                } catch (e) {
+                  debugPrint('DB recover create $name: $e');
+                }
+                try {
+                  await db.execute('INSERT INTO "$name" SELECT * FROM legacy."$name"');
+                } catch (e) {
+                  debugPrint('DB recover copy $name: $e');
+                }
+              }
+
+              try {
+                final extras = await db.rawQuery(
+                  "SELECT sql FROM legacy.sqlite_master WHERE type IN ('index','trigger') AND sql IS NOT NULL AND name NOT LIKE 'sqlite_%'",
+                );
+                for (final row in extras) {
+                  final sql = row['sql'] as String?;
+                  if (sql != null && sql.isNotEmpty) {
+                    try {
+                      await db.execute(sql);
+                    } catch (_) {}
+                  }
+                }
+              } catch (_) {}
+
+              await db.execute('DETACH DATABASE legacy');
+              await db.close();
+              newDb = null;
+
+              final bakPath =
+                  '$path.bak.${DateTime.now().millisecondsSinceEpoch}';
+              await File(path).rename(bakPath);
+              await File(recoveredPath).rename(path);
+              debugPrint(
+                  'DB recover rewritten via ATTACH compat=$compat keyLen=${attachKey.length} hex=$useHex bak=$bakPath');
+              return true;
+            } catch (e) {
+              debugPrint(
+                  'DB recover ATTACH failed compat=$compat keyLen=${attachKey.length} hex=$useHex: $e');
+              try {
+                await newDb?.execute('DETACH DATABASE legacy');
+              } catch (_) {}
+            }
+          }
+        }
+      }
+      try {
+        await newDb?.close();
+      } catch (_) {}
+      try {
+        if (await File(recoveredPath).exists()) await File(recoveredPath).delete();
+      } catch (_) {}
+      return false;
+    } catch (e) {
+      debugPrint('DB recover setup failed: $e');
+      try {
+        await newDb?.close();
+      } catch (_) {}
+      return false;
+    }
+  }
+
+  static Future<sqlcipher.Database> openSqlCipherDatabase(
+    String path, {
+    String? password,
+    int? version,
+    Future<void> Function(dynamic db, int version)? onCreate,
+    Future<void> Function(dynamic db, int oldVersion, int newVersion)?
+        onUpgrade,
+  }) async {
+    await _logDbFileHeader(path);
+
+    final passwords = <String>[
+      if (password != null && password.isNotEmpty) password,
+      ...encryptionPasswordCandidates(),
+    ];
+    final seen = <String>{};
+    final uniquePasswords = <String>[
+      for (final p in passwords)
+        if (seen.add(p)) p,
+    ];
+    if (await File(path).exists()) {
+      uniquePasswords.add('');
+    }
+    if (uniquePasswords.isEmpty) {
+      throw StateError('No SQLCipher password available');
+    }
+
+    Object? lastError;
+    const compatModes = <int?>[null, 4, 3, 2];
+    for (final compat in compatModes) {
+      sqlcipher.Database? probe;
+      try {
+        if (compat != null) {
+          probe = await sqlcipher.openDatabase(
+            ':memory:',
+            password: 'compat',
+            singleInstance: false,
+          );
+          await _runPragma(probe, 'PRAGMA cipher_default_compatibility = $compat');
+        }
+        for (final candidate in uniquePasswords) {
+          try {
+            final db = await sqlcipher.openDatabase(
+              path,
+              version: version,
+              password: candidate,
+              onCreate: onCreate,
+              onUpgrade: onUpgrade,
+              singleInstance: false,
+            );
+            debugPrint(
+                'DBHelper SQLCipher open ok compat=${compat ?? "default"} keyLen=${candidate.length}');
+            return db;
+          } catch (e) {
+            lastError = e;
+            debugPrint(
+                'DBHelper SQLCipher open failed compat=${compat ?? "default"} keyLen=${candidate.length}: $e');
+          }
+        }
+      } finally {
+        try {
+          await probe?.close();
+        } catch (_) {}
+      }
+    }
+
+    final rewritePassword = uniquePasswords.firstWhere((p) => p.isNotEmpty,
+        orElse: () => encryptionPassword() ?? '');
+    if (rewritePassword.isNotEmpty && await File(path).exists()) {
+      final recovered = await _rekeyExistingDbViaAttach(
+        path: path,
+        outputPassword: rewritePassword,
+      );
+      if (recovered) {
+        return sqlcipher.openDatabase(
+          path,
+          version: version,
+          password: rewritePassword,
+          onCreate: onCreate,
+          onUpgrade: onUpgrade,
+          singleInstance: false,
+        );
+      }
+    }
+
+    throw lastError ?? StateError('SQLCipher open failed for $path');
+  }
 
   /// Debug: Check what DB files exist on disk
   static Future<void> debugPrintDatabaseFiles() async {
@@ -160,29 +545,87 @@ class DBHelper {
     debugPrint(
         'DBHelper.initDatabase opening: $path encryptedPasswordPresent=${password != null && password.isNotEmpty}');
 
-    // 1) Preferred path: open as encrypted SQLCipher.
-    if (password != null && password.isNotEmpty) {
+    // 128 open path: SQLCipher with ENCRYPTION_KEY, then plain sqlite.
+    // If this file already has My Library, we keep it as-is.
+    try {
+      final db = await openLike128(
+        path,
+        password: password,
+        version: 3,
+        onCreate: (db, version) async {
+          await _onCreate(db, version);
+        },
+        onUpgrade: onUpgrade,
+      );
+      await DBMigrationHelper.restoreLibraryFrom128Backups(
+        liveDb: db,
+        password: password,
+      );
+      return db;
+    } catch (e) {
+      debugPrint('DBHelper.initDatabase encrypted/plain open failed: $e');
+    }
+
+    // Plain sqlite only if the file really is unencrypted. Encrypted SQLCipher
+    // files always fail here with code 26 and used to crash into the category screen.
+    final exists = await File(path).exists();
+    if (!exists || await _fileHasPlainSqliteHeader(path)) {
       try {
-        return await sqlcipher.openDatabase(
+        return await plain.openDatabase(
           path,
           version: 3,
-          password: password,
-          onCreate: _onCreate,
+          onCreate: (db, version) async {
+            await _onCreate(db, version);
+          },
           onUpgrade: onUpgrade,
         );
       } catch (e) {
-        debugPrint('DBHelper.initDatabase encrypted open failed: $e');
+        debugPrint('DBHelper.initDatabase plain open failed: $e');
+        rethrow;
       }
     }
 
-    // 2) Fallback: open as plain sqlite. Fixes situations where the file
-    // on disk isn't actually encrypted (or password/encryption format mismatch).
-    return await plain.openDatabase(
-      path,
-      version: 3,
-      onCreate: _onCreate,
-      onUpgrade: onUpgrade,
-    );
+    // Keep the unreadable 128/133 file, then create a new DB so splash /
+    // category restore can run (same last-resort that unblocked the app).
+    if (exists) {
+      final adoptPassword = encryptionPassword() ?? password;
+      if (adoptPassword != null && adoptPassword.isNotEmpty) {
+        final adopted = await DBMigrationHelper.tryAdoptReadableEncryptedBackup(
+          livePath: path,
+          password: adoptPassword,
+          version: 3,
+          onCreate: (db, version) async {
+            await _onCreate(db, version);
+          },
+          onUpgrade: onUpgrade,
+        );
+        if (adopted != null) return adopted;
+
+        final bak =
+            '$path.undecryptable.${DateTime.now().millisecondsSinceEpoch}.bak';
+        try {
+          await File(path).copy(bak);
+          await File(path).delete();
+          debugPrint(
+              'DBHelper quarantined unreadable bible_enc.db to $bak; creating a new encrypted DB');
+          return await sqlcipher.openDatabase(
+            path,
+            version: 3,
+            password: adoptPassword,
+            onCreate: (db, version) async {
+              await _onCreate(db, version);
+            },
+            onUpgrade: onUpgrade,
+            singleInstance: false,
+          );
+        } catch (e) {
+          debugPrint('DBHelper quarantine/create-new failed: $e');
+        }
+      }
+    }
+
+    throw StateError(
+        'bible_enc.db exists but could not be decrypted (not a plain SQLite file)');
   }
 
   _onCreate(dynamic db, int version) async {
@@ -418,9 +861,11 @@ class DBHelper {
   Future<BookMarkModel> insertBookmark(BookMarkModel bookmarkmodel) async {
     var dbAccount = await db;
     try {
-      await dbAccount!.insert("bookmark", bookmarkmodel.toJson());
+      final id = await dbAccount!.insert(
+          "bookmark", _libraryInsertValues(bookmarkmodel.toJson()));
+      debugPrint('insertBookmark id=$id');
     } catch (e) {
-      // print(e);
+      debugPrint('insertBookmark failed: $e');
     }
     return bookmarkmodel;
   }
@@ -460,9 +905,11 @@ class DBHelper {
   Future<SaveNotesModel> insertNotes(SaveNotesModel savenotesmodel) async {
     var dbAccount = await db;
     try {
-      await dbAccount!.insert("save_notes", savenotesmodel.toJson());
+      final id = await dbAccount!.insert(
+          "save_notes", _libraryInsertValues(savenotesmodel.toJson()));
+      debugPrint('insertNotes id=$id');
     } catch (e) {
-      // print(e);
+      debugPrint('insertNotes failed: $e');
     }
     return savenotesmodel;
   }
@@ -513,9 +960,11 @@ class DBHelper {
       HighLightContentModal highlightcontentmodel) async {
     var dbAccount = await db;
     try {
-      await dbAccount!.insert("highlight", highlightcontentmodel.toJson());
+      final id = await dbAccount!.insert(
+          "highlight", _libraryInsertValues(highlightcontentmodel.toJson()));
+      debugPrint('insertIntoHighLight id=$id');
     } catch (e) {
-      // print(e);
+      debugPrint('insertIntoHighLight failed: $e');
     }
     return highlightcontentmodel;
   }
@@ -618,9 +1067,11 @@ class DBHelper {
   Future<BookMarkModel> insertUnderLine(BookMarkModel bookmarkmodel) async {
     var dbAccount = await db;
     try {
-      await dbAccount!.insert("underline", bookmarkmodel.toJson());
+      final id = await dbAccount!.insert(
+          "underline", _libraryInsertValues(bookmarkmodel.toJson()));
+      debugPrint('insertUnderLine id=$id');
     } catch (e) {
-      // print(e);
+      debugPrint('insertUnderLine failed: $e');
     }
     return bookmarkmodel;
   }
@@ -930,10 +1381,117 @@ class DBMigrationHelper {
 
   static Future<String> getNewDbPath() => BibleEncryptedDbPaths.absolutePath();
 
+  /// Quarantined / renamed copies of bible_enc.db from earlier 133 builds.
+  /// Newest first. Never includes the live bible_enc.db.
+  static Future<List<String>> _encryptedBackupDbPaths() async {
+    final livePath = await getNewDbPath();
+    final dir = await getApplicationDocumentsDirectory();
+    final files = <File>[];
+    try {
+      await for (final entity in dir.list()) {
+        if (entity is! File) continue;
+        if (entity.path == livePath) continue;
+        final name = p.basename(entity.path);
+        if (!name.startsWith(BibleEncryptedDbPaths.fileName)) continue;
+        if (name.contains('undecryptable') || name.contains('.bak')) {
+          files.add(entity);
+        }
+      }
+    } catch (e) {
+      debugPrint('_encryptedBackupDbPaths list failed: $e');
+    }
+    files.sort((a, b) {
+      try {
+        return b.statSync().modified.compareTo(a.statSync().modified);
+      } catch (_) {
+        return b.path.compareTo(a.path);
+      }
+    });
+    return files.map((f) => f.path).toList();
+  }
+
+  static Future<List<String>> _libraryCopySourcePaths() async {
+    final livePath = await getNewDbPath();
+    final paths = <String>[];
+    final seen = <String>{};
+
+    Future<void> add(String? path) async {
+      if (path == null || path.isEmpty) return;
+      if (path == livePath) return;
+      if (!seen.add(path)) return;
+      if (!await File(path).exists()) return;
+      paths.add(path);
+    }
+
+    await add(await getSourceDbPath());
+    for (final bak in await _encryptedBackupDbPaths()) {
+      await add(bak);
+    }
+    return paths;
+  }
+
+  static Future<int> _libraryRowCount(dynamic db) async {
+    var total = 0;
+    for (final table in _userDataTables) {
+      try {
+        final rows = await db.rawQuery('SELECT COUNT(*) as c FROM $table');
+        total += (rows.isNotEmpty ? (rows.first['c'] as int?) : 0) ?? 0;
+      } catch (_) {}
+    }
+    return total;
+  }
+
+  /// If live bible_enc.db cannot be opened, use a readable backup that still
+  /// has My Library rows. Keeps the unreadable file as `.pre-adopt.*.bak`.
+  static Future<dynamic> tryAdoptReadableEncryptedBackup({
+    required String livePath,
+    required String password,
+    int? version,
+    Future<void> Function(dynamic db, int version)? onCreate,
+    Future<void> Function(dynamic db, int oldVersion, int newVersion)?
+        onUpgrade,
+  }) async {
+    final backups = await _encryptedBackupDbPaths();
+    for (final bak in backups) {
+      dynamic probe;
+      try {
+        probe = await DBHelper.openLike128(bak, password: password);
+        final libraryCount = await _libraryRowCount(probe);
+        await probe.close();
+        probe = null;
+        if (libraryCount <= 0) {
+          debugPrint('tryAdopt skip $bak (no library rows)');
+          continue;
+        }
+
+        final keep =
+            '$livePath.pre-adopt.${DateTime.now().millisecondsSinceEpoch}.bak';
+        await File(livePath).copy(keep);
+        await File(bak).copy(livePath);
+        debugPrint(
+            'tryAdopt restored $bak → bible_enc.db; previous file kept at $keep');
+        return await DBHelper.openLike128(
+          livePath,
+          password: password,
+          version: version,
+          onCreate: onCreate,
+          onUpgrade: onUpgrade,
+        );
+      } catch (e) {
+        debugPrint('tryAdopt skip $bak: $e');
+        try {
+          await probe?.close();
+        } catch (_) {}
+      }
+    }
+    return null;
+  }
+
   static Future<bool> _targetDbHasCoreData(
       String targetPath, String password) async {
     try {
-      final db = await sqlcipher.openDatabase(targetPath, password: password);
+      final db =
+          await DBHelper.openSqlCipherDatabase(targetPath, password: password);
       final verseCountRows =
           await db.rawQuery("SELECT COUNT(*) as c FROM verse");
       final bookCountRows = await db.rawQuery("SELECT COUNT(*) as c FROM book");
@@ -957,7 +1515,8 @@ class DBMigrationHelper {
   static Future<bool> _targetDbHasLibraryData(
       String targetPath, String password) async {
     try {
-      final db = await sqlcipher.openDatabase(targetPath, password: password);
+      final db =
+          await DBHelper.openSqlCipherDatabase(targetPath, password: password);
 
       Future<int> countFrom(String table) async {
         try {
@@ -1077,7 +1636,7 @@ class DBMigrationHelper {
     dynamic oldDb;
     try {
       oldDb = looksEncrypted
-          ? await sqlcipher.openDatabase(sourceDbPath, password: password)
+          ? await DBHelper.openSqlCipherDatabase(sourceDbPath, password: password)
           : await plain.openDatabase(sourceDbPath);
     } catch (e) {
       debugPrint('testapp Error opening source DB: $e');
@@ -1087,7 +1646,7 @@ class DBMigrationHelper {
     // Create new encrypted DB
     sqlcipher.Database? newDb;
     try {
-      newDb = await sqlcipher.openDatabase(
+      newDb = await DBHelper.openSqlCipherDatabase(
         newDbPath,
         password: password,
         version: 3,
@@ -1243,7 +1802,7 @@ class DBMigrationHelper {
           : false;
       
       dynamic sourceDb = looksEncrypted
-          ? await sqlcipher.openDatabase(sourceDbPath, password: password)
+          ? await DBHelper.openSqlCipherDatabase(sourceDbPath, password: password)
           : await plain.openDatabase(sourceDbPath);
 
       for (final tableName in _userDataTables) {
@@ -1280,7 +1839,7 @@ class DBMigrationHelper {
 
   /// Call from Library screens when data is empty to retry copying from legacy DB.
   static Future<void> tryRestoreLibraryDataFromLegacy() async {
-    final password = dotenv.env[AssetsConstants.dbPasswordKey];
+    final password = DBHelper.encryptionPassword();
     if (password == null || password.isEmpty) return;
     await copyUserDataFromLegacyIfNeeded(password);
   }
@@ -1288,7 +1847,7 @@ class DBMigrationHelper {
   /// Emergency recovery method for users who already updated and lost data
   /// This method is more aggressive and will attempt multiple recovery strategies
   static Future<void> emergencyRecoverUserData() async {
-    final password = dotenv.env[AssetsConstants.dbPasswordKey];
+    final password = DBHelper.encryptionPassword();
     if (password == null || password.isEmpty) {
       debugPrint('emergencyRecoverUserData: No password available');
       return;
@@ -1360,7 +1919,11 @@ class DBMigrationHelper {
     }
 
     try {
-      final newDb = await sqlcipher.openDatabase(newDbPath, password: password);
+      final newDb = await DBHelper().db;
+      if (newDb == null) {
+        debugPrint('_recoverFromBackupFile: live DB missing');
+        return;
+      }
       
       // Check if backup has user data
       bool hasUserData = false;
@@ -1399,59 +1962,28 @@ class DBMigrationHelper {
       } else {
         debugPrint('_recoverFromBackupFile: No user data found in $backupPath');
       }
-      
-      await newDb.close();
     } finally {
       await backupDb?.close();
     }
   }
 
-  /// If legacy DB still exists and current DB has no user data, copy it over.
-  /// Call after migration and before deleting legacy DB files.
-  static Future<void> copyUserDataFromLegacyIfNeeded(String password) async {
-    final sourceDbPath = await getSourceDbPath();
-    final newDbPath = await getNewDbPath();
-
-    // Always print early so we can see *why* restore didn't happen.
-    final sourceExists =
-        sourceDbPath != null && await File(sourceDbPath).exists();
-    final newExists = await File(newDbPath).exists();
-    print(
-        'copyUserDataFromLegacyIfNeeded start sourceDbPath=$sourceDbPath sourceExists=$sourceExists newDbPath=$newDbPath newExists=$newExists');
-
-    if (!newExists) {
-      print('copyUserDataFromLegacyIfNeeded: target DB missing ($newDbPath).');
-      return;
-    }
-
-    if (!sourceExists) {
-      print('copyUserDataFromLegacyIfNeeded: no legacy source DB to copy.');
-      return;
-    }
-
-    final looksEncrypted = !sourceDbPath!.endsWith(_unencryptedDbName)
-        ? await _isDatabaseEncrypted(sourceDbPath)
-        : false;
+  /// Copy My Library tables from a source DB into the live bible_enc.db.
+  /// Source files are never deleted. Inserts use IGNORE so existing rows stay.
+  static Future<void> _copyLibraryTablesFrom({
+    required String sourceDbPath,
+    required String password,
+    required dynamic newDb,
+  }) async {
 
     dynamic legacyDb;
     try {
-      legacyDb = looksEncrypted
-          ? await sqlcipher.openDatabase(sourceDbPath, password: password)
-          : await plain.openDatabase(sourceDbPath);
-    } catch (e) {
-      print('copyUserDataFromLegacyIfNeeded: could not open legacy DB: $e');
-      return;
-    }
-
-    sqlcipher.Database? newDb;
-    try {
-      newDb = await sqlcipher.openDatabase(
-        newDbPath,
+      legacyDb = await DBHelper.openLike128(
+        sourceDbPath,
         password: password,
+        singleInstance: false,
       );
     } catch (e) {
-      print('copyUserDataFromLegacyIfNeeded: could not open new DB: $e');
-      await legacyDb?.close();
+      print('copyUserDataFromLegacyIfNeeded: could not open $sourceDbPath: $e');
       return;
     }
 
@@ -1475,7 +2007,7 @@ class DBMigrationHelper {
         return null;
       }
 
-      final Map<String, List<String>> legacyCandidatesForTarget = {
+      const legacyCandidatesForTarget = {
         'bookmark': ['bookmark', 'bookmarks', 'book_mark', 'bookMark'],
         'highlight': ['highlight', 'highlights', 'high_light', 'highLight'],
         'underline': ['underline', 'underlines', 'under_line', 'underLine'],
@@ -1502,11 +2034,8 @@ class DBMigrationHelper {
                   ? (newCountRows.first['c'] as int?)
                   : 0) ??
               0;
-          
-          // CRITICAL FIX: Always attempt to restore user data from legacy DB
-          // Even if current table has some data, legacy might have more/different data
-          // Use IGNORE conflict resolution to avoid duplicates
-          debugPrint('copyUserDataFromLegacyIfNeeded: $tableName current count=$newCount, checking legacy...');
+          debugPrint(
+              'copyUserDataFromLegacyIfNeeded: $tableName current count=$newCount source=$sourceDbPath');
 
           final legacyTable = await pickLegacyTable(
             legacyCandidatesForTarget[tableName] ?? [tableName],
@@ -1515,7 +2044,8 @@ class DBMigrationHelper {
 
           final rows = await legacyDb.query(legacyTable);
           if (rows.isEmpty) {
-            debugPrint('copyUserDataFromLegacyIfNeeded: $legacyTable is empty, skipping');
+            debugPrint(
+                'copyUserDataFromLegacyIfNeeded: $legacyTable is empty, skipping');
             continue;
           }
 
@@ -1523,7 +2053,7 @@ class DBMigrationHelper {
           int copiedCount = 0;
           for (final row in rows) {
             final mappedRow = _mapAndFilterRow(tableName, row, targetColumns);
-            mappedRow.remove('id'); // Remove ID to avoid conflicts
+            mappedRow.remove('id');
             if (mappedRow.isEmpty) continue;
             try {
               await newDb.insert(tableName, mappedRow,
@@ -1534,14 +2064,100 @@ class DBMigrationHelper {
             }
           }
           print(
-              'copyUserDataFromLegacyIfNeeded: copied $copiedCount/${rows.length} rows from $legacyTable into $tableName');
+              'copyUserDataFromLegacyIfNeeded: copied $copiedCount/${rows.length} rows from $legacyTable ($sourceDbPath) into $tableName');
         } catch (e) {
           print('copyUserDataFromLegacyIfNeeded: table $tableName error: $e');
         }
       }
     } finally {
       await legacyDb?.close();
-      await newDb.close();
+    }
+  }
+
+  /// If live DB has no My Library rows, copy them from a 128 `.bak` / legacy
+  /// file that we can open. Never deletes backups. Never closes [liveDb].
+  static Future<void> restoreLibraryFrom128Backups({
+    required dynamic liveDb,
+    String? password,
+  }) async {
+    if (liveDb == null) return;
+    try {
+      final existing = await _libraryRowCount(liveDb);
+      if (existing > 0) {
+        debugPrint(
+            'restoreLibraryFrom128Backups: live already has $existing library rows');
+        return;
+      }
+    } catch (e) {
+      debugPrint('restoreLibraryFrom128Backups: live library count failed: $e');
+      return;
+    }
+
+    final pass = (password != null && password.isNotEmpty)
+        ? password
+        : DBHelper.encryptionPassword();
+    if (pass == null || pass.isEmpty) return;
+
+    final sources = await _libraryCopySourcePaths();
+    if (sources.isEmpty) {
+      debugPrint('restoreLibraryFrom128Backups: no 128 backup/legacy DB');
+      return;
+    }
+
+    for (final sourceDbPath in sources) {
+      await _copyLibraryTablesFrom(
+        sourceDbPath: sourceDbPath,
+        password: pass,
+        newDb: liveDb,
+      );
+      try {
+        final copied = await _libraryRowCount(liveDb);
+        if (copied > 0) {
+          debugPrint(
+              'restoreLibraryFrom128Backups: restored $copied library rows from $sourceDbPath');
+          return;
+        }
+      } catch (_) {}
+    }
+  }
+
+  /// If a 121/128 DB or a quarantined bible_enc.db backup still exists, copy
+  /// My Library into the live file. Never deletes source files.
+  static Future<void> copyUserDataFromLegacyIfNeeded(String password) async {
+    final newDbPath = await getNewDbPath();
+    final sources = await _libraryCopySourcePaths();
+    final newExists = await File(newDbPath).exists();
+    print(
+        'copyUserDataFromLegacyIfNeeded start sources=$sources newDbPath=$newDbPath newExists=$newExists');
+
+    if (!newExists) {
+      print('copyUserDataFromLegacyIfNeeded: target DB missing ($newDbPath).');
+      return;
+    }
+
+    if (sources.isEmpty) {
+      print('copyUserDataFromLegacyIfNeeded: no legacy/backup DB to copy.');
+      return;
+    }
+
+    dynamic newDb;
+    try {
+      newDb = await DBHelper().db;
+    } catch (e) {
+      print('copyUserDataFromLegacyIfNeeded: could not open new DB: $e');
+      return;
+    }
+    if (newDb == null) {
+      print('copyUserDataFromLegacyIfNeeded: could not open new DB: $newDbPath');
+      return;
+    }
+
+    for (final sourceDbPath in sources) {
+      await _copyLibraryTablesFrom(
+        sourceDbPath: sourceDbPath,
+        password: password,
+        newDb: newDb,
+      );
     }
   }
 

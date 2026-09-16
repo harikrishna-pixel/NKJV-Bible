@@ -13,7 +13,6 @@ import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:get/get.dart';
 import 'package:open_file_manager/open_file_manager.dart';
@@ -22,7 +21,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class ExportDb {
-  static String encryptionKey = dotenv.env['ENCRYPTION_KEY'] ?? '';
+  static String get encryptionKey => DBHelper.encryptionPassword() ?? '';
 
   /// iOS [open_file_manager] appends this to `shareddocuments://.../Documents/`.
   /// Must be a relative folder (not an absolute file path) and URL-encoded —
