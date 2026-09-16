@@ -2736,7 +2736,20 @@ class DBMigrationHelper {
       return;
     }
 
-    await _applyMergedLibraryRows(liveDb, merged);
+    try {
+      await liveDb.transaction((txn) async {
+        await _applyMergedLibraryRows(txn, merged);
+        final after = await _libraryUserRowCount(txn);
+        if (after < mergedTotal) {
+          throw StateError(
+              'library verify failed live=$after uniqueSources=$mergedTotal');
+        }
+      });
+    } catch (e) {
+      debugPrint(
+          'restoreLibraryFrom128Backups: abort verify $e (source files left untouched)');
+      return;
+    }
     final after = await _libraryUserRowCount(liveDb);
     debugPrint(
         'restoreLibraryFrom128Backups: merged $mergedTotal unique library rows; live now has $after');
