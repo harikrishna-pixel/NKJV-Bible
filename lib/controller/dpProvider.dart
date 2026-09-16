@@ -1766,6 +1766,24 @@ class DBMigrationHelper {
     return total;
   }
 
+  /// Bookmarks/highlights/underlines/notes only. Seeded calendar / images /
+  /// dailyVersesMainList must not count as "library already restored".
+  static Future<int> _libraryUserRowCount(dynamic db) async {
+    var total = 0;
+    for (final table in const [
+      'bookmark',
+      'highlight',
+      'underline',
+      'save_notes',
+    ]) {
+      try {
+        final rows = await db.rawQuery('SELECT COUNT(*) as c FROM $table');
+        total += (rows.isNotEmpty ? (rows.first['c'] as int?) : 0) ?? 0;
+      } catch (_) {}
+    }
+    return total;
+  }
+
   /// If live bible_enc.db cannot be opened, use a readable backup that still
   /// has My Library rows. Keeps the unreadable file as `.pre-adopt.*.bak`.
   static Future<dynamic> tryAdoptReadableEncryptedBackup({
@@ -2469,7 +2487,7 @@ class DBMigrationHelper {
   }) async {
     if (liveDb == null) return;
     try {
-      final existing = await _libraryRowCount(liveDb);
+      final existing = await _libraryUserRowCount(liveDb);
       if (existing > 0) {
         debugPrint(
             'restoreLibraryFrom128Backups: live already has $existing library rows');
@@ -2498,7 +2516,7 @@ class DBMigrationHelper {
         newDb: liveDb,
       );
       try {
-        final copied = await _libraryRowCount(liveDb);
+        final copied = await _libraryUserRowCount(liveDb);
         if (copied > 0) {
           debugPrint(
               'restoreLibraryFrom128Backups: restored $copied library rows from $sourceDbPath');
