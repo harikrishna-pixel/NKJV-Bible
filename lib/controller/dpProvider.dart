@@ -110,6 +110,18 @@ class DBHelper {
         debugPrint('DBHelper.initDatabase encrypted open failed: $e');
       }
     }
+    try {
+      debugPrint('DBHelper.openLike128 plain fallback $path');
+      return await plain.openDatabase(
+        path,
+        version: version,
+        onCreate: onCreate,
+        onUpgrade: onUpgrade,
+        singleInstance: singleInstance,
+      );
+    } catch (e) {
+      debugPrint('DBHelper.openLike128 plain fallback failed: $e');
+    }
     if (await File(path).exists() && !await _fileHasPlainSqliteHeader(path)) {
       throw StateError('SQLCipher open failed for $path');
     }
@@ -283,6 +295,20 @@ class DBHelper {
               'tryOpenExisting128File fail compat=$compat keyLen=${key.length}: $e');
         }
       }
+    }
+    try {
+      debugPrint('tryOpenExisting128File plain fallback $path');
+      final db = await plain.openDatabase(path, singleInstance: singleInstance);
+      if (!await _openedDbHasUserTables(db, path)) {
+        try {
+          await db.close();
+        } catch (_) {}
+        return null;
+      }
+      debugPrint('tryOpenExisting128File ok plain fallback');
+      return db;
+    } catch (e) {
+      debugPrint('tryOpenExisting128File plain fallback fail: $e');
     }
     return null;
   }
