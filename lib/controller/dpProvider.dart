@@ -208,6 +208,8 @@ class DBHelper {
     } catch (_) {}
     return files;
   }
+
+  static Future<void> _copySqliteSidecars(String fromPath, String toPath) async {
     for (final suffix in <String>['-wal', '-shm']) {
       try {
         final src = File('$fromPath$suffix');
@@ -1899,6 +1901,8 @@ class DBMigrationHelper {
         counts.bookmark + counts.highlight + counts.underline + counts.saveNotes;
     return '${p.basename(path)}=$kind/open=$opened/bookmark=${counts.bookmark}/highlight=${counts.highlight}/underline=${counts.underline}/save_notes=${counts.saveNotes}/total=$total';
   }
+
+  static String? _libraryMergeKey(String table, Map<String, Object?> row) {
     final book = row['book_num'];
     final chapter = row['chapter_num'];
     final verse = row['verse_num'];
