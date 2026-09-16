@@ -876,17 +876,41 @@ class DBHelper {
         final keep =
             '$path.128-keep.${DateTime.now().millisecondsSinceEpoch}.bak';
         try {
-          await File(path).copy(keep);
-          await _copySqliteSidecars(path, keep);
-          debugPrint(
-              'DBHelper kept original bible_enc.db at $keep; creating a new live DB');
-          try {
-            await File(path).delete();
-          } catch (_) {}
-          for (final suffix in <String>['-wal', '-shm']) {
+          if (p.basename(path).contains('.bak')) {
+            debugPrint('DBHelper last-resort refusing to delete bak $path');
+          } else {
+            final originalLength = await File(path).length();
+            await File(path).copy(keep);
+            await _copySqliteSidecars(path, keep);
+            if (!await File(keep).exists() ||
+                await File(keep).length() != originalLength) {
+              throw StateError('128-keep copy missing or incomplete: $keep');
+            }
+            final keepHandle = await File(keep).open();
+            await keepHandle.close();
+            final keepDb = await tryOpenExisting128File(
+              keep,
+              password: adoptPassword,
+            );
+            if (keepDb != null) {
+              try {
+                await keepDb.close();
+              } catch (_) {}
+              debugPrint('DBHelper last-resort keep opened $keep');
+            } else {
+              debugPrint(
+                  'DBHelper last-resort keep copied (undecryptable) $keep');
+            }
+            debugPrint(
+                'DBHelper kept original bible_enc.db at $keep; creating a new live DB');
             try {
-              await File('$path$suffix').delete();
+              await File(path).delete();
             } catch (_) {}
+            for (final suffix in <String>['-wal', '-shm']) {
+              try {
+                await File('$path$suffix').delete();
+              } catch (_) {}
+            }
           }
           final db = await sqlcipher.openDatabase(
             path,
