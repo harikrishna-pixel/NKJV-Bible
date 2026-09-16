@@ -1816,7 +1816,52 @@ class DBMigrationHelper {
     return total;
   }
 
-  static String? _libraryMergeKey(String table, Map<String, Object?> row) {
+  static Future<bool> _candidateHeaderIsPlain(String path) async {
+    try {
+      final raf = await File(path).open();
+      try {
+        final bytes = await raf.read(16);
+        if (bytes.length < 16) return false;
+        return String.fromCharCodes(bytes) == 'SQLite format 3\x00';
+      } finally {
+        await raf.close();
+      }
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<({int bookmark, int highlight, int underline, int saveNotes})>
+      _libraryFourCounts(dynamic db) async {
+    Future<int> count(String table) async {
+      try {
+        final rows = await db.rawQuery('SELECT COUNT(*) as c FROM $table');
+        return (rows.isNotEmpty ? (rows.first['c'] as int?) : 0) ?? 0;
+      } catch (_) {
+        return 0;
+      }
+    }
+
+    return (
+      bookmark: await count('bookmark'),
+      highlight: await count('highlight'),
+      underline: await count('underline'),
+      saveNotes: await count('save_notes'),
+    );
+  }
+
+  static String _dbAuditPart(
+    String path, {
+    required bool plain,
+    required bool opened,
+    required ({int bookmark, int highlight, int underline, int saveNotes})
+        counts,
+  }) {
+    final kind = plain ? 'plain' : 'encrypted';
+    final total =
+        counts.bookmark + counts.highlight + counts.underline + counts.saveNotes;
+    return '${p.basename(path)}=$kind/open=$opened/bookmark=${counts.bookmark}/highlight=${counts.highlight}/underline=${counts.underline}/save_notes=${counts.saveNotes}/total=$total';
+  }
     final book = row['book_num'];
     final chapter = row['chapter_num'];
     final verse = row['verse_num'];
@@ -2721,9 +2766,15 @@ class DBMigrationHelper {
     }
 
     final merged = <String, Map<String, Map<String, Object?>>>{};
+    final auditParts = <String>[];
+    const zeros =
+        (bookmark: 0, highlight: 0, underline: 0, saveNotes: 0);
     for (final sourceDbPath in sources) {
       final isLive = p.equals(sourceDbPath, livePath);
+      final plain = await _candidateHeaderIsPlain(sourceDbPath);
       dynamic sourceDb;
+      var opened = false;
+      var counts = zeros;
       try {
         if (isLive) {
           sourceDb = liveDb;
@@ -2738,11 +2789,16 @@ class DBMigrationHelper {
             singleInstance: false,
           );
         }
-        if (sourceDb == null) continue;
-        await _collectLibraryRowsFromDb(sourceDb, merged);
+        if (sourceDb != null) {
+          opened = true;
+          counts = await _libraryFourCounts(sourceDb);
+          await _collectLibraryRowsFromDb(sourceDb, merged);
+        }
       } catch (e) {
         debugPrint('restoreLibraryFrom128Backups: skip $sourceDbPath: $e');
       } finally {
+        auditParts.add(_dbAuditPart(sourceDbPath,
+            plain: plain, opened: opened, counts: counts));
         if (!isLive) {
           try {
             await sourceDb?.close();
@@ -2750,6 +2806,8 @@ class DBMigrationHelper {
         }
       }
     }
+    debugPrint(
+        '[DB AUDIT] ${auditParts.isEmpty ? '(no database files)' : auditParts.join(' | ')}');
 
     var mergedTotal = 0;
     for (final tableRows in merged.values) {
