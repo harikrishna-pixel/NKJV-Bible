@@ -194,7 +194,20 @@ class DBHelper {
     return true;
   }
 
-  static Future<void> _copySqliteSidecars(String fromPath, String toPath) async {
+  static Future<List<File>> _existing128KeepFiles(String livePath) async {
+    final files = <File>[];
+    try {
+      final dir = File(livePath).parent;
+      await for (final entity in dir.list()) {
+        if (entity is! File) continue;
+        final name = p.basename(entity.path);
+        if (name.contains('128-keep') && name.contains('.bak')) {
+          files.add(entity);
+        }
+      }
+    } catch (_) {}
+    return files;
+  }
     for (final suffix in <String>['-wal', '-shm']) {
       try {
         final src = File('$fromPath$suffix');
@@ -873,33 +886,57 @@ class DBHelper {
         );
         if (adopted != null) return adopted;
 
-        final keep =
-            '$path.128-keep.${DateTime.now().millisecondsSinceEpoch}.bak';
         try {
           if (p.basename(path).contains('.bak')) {
             debugPrint('DBHelper last-resort refusing to delete bak $path');
           } else {
             final originalLength = await File(path).length();
-            await File(path).copy(keep);
-            await _copySqliteSidecars(path, keep);
-            if (!await File(keep).exists() ||
-                await File(keep).length() != originalLength) {
-              throw StateError('128-keep copy missing or incomplete: $keep');
-            }
-            final keepHandle = await File(keep).open();
-            await keepHandle.close();
-            final keepDb = await tryOpenExisting128File(
-              keep,
-              password: adoptPassword,
-            );
-            if (keepDb != null) {
+            final existingKeeps = await _existing128KeepFiles(path);
+            File? reusedKeep;
+            for (final keepFile in existingKeeps) {
               try {
-                await keepDb.close();
+                if (await keepFile.length() == originalLength) {
+                  reusedKeep = keepFile;
+                  break;
+                }
               } catch (_) {}
-              debugPrint('DBHelper last-resort keep opened $keep');
-            } else {
+            }
+
+            var keep = reusedKeep?.path;
+            if (existingKeeps.length >= 3 && reusedKeep == null) {
               debugPrint(
-                  'DBHelper last-resort keep copied (undecryptable) $keep');
+                  'DBHelper last-resort skip copy: ${existingKeeps.length} 128-keep files already exist');
+              keep = existingKeeps.first.path;
+            } else if (reusedKeep != null) {
+              debugPrint(
+                  'DBHelper last-resort skip copy: same ${originalLength}b already at $keep');
+            } else {
+              keep =
+                  '$path.128-keep.${DateTime.now().millisecondsSinceEpoch}.bak';
+              await File(path).copy(keep);
+              await _copySqliteSidecars(path, keep);
+              if (!await File(keep).exists() ||
+                  await File(keep).length() != originalLength) {
+                throw StateError('128-keep copy missing or incomplete: $keep');
+              }
+              final keepHandle = await File(keep).open();
+              await keepHandle.close();
+              final keepDb = await tryOpenExisting128File(
+                keep,
+                password: adoptPassword,
+              );
+              if (keepDb != null) {
+                try {
+                  await keepDb.close();
+                } catch (_) {}
+                debugPrint('DBHelper last-resort keep opened $keep');
+              } else {
+                debugPrint(
+                    'DBHelper last-resort keep copied (undecryptable) $keep');
+              }
+            }
+            if (keep == null || !await File(keep).exists()) {
+              throw StateError('128-keep not available; not deleting live');
             }
             debugPrint(
                 'DBHelper kept original bible_enc.db at $keep; creating a new live DB');
