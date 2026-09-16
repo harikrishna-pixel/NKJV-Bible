@@ -247,9 +247,9 @@ class DBHelper {
       if (seen.add(key)) keys.add(key);
     }
 
+    addKey(encryptionPassword(keepRawWhitespace: true));
     addKey(password);
     addKey(encryptionPassword());
-    addKey(encryptionPassword(keepRawWhitespace: true));
     for (final extra in encryptionPasswordCandidates()) {
       addKey(extra);
     }
@@ -361,17 +361,16 @@ class DBHelper {
     return map;
   }
 
-  /// Trimmed key first, then raw `.env` value if it differed (133 builds that
-  /// accidentally encrypted with a trailing space). Also SQLCipher raw-key
-  /// forms (`x'<hex>'`) — ATTACH previously hex-encoded hashes twice, so the
-  /// 128 file never opened and My Library stayed empty.
+  /// Raw `.env` ENCRYPTION_KEY first (same as 128). Trimmed and hashed forms
+  /// are fallbacks only.
   static List<String> encryptionPasswordCandidates() {
     final raw = dotenv.env[AssetsConstants.dbPasswordKey];
     if (raw == null || raw.isEmpty) return const [];
     final trimmed = raw.trim();
-    if (trimmed.isEmpty) return const [];
-    final candidates = <String>[trimmed];
-    if (raw != trimmed) candidates.add(raw);
+    if (trimmed.isEmpty && raw.isEmpty) return const [];
+    final candidates = <String>[];
+    if (raw.isNotEmpty) candidates.add(raw);
+    if (trimmed.isNotEmpty && trimmed != raw) candidates.add(trimmed);
 
     void addRawHexKey(String hex) {
       if (hex.isEmpty) return;
@@ -380,15 +379,16 @@ class DBHelper {
       if (!candidates.contains(wrapped)) candidates.add(wrapped);
     }
 
+    final forHash = raw.isNotEmpty ? raw : trimmed;
     try {
-      addRawHexKey(sha256.convert(utf8.encode(trimmed)).toString());
+      addRawHexKey(sha256.convert(utf8.encode(forHash)).toString());
     } catch (_) {}
     try {
-      addRawHexKey(md5.convert(utf8.encode(trimmed)).toString());
+      addRawHexKey(md5.convert(utf8.encode(forHash)).toString());
     } catch (_) {}
     try {
       addRawHexKey(
-        utf8.encode(trimmed).map((b) => b.toRadixString(16).padLeft(2, '0')).join(),
+        utf8.encode(forHash).map((b) => b.toRadixString(16).padLeft(2, '0')).join(),
       );
     } catch (_) {}
     return candidates;
