@@ -429,15 +429,19 @@ class _SplashScreenState extends State<SplashScreen>
       try {
         // Only do essential initialization that's required before navigation
         // APIs are already loading in background via BackgroundApiService
+        debugPrint('[STARTUP] app start');
 
         // Drop any stale DB handle (hot restart / odd overwrite cases); always
         // align with current file on disk before migration + seed.
         await DBHelper.resetStaticDatabaseConnection();
+        debugPrint('[STARTUP] DB initialization start');
+        await DBHelper.runPhysicalDatabaseDiagnostic('before-migration');
 
         // Essential: Database migration
         print('SPLASH before migrateToEncryptedDatabase');
         // Also log to system console (visible in Mac Console.app)
         debugPrint('SPLASH before migrateToEncryptedDatabase');
+        debugPrint('[STARTUP] migration start');
         try {
           await Future.wait<void>([
             DBMigrationHelper.migrateToEncryptedDatabase(password),
@@ -446,6 +450,7 @@ class _SplashScreenState extends State<SplashScreen>
         } on TimeoutException {
           debugPrint('SPLASH migration/wallet timed out — continuing');
         }
+        debugPrint('[STARTUP] migration end');
         print('SPLASH after migrateToEncryptedDatabase');
         debugPrint('SPLASH after migrateToEncryptedDatabase');
 
@@ -464,6 +469,7 @@ class _SplashScreenState extends State<SplashScreen>
         await checkappcount();
 
         // Essential: Load local data (books, verses from DB)
+        debugPrint('[STARTUP] DBHelper initialized (loadBookList/loadBookContent → DBHelper.db)');
         await Future.wait<void>([
           loadBookList(),
           loadBookContent(),
@@ -516,14 +522,17 @@ class _SplashScreenState extends State<SplashScreen>
 
         // Essential: Update local DB (sync verse flags with bookmarks/highlights)
         try {
+          debugPrint('[STARTUP] Library query start');
           await Future.wait<void>([
             updateLocalDB(),
             deleteFiles(),
           ]).timeout(_splashHeavyStepTimeout);
+          debugPrint('[STARTUP] Library query end');
         } on TimeoutException {
           debugPrint('SPLASH updateLocalDB/deleteFiles timed out — continuing');
         }
         print('SPLASH after copyUserDataFromLegacyIfNeeded');
+        await DBHelper.runPhysicalDatabaseDiagnostic('after-init');
         if (kDebugMode) {
           await DBHelper.debugPrintLibraryTableCounts();
         }
@@ -803,6 +812,13 @@ class _SplashScreenState extends State<SplashScreen>
       final counts = await _readCoreBibleCountsWithRetry();
       if (counts == null) {
         debugPrint('testapp Core bible check: DB null → Bible restore flow');
+        debugPrint('[STARTUP] Category screen reason=db_null');
+        DBHelper.libraryTrace('CATEGORY_INIT', {
+          'verse': 'unknown',
+          'book': 'unknown',
+          'willShowCategory': true,
+          'reason': 'db_null',
+        });
         if (BibleInfo.folders.length <= 1) {
           _schedulePostSplashAtt();
           Get.offAll(() => PreferenceSelectionScreen(
@@ -819,7 +835,18 @@ class _SplashScreenState extends State<SplashScreen>
       }
       final verseCount = counts.verseCount;
       final bookCount = counts.bookCount;
+      DBHelper.libraryTrace('CATEGORY_INIT', {
+        'verse': verseCount,
+        'book': bookCount,
+        'willShowCategory': verseCount == 0 || bookCount == 0,
+        'reason': verseCount == 0 || bookCount == 0
+            ? 'verse_or_book_empty'
+            : 'core_data_present_library_not_used',
+      });
       if (verseCount == 0 || bookCount == 0) {
+        debugPrint(
+            '[STARTUP] Category screen reason=verse_or_book_empty verse=$verseCount book=$bookCount');
+        debugPrint('[STARTUP] Category screen');
         if (BibleInfo.folders.length <= 1) {
           _schedulePostSplashAtt();
           Get.offAll(() => PreferenceSelectionScreen(

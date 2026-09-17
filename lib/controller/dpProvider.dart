@@ -53,6 +53,84 @@ class DBHelper {
 
   static Future<dynamic>? _dbOpening;
 
+  static void libraryTrace(String step, Map<String, Object?> fields) {
+    final parts = <String>['[LIBRARY TRACE] STEP=$step'];
+    fields.forEach((key, value) {
+      if (value != null) parts.add('$key=$value');
+    });
+    debugPrint(parts.join(' '));
+  }
+
+  static Future<Map<String, int>> libraryFourCountsMap(dynamic db) async {
+    Future<int> count(String table) async {
+      try {
+        final rows = await db.rawQuery('SELECT COUNT(*) as c FROM $table');
+        return (rows.isNotEmpty ? (rows.first['c'] as int?) : 0) ?? 0;
+      } catch (_) {
+        return 0;
+      }
+    }
+
+    final bookmark = await count('bookmark');
+    final highlight = await count('highlight');
+    final underline = await count('underline');
+    final saveNotes = await count('save_notes');
+    return {
+      'bookmark': bookmark,
+      'highlight': highlight,
+      'underline': underline,
+      'save_notes': saveNotes,
+      'total': bookmark + highlight + underline + saveNotes,
+    };
+  }
+
+  static Future<void> _traceLibraryRead(
+      dynamic dbAccount, String table, int rows) async {
+    String path = '';
+    try {
+      path = '${dbAccount?.path ?? ''}';
+    } catch (_) {}
+    final expected = await BibleEncryptedDbPaths.absolutePath();
+    final counts = await libraryFourCountsMap(dbAccount);
+    debugPrint('[LIBRARY DB] absolute_path=$path database_instance=${identityHashCode(dbAccount)} cached=${_db == null ? 'null' : identityHashCode(_db)} expectedLive=$expected');
+    debugPrint('[LIBRARY QUERY] table=$table query=SELECT * FROM $table ORDER BY id DESC rows_returned=$rows');
+    libraryTrace('LIBRARY_READ', {
+      'path': path,
+      'expectedLive': expected,
+      'sameFile': path == expected,
+      'table': table,
+      'query': 'SELECT * FROM $table ORDER BY id DESC',
+      'rows': rows,
+      'bookmark': counts['bookmark'],
+      'highlight': counts['highlight'],
+      'underline': counts['underline'],
+      'save_notes': counts['save_notes'],
+      'total': counts['total'],
+      'conn': identityHashCode(dbAccount),
+      'cachedConn': _db == null ? 'null' : identityHashCode(_db),
+    });
+  }
+
+  static Future<dynamic> _traceDbHelperOpen(dynamic db, String path) async {
+    String openedPath = path;
+    try {
+      openedPath = '${db?.path ?? path}';
+    } catch (_) {}
+    final counts = await libraryFourCountsMap(db);
+    libraryTrace('DBHELPER_OPEN', {
+      'path': openedPath,
+      'configuredPath': path,
+      'sameFile': openedPath == path,
+      'bookmark': counts['bookmark'],
+      'highlight': counts['highlight'],
+      'underline': counts['underline'],
+      'save_notes': counts['save_notes'],
+      'total': counts['total'],
+      'conn': identityHashCode(db),
+    });
+    return db;
+  }
+
   Future<dynamic> get db async {
     if (_db != null) {
       try {
@@ -243,11 +321,15 @@ class DBHelper {
       singleInstance: false,
     );
     _cipherDefaultHolder = holder;
-    if (compatibility != null) {
+    // 128 opened with SQLCipher 4 defaults (no cipher_compatibility pragma).
+    // null must RESET leftover 1/2/3 defaults from earlier probe loops.
+    if (compatibility == null || compatibility >= 4) {
+      await _runPragma(holder, 'PRAGMA cipher_default_compatibility = 4');
+      await _runPragma(holder, 'PRAGMA cipher_default_kdf_iter = 256000');
+      await _runPragma(holder, 'PRAGMA cipher_default_page_size = 4096');
+    } else {
       await _runPragma(
           holder, 'PRAGMA cipher_default_compatibility = $compatibility');
-    }
-    if (compatibility != null && compatibility <= 3) {
       await _runPragma(holder, 'PRAGMA cipher_default_kdf_iter = 64000');
       await _runPragma(holder, 'PRAGMA cipher_default_page_size = 1024');
     }
@@ -259,12 +341,45 @@ class DBHelper {
     String path, {
     String? password,
     bool singleInstance = false,
+    bool readOnly = false,
   }) async {
     if (!await File(path).exists()) return null;
 
     if (await _fileHasPlainSqliteHeader(path)) {
       debugPrint('tryOpenExisting128File plain sqlite $path');
-      return await plain.openDatabase(path, singleInstance: true);
+      return await plain.openDatabase(
+        path,
+        singleInstance: singleInstance,
+        readOnly: readOnly,
+      );
+    }
+
+    // 128 initDatabase: sqlcipher.openDatabase(path, password: ENCRYPTION_KEY)
+    // with SQLCipher 4 defaults. Do this before any compat=1/2/3 probe.
+    final key128 = (password != null && password.isNotEmpty)
+        ? password
+        : dotenv.env[AssetsConstants.dbPasswordKey];
+    if (key128 != null && key128.isNotEmpty) {
+      try {
+        await _setSqlCipherDefaultCompat(null);
+        final db = await sqlcipher.openDatabase(
+          path,
+          password: key128,
+          singleInstance: singleInstance,
+          readOnly: readOnly,
+        );
+        if (await _openedDbHasUserTables(db, path)) {
+          debugPrint(
+              'tryOpenExisting128File ok exactly-like-128 keyLen=${key128.length}');
+          return db;
+        }
+        debugPrint('tryOpenExisting128File exactly-like-128 false-open');
+        try {
+          await db.close();
+        } catch (_) {}
+      } catch (e) {
+        debugPrint('tryOpenExisting128File exactly-like-128 fail: $e');
+      }
     }
 
     final keys = <String>[];
@@ -293,6 +408,7 @@ class DBHelper {
             path,
             password: key,
             singleInstance: singleInstance,
+            readOnly: readOnly,
           );
           if (!await _openedDbHasUserTables(db, path)) {
             debugPrint(
@@ -313,7 +429,11 @@ class DBHelper {
     }
     try {
       debugPrint('tryOpenExisting128File plain fallback $path');
-      final db = await plain.openDatabase(path, singleInstance: singleInstance);
+      final db = await plain.openDatabase(
+        path,
+        singleInstance: singleInstance,
+        readOnly: readOnly,
+      );
       if (!await _openedDbHasUserTables(db, path)) {
         try {
           await db.close();
@@ -326,6 +446,131 @@ class DBHelper {
       debugPrint('tryOpenExisting128File plain fallback fail: $e');
     }
     return null;
+  }
+
+  /// Read-only SQLCipher ATTACH of an encrypted 128 backup.
+  /// Native `openDatabase(password:)` often fails on these files; ATTACH can
+  /// still SELECT Library tables. Does not rename, rekey, or write the source.
+  static Future<Map<String, List<Map<String, Object?>>>?>
+      readLibraryTablesViaAttach(
+    String path, {
+    String? password,
+  }) async {
+    if (!await File(path).exists()) return null;
+    if (await _fileHasPlainSqliteHeader(path)) return null;
+
+    final tmpDir = await getTemporaryDirectory();
+    final tmp = p.join(
+      tmpDir.path,
+      'restore_attach_${DateTime.now().millisecondsSinceEpoch}.db',
+    );
+    final keys = <String>[];
+    final seenKeys = <String>{};
+    void addAttachKey(String? key) {
+      if (key == null || key.isEmpty) return;
+      if (seenKeys.add(key)) keys.add(key);
+    }
+
+    addAttachKey(dotenv.env[AssetsConstants.dbPasswordKey]);
+    addAttachKey(password);
+    for (final extra in encryptionPasswordCandidates()) {
+      addAttachKey(extra);
+    }
+
+    sqlcipher.Database? holder;
+    try {
+      holder = await sqlcipher.openDatabase(
+        tmp,
+        password: keys.isNotEmpty ? keys.first : 'restore-attach',
+        singleInstance: false,
+      );
+      const aliases = {
+        'bookmark': ['bookmark', 'bookmarks', 'book_mark', 'bookMark'],
+        'highlight': ['highlight', 'highlights', 'high_light', 'highLight'],
+        'underline': ['underline', 'underlines', 'under_line', 'underLine'],
+        'save_notes': [
+          'save_notes',
+          'notes',
+          'note',
+          'saved_notes',
+          'saveNotes'
+        ],
+      };
+      // 128 stored Library with passphrase KEY 'ENCRYPTION_KEY' and SQLCipher 4.
+      final attachOrder = <int?>[null, 4, 3, 2, 1];
+      for (final compat in attachOrder) {
+        for (final attachKey in keys) {
+          for (final useHex in <bool>[false, true]) {
+            try {
+              await _setSqlCipherDefaultCompat(compat);
+              if (compat == null || compat >= 4) {
+                await _runPragma(
+                    holder, 'PRAGMA cipher_default_compatibility = 4');
+                await _runPragma(
+                    holder, 'PRAGMA cipher_default_kdf_iter = 256000');
+                await _runPragma(
+                    holder, 'PRAGMA cipher_default_page_size = 4096');
+              } else {
+                await _runPragma(
+                    holder, 'PRAGMA cipher_default_compatibility = $compat');
+                await _runPragma(
+                    holder, 'PRAGMA cipher_default_kdf_iter = 64000');
+                await _runPragma(
+                    holder, 'PRAGMA cipher_default_page_size = 1024');
+              }
+              final keySql = _attachKeySql(attachKey, useHex: useHex);
+              await holder.execute(
+                  'ATTACH DATABASE ${_sqlQuote(path)} AS legacy KEY $keySql');
+              final tables = await holder.rawQuery(
+                "SELECT name FROM legacy.sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+              );
+              if (tables.isEmpty) {
+                await holder.execute('DETACH DATABASE legacy');
+                continue;
+              }
+              final out = <String, List<Map<String, Object?>>>{};
+              for (final table in aliases.keys) {
+                for (final name in aliases[table]!) {
+                  try {
+                    final rows =
+                        await holder.rawQuery('SELECT * FROM legacy."$name"');
+                    out[table] = [
+                      for (final row in rows) Map<String, Object?>.from(row)
+                    ];
+                    break;
+                  } catch (_) {}
+                }
+              }
+              await holder.execute('DETACH DATABASE legacy');
+              debugPrint(
+                  '[RESTORE DEBUG] ATTACH open=true path=$path highlight=${out['highlight']?.length ?? 0} bookmark=${out['bookmark']?.length ?? 0} underline=${out['underline']?.length ?? 0} save_notes=${out['save_notes']?.length ?? 0}');
+              return out;
+            } catch (e) {
+              debugPrint(
+                  '[RESTORE DEBUG] ATTACH failed compat=$compat keyLen=${attachKey.length} hex=$useHex error=$e');
+              try {
+                await holder.execute('DETACH DATABASE legacy');
+              } catch (_) {}
+            }
+          }
+        }
+      }
+      debugPrint('[RESTORE DEBUG] ATTACH open=false path=$path');
+      return null;
+    } catch (e) {
+      debugPrint('[RESTORE DEBUG] ATTACH setup failed: $e');
+      return null;
+    } finally {
+      try {
+        await holder?.close();
+      } catch (_) {}
+      for (final filePath in <String>[tmp, '$tmp-wal', '$tmp-shm']) {
+        try {
+          final f = File(filePath);
+          if (await f.exists()) await f.delete();
+        } catch (_) {}
+      }
+    }
   }
 
   static Future<void> _keepPreUpgradeCopy(String path) async {
@@ -710,6 +955,186 @@ class DBHelper {
     throw lastError ?? StateError('SQLCipher open failed for $path');
   }
 
+  /// Read-only: list every on-device DB-like file and query Library tables.
+  /// Does not copy, delete, rename, restore, or change open/migration behavior.
+  static Future<void> runPhysicalDatabaseDiagnostic(String phase) async {
+    debugPrint('[STARTUP] physical DB diagnostic start phase=$phase');
+    try {
+      final livePath = await BibleEncryptedDbPaths.absolutePath();
+      final dirs = <String>{};
+      Future<void> addDir(String label, Future<Directory> Function() fn) async {
+        try {
+          final dir = await fn();
+          dirs.add(dir.path);
+          debugPrint('[DB DIR] $label=${dir.path}');
+        } catch (e) {
+          debugPrint('[DB DIR] $label error=$e');
+        }
+      }
+
+      await addDir('Documents', getApplicationDocumentsDirectory);
+      await addDir('Support', getApplicationSupportDirectory);
+      try {
+        dirs.add(await plain.getDatabasesPath());
+        debugPrint('[DB DIR] DatabasesPath=${await plain.getDatabasesPath()}');
+      } catch (e) {
+        debugPrint('[DB DIR] DatabasesPath error=$e');
+      }
+      try {
+        dirs.add((await getLibraryDirectory()).path);
+        debugPrint('[DB DIR] Library=${(await getLibraryDirectory()).path}');
+      } catch (e) {
+        debugPrint('[DB DIR] Library error=$e');
+      }
+
+      final files = <File>[];
+      final seen = <String>{};
+      for (final dirPath in dirs) {
+        try {
+          await for (final entity in Directory(dirPath).list(recursive: false)) {
+            if (entity is! File) continue;
+            final name = p.basename(entity.path);
+            final lower = name.toLowerCase();
+            final looksLikeDb = lower.endsWith('.db') ||
+                lower.contains('.bak') ||
+                lower.contains('bible') ||
+                lower.contains('sqlite');
+            if (!looksLikeDb) continue;
+            if (!seen.add(entity.path)) continue;
+            files.add(entity);
+          }
+        } catch (e) {
+          debugPrint('[DB DIR] list failed $dirPath: $e');
+        }
+      }
+      files.sort((a, b) => a.path.compareTo(b.path));
+
+      String? bestPath;
+      var bestTotal = 0;
+      var liveTotal = 0;
+      String liveType = 'missing';
+      final openedByFingerprint = <String, Map<String, Object?>>{};
+
+      for (final file in files) {
+        final path = file.path;
+        int size = 0;
+        var headerHex = '';
+        var headerAscii = '';
+        var type = 'unknown';
+        try {
+          size = await file.length();
+          final raf = await file.open();
+          try {
+            final bytes = await raf.read(16);
+            headerHex =
+                bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+            headerAscii = String.fromCharCodes(
+                bytes.map((b) => (b >= 32 && b < 127) ? b : 0x2e));
+            if (bytes.length >= 16 &&
+                String.fromCharCodes(bytes) == 'SQLite format 3\x00') {
+              type = 'plain';
+            } else if (bytes.isNotEmpty) {
+              type = 'encrypted';
+            } else {
+              type = 'empty';
+            }
+          } finally {
+            await raf.close();
+          }
+        } catch (e) {
+          debugPrint('[DB PHYSICAL] path=$path header-error=$e');
+        }
+        debugPrint('[DB PHYSICAL]');
+        debugPrint(path);
+        debugPrint('filename=${p.basename(path)}');
+        debugPrint('size=$size');
+        debugPrint('first 16 bytes=$headerHex ascii=$headerAscii');
+        debugPrint('type=$type');
+
+        var opened = false;
+        var bookmark = 0;
+        var highlight = 0;
+        var underline = 0;
+        var saveNotes = 0;
+        final fingerprint = '$size|$headerHex';
+        final cached = openedByFingerprint[fingerprint];
+        if (cached != null) {
+          opened = cached['open'] as bool;
+          bookmark = cached['bookmark'] as int;
+          highlight = cached['highlight'] as int;
+          underline = cached['underline'] as int;
+          saveNotes = cached['saveNotes'] as int;
+          debugPrint(
+              '[DB DATA] identical bytes to ${cached['path']}; reused counts (no second open)');
+        } else {
+          dynamic probe;
+          try {
+            probe = await tryOpenExisting128File(
+              path,
+              singleInstance: false,
+              readOnly: true,
+            );
+            opened = probe != null;
+            if (probe != null) {
+              final counts = await libraryFourCountsMap(probe);
+              bookmark = counts['bookmark'] ?? 0;
+              highlight = counts['highlight'] ?? 0;
+              underline = counts['underline'] ?? 0;
+              saveNotes = counts['save_notes'] ?? 0;
+            }
+          } catch (e) {
+            debugPrint('[DB DATA] open-error path=$path error=$e');
+          } finally {
+            try {
+              await probe?.close();
+            } catch (_) {}
+          }
+          openedByFingerprint[fingerprint] = {
+            'path': path,
+            'open': opened,
+            'bookmark': bookmark,
+            'highlight': highlight,
+            'underline': underline,
+            'saveNotes': saveNotes,
+          };
+        }
+        final total = bookmark + highlight + underline + saveNotes;
+        debugPrint('[DB DATA]');
+        debugPrint('path=$path');
+        debugPrint('type=$type');
+        debugPrint('open=$opened');
+        debugPrint('bookmark=$bookmark');
+        debugPrint('highlight=$highlight');
+        debugPrint('underline=$underline');
+        debugPrint('save_notes=$saveNotes');
+        debugPrint('total=$total');
+        if (p.equals(path, livePath)) {
+          liveTotal = total;
+          liveType = type;
+        } else if (opened && total > bestTotal) {
+          bestTotal = total;
+          bestPath = path;
+        }
+      }
+
+      debugPrint(
+          '[DB LIVE] path=$livePath type=$liveType total=$liveTotal cachedConn=${_db == null ? 'null' : identityHashCode(_db)}');
+      if (liveTotal == 0 && bestPath != null && bestTotal > 0) {
+        debugPrint('[DB DATA FOUND]');
+        debugPrint('SOURCE=$bestPath');
+        debugPrint('SOURCE_TOTAL=$bestTotal');
+        debugPrint('LIVE=$livePath');
+        debugPrint('LIVE_TOTAL=$liveTotal');
+      } else if (liveTotal == 0 && (bestPath == null || bestTotal == 0)) {
+        debugPrint(
+            '[DB DATA FOUND] none: every opened candidate has total=0 live=$livePath');
+      }
+    } catch (e, st) {
+      debugPrint('[DB PHYSICAL] diagnostic failed: $e\n$st');
+    }
+    debugPrint('[STARTUP] physical DB diagnostic end phase=$phase');
+  }
+
   /// Debug: Check what DB files exist on disk
   static Future<void> debugPrintDatabaseFiles() async {
     try {
@@ -772,6 +1197,7 @@ class DBHelper {
 
   initDatabase() async {
     final String path = await BibleEncryptedDbPaths.absolutePath();
+    // Same as 128: raw ENCRYPTION_KEY from .env.
     final password = dotenv.env[AssetsConstants.dbPasswordKey];
 
     Future<void> onUpgrade(dynamic db, int oldVersion, int newVersion) async {
@@ -808,6 +1234,7 @@ class DBHelper {
 
     debugPrint(
         'DBHelper.initDatabase opening: $path encryptedPasswordPresent=${password != null && password.isNotEmpty}');
+    debugPrint('[STARTUP] initDatabase start path=$path');
 
     await _keepPreUpgradeCopy(path);
     await DBMigrationHelper.copyLegacyBibleEncIntoLiveIfMissing(path);
@@ -826,7 +1253,7 @@ class DBHelper {
             liveDb: db,
             password: password,
           );
-          return db;
+          return await _traceDbHelperOpen(db, path);
         }
       } catch (e) {
         debugPrint('DBHelper.initDatabase existing-file open failed: $e');
@@ -849,7 +1276,7 @@ class DBHelper {
         liveDb: db,
         password: password,
       );
-      return db;
+      return await _traceDbHelperOpen(db, path);
     } catch (e) {
       debugPrint('DBHelper.initDatabase encrypted/plain open failed: $e');
     }
@@ -858,7 +1285,7 @@ class DBHelper {
     // files always fail here with code 26 and used to crash into the category screen.
     if (!exists || await _fileHasPlainSqliteHeader(path)) {
       try {
-        return await plain.openDatabase(
+        final db = await plain.openDatabase(
           path,
           version: 3,
           onCreate: (db, version) async {
@@ -866,6 +1293,12 @@ class DBHelper {
           },
           onUpgrade: onUpgrade,
         );
+        await ensureCurrentSchema(db);
+        await DBMigrationHelper.restoreLibraryFrom128Backups(
+          liveDb: db,
+          password: password,
+        );
+        return await _traceDbHelperOpen(db, path);
       } catch (e) {
         debugPrint('DBHelper.initDatabase plain open failed: $e');
         rethrow;
@@ -895,20 +1328,30 @@ class DBHelper {
             final originalLength = await File(path).length();
             final existingKeeps = await _existing128KeepFiles(path);
             File? reusedKeep;
+            File? largestKeep;
+            var largestSize = 0;
             for (final keepFile in existingKeeps) {
               try {
-                if (await keepFile.length() == originalLength) {
-                  reusedKeep = keepFile;
-                  break;
+                final len = await keepFile.length();
+                if (len > largestSize) {
+                  largestSize = len;
+                  largestKeep = keepFile;
+                }
+                if (len == originalLength) {
+                  reusedKeep ??= keepFile;
                 }
               } catch (_) {}
             }
 
             var keep = reusedKeep?.path;
-            if (existingKeeps.length >= 3 && reusedKeep == null) {
+            if (largestKeep != null && largestSize > originalLength) {
+              debugPrint(
+                  'DBHelper last-resort reuse larger keep ${largestSize}b > live ${originalLength}b at ${largestKeep.path}');
+              keep = largestKeep.path;
+            } else if (existingKeeps.length >= 3 && reusedKeep == null) {
               debugPrint(
                   'DBHelper last-resort skip copy: ${existingKeeps.length} 128-keep files already exist');
-              keep = existingKeeps.first.path;
+              keep = (largestKeep ?? existingKeeps.first).path;
             } else if (reusedKeep != null) {
               debugPrint(
                   'DBHelper last-resort skip copy: same ${originalLength}b already at $keep');
@@ -921,21 +1364,7 @@ class DBHelper {
                   await File(keep).length() != originalLength) {
                 throw StateError('128-keep copy missing or incomplete: $keep');
               }
-              final keepHandle = await File(keep).open();
-              await keepHandle.close();
-              final keepDb = await tryOpenExisting128File(
-                keep,
-                password: adoptPassword,
-              );
-              if (keepDb != null) {
-                try {
-                  await keepDb.close();
-                } catch (_) {}
-                debugPrint('DBHelper last-resort keep opened $keep');
-              } else {
-                debugPrint(
-                    'DBHelper last-resort keep copied (undecryptable) $keep');
-              }
+              debugPrint('DBHelper last-resort copied live to $keep');
             }
             if (keep == null || !await File(keep).exists()) {
               throw StateError('128-keep not available; not deleting live');
@@ -965,7 +1394,7 @@ class DBHelper {
             liveDb: db,
             password: adoptPassword,
           );
-          return db;
+          return await _traceDbHelperOpen(db, path);
         } catch (e) {
           debugPrint('DBHelper keep-original/create-new failed: $e');
         }
@@ -1225,6 +1654,7 @@ class DBHelper {
     var dbAccount = await db;
     final List<Map<String, Object?>> queryResult =
         await dbAccount!.query("bookmark", orderBy: "id DESC");
+    await _traceLibraryRead(dbAccount, 'bookmark', queryResult.length);
     return queryResult.map((e) => BookMarkModel.fromJson(e)).toList();
   }
 
@@ -1269,7 +1699,7 @@ class DBHelper {
     var dbAccount = await db;
     final List<Map<String, Object?>> queryResult =
         await dbAccount!.query("save_notes", orderBy: "id DESC");
-    // print(queryResult);
+    await _traceLibraryRead(dbAccount, 'save_notes', queryResult.length);
     return queryResult.map((e) => SaveNotesModel.fromJson(e)).toList();
   }
 
@@ -1324,7 +1754,7 @@ class DBHelper {
     var dbAccount = await db;
     final List<Map<String, Object?>> queryResult =
         await dbAccount!.query("highlight", orderBy: "id DESC");
-    // print(queryResult);
+    await _traceLibraryRead(dbAccount, 'highlight', queryResult.length);
     return queryResult.map((e) => HighLightContentModal.fromJson(e)).toList();
   }
 
@@ -1431,6 +1861,7 @@ class DBHelper {
     var dbAccount = await db;
     final List<Map<String, Object?>> queryResult =
         await dbAccount!.query("underline", orderBy: "id DESC");
+    await _traceLibraryRead(dbAccount, 'underline', queryResult.length);
     print(queryResult);
     return queryResult.map((e) => BookMarkModel.fromJson(e)).toList();
   }
@@ -1742,7 +2173,7 @@ class DBMigrationHelper {
 
   static Future<bool> _isDatabaseEncrypted(String path) async {
     try {
-      final db = await plain.openDatabase(path);
+      final db = await plain.openDatabase(path, readOnly: true);
       await db.rawQuery("SELECT name FROM sqlite_master LIMIT 1");
       await db.close();
       debugPrint("testapp DB at $path is UNENCRYPTED.");
@@ -1802,9 +2233,11 @@ class DBMigrationHelper {
     }
     files.sort((a, b) {
       try {
-        return b.statSync().modified.compareTo(a.statSync().modified);
+        final sizeCmp = b.lengthSync().compareTo(a.lengthSync());
+        if (sizeCmp != 0) return sizeCmp;
+        return a.statSync().modified.compareTo(b.statSync().modified);
       } catch (_) {
-        return b.path.compareTo(a.path);
+        return a.path.compareTo(b.path);
       }
     });
     return files.map((f) => f.path).toList();
@@ -1889,17 +2322,26 @@ class DBMigrationHelper {
     );
   }
 
+  static int _libraryFourTotal(
+      ({int bookmark, int highlight, int underline, int saveNotes}) counts) {
+    return counts.bookmark +
+        counts.highlight +
+        counts.underline +
+        counts.saveNotes;
+  }
+
   static String _dbAuditPart(
     String path, {
+    required bool isLive,
     required bool plain,
     required bool opened,
     required ({int bookmark, int highlight, int underline, int saveNotes})
         counts,
   }) {
     final kind = plain ? 'plain' : 'encrypted';
-    final total =
-        counts.bookmark + counts.highlight + counts.underline + counts.saveNotes;
-    return '${p.basename(path)}=$kind/open=$opened/bookmark=${counts.bookmark}/highlight=${counts.highlight}/underline=${counts.underline}/save_notes=${counts.saveNotes}/total=$total';
+    final total = _libraryFourTotal(counts);
+    final role = isLive ? 'live' : 'candidate';
+    return '$role=${p.basename(path)}:type=$kind:open=$opened:bookmark=${counts.bookmark}:highlight=${counts.highlight}:underline=${counts.underline}:save_notes=${counts.saveNotes}:total=$total';
   }
 
   static String? _libraryMergeKey(String table, Map<String, Object?> row) {
@@ -1995,73 +2437,110 @@ class DBMigrationHelper {
       } catch (_) {
         continue;
       }
-      final dest = merged.putIfAbsent(table, () => {});
-      for (final row in rows) {
-        final mapped = Map<String, Object?>.from(row);
-        if (table == 'highlight' &&
-            mapped.containsKey('plaincontent') &&
-            !mapped.containsKey('plain_content')) {
-          mapped['plain_content'] = mapped['plaincontent'];
-        }
-        final key = _libraryMergeKey(table, mapped);
-        if (key == null) continue;
-        final existing = dest[key];
-        if (existing == null || _libraryRowIsNewer(mapped, existing)) {
-          dest[key] = mapped;
-        }
+      _mergeLibraryTableRows(table, rows, merged);
+    }
+  }
+
+  static void _mergeLibraryTableRows(
+    String table,
+    List<Map<String, Object?>> rows,
+    Map<String, Map<String, Map<String, Object?>>> merged,
+  ) {
+    final dest = merged.putIfAbsent(table, () => {});
+    for (final row in rows) {
+      final mapped = Map<String, Object?>.from(row);
+      if (table == 'highlight' &&
+          mapped.containsKey('plaincontent') &&
+          !mapped.containsKey('plain_content')) {
+        mapped['plain_content'] = mapped['plaincontent'];
+      }
+      final key = _libraryMergeKey(table, mapped);
+      if (key == null) continue;
+      final existing = dest[key];
+      if (existing == null || _libraryRowIsNewer(mapped, existing)) {
+        dest[key] = mapped;
       }
     }
   }
+
+  static const _liveLibraryColumns = {
+    'bookmark': [
+      'book_num',
+      'chapter_num',
+      'verse_num',
+      'content',
+      'plaincontent',
+      'bookName',
+      'timestamp',
+    ],
+    'highlight': [
+      'book_num',
+      'chapter_num',
+      'verse_num',
+      'content',
+      'plain_content',
+      'verse_id',
+      'book_name',
+      'color',
+      'timestamp',
+    ],
+    'underline': [
+      'book_num',
+      'chapter_num',
+      'verse_num',
+      'content',
+      'plaincontent',
+      'bookName',
+      'timestamp',
+    ],
+    'save_notes': [
+      'book_num',
+      'chapter_num',
+      'verse_num',
+      'content',
+      'book_name',
+      'notes',
+      'plaincontent',
+      'timestamp',
+    ],
+  };
 
   static Future<void> _applyMergedLibraryRows(
     dynamic liveDb,
     Map<String, Map<String, Map<String, Object?>>> merged,
   ) async {
-    for (final table in merged.keys) {
-      List<String> targetColumns;
-      try {
-        targetColumns = await _getTableColumns(liveDb, table);
-      } catch (_) {
+    for (final table in const [
+      'bookmark',
+      'highlight',
+      'underline',
+      'save_notes',
+    ]) {
+      final incoming = merged[table];
+      if (incoming == null || incoming.isEmpty) {
+        debugPrint(
+            '[RESTORE DEBUG] $table source rows=0 insert attempted=0');
         continue;
       }
-      if (targetColumns.isEmpty) continue;
-      for (final row in merged[table]!.values) {
+      List<String> targetColumns = _liveLibraryColumns[table] ?? const [];
+      try {
+        final probed = await _getTableColumns(liveDb, table);
+        if (probed.isNotEmpty) targetColumns = probed;
+      } catch (e) {
+        debugPrint(
+            '[RESTORE DEBUG] $table using live schema columns liveType=${liveDb.runtimeType} error=$e');
+      }
+      var attempted = 0;
+      var inserted = 0;
+      for (final row in incoming.values) {
         final mapped = _mapAndFilterRow(table, row, targetColumns);
         mapped.remove('id');
         if (mapped.isEmpty) continue;
-        List<Map<String, Object?>> found;
-        try {
-          found = await liveDb.query(
-            table,
-            where: _libraryMergeWhereSql(table),
-            whereArgs: _libraryMergeWhereArgs(table, mapped),
-            limit: 1,
-          );
-        } catch (_) {
-          found = const [];
-        }
-        if (found.isEmpty) {
-          try {
-            await liveDb.insert(table, mapped);
-          } catch (e) {
-            debugPrint('restoreLibrary merge insert $table: $e');
-          }
-          continue;
-        }
-        if (!_libraryRowIsNewer(mapped, found.first)) continue;
-        final id = found.first['id'];
-        if (id == null) continue;
-        try {
-          await liveDb.update(
-            table,
-            mapped,
-            where: 'id = ?',
-            whereArgs: [id],
-          );
-        } catch (e) {
-          debugPrint('restoreLibrary merge update $table: $e');
-        }
+        attempted++;
+        await liveDb.insert(table, mapped);
+        inserted++;
       }
+      debugPrint(
+          '[RESTORE DEBUG] $table source rows=${incoming.length} insert attempted=$attempted insert succeeded=$inserted');
     }
   }
 
@@ -2100,6 +2579,7 @@ class DBMigrationHelper {
         probe = await DBHelper.tryOpenExisting128File(
           bak,
           password: password,
+          readOnly: true,
         );
         if (probe == null) {
           debugPrint('tryAdopt skip $bak (could not open)');
@@ -2193,9 +2673,10 @@ class DBMigrationHelper {
     }
   }
 
-  /// Get columns from target table
-  static Future<List<String>> _getTableColumns(
-      sqlcipher.Database db, String table) async {
+  /// Columns of [table] on the open handle (live Database, Transaction, or
+  /// SQLCipher). Must stay `dynamic`: live bible_enc.db is plain sqflite, and
+  /// restore applies rows inside `transaction()`, which is not sqlcipher.Database.
+  static Future<List<String>> _getTableColumns(dynamic db, String table) async {
     final result = await db.rawQuery('PRAGMA table_info($table)');
     return result.map((row) => row['name'] as String).toList();
   }
@@ -2210,7 +2691,21 @@ class DBMigrationHelper {
           ? tableMap[oldCol]!
           : oldCol;
       if (targetColumns.contains(newCol)) {
-        mapped[newCol] = value;
+        if (value != null &&
+            value is! String &&
+            (newCol == 'color' ||
+                newCol == 'content' ||
+                newCol == 'plain_content' ||
+                newCol == 'plaincontent' ||
+                newCol == 'book_name' ||
+                newCol == 'bookName' ||
+                newCol == 'notes' ||
+                newCol == 'verse_id' ||
+                newCol == 'timestamp')) {
+          mapped[newCol] = value.toString();
+        } else {
+          mapped[newCol] = value;
+        }
       }
     });
     return mapped;
@@ -2219,6 +2714,10 @@ class DBMigrationHelper {
   static Future<void> migrateToEncryptedDatabase(String password) async {
     final sourceDbPath = await getSourceDbPath();
     final newDbPath = await getNewDbPath();
+    DBHelper.libraryTrace('MIGRATION_PATH', {
+      'source': sourceDbPath ?? '(none)',
+      'destination': newDbPath,
+    });
 
     if (await File(newDbPath).exists()) {
       // This file is the SAME path DBHelper opens (see BibleEncryptedDbPaths).
@@ -2673,18 +3172,52 @@ class DBMigrationHelper {
       legacyDb = await DBHelper.tryOpenExisting128File(
         sourceDbPath,
         password: password,
-      );
-      legacyDb ??= await DBHelper.openLiveOrRecoverEncrypted(
-        sourceDbPath,
-        password: password,
-        singleInstance: false,
+        readOnly: true,
       );
     } catch (e) {
       print('copyUserDataFromLegacyIfNeeded: could not open $sourceDbPath: $e');
-      return;
     }
     if (legacyDb == null) {
-      print('copyUserDataFromLegacyIfNeeded: could not open $sourceDbPath');
+      final attached = await DBHelper.readLibraryTablesViaAttach(
+        sourceDbPath,
+        password: password,
+      );
+      if (attached == null) {
+        print('copyUserDataFromLegacyIfNeeded: could not open $sourceDbPath');
+        return;
+      }
+      try {
+        for (final tableName in const [
+          'bookmark',
+          'highlight',
+          'underline',
+          'save_notes',
+        ]) {
+          final rows = attached[tableName];
+          if (rows == null || rows.isEmpty) continue;
+          final targetColumns = await _getTableColumns(newDb, tableName);
+          int copiedCount = 0;
+          for (final row in rows) {
+            final mappedRow = _mapAndFilterRow(tableName, row, targetColumns);
+            mappedRow.remove('id');
+            if (mappedRow.isEmpty) continue;
+            if (await _libraryRowAlreadyExists(newDb, tableName, mappedRow)) {
+              continue;
+            }
+            try {
+              await newDb.insert(tableName, mappedRow);
+              copiedCount++;
+            } catch (e) {
+              debugPrint("testapp copyUserData insert '$tableName': $e");
+            }
+          }
+          print(
+              'copyUserDataFromLegacyIfNeeded: copied $copiedCount/${rows.length} rows from $tableName ($sourceDbPath) into $tableName');
+        }
+      } catch (e) {
+        print(
+            'copyUserDataFromLegacyIfNeeded: attach-insert $sourceDbPath: $e');
+      }
       return;
     }
 
@@ -2760,8 +3293,7 @@ class DBMigrationHelper {
               continue;
             }
             try {
-              await newDb.insert(tableName, mappedRow,
-                  conflictAlgorithm: sqlcipher.ConflictAlgorithm.ignore);
+              await newDb.insert(tableName, mappedRow);
               copiedCount++;
             } catch (e) {
               debugPrint("testapp copyUserData insert '$tableName': $e");
@@ -2786,11 +3318,11 @@ class DBMigrationHelper {
   }) async {
     if (liveDb == null) return;
     final livePath = await getNewDbPath();
-    final pass = (password != null && password.isNotEmpty)
-        ? password
-        : (dotenv.env[AssetsConstants.dbPasswordKey] ??
-            DBHelper.encryptionPassword() ??
-            '');
+    // Same key 128 used: dotenv ENCRYPTION_KEY (not a trimmed/hashed variant).
+    final pass = dotenv.env[AssetsConstants.dbPasswordKey] ??
+        ((password != null && password.isNotEmpty)
+            ? password
+            : (DBHelper.encryptionPassword() ?? ''));
 
     final sources = <String>[];
     final seen = <String>{};
@@ -2810,36 +3342,120 @@ class DBMigrationHelper {
     final auditParts = <String>[];
     const zeros =
         (bookmark: 0, highlight: 0, underline: 0, saveNotes: 0);
+    var liveTotal = 0;
+    var selectedPath = livePath;
+    var selectedTotal = 0;
     for (final sourceDbPath in sources) {
       final isLive = p.equals(sourceDbPath, livePath);
       final plain = await _candidateHeaderIsPlain(sourceDbPath);
+      if (!isLive &&
+          !plain &&
+          selectedTotal > 0 &&
+          selectedPath != livePath) {
+        try {
+          if (await File(sourceDbPath).length() ==
+              await File(selectedPath).length()) {
+            debugPrint(
+                '[RESTORE DEBUG] skip duplicate encrypted ${p.basename(sourceDbPath)}');
+            continue;
+          }
+        } catch (_) {}
+      }
+      DBHelper.libraryTrace(isLive ? 'SOURCE_FOUND' : 'SOURCE_FOUND', {
+        'path': sourceDbPath,
+        'type': plain ? 'plain' : 'encrypted',
+        'role': isLive ? 'live' : 'candidate',
+      });
       dynamic sourceDb;
       var opened = false;
       var counts = zeros;
+      var collected = 0;
       try {
         if (isLive) {
           sourceDb = liveDb;
         } else {
+          // Never create/replace a source .bak. If it cannot be opened as an
+          // existing 128 file, it is not a Library candidate.
           sourceDb = await DBHelper.tryOpenExisting128File(
             sourceDbPath,
             password: pass,
+            readOnly: true,
           );
-          sourceDb ??= await DBHelper.openLiveOrRecoverEncrypted(
+        }
+        opened = sourceDb != null;
+        debugPrint(
+            '[RESTORE DEBUG] backup path=$sourceDbPath type=${plain ? 'plain' : 'encrypted'} open=$opened error=${opened ? 'none' : 'tryOpenExisting128File returned null'}');
+        if (!opened && !isLive && !plain) {
+          final attached = await DBHelper.readLibraryTablesViaAttach(
             sourceDbPath,
             password: pass,
-            singleInstance: false,
           );
+          if (attached != null) {
+            opened = true;
+            counts = (
+              bookmark: attached['bookmark']?.length ?? 0,
+              highlight: attached['highlight']?.length ?? 0,
+              underline: attached['underline']?.length ?? 0,
+              saveNotes: attached['save_notes']?.length ?? 0,
+            );
+            final total = _libraryFourTotal(counts);
+            debugPrint(
+                '[RESTORE DEBUG] bookmark=${counts.bookmark} highlight=${counts.highlight} underline=${counts.underline} save_notes=${counts.saveNotes} total=$total');
+            if (opened && total > selectedTotal) {
+              selectedPath = sourceDbPath;
+              selectedTotal = total;
+            }
+            final before = merged.values.fold<int>(0, (n, m) => n + m.length);
+            for (final table in attached.keys) {
+              _mergeLibraryTableRows(table, attached[table]!, merged);
+            }
+            collected =
+                merged.values.fold<int>(0, (n, m) => n + m.length) - before;
+            debugPrint(
+                '[RESTORE DEBUG] ATTACH collected=$collected from $sourceDbPath');
+          }
         }
+        DBHelper.libraryTrace('SOURCE_OPEN', {
+          'path': sourceDbPath,
+          'success': opened,
+          'type': plain ? 'plain' : 'encrypted',
+        });
         if (sourceDb != null) {
-          opened = true;
           counts = await _libraryFourCounts(sourceDb);
+          final total = _libraryFourTotal(counts);
+          debugPrint(
+              '[RESTORE DEBUG] bookmark=${counts.bookmark} highlight=${counts.highlight} underline=${counts.underline} save_notes=${counts.saveNotes} total=$total');
+          DBHelper.libraryTrace('SOURCE_ROWS', {
+            'path': sourceDbPath,
+            'bookmark': counts.bookmark,
+            'highlight': counts.highlight,
+            'underline': counts.underline,
+            'save_notes': counts.saveNotes,
+            'total': total,
+          });
+          if (isLive) liveTotal = total;
+          if (opened && total > selectedTotal) {
+            selectedPath = sourceDbPath;
+            selectedTotal = total;
+          }
+          final before = merged.values.fold<int>(0, (n, m) => n + m.length);
           await _collectLibraryRowsFromDb(sourceDb, merged);
+          collected = merged.values.fold<int>(0, (n, m) => n + m.length) - before;
+          if (total > 0 && collected == 0) {
+            DBHelper.libraryTrace('SOURCE_COLLECT_DROPPED', {
+              'path': sourceDbPath,
+              'counted': total,
+              'collected': collected,
+            });
+          }
         }
       } catch (e) {
+        debugPrint(
+            '[RESTORE DEBUG] backup path=$sourceDbPath type=${plain ? 'plain' : 'encrypted'} open=false error=$e');
         debugPrint('restoreLibraryFrom128Backups: skip $sourceDbPath: $e');
       } finally {
         auditParts.add(_dbAuditPart(sourceDbPath,
-            plain: plain, opened: opened, counts: counts));
+            isLive: isLive, plain: plain, opened: opened, counts: counts));
         if (!isLive) {
           try {
             await sourceDb?.close();
@@ -2847,35 +3463,108 @@ class DBMigrationHelper {
         }
       }
     }
+    if (liveTotal == 0 && selectedTotal > 0) {
+      debugPrint('[DB DATA FOUND]');
+      debugPrint('SOURCE=$selectedPath');
+      debugPrint('SOURCE_TOTAL=$selectedTotal');
+      debugPrint('LIVE=$livePath');
+      debugPrint('LIVE_TOTAL=$liveTotal');
+      debugPrint(
+          'restoreLibraryFrom128Backups: live library total=0; not using empty live as source; selected=${p.basename(selectedPath)} total=$selectedTotal');
+    }
     debugPrint(
-        '[DB AUDIT] ${auditParts.isEmpty ? '(no database files)' : auditParts.join(' | ')}');
+        '[DB AUDIT] ${auditParts.isEmpty ? '(no database files)' : auditParts.join(' | ')} | selected=${p.basename(selectedPath)}');
 
     var mergedTotal = 0;
     for (final tableRows in merged.values) {
       mergedTotal += tableRows.length;
     }
+    DBHelper.libraryTrace('RESTORE_START', {
+      'source': selectedPath,
+      'destination': livePath,
+      'liveTotal': liveTotal,
+      'selectedTotal': selectedTotal,
+      'uniqueMerged': mergedTotal,
+      'destinationConn': identityHashCode(liveDb),
+    });
+    final beforeCounts = await DBHelper.libraryFourCountsMap(liveDb);
+    debugPrint(
+        '[RESTORE DEBUG] liveType=${liveDb.runtimeType} conn=${identityHashCode(liveDb)} source highlight rows=${merged['highlight']?.length ?? 0} destination highlight rows BEFORE=${beforeCounts['highlight']} bookmark BEFORE=${beforeCounts['bookmark']} underline BEFORE=${beforeCounts['underline']} save_notes BEFORE=${beforeCounts['save_notes']}');
+    if (liveTotal > 0 && selectedTotal > 0 && liveTotal >= selectedTotal) {
+      debugPrint(
+          '[RESTORE DEBUG] live already has library rows live=$liveTotal source=$selectedTotal — skip insert');
+      return;
+    }
     if (mergedTotal == 0) {
       debugPrint('restoreLibraryFrom128Backups: no library rows in any source');
+      DBHelper.libraryTrace('RESTORE_DONE', {
+        'source': selectedPath,
+        'destination': livePath,
+        'sourceRows': selectedTotal,
+        'destinationRows': liveTotal,
+        'uniqueMerged': 0,
+        'result': 'no_library_rows_in_any_opened_source',
+      });
+      return;
+    }
+    if (liveTotal == 0 && selectedTotal == 0) {
+      debugPrint(
+          'restoreLibraryFrom128Backups: live opened empty and no other candidate had Library rows');
+      DBHelper.libraryTrace('RESTORE_DONE', {
+        'source': selectedPath,
+        'destination': livePath,
+        'sourceRows': 0,
+        'destinationRows': 0,
+        'result': 'empty_live_and_empty_candidates',
+      });
       return;
     }
 
     try {
       await liveDb.transaction((txn) async {
+        debugPrint(
+            '[RESTORE DEBUG] transaction start txnType=${txn.runtimeType}');
         await _applyMergedLibraryRows(txn, merged);
         final after = await _libraryUserRowCount(txn);
+        debugPrint(
+            '[RESTORE DEBUG] transaction verify after=$after uniqueMerged=$mergedTotal');
         if (after < mergedTotal) {
           throw StateError(
               'library verify failed live=$after uniqueSources=$mergedTotal');
         }
       });
     } catch (e) {
+      debugPrint('[RESTORE DEBUG] transaction rolled back error=$e');
       debugPrint(
           'restoreLibraryFrom128Backups: abort verify $e (source files left untouched)');
+      DBHelper.libraryTrace('RESTORE_DONE', {
+        'source': selectedPath,
+        'destination': livePath,
+        'sourceRows': selectedTotal,
+        'destinationRows': liveTotal,
+        'uniqueMerged': mergedTotal,
+        'result': 'verify_aborted_sources_untouched',
+      });
       return;
     }
     final after = await _libraryUserRowCount(liveDb);
     debugPrint(
         'restoreLibraryFrom128Backups: merged $mergedTotal unique library rows; live now has $after');
+    final destCounts = await DBHelper.libraryFourCountsMap(liveDb);
+    debugPrint(
+        '[RESTORE DEBUG] destination highlight rows AFTER=${destCounts['highlight']} bookmark=${destCounts['bookmark']} underline=${destCounts['underline']} save_notes=${destCounts['save_notes']} total=${destCounts['total']}');
+    DBHelper.libraryTrace('RESTORE_DONE', {
+      'source': selectedPath,
+      'destination': livePath,
+      'sourceRows': selectedTotal,
+      'destinationRows': destCounts['total'],
+      'bookmark': destCounts['bookmark'],
+      'highlight': destCounts['highlight'],
+      'underline': destCounts['underline'],
+      'save_notes': destCounts['save_notes'],
+      'uniqueMerged': mergedTotal,
+      'destinationConn': identityHashCode(liveDb),
+    });
   }
 
   /// If a 121/128 DB or a quarantined bible_enc.db backup still exists, copy
@@ -2884,6 +3573,7 @@ class DBMigrationHelper {
     final newDbPath = await getNewDbPath();
     final sources = await _libraryCopySourcePaths();
     final newExists = await File(newDbPath).exists();
+    final pass = dotenv.env[AssetsConstants.dbPasswordKey] ?? password;
     print(
         'copyUserDataFromLegacyIfNeeded start sources=$sources newDbPath=$newDbPath newExists=$newExists');
 
@@ -2912,7 +3602,7 @@ class DBMigrationHelper {
     for (final sourceDbPath in sources) {
       await _copyLibraryTablesFrom(
         sourceDbPath: sourceDbPath,
-        password: password,
+        password: pass,
         newDb: newDb,
       );
     }
