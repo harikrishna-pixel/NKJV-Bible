@@ -7,7 +7,7 @@ class BibleInfo {
   // 6484270584  //6459793603
   static String ios_Bundle_Id = "com.balaklrapps.newlivingtranslation";
   static String bible_shortName = "NLT Bible";
-  static String current_Version = "1.0.133";
+  static String current_Version = "1.0.134";
   static String android_Package_Name = "com.whitebibles.genevabible";
   static String appID = 'e8b91815-ed0a-11ef-b28e-fa163e8c011b';
   //static int surveyAppId = 3;
