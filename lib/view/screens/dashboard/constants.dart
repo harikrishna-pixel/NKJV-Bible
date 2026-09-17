@@ -1,23 +1,23 @@
 class BibleInfo {
-  static String apple_AppId = "6459794212";
+  static String apple_AppId = "6459818399";
 
   // 6484270584  //6459793603
-  static String ios_Bundle_Id = "com.balaklrapps.newkingsjamesversion";
-  static String bible_shortName = "NKJV Bible";
-  static String current_Version = "1.0.115";
+  static String ios_Bundle_Id = "com.balaklrapps.newlivingtranslation";
+  static String bible_shortName = "NLT Bible";
+  static String current_Version = "1.0.135";
   static String android_Package_Name = "com.whitebibles.genevabible";
-  static String appID = '03a0762a-ed0b-11ef-b28e-fa163e8c011b';
+  static String appID = 'e8b91815-ed0a-11ef-b28e-fa163e8c011b';
   //static int surveyAppId = 3;
 
 //IAP
   static String sixMonthPlanid =
-      'com.balaklrapps.newkingsjamesversion.sixmonthadsfree';
+      'com.balaklrapps.newlivingtranslation.sixmonthadsfree';
   static String oneYearPlanid =
-      'com.balaklrapps.newkingsjamesversion.oneyearadsfree';
+      'com.balaklrapps.newlivingtranslation.oneyearadsfree';
   static String twoYearPlanid =
       'com.balaklrapps.newkingsjamesversion.twoyearadsfree';
   static String lifeTimePlanid =
-      'com.balaklrapps.newkingsjamesversion.lifetimeadsfree';
+      'com.balaklrapps.newlivingtranslation.lifetimeadsfree';
   static String subIdentifierTwoYear = twoYearPlanid;
   static String exitOfferPlanid =
       'com.balaklrapps.newkingsjamesversion.lifetime.exitoffer';
@@ -31,11 +31,11 @@ class BibleInfo {
 
   // Coin Pack IDs
   static String coinPack1Id =
-      'com.balaklrapps.newkingsjamesversion.creditpack1';
+      'com.balaklrapps.newlivingtranslation.creditpack1';
   static String coinPack2Id =
-      'com.balaklrapps.newkingsjamesversion.creditpack2';
+      'com.balaklrapps.newlivingtranslation.creditpack2';
   static String coinPack3Id =
-      'com.balaklrapps.newkingsjamesversion.creditpack3';
+      'com.balaklrapps.newlivingtranslation.creditpack3';
 
   // Coin Pack Credits (for offline mode)
   static String coinPack1Credits = '500';
@@ -71,15 +71,15 @@ class BibleInfo {
   static String adsGoogleRewardInterstitialIdAndroid = "";
 
   // Ads IDs - iOS
-  static String adsGoogleBannerIdIos = "ca-app-pub-4194577750257069/3139244514";
+  static String adsGoogleBannerIdIos = "ca-app-pub-4194577750257069/6616901313";
   static String adsGoogleBannerId_2Ios = "";
   static String adsGoogleBannerId_3Ios = "";
   static String adsGoogleInterstitialIdIos =
-      "ca-app-pub-4194577750257069/4647434167";
-  static String adsGoogleRewardIdIos = "ca-app-pub-4194577750257069/5194562213";
+      "ca-app-pub-4194577750257069/9827735629";
+  static String adsGoogleRewardIdIos = "ca-app-pub-4194577750257069/8514653950";
   static String adsGoogleOpenAppIdIos =
-      "ca-app-pub-4194577750257069/5080965858";
-  static String adsGoogleNativeIdIos = "ca-app-pub-4194577750257069/5995854674";
+      "ca-app-pub-4194577750257069/9007260938";
+  static String adsGoogleNativeIdIos = "ca-app-pub-4194577750257069/5670984257";
   static String adsGoogleRewardInterstitialIdIos = "";
 
   // TEST Ads IDs - iOS
@@ -99,7 +99,7 @@ class BibleInfo {
 
 // add folder names here  assets/zipped/
   static List<String> folders = [
-    "NKJV"
+    "NLT Bible"
   ];
 
   static String emailVerify = "0";

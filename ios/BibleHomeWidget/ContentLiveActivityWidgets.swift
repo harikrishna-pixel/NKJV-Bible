@@ -3,7 +3,7 @@ import SwiftUI
 import WidgetKit
 
 private let kMemoryVerseLiveActivityURL = URL(string: "biblebookapp://verse?homeWidget")
-private let kContinueReadingLiveActivityURL = URL(string: "biblebookapp://verse?homeWidget")
+private let kContinueReadingLiveActivityURL = URL(string: "biblebookapp://reading?homeWidget")
 
 private let paper = Color(red: 0.95, green: 0.92, blue: 0.84)
 private let ink = Color(red: 0.29, green: 0.22, blue: 0.18)

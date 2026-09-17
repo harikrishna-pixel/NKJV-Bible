@@ -19,7 +19,7 @@ import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/setting_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/post_prayer_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
-import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_maintenance_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:biblebookapp/view/widget/ai_gemini_privacy_banner.dart';
@@ -1260,7 +1260,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                 if (posted == true) {
                   await nav.push(
                     MaterialPageRoute(
-                      builder: (_) => const PrayerWallScreen(),
+                      builder: (_) => const PrayerWallMaintenanceScreen(),
                     ),
                   );
                 }
@@ -4240,19 +4240,19 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: InkWell(
-                                          onTap: () async {
+                                          onTap: () {
                                             // Navigate to Prayer Wall (community prayers)
                                             _resetPrayerChatView();
-                                            await _refreshCommunityLiveIndicator();
-                                            await Navigator.of(context).push(
+                                            Navigator.of(context).push(
                                               MaterialPageRoute(
-                                                builder: (_) => const PrayerWallScreen(),
+                                                builder: (_) =>
+                                                    const PrayerWallMaintenanceScreen(),
                                               ),
-                                            );
-                                            if (mounted) {
-                                              await _refreshCommunityLiveIndicator();
+                                            ).then((_) {
+                                              if (!mounted) return;
+                                              _refreshCommunityLiveIndicator();
                                               _resetPrayerChatView();
-                                            }
+                                            });
                                           },
                                           borderRadius: BorderRadius.circular(16),
                                           child: Stack(

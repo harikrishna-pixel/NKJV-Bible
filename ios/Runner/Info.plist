@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>NKJV Bible</string>
+	<string>NLT Bible</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -46,7 +46,7 @@
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>GADApplicationIdentifier</key>
-	<string>ca-app-pub-4194577750257069~7649128990</string>
+	<string>ca-app-pub-4194577750257069~4831393961</string>
 	<key>GIDClientID</key>
 	<string>727999460969-6ph3vmtbq4o76rbtomvpe1aff341bgdo.apps.googleusercontent.com</string>
 	<key>LSRequiresIPhoneOS</key>
@@ -113,12 +113,12 @@
 	<string>We need access to your photo library to save images.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>This app needs access to speech recognition to convert your voice to text in the chat feature</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>NSUserNotificationUsageDescription</key>
 	<string>We use notifications to keep you informed of important updates.</string>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>Select 'Allow' to receive personalized service content and advertisement. If you select 'Ask App not to Track', you may see irrelevant content and advertisement.</string>
-	<key>NSSupportsLiveActivities</key>
-	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>

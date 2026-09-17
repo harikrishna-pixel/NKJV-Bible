@@ -30,7 +30,7 @@ import 'package:biblebookapp/view/screens/dashboard/add_widget_intro_screen.dart
 import 'package:biblebookapp/view/screens/dashboard/ios_style_app_drawer.dart';
 import 'package:biblebookapp/view/screens/dashboard/social_link_screen.dart';
 import 'package:biblebookapp/view/screens/verse_topics/verse_topics_screen.dart';
-import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_maintenance_screen.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/eproducts_screen.dart';
@@ -6206,12 +6206,12 @@ class _HomeScreenState extends State<HomeScreen>
             );
           }
         },
-        onPrayerWallTap: () async {
-          await SharPreferences.setString('OpenAd', '1');
+        onPrayerWallTap: () {
+          SharPreferences.setString('OpenAd', '1');
           Get.to(
-            () => const PrayerWallScreen(),
-            transition: Transition.cupertinoDialog,
-            duration: const Duration(milliseconds: 300),
+            () => const PrayerWallMaintenanceScreen(),
+            transition: Transition.cupertino,
+            duration: const Duration(milliseconds: 250),
           );
         },
         onTelegramTap: () {

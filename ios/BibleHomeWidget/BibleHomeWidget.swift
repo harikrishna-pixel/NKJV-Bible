@@ -10,7 +10,7 @@
 import SwiftUI
 import WidgetKit
 
-private let appGroupId = "group.com.balaklrapps.newkingsjamesversion"
+private let appGroupId = "group.com.balaklrapps.newlivingtranslation"
 
 // MARK: - Old Paper Theme
 
@@ -899,7 +899,7 @@ struct ContinueReadingView: View {
         }
       }
     }
-    .widgetURL(URL(string: "biblebookapp://verse?homeWidget"))
+    .widgetURL(URL(string: "biblebookapp://reading?homeWidget"))
   }
 }
 
@@ -1050,7 +1050,7 @@ struct WeeklyReadingStreakView: View {
         }
       }
     }
-    .widgetURL(URL(string: "biblebookapp://verse?homeWidget"))
+    .widgetURL(URL(string: "biblebookapp://streak?homeWidget"))
   }
 }
 

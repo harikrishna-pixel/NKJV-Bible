@@ -7,6 +7,7 @@ import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_comments_sheet
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_models.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_share_screen.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_maintenance_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
 import 'package:biblebookapp/utils/network_error_message.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
@@ -107,11 +108,6 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
   @override
   void initState() {
     super.initState();
-    _hydrateLikesFromDisk();
-    _hydratePrayerAuthorsFromDisk();
-    _hydrateMyPrayerIdsFromDisk();
-    _loadAuthAndLocalName();
-    _refresh();
   }
 
   Future<void> _loadAuthAndLocalName() async {
@@ -671,6 +667,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return const PrayerWallMaintenanceScreen();
+
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isVintage =
         themeProvider.currentCustomTheme == AppCustomTheme.vintage;

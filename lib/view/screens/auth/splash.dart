@@ -35,6 +35,7 @@ import 'package:biblebookapp/core/extract_zip_json.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/initialization_helper.dart';
 import 'package:biblebookapp/services/paywall_preload_service.dart';
+import 'package:biblebookapp/services/background_api_service.dart';
 import 'package:biblebookapp/view/constants/assets_constants.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
@@ -89,6 +90,8 @@ class _SplashScreenState extends State<SplashScreen>
   late final AnimationController _splashProgressController;
   bool _initComplete = false;
   bool _hasNavigated = false;
+  bool _isLeavingSplash = false;
+  Completer<void>? _splashOpenAdCompleter;
 
   // Platform messages are asynchronous, so we initialize in an async method.
 
@@ -117,7 +120,7 @@ class _SplashScreenState extends State<SplashScreen>
     splashProgressAnim.addListener(() {
       if (!mounted) return;
       setState(() {
-        _progress = splashProgressAnim.value;
+        _progress = splashProgressAnim.value * 0.98;
       });
     });
     _splashProgressController.addStatusListener((status) {
@@ -130,20 +133,105 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _leaveSplash() async {
-    if (_hasNavigated || !mounted) return;
+    if (_hasNavigated || _isLeavingSplash || !mounted) return;
+    _isLeavingSplash = true;
+    if (mounted) {
+      setState(() {
+        _progress = 0.98;
+      });
+    }
+    final openAdShown = await _runSplashOpenAdIfNeeded();
+    if (!mounted) return;
     _hasNavigated = true;
     setState(() {
       _progress = 1.0;
     });
-    await Future.delayed(const Duration(milliseconds: 300));
+    // If the open ad did not show, hold at 100% for 3s then enter the app.
+    await Future.delayed(
+      openAdShown
+          ? const Duration(milliseconds: 300)
+          : const Duration(seconds: 3),
+    );
     if (!mounted) return;
     await handleNavigation();
   }
 
   void _tryLeaveSplash() {
-    if (_hasNavigated || !_initComplete || !mounted) return;
+    if (_hasNavigated || _isLeavingSplash || !_initComplete || !mounted) return;
     if (!_splashProgressController.isCompleted) return;
     _leaveSplash();
+  }
+
+  void _completeSplashOpenAd() {
+    final completer = _splashOpenAdCompleter;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete();
+    }
+  }
+
+  /// Splash open-ad path. Do not use [initAppOpen] here: its first-call
+  /// `'test'` return skips the ad, then `showopenad` is cleared so Home
+  /// cannot show it either.
+  /// Returns true only if the open ad was actually shown.
+  Future<bool> _runSplashOpenAdIfNeeded() async {
+    final pendingStreakRating = await SharPreferences.getInt(
+            SharPreferences.pendingStreakCompleteCelebration) ??
+        0;
+    if (pendingStreakRating >= 1) return false;
+
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getString('showopenad');
+    if (data != "true") return false;
+
+    if (!await _shouldShowSplashOpenAd()) {
+      await prefs.setString("showopenad", "false");
+      return false;
+    }
+
+    try {
+      await MobileAds.instance.initialize().timeout(const Duration(seconds: 5));
+    } catch (_) {}
+
+    await SharPreferences.setString('test', 'test');
+    final shown = await loadOpenAd();
+    await prefs.setString("showopenad", "false");
+    return shown;
+  }
+
+  Future<bool> _shouldShowSplashOpenAd() async {
+    final isAdEnabledFromApi =
+        await SharPreferences.getBoolean(SharPreferences.isAdsEnabledApi);
+    if (!(isAdEnabledFromApi ?? true)) return false;
+
+    final rewardTime =
+        await SharPreferences.getString(SharPreferences.isRewardAdViewTime);
+    if (rewardTime != null) {
+      final saveTime = DateTime.tryParse(rewardTime);
+      if (saveTime != null && DateTime.now().difference(saveTime).inDays.isNegative) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  Future<String> _resolveOpenAdUnitId() async {
+    var openAdUnitId =
+        await SharPreferences.getString(SharPreferences.openAppId) ?? '';
+    if (openAdUnitId.isEmpty) {
+      try {
+        await BackgroundApiService()
+            .waitForCompletion()
+            .timeout(const Duration(seconds: 2));
+      } catch (_) {}
+      openAdUnitId =
+          await SharPreferences.getString(SharPreferences.openAppId) ?? '';
+    }
+    if (openAdUnitId.isEmpty) {
+      openAdUnitId = Platform.isIOS
+          ? BibleInfo.adsGoogleOpenAppIdIos
+          : BibleInfo.adsGoogleOpenAppIdAndroid;
+    }
+    return openAdUnitId;
   }
 
   Future<void> _markInitCompleteAndTryLeave() async {
@@ -153,6 +241,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
+    _completeSplashOpenAd();
     _splashProgressController.dispose();
     super.dispose();
   }
@@ -164,47 +253,87 @@ class _SplashScreenState extends State<SplashScreen>
     });
   }
 
-  loadOpenAd() async {
+  Future<bool> loadOpenAd() async {
     final trackingAllowed = await isTrackingAllowed();
     debugPrint('ad pop loadOpenAd -  ${!trackingAllowed}');
     bool? isAdEnabledFromApi =
     await SharPreferences.getBoolean(SharPreferences.isAdsEnabledApi);
-    if (isAdEnabledFromApi ?? true) {
-      String? openAdUnitId =
-      await SharPreferences.getString(SharPreferences.openAppId);
-      AppOpenAd.load(
-        adUnitId: openAdUnitId ?? '',
-        request: await AdConsentManager.getAdRequest(),
-        //orientation: 1,
-        adLoadCallback: AppOpenAdLoadCallback(
-          onAdLoaded: (ad) {
-            _appOpenAd = ad;
-
-            _appOpenAd!.fullScreenContentCallback = FullScreenContentCallback(
-              onAdDismissedFullScreenContent: (ad) {
-                ad.dispose();
-                _appOpenAd = null;
-              },
-              onAdFailedToShowFullScreenContent: (ad, error) {
-                ad.dispose();
-                _appOpenAd = null;
-              },
-            );
-            Future.delayed(const Duration(milliseconds: 500), () {
-              if (!mounted) return;
-              final adToShow = _appOpenAd;
-              if (adToShow == null) return;
-              adToShow.show();
-            });
-          },
-          onAdFailedToLoad: (error) {
-            debugPrint('AppOpenAd failed to load: $error');
-            SharPreferences.setBoolean(SharPreferences.isAdsEnabled, false);
-          },
-        ),
-      );
+    if (!(isAdEnabledFromApi ?? true)) {
+      return false;
     }
-    await Future.delayed(const Duration(seconds: 3));
+
+    final openAdUnitId = await _resolveOpenAdUnitId();
+    if (openAdUnitId.isEmpty) {
+      debugPrint('AppOpenAd skipped: empty ad unit id');
+      return false;
+    }
+
+    var didShow = false;
+    final loadDone = Completer<bool>();
+    _splashOpenAdCompleter = Completer<void>();
+
+    AppOpenAd.load(
+      adUnitId: openAdUnitId,
+      request: await AdConsentManager.getAdRequest(),
+      //orientation: 1,
+      adLoadCallback: AppOpenAdLoadCallback(
+        onAdLoaded: (ad) {
+          _appOpenAd = ad;
+
+          _appOpenAd!.fullScreenContentCallback = FullScreenContentCallback(
+            onAdShowedFullScreenContent: (ad) {
+              didShow = true;
+            },
+            onAdDismissedFullScreenContent: (ad) {
+              ad.dispose();
+              _appOpenAd = null;
+              _completeSplashOpenAd();
+            },
+            onAdFailedToShowFullScreenContent: (ad, error) {
+              ad.dispose();
+              _appOpenAd = null;
+              _completeSplashOpenAd();
+            },
+          );
+          if (!loadDone.isCompleted) loadDone.complete(true);
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (!mounted) {
+              _completeSplashOpenAd();
+              return;
+            }
+            final adToShow = _appOpenAd;
+            if (adToShow == null) {
+              _completeSplashOpenAd();
+              return;
+            }
+            try {
+              adToShow.show();
+            } catch (e) {
+              debugPrint('AppOpenAd show failed: $e');
+              _completeSplashOpenAd();
+            }
+          });
+        },
+        onAdFailedToLoad: (error) {
+          debugPrint('AppOpenAd failed to load: $error');
+          SharPreferences.setBoolean(SharPreferences.isAdsEnabled, false);
+          if (!loadDone.isCompleted) loadDone.complete(false);
+          _completeSplashOpenAd();
+        },
+      ),
+    );
+
+    final loaded = await loadDone.future.timeout(
+      const Duration(seconds: 8),
+      onTimeout: () => false,
+    );
+    if (loaded &&
+        _appOpenAd != null &&
+        _splashOpenAdCompleter != null &&
+        !_splashOpenAdCompleter!.isCompleted) {
+      await _splashOpenAdCompleter!.future;
+    }
+    return didShow;
   }
 
   Future<void> initAppOpen() async {
@@ -229,9 +358,9 @@ class _SplashScreenState extends State<SplashScreen>
                   true;
               // debugPrint("Open ad tigger and $checkad and && $dta");
               if (data) {
-                loadOpenAd();
+                await loadOpenAd();
               }
-              setState(() {});
+              if (mounted) setState(() {});
             } else {
               SharPreferences.setBoolean(SharPreferences.isAdsEnabled, false);
             }
@@ -246,9 +375,9 @@ class _SplashScreenState extends State<SplashScreen>
                 true;
             // debugPrint("Open ad tigger and $checkad and && $dta");
             if (data) {
-              loadOpenAd();
+              await loadOpenAd();
             }
-            setState(() {});
+            if (mounted) setState(() {});
           }
         });
       } else {
