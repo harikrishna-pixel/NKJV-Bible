@@ -382,48 +382,54 @@ class DBHelper {
       }
     }
 
-    final keys = <String>[];
-    final seen = <String>{};
-    void addKey(String? key) {
-      if (key == null || key.isEmpty) return;
-      if (seen.add(key)) keys.add(key);
-    }
-
-    addKey(encryptionPassword(keepRawWhitespace: true));
-    addKey(password);
-    addKey(encryptionPassword());
-    for (final extra in encryptionPasswordCandidates()) {
-      addKey(extra);
-    }
-
-    for (final compat in <int?>[null, 4, 3, 2, 1]) {
-      try {
-        await _setSqlCipherDefaultCompat(compat);
-      } catch (e) {
-        debugPrint('tryOpenExisting128File compat setup $compat: $e');
+    // 128 live and 128-keep/pre-upgrade copies: do not probe compat 1/2/3.
+    // That leftover default made ATTACH/open fail on 128→134.
+    final skipCompatProbe =
+        p.basename(path).startsWith(BibleEncryptedDbPaths.fileName);
+    if (!skipCompatProbe) {
+      final keys = <String>[];
+      final seen = <String>{};
+      void addKey(String? key) {
+        if (key == null || key.isEmpty) return;
+        if (seen.add(key)) keys.add(key);
       }
-      for (final key in keys) {
+
+      addKey(encryptionPassword(keepRawWhitespace: true));
+      addKey(password);
+      addKey(encryptionPassword());
+      for (final extra in encryptionPasswordCandidates()) {
+        addKey(extra);
+      }
+
+      for (final compat in <int?>[null, 4, 3, 2, 1]) {
         try {
-          final db = await sqlcipher.openDatabase(
-            path,
-            password: key,
-            singleInstance: singleInstance,
-            readOnly: readOnly,
-          );
-          if (!await _openedDbHasUserTables(db, path)) {
-            debugPrint(
-                'tryOpenExisting128File false-open compat=$compat keyLen=${key.length}');
-            try {
-              await db.close();
-            } catch (_) {}
-            continue;
-          }
-          debugPrint(
-              'tryOpenExisting128File ok compat=$compat keyLen=${key.length}');
-          return db;
+          await _setSqlCipherDefaultCompat(compat);
         } catch (e) {
-          debugPrint(
-              'tryOpenExisting128File fail compat=$compat keyLen=${key.length}: $e');
+          debugPrint('tryOpenExisting128File compat setup $compat: $e');
+        }
+        for (final key in keys) {
+          try {
+            final db = await sqlcipher.openDatabase(
+              path,
+              password: key,
+              singleInstance: singleInstance,
+              readOnly: readOnly,
+            );
+            if (!await _openedDbHasUserTables(db, path)) {
+              debugPrint(
+                  'tryOpenExisting128File false-open compat=$compat keyLen=${key.length}');
+              try {
+                await db.close();
+              } catch (_) {}
+              continue;
+            }
+            debugPrint(
+                'tryOpenExisting128File ok compat=$compat keyLen=${key.length}');
+            return db;
+          } catch (e) {
+            debugPrint(
+                'tryOpenExisting128File fail compat=$compat keyLen=${key.length}: $e');
+          }
         }
       }
     }
@@ -3169,6 +3175,50 @@ class DBMigrationHelper {
 
     dynamic legacyDb;
     try {
+      final looksPlain = await _candidateHeaderIsPlain(sourceDbPath);
+      if (!looksPlain) {
+        final attached = await DBHelper.readLibraryTablesViaAttach(
+          sourceDbPath,
+          password: password,
+        );
+        if (attached != null) {
+          try {
+            for (final tableName in const [
+              'bookmark',
+              'highlight',
+              'underline',
+              'save_notes',
+            ]) {
+              final rows = attached[tableName];
+              if (rows == null || rows.isEmpty) continue;
+              final targetColumns = await _getTableColumns(newDb, tableName);
+              int copiedCount = 0;
+              for (final row in rows) {
+                final mappedRow =
+                    _mapAndFilterRow(tableName, row, targetColumns);
+                mappedRow.remove('id');
+                if (mappedRow.isEmpty) continue;
+                if (await _libraryRowAlreadyExists(
+                    newDb, tableName, mappedRow)) {
+                  continue;
+                }
+                try {
+                  await newDb.insert(tableName, mappedRow);
+                  copiedCount++;
+                } catch (e) {
+                  debugPrint("testapp copyUserData insert '$tableName': $e");
+                }
+              }
+              print(
+                  'copyUserDataFromLegacyIfNeeded: copied $copiedCount/${rows.length} rows from $tableName ($sourceDbPath) into $tableName');
+            }
+          } catch (e) {
+            print(
+                'copyUserDataFromLegacyIfNeeded: attach-insert $sourceDbPath: $e');
+          }
+          return;
+        }
+      }
       legacyDb = await DBHelper.tryOpenExisting128File(
         sourceDbPath,
         password: password,
@@ -3373,19 +3423,10 @@ class DBMigrationHelper {
       try {
         if (isLive) {
           sourceDb = liveDb;
-        } else {
-          // Never create/replace a source .bak. If it cannot be opened as an
-          // existing 128 file, it is not a Library candidate.
-          sourceDb = await DBHelper.tryOpenExisting128File(
-            sourceDbPath,
-            password: pass,
-            readOnly: true,
-          );
-        }
-        opened = sourceDb != null;
-        debugPrint(
-            '[RESTORE DEBUG] backup path=$sourceDbPath type=${plain ? 'plain' : 'encrypted'} open=$opened error=${opened ? 'none' : 'tryOpenExisting128File returned null'}');
-        if (!opened && !isLive && !plain) {
+        } else if (!plain) {
+          // 128 SQLCipher file: ATTACH first (same key as 128). Native
+          // openDatabase on the .bak often fails on iOS and must not run
+          // compat 1/2/3 before ATTACH.
           final attached = await DBHelper.readLibraryTablesViaAttach(
             sourceDbPath,
             password: pass,
@@ -3400,8 +3441,10 @@ class DBMigrationHelper {
             );
             final total = _libraryFourTotal(counts);
             debugPrint(
+                '[RESTORE DEBUG] backup path=$sourceDbPath type=encrypted open=true error=none');
+            debugPrint(
                 '[RESTORE DEBUG] bookmark=${counts.bookmark} highlight=${counts.highlight} underline=${counts.underline} save_notes=${counts.saveNotes} total=$total');
-            if (opened && total > selectedTotal) {
+            if (total > selectedTotal) {
               selectedPath = sourceDbPath;
               selectedTotal = total;
             }
@@ -3413,7 +3456,30 @@ class DBMigrationHelper {
                 merged.values.fold<int>(0, (n, m) => n + m.length) - before;
             debugPrint(
                 '[RESTORE DEBUG] ATTACH collected=$collected from $sourceDbPath');
+          } else {
+            sourceDb = await DBHelper.tryOpenExisting128File(
+              sourceDbPath,
+              password: pass,
+              readOnly: true,
+            );
+            opened = sourceDb != null;
+            debugPrint(
+                '[RESTORE DEBUG] backup path=$sourceDbPath type=encrypted open=$opened error=${opened ? 'none' : 'tryOpenExisting128File returned null'}');
           }
+        } else {
+          sourceDb = await DBHelper.tryOpenExisting128File(
+            sourceDbPath,
+            password: pass,
+            readOnly: true,
+          );
+          opened = sourceDb != null;
+          debugPrint(
+              '[RESTORE DEBUG] backup path=$sourceDbPath type=plain open=$opened error=${opened ? 'none' : 'tryOpenExisting128File returned null'}');
+        }
+        if (isLive) {
+          opened = sourceDb != null;
+          debugPrint(
+              '[RESTORE DEBUG] backup path=$sourceDbPath type=${plain ? 'plain' : 'encrypted'} open=$opened error=${opened ? 'none' : 'tryOpenExisting128File returned null'}');
         }
         DBHelper.libraryTrace('SOURCE_OPEN', {
           'path': sourceDbPath,

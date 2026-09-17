@@ -435,7 +435,6 @@ class _SplashScreenState extends State<SplashScreen>
         // align with current file on disk before migration + seed.
         await DBHelper.resetStaticDatabaseConnection();
         debugPrint('[STARTUP] DB initialization start');
-        await DBHelper.runPhysicalDatabaseDiagnostic('before-migration');
 
         // Essential: Database migration
         print('SPLASH before migrateToEncryptedDatabase');
