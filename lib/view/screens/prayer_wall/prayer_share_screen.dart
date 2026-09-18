@@ -5,6 +5,7 @@ import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -32,7 +33,14 @@ class PrayerShareScreen extends StatelessWidget {
 
   String get _shareText {
     final t = title.trim().isEmpty ? 'Prayer Request' : title.trim();
-    final d = description.trim();
+    final myWords = PrayerDualDescription.myWords(description);
+    final ai = PrayerDualDescription.aiPrayer(description);
+    final String d;
+    if (myWords != null && ai != null) {
+      d = 'My Words:\n$myWords\n\nPrayer Created for You:\n$ai';
+    } else {
+      d = description.trim();
+    }
     final idLine = prayerId.trim().isEmpty ? '' : '\n\nPrayer ID: $prayerId';
     return '$t\n\n$d$idLine\n\nRead more at: $_appLink';
   }
@@ -136,39 +144,101 @@ class PrayerShareScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: brown.withValues(alpha: 0.22)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title.trim().isEmpty ? 'Prayer Request' : title.trim(),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: isDark ? Colors.white : brown,
-                        fontFamily: 'Georgia',
-                      ),
+              Flexible(
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: brown.withValues(alpha: 0.22)),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title.trim().isEmpty
+                              ? 'Prayer Request'
+                              : title.trim(),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? Colors.white : brown,
+                            fontFamily: 'Georgia',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Builder(
+                          builder: (_) {
+                            final myWords =
+                                PrayerDualDescription.myWords(description);
+                            final ai =
+                                PrayerDualDescription.aiPrayer(description);
+                            if (myWords != null && ai != null) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'My Words',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
+                                      color: isDark ? Colors.white70 : brown,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    myWords,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontStyle: FontStyle.italic,
+                                      height: 1.35,
+                                      color: isDark
+                                          ? Colors.white70
+                                          : Colors.grey.shade800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    'Prayer Created for You',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
+                                      color: isDark ? Colors.white70 : brown,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    ai,
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      height: 1.35,
+                                      color: isDark
+                                          ? Colors.white70
+                                          : Colors.grey.shade800,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }
+                            return Text(
+                              description.trim().isEmpty
+                                  ? '-'
+                                  : description.trim(),
+                              style: TextStyle(
+                                fontSize: 13,
+                                height: 1.35,
+                                color: isDark
+                                    ? Colors.white70
+                                    : Colors.grey.shade800,
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      description.trim().isEmpty ? '-' : description.trim(),
-                      maxLines: 5,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        height: 1.35,
-                        color: isDark ? Colors.white70 : Colors.grey.shade800,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -193,7 +263,7 @@ class PrayerShareScreen extends StatelessWidget {
                 tileBg: tileBg,
                 onTap: () => _copy(context),
               ),
-              const Spacer(),
+              const SizedBox(height: 16),
               Text(
                 'Tip: Share the prayer so others can support you in faith.',
                 textAlign: TextAlign.center,

@@ -1,3 +1,4 @@
+import 'package:biblebookapp/main.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/images.dart';
@@ -21,14 +22,67 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:provider/provider.dart' as P;
 
 class LoginScreen extends HookConsumerWidget {
-  LoginScreen({super.key, required this.hasSkip, this.popOnSuccess = false});
+  LoginScreen({
+    super.key,
+    required this.hasSkip,
+    this.popOnSuccess = false,
+    this.replaceOnSuccess,
+    this.onOpenSignUp,
+  });
   final bool hasSkip;
   final bool popOnSuccess;
+
+  /// UI-only: Prayer Wall + path — replace Login with Post a Prayer (no pop-then-push).
+  final VoidCallback? replaceOnSuccess;
+
+  /// UI-only: Prayer Wall auth host — switch to Sign Up in the same route
+  /// (avoids Login under Sign Up stealing keyboard). Null = existing push/Get.
+  final VoidCallback? onOpenSignUp;
+
+  /// Route name for Prayer Wall embedded login ([Navigator.push] settings).
+  static const embeddedRouteName = '/prayer-wall-embedded-login';
+
+  /// UI-only: shared across all LoginScreen routes — blocks double sign-in.
+  static bool _signInFlowBusy = false;
+
+  /// UI-only: one embedded pop per Prayer Wall login route.
+  static bool _embeddedLoginSuccessHandled = false;
+
+  /// UI-only: one post-login referral + Home navigation at a time.
+  static bool _standardLoginSuccessHandled = false;
+
+  /// Prayer Wall embedded Login was opened with [Navigator.push] — close the
+  /// same way so Login never stays stacked under the Wall.
+  static void popEmbedded(BuildContext context, bool result) {
+    if (context.mounted && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop(result);
+      return;
+    }
+    Get.back(result: result);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final formKey = useMemoized(() => GlobalKey<FormState>());
     final loginState = ref.watch(loginBloc);
     double screenWidth = MediaQuery.of(context).size.width;
+
+    useEffect(() {
+      if (popOnSuccess || replaceOnSuccess != null) {
+        _embeddedLoginSuccessHandled = false;
+      } else {
+        _standardLoginSuccessHandled = false;
+      }
+      return () {
+        // UI-only: never leave busy/static flags stuck after pop (all devices).
+        _signInFlowBusy = false;
+        if (popOnSuccess || replaceOnSuccess != null) {
+          _embeddedLoginSuccessHandled = false;
+        } else {
+          _standardLoginSuccessHandled = false;
+        }
+      };
+    }, const []);
 
     // Check and clear fields if account was deleted
     useMemoized(() {
@@ -37,7 +91,10 @@ class LoginScreen extends HookConsumerWidget {
       });
     });
     // debugPrint("sz current width - $screenWidth ");
-    return Scaffold(
+    // UI-only: when Sign Up (or any route) covers Login, drop Login focus so
+    // Prayer Wall → Login → Sign Up fields can type (no auth/API change).
+    return _LoginFocusWhenCovered(
+      child: Scaffold(
       resizeToAvoidBottomInset: false,
       body: Container(
         height: MediaQuery.of(context).size.height,
@@ -66,8 +123,8 @@ class LoginScreen extends HookConsumerWidget {
                         color: CommanColor.whiteBlack(context),
                       ),
                       onPressed: () {
-                        if (popOnSuccess) {
-                          Get.back();
+                        if (popOnSuccess || replaceOnSuccess != null) {
+                          LoginScreen.popEmbedded(context, false);
                         } else {
                           Get.offAll(() => HomeScreen(
                               From: "splash",
@@ -147,57 +204,81 @@ class LoginScreen extends HookConsumerWidget {
                       const SizedBox(height: 32),
                       GestureDetector(
                         onTap: () async {
+                          if (_signInFlowBusy || loginState.isLoading) return;
                           if (formKey.currentState?.validate() ?? false) {
                             FocusScope.of(context).unfocus();
+                            _signInFlowBusy = true;
                             try {
-                              if (!loginState.isLoading) {
-                                final user = await loginState.login(context);
-                                //  Constants.showToast(
-                                //     "Hi $user, Welcome to Amplified Bible");
+                              final user = await loginState.login(context);
+                              //  Constants.showToast(
+                              //     "Hi $user, Welcome to Amplified Bible");
 
-                                // Always route to HomeScreen after successful login
-                                if (user != null) {
-                                  Constants.showToast(
-                                      "Hi ${user.displayName}, Welcome to ${BibleInfo.bible_shortName}");
-                                  if (context.mounted) {
-                                    // One referral join per account — skip if
-                                    // this user already entered a code / claimed.
-                                    final alreadyReferred = (user.referredBy !=
-                                                null &&
-                                            user.referredBy!.trim().isNotEmpty) ||
-                                        ((user.referralRewardClaimed ?? 0) > 0);
-                                    if (!alreadyReferred) {
-                                      await ReferralCodeBottomSheet.show(
-                                        context: context,
-                                        email: loginState.emailCon.text.trim(),
-                                        password: loginState.passCon.text,
-                                        ownReferralCode: user.referralCode,
-                                        initialReferredBy: user.referredBy,
-                                        initialReferralRewardClaimed:
-                                            user.referralRewardClaimed,
-                                      );
+                              // Always route to HomeScreen after successful login
+                              if (user != null) {
+                                // Embedded login (Prayer Wall): pop Login only.
+                                // Never open referral here; toast after pop.
+                                if (popOnSuccess || replaceOnSuccess != null) {
+                                  ReferralCodeBottomSheet.resetPresentationLock();
+                                  final welcome =
+                                      "Hi ${user.displayName}, Welcome to ${BibleInfo.bible_shortName}";
+                                  // UI-only: always pop embedded Login so it
+                                  // never stays under Prayer Wall. Optional
+                                  // replaceOnSuccess runs after pop.
+                                  if (!_embeddedLoginSuccessHandled) {
+                                    _embeddedLoginSuccessHandled = true;
+                                    final afterPop = replaceOnSuccess;
+                                    LoginScreen.popEmbedded(context, true);
+                                    if (afterPop != null) {
+                                      WidgetsBinding.instance
+                                          .addPostFrameCallback((_) {
+                                        afterPop();
+                                      });
                                     }
                                   }
-                                  if (!context.mounted) return;
-                                  if (popOnSuccess) {
-                                    return Navigator.of(context).pop(true);
-                                  }
-                                  return Get.offAll(() => HomeScreen(
-                                      From: "splash",
-                                      selectedVerseNumForRead: "",
-                                      selectedBookForRead: "",
-                                      selectedChapterForRead: "",
-                                      selectedBookNameForRead: "",
-                                      selectedVerseForRead: ""));
+                                  WidgetsBinding.instance
+                                      .addPostFrameCallback((_) {
+                                    Constants.showToast(welcome);
+                                  });
+                                  return;
                                 }
+                                if (_standardLoginSuccessHandled) return;
+                                _standardLoginSuccessHandled = true;
+                                Constants.showToast(
+                                    "Hi ${user.displayName}, Welcome to ${BibleInfo.bible_shortName}");
+                                if (!context.mounted) return;
+                                // UI only: after sign-in go to Reading (Home).
+                                // Do not show Referral Code sheet on login.
+                                // Account → Enter Referral Code is unchanged.
+                                return Get.offAll(() => HomeScreen(
+                                    From: "splash",
+                                    selectedVerseNumForRead: "",
+                                    selectedBookForRead: "",
+                                    selectedChapterForRead: "",
+                                    selectedBookNameForRead: "",
+                                    selectedVerseForRead: ""));
                               }
                             } catch (e) {
                               if (e.toString() == 'verification') {
-                                Get.offAll(
-                                    () => const MailVerificationScreen());
+                                // UI-only: embedded PW login must not Get.offAll
+                                // (that wiped Prayer Wall on phone/iPad).
+                                final embedded = popOnSuccess ||
+                                    replaceOnSuccess != null;
+                                if (embedded) {
+                                  LoginScreen.popEmbedded(context, false);
+                                  WidgetsBinding.instance
+                                      .addPostFrameCallback((_) {
+                                    Get.to(
+                                        () => const MailVerificationScreen());
+                                  });
+                                } else {
+                                  Get.offAll(
+                                      () => const MailVerificationScreen());
+                                }
                               } else {
                                 Constants.showToast(e.toString());
                               }
+                            } finally {
+                              _signInFlowBusy = false;
                             }
                           }
                         },
@@ -239,7 +320,22 @@ class LoginScreen extends HookConsumerWidget {
                       const SizedBox(height: 8),
                       GestureDetector(
                           onTap: () {
-                            Get.to(() => ForgetPasswordScreen());
+                            // UI-only: Prayer Wall embedded Login stays on the
+                            // same Navigator (avoid Get stack under Wall).
+                            final embedded = popOnSuccess ||
+                                replaceOnSuccess != null;
+                            if (embedded) {
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  settings: const RouteSettings(
+                                    name: '/prayer-wall-embedded-forgot',
+                                  ),
+                                  builder: (_) => ForgetPasswordScreen(),
+                                ),
+                              );
+                            } else {
+                              Get.to(() => ForgetPasswordScreen());
+                            }
                           },
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.end,
@@ -269,7 +365,38 @@ class LoginScreen extends HookConsumerWidget {
                                         color: CommanColor.whiteBlack(context)),
                                     recognizer: TapGestureRecognizer()
                                       ..onTap = () {
-                                        Get.to(() => SignupScreen());
+                                        FocusManager.instance.primaryFocus
+                                            ?.unfocus();
+                                        // UI-only: same-route Sign Up when host
+                                        // provided (Prayer Wall keyboard fix).
+                                        if (onOpenSignUp != null) {
+                                          onOpenSignUp!();
+                                          return;
+                                        }
+                                        final embedded = popOnSuccess ||
+                                            replaceOnSuccess != null;
+                                        if (embedded) {
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute<void>(
+                                              settings: const RouteSettings(
+                                                name:
+                                                    '/prayer-wall-embedded-signup',
+                                              ),
+                                              builder: (_) => SignupScreen(
+                                                popOnSuccess: true,
+                                                openPostPrayerOnSuccess:
+                                                    replaceOnSuccess != null,
+                                              ),
+                                            ),
+                                          );
+                                        } else {
+                                          Get.to(
+                                            () => SignupScreen(
+                                              popOnSuccess: false,
+                                              openPostPrayerOnSuccess: false,
+                                            ),
+                                          );
+                                        }
                                       })
                               ])),
                     ],
@@ -285,7 +412,34 @@ class LoginScreen extends HookConsumerWidget {
                   children: [
                     GestureDetector(
                       onTap: () {
-                        Get.to(() => SignupScreen());
+                        FocusManager.instance.primaryFocus?.unfocus();
+                        if (onOpenSignUp != null) {
+                          onOpenSignUp!();
+                          return;
+                        }
+                        final embedded = popOnSuccess ||
+                            replaceOnSuccess != null;
+                        if (embedded) {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              settings: const RouteSettings(
+                                name: '/prayer-wall-embedded-signup',
+                              ),
+                              builder: (_) => SignupScreen(
+                                popOnSuccess: true,
+                                openPostPrayerOnSuccess:
+                                    replaceOnSuccess != null,
+                              ),
+                            ),
+                          );
+                        } else {
+                          Get.to(
+                            () => SignupScreen(
+                              popOnSuccess: false,
+                              openPostPrayerOnSuccess: false,
+                            ),
+                          );
+                        }
                       },
                       child: Text(
                         'Note:',
@@ -312,6 +466,116 @@ class LoginScreen extends HookConsumerWidget {
           ],
         ),
       ),
+    ),
+    );
+  }
+}
+
+/// UI-only: one Navigator route for Prayer Wall Login ↔ Sign Up.
+/// Avoids stacking Sign Up on Login (that blocked the keyboard).
+class PrayerWallEmbeddedAuthHost extends StatefulWidget {
+  const PrayerWallEmbeddedAuthHost({
+    super.key,
+    this.replaceOnSuccess,
+  });
+
+  final VoidCallback? replaceOnSuccess;
+
+  static const routeName = '/prayer-wall-embedded-auth';
+
+  @override
+  State<PrayerWallEmbeddedAuthHost> createState() =>
+      _PrayerWallEmbeddedAuthHostState();
+}
+
+class _PrayerWallEmbeddedAuthHostState
+    extends State<PrayerWallEmbeddedAuthHost> {
+  bool _showSignUp = false;
+
+  void _openSignUp() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _showSignUp = true);
+  }
+
+  void _backToLogin() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _showSignUp = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_showSignUp) {
+      return SignupScreen(
+        key: const ValueKey('prayer-wall-embedded-signup'),
+        popOnSuccess: true,
+        openPostPrayerOnSuccess: widget.replaceOnSuccess != null,
+        onBackToEmbeddedLogin: _backToLogin,
+      );
+    }
+    return LoginScreen(
+      key: const ValueKey('prayer-wall-embedded-login'),
+      hasSkip: false,
+      popOnSuccess: true,
+      replaceOnSuccess: widget.replaceOnSuccess,
+      onOpenSignUp: _openSignUp,
+    );
+  }
+}
+
+/// UI-only: while another route covers Login (Prayer Wall → Sign Up), prevent
+/// Login TextFields from holding keyboard/caret focus. Auth logic unchanged.
+class _LoginFocusWhenCovered extends StatefulWidget {
+  const _LoginFocusWhenCovered({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_LoginFocusWhenCovered> createState() => _LoginFocusWhenCoveredState();
+}
+
+class _LoginFocusWhenCoveredState extends State<_LoginFocusWhenCovered>
+    with RouteAware {
+  bool _covered = false;
+  ModalRoute<dynamic>? _route;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route == _route) return;
+    if (_route != null) {
+      routeObserver.unsubscribe(this);
+    }
+    _route = route;
+    if (_route != null) {
+      routeObserver.subscribe(this, _route!);
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_route != null) {
+      routeObserver.unsubscribe(this);
+    }
+    super.dispose();
+  }
+
+  @override
+  void didPushNext() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (mounted) setState(() => _covered = true);
+  }
+
+  @override
+  void didPopNext() {
+    if (mounted) setState(() => _covered = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeFocus(
+      excluding: _covered,
+      child: widget.child,
     );
   }
 }

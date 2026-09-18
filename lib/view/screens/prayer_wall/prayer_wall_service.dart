@@ -1,7 +1,13 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:biblebookapp/constant/prayer_wall_api_constant.dart';
+import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
+import 'package:biblebookapp/view/screens/dashboard/constants.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_models.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
 /// Thin HTTP layer for Prayer Wall — keeps UI free of URL strings.
@@ -13,21 +19,471 @@ class PrayerWallService {
         'Authorization': 'marberx@123tech',
       };
 
+  /// App identity fields for all Prayer Wall write payloads.
+  static Map<String, dynamic> get _appMeta => {
+        'app_id': BibleInfo.ios_Bundle_Id,
+        'app_name': BibleInfo.bible_shortName,
+        'bundle_id': BibleInfo.ios_Bundle_Id, // com.balaklrapps.newkingsjamesversion
+      };
+
+  static String _encodeBody(Map<String, dynamic> body) =>
+      jsonEncode({...body, ..._appMeta});
+
   static String? _extractId(dynamic decoded) {
     if (decoded is! Map) return null;
     final m = Map<String, dynamic>.from(decoded);
     return m['_id']?.toString() ?? m['id']?.toString();
   }
 
+  /// Resolve returns `user_id` — that value is passed as `identityUserId` on GET/POST.
+  static String? _extractResolveUserId(dynamic decoded) {
+    String? fromMap(Map<String, dynamic> map) {
+      final v = map['user_id'] ?? map['userId'];
+      final s = v?.toString().trim() ?? '';
+      if (s.isNotEmpty) return s;
+      final data = map['data'];
+      if (data is Map) {
+        final nested = Map<String, dynamic>.from(data);
+        final inner = nested['user_id'] ?? nested['userId'];
+        final t = inner?.toString().trim() ?? '';
+        if (t.isNotEmpty) return t;
+      }
+      return null;
+    }
+
+    if (decoded is Map) {
+      return fromMap(Map<String, dynamic>.from(decoded));
+    }
+    return null;
+  }
+
+  static Future<String> _deviceUid() async {
+    try {
+      final plugin = DeviceInfoPlugin();
+      if (Platform.isAndroid) {
+        final info = await plugin.androidInfo;
+        return (info.id ?? '').trim();
+      }
+      if (Platform.isIOS) {
+        final info = await plugin.iosInfo;
+        return (info.identifierForVendor ?? '').trim();
+      }
+    } catch (e) {
+      print('PrayerWallService._deviceUid error: $e');
+    }
+    return '';
+  }
+
+  /// In-flight resolve so parallel callers share one POST (avoids race 500s).
+  static Future<String?>? _resolveInFlight;
+
+  /// Additive: POST `/api/users/resolve` after login — does not change login.
+  /// Logged-in: `app_id` + login `email` + `user_name` (Postman-safe; no device clash).
+  /// Guest: `app_id` + `device_id` (+ optional name).
+  static Future<String?> resolveIdentityUser({
+    String? email,
+    String? userName,
+  }) async {
+    if (_resolveInFlight != null) {
+      print('PrayerWall resolve: reuse in-flight request');
+      return _resolveInFlight;
+    }
+    _resolveInFlight = _resolveIdentityUserImpl(
+      email: email,
+      userName: userName,
+    );
+    try {
+      return await _resolveInFlight;
+    } finally {
+      _resolveInFlight = null;
+    }
+  }
+
+  static Future<String?> _resolveIdentityUserImpl({
+    String? email,
+    String? userName,
+  }) async {
+    try {
+      final deviceId = await _deviceUid();
+      var resolvedEmail = (email ?? '').trim();
+      var resolvedName = (userName ?? '').trim();
+      // Fallback: login/signup cache keys when caller did not pass them.
+      if (resolvedEmail.isEmpty || resolvedName.isEmpty) {
+        try {
+          if (resolvedEmail.isEmpty) {
+            resolvedEmail =
+                (await CacheNotifier().readCache(key: 'user') ?? '')
+                    .toString()
+                    .trim();
+          }
+          if (resolvedName.isEmpty) {
+            resolvedName =
+                (await CacheNotifier().readCache(key: 'name') ?? '')
+                    .toString()
+                    .trim();
+          }
+        } catch (_) {}
+      }
+
+      // Why real login got 500 while hardcode/Postman got 200:
+      // app sent email + real device_id together; that device_id was often
+      // already tied to another identity → server conflict 500.
+      // Fix: when login email exists, match Postman — email (+ user_name) only.
+      final bodyMap = <String, dynamic>{
+        'app_id': BibleInfo.ios_Bundle_Id,
+      };
+      if (resolvedEmail.isNotEmpty) {
+        bodyMap['email'] = resolvedEmail;
+        if (resolvedName.isNotEmpty) {
+          bodyMap['user_name'] = resolvedName;
+        }
+      } else {
+        // Guest / no email: identify by device only.
+        if (deviceId.isNotEmpty) {
+          bodyMap['device_id'] = deviceId;
+        }
+        if (resolvedName.isNotEmpty) {
+          bodyMap['user_name'] = resolvedName;
+        }
+      }
+
+      final bodyJson = jsonEncode(bodyMap);
+      print('========== POST /api/users/resolve ==========');
+      print('URL  → ${PrayerWallApiConstant.usersResolve}');
+      print('email (login/signup) → $resolvedEmail');
+      print('user_name (login/signup) → $resolvedName');
+      print(
+        'device_id → ${resolvedEmail.isNotEmpty ? "(omitted; email login)" : deviceId}',
+      );
+      print('body → $bodyJson');
+      print('=============================================');
+      final res = await http
+          .post(
+            Uri.parse(PrayerWallApiConstant.usersResolve),
+            headers: _jsonHeaders,
+            body: bodyJson,
+          )
+          .timeout(const Duration(seconds: 15));
+      print(
+        'POST /api/users/resolve response → '
+        '${res.statusCode} ${res.body}',
+      );
+      if (res.statusCode < 200 || res.statusCode >= 300) return null;
+      final decoded = jsonDecode(res.body);
+      if (decoded is Map) {
+        final m = Map<String, dynamic>.from(decoded);
+        final data = m['data'];
+        print('resolve raw identityUserId → ${m['identityUserId']}');
+        print('resolve raw user_id → ${m['user_id']}');
+        if (data is Map) {
+          print(
+            'resolve data.identityUserId → ${data['identityUserId']} '
+            'data.user_id → ${data['user_id']}',
+          );
+        }
+      }
+      final userId = _extractResolveUserId(decoded);
+      print('resolve using user_id as identityUserId → ${userId ?? "none"}');
+      if (userId != null && userId.isNotEmpty) {
+        await PrayerWallLocalStore.saveIdentityUserId(userId);
+      }
+      return userId;
+    } catch (e) {
+      print('PrayerWallService.resolveIdentityUser error: $e');
+      return null;
+    }
+  }
+
+  /// Cached resolve id, or resolve now using login email + name + device UID.
+  static Future<String?> ensureIdentityUserId() async {
+    final cached = await PrayerWallLocalStore.loadIdentityUserId();
+    if (cached != null && cached.isNotEmpty) return cached;
+    var email = '';
+    var name = '';
+    try {
+      email = (await CacheNotifier().readCache(key: 'user') ?? '')
+          .toString()
+          .trim();
+      name = (await CacheNotifier().readCache(key: 'name') ?? '')
+          .toString()
+          .trim();
+    } catch (_) {}
+    return resolveIdentityUser(
+      email: email.isEmpty ? null : email,
+      userName: name.isEmpty ? null : name,
+    );
+  }
+
+  /// Additive: `GET /api/prayer-queue` — full rotating wait list.
+  static Future<PrayerQueueListResult> fetchPrayerQueue() async {
+    final url = PrayerWallApiConstant.prayerQueue;
+    print('========== GET /api/prayer-queue ==========');
+    print('URL → $url');
+    print('==========================================');
+    final res = await http.get(Uri.parse(url), headers: _jsonHeaders);
+    print(
+      'GET /api/prayer-queue response → ${res.statusCode} ${res.body}',
+    );
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw Exception('Prayer queue failed (${res.statusCode}): ${res.body}');
+    }
+    final parsed = PrayerQueueListResult.fromResponseBody(res.body);
+    if (parsed == null) {
+      throw Exception('Prayer queue parse failed');
+    }
+    return parsed;
+  }
+
+  /// Additive: `GET /api/prayer-queue/current` — active hotspot slot.
+  static Future<PrayerQueueCurrentResult> fetchPrayerQueueCurrent() async {
+    final url = PrayerWallApiConstant.prayerQueueCurrent;
+    print('========== GET /api/prayer-queue/current ==========');
+    print('URL → $url');
+    print('==================================================');
+    final res = await http.get(Uri.parse(url), headers: _jsonHeaders);
+    print(
+      'GET /api/prayer-queue/current response → ${res.statusCode} ${res.body}',
+    );
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw Exception(
+        'Prayer queue current failed (${res.statusCode}): ${res.body}',
+      );
+    }
+    final parsed = PrayerQueueCurrentResult.fromResponseBody(res.body);
+    if (parsed == null) {
+      throw Exception('Prayer queue current parse failed');
+    }
+    return parsed;
+  }
+
   static Future<List<PrayerWallItem>> fetchPrayers() async {
-    final res = await http.get(
-      Uri.parse(PrayerWallApiConstant.prayers),
+    // Wall feed stays GET /api/prayers. When logged in, also pass
+    // excludeBlockedForUserId (viewer resolve user_id). Guest = full list.
+    // identityUserId query is not used here (filters to one user).
+    var url = PrayerWallApiConstant.prayers;
+    var usedExclude = false;
+    try {
+      var uid = (await PrayerWallLocalStore.loadIdentityUserId() ?? '').trim();
+      if (uid.isEmpty) {
+        var email = '';
+        try {
+          email = (await CacheNotifier().readCache(key: 'user') ?? '')
+              .toString()
+              .trim();
+        } catch (_) {}
+        if (email.isNotEmpty) {
+          uid = (await ensureIdentityUserId() ?? '').trim();
+        }
+      }
+      if (uid.isNotEmpty) {
+        url = PrayerWallApiConstant.prayersExcludingBlockedForUser(uid);
+        usedExclude = true;
+      }
+    } catch (e) {
+      print('fetchPrayers excludeBlockedForUserId skip: $e');
+    }
+    print('========== GET /api/prayers ==========');
+    print('URL → $url');
+    print('======================================');
+    var res = await http.get(
+      Uri.parse(url),
       headers: _jsonHeaders,
     );
+    print(
+      'GET /api/prayers response → ${res.statusCode} ${res.body}',
+    );
+    if (usedExclude &&
+        (res.statusCode < 200 || res.statusCode >= 300)) {
+      print('excludeBlockedForUserId failed; fallback GET /api/prayers');
+      res = await http.get(
+        Uri.parse(PrayerWallApiConstant.prayers),
+        headers: _jsonHeaders,
+      );
+      print(
+        'GET /api/prayers fallback → ${res.statusCode} ${res.body}',
+      );
+    }
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception('Prayers failed (${res.statusCode}): ${res.body}');
     }
     return PrayerWallItem.listFromResponseBody(res.body);
+  }
+
+  /// Additive: `GET /api/prayers?identityUserId=<resolve user_id>`.
+  static Future<List<PrayerWallItem>> fetchPrayersByIdentityUserId() async {
+    var email = '';
+    var name = '';
+    try {
+      email = (await CacheNotifier().readCache(key: 'user') ?? '')
+          .toString()
+          .trim();
+      name = (await CacheNotifier().readCache(key: 'name') ?? '')
+          .toString()
+          .trim();
+    } catch (_) {}
+    final identityUserId = await resolveIdentityUser(
+          email: email.isEmpty ? null : email,
+          userName: name.isEmpty ? null : name,
+        ) ??
+        await PrayerWallLocalStore.loadIdentityUserId();
+    if (identityUserId == null || identityUserId.isEmpty) {
+      print('GET /api/prayers skipped: resolve user_id missing');
+      return [];
+    }
+    final url =
+        PrayerWallApiConstant.prayersForIdentityUserId(identityUserId);
+    print('========== GET /api/prayers?identityUserId ==========');
+    print('URL → $url');
+    print('identityUserId (resolve user_id) → $identityUserId');
+    print('====================================================');
+    final res = await http.get(
+      Uri.parse(url),
+      headers: _jsonHeaders,
+    );
+    print(
+      'GET /api/prayers?identityUserId response → '
+      '${res.statusCode} ${res.body}',
+    );
+    if (res.statusCode < 200 || res.statusCode >= 300) return [];
+    final list = PrayerWallItem.listFromResponseBody(res.body);
+    // Identity GET may return the full wall; keep only this login email.
+    if (email.isEmpty) return list;
+    final want = email.toLowerCase();
+    return list
+        .where((p) => (p.email ?? '').trim().toLowerCase() == want)
+        .toList();
+  }
+
+  /// Additive: `GET /api/prayer-history?user_id=<resolve user_id>`.
+  /// Does not change wall GET /api/prayers or identity My Prayers fetch.
+  static Future<List<PrayerWallItem>> fetchPrayerHistory() async {
+    final identityUserId = await ensureIdentityUserId();
+    if (identityUserId == null || identityUserId.isEmpty) {
+      print('GET /api/prayer-history skipped: resolve user_id missing');
+      return [];
+    }
+    final url = PrayerWallApiConstant.prayerHistoryForUser(identityUserId);
+    print('========== GET /api/prayer-history ==========');
+    print('URL → $url');
+    print('user_id (resolve user_id) → $identityUserId');
+    print('=============================================');
+    try {
+      final res = await http
+          .get(
+            Uri.parse(url),
+            headers: _jsonHeaders,
+          )
+          .timeout(const Duration(seconds: 15));
+      print(
+        'GET /api/prayer-history response → '
+        '${res.statusCode} ${res.body}',
+      );
+      if (res.statusCode < 200 || res.statusCode >= 300) return [];
+      if (res.body.isEmpty) return [];
+      var list = PrayerWallItem.listFromResponseBody(res.body);
+      if (list.isEmpty) {
+        list = _listFromHistoryBody(res.body);
+      }
+      return list;
+    } catch (e) {
+      print('PrayerWallService.fetchPrayerHistory error: $e');
+      return [];
+    }
+  }
+
+  static List<PrayerWallItem> _listFromHistoryBody(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is! Map) return [];
+      final m = Map<String, dynamic>.from(decoded);
+      dynamic nested = m['expired'] ??
+          m['expired_prayers'] ??
+          m['history'] ??
+          m['prayer_history'];
+      final data = m['data'];
+      if (nested == null && data is Map) {
+        final dm = Map<String, dynamic>.from(data);
+        nested = dm['expired'] ??
+            dm['expired_prayers'] ??
+            dm['history'] ??
+            dm['prayer_history'] ??
+            dm['prayers'] ??
+            dm['items'];
+      }
+      if (nested is! List) return [];
+      final out = <PrayerWallItem>[];
+      for (final e in nested) {
+        final p = PrayerWallItem.fromDynamic(e);
+        if (p != null) out.add(p);
+      }
+      return out;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Additive: one prayer by posted id — `GET /api/prayers?prayerId={id}`.
+  /// Server may ignore the query and return the full list; we keep only exact id.
+  /// Does not change [fetchPrayers] (full wall).
+  static Future<PrayerWallItem?> fetchPrayerByPrayerId(String prayerId) async {
+    final id = prayerId.trim();
+    if (id.isEmpty) return null;
+    final res = await http.get(
+      Uri.parse(PrayerWallApiConstant.prayersForPrayerId(id)),
+      headers: _jsonHeaders,
+    );
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw Exception(
+          'Prayer by id failed (${res.statusCode}): ${res.body}');
+    }
+    final list = PrayerWallItem.listFromResponseBody(res.body);
+    for (final p in list) {
+      if (p.id == id) return p;
+    }
+    // Some APIs return a single object instead of a list.
+    try {
+      final decoded = jsonDecode(res.body);
+      final one = PrayerWallItem.fromDynamic(decoded);
+      if (one != null && one.id == id) return one;
+    } catch (_) {}
+    return null;
+  }
+
+  /// Additive: load history for ids saved when the user posted.
+  /// Always filters to [prayerIds] only (API `?prayerId=` may return the full wall).
+  static Future<List<PrayerWallItem>> fetchPrayersByPrayerIds(
+    Iterable<String> prayerIds,
+  ) async {
+    final ids = prayerIds
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toSet();
+    if (ids.isEmpty) return [];
+
+    // One request (server ignores filter today); keep only requested ids.
+    List<PrayerWallItem> list;
+    try {
+      final probeId = ids.first;
+      final res = await http.get(
+        Uri.parse(PrayerWallApiConstant.prayersForPrayerId(probeId)),
+        headers: _jsonHeaders,
+      );
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        throw Exception(
+            'Prayers by id failed (${res.statusCode}): ${res.body}');
+      }
+      list = PrayerWallItem.listFromResponseBody(res.body);
+    } catch (_) {
+      list = await fetchPrayers();
+    }
+
+    final out = list.where((p) => ids.contains(p.id)).toList();
+    out.sort((a, b) {
+      final am = a.createdAt?.millisecondsSinceEpoch ?? 0;
+      final bm = b.createdAt?.millisecondsSinceEpoch ?? 0;
+      return bm.compareTo(am);
+    });
+    return out;
   }
 
   static Future<Map<String, dynamic>> createPrayer({
@@ -36,6 +492,9 @@ class PrayerWallService {
     required String prayerCategory,
     bool isAnonymous = true,
     String? userName,
+    String? profileImage,
+    String? email,
+    String? identityUserId,
     int prayerDuration = 7,
   }) async {
     final bodyMap = <String, dynamic>{
@@ -52,14 +511,39 @@ class PrayerWallService {
     if (normalizedUserName != null && normalizedUserName.isNotEmpty) {
       bodyMap['user_name'] = normalizedUserName;
     }
-    final bodyJson = jsonEncode(bodyMap);
-    print('PrayerWallService.createPrayer request body: $bodyJson');
+    // Additive: pass profile photo URL when available (does not change other fields).
+    final normalizedImage = profileImage?.trim();
+    if (normalizedImage != null && normalizedImage.isNotEmpty) {
+      bodyMap['profile_image'] = normalizedImage;
+    }
+    // Additive: pass login email when available.
+    final normalizedEmail = email?.trim();
+    if (normalizedEmail != null && normalizedEmail.isNotEmpty) {
+      bodyMap['email'] = normalizedEmail;
+    }
+    // Additive: pass resolve `user_id` as identityUserId on create.
+    var resolvedIdentity = (identityUserId ?? '').trim();
+    if (resolvedIdentity.isEmpty) {
+      resolvedIdentity = (await ensureIdentityUserId()) ?? '';
+    }
+    if (resolvedIdentity.isNotEmpty) {
+      bodyMap['identityUserId'] = resolvedIdentity;
+    }
+    final bodyJson = _encodeBody(bodyMap);
+    // Debug: values sent with create prayer (app identity + full body).
+    print('========== POST PRAYER ==========');
+    print('app_id    → ${BibleInfo.ios_Bundle_Id}');
+    print('app_name  → ${BibleInfo.bible_shortName}');
+    print('bundle_id → ${BibleInfo.ios_Bundle_Id}');
+    print('request body → $bodyJson');
+    print('================================');
 
     final res = await http.post(
       Uri.parse(PrayerWallApiConstant.prayers),
       headers: _jsonHeaders,
       body: bodyJson,
     );
+    print('POST prayer response → ${res.statusCode} ${res.body}');
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception('Create prayer failed (${res.statusCode}): ${res.body}');
     }
@@ -74,7 +558,7 @@ class PrayerWallService {
     required String prayerTitle,
     required String prayerDescription,
   }) async {
-    final body = jsonEncode({
+    final body = _encodeBody({
       // Support multiple backend shapes without changing UI logic.
       'prayerId': prayerId,
       '_id': prayerId,
@@ -113,7 +597,7 @@ class PrayerWallService {
   }
 
   static Future<void> deletePrayer(String prayerId) async {
-    final body = jsonEncode({
+    final body = _encodeBody({
       // Support multiple backend shapes without changing UI logic.
       'prayerId': prayerId,
       '_id': prayerId,
@@ -212,7 +696,7 @@ class PrayerWallService {
     final res = await http.post(
       Uri.parse(PrayerWallApiConstant.likes),
       headers: _jsonHeaders,
-      body: jsonEncode({'prayerId': prayerId}),
+      body: _encodeBody({'prayerId': prayerId}),
     );
     if (res.statusCode == 201) {
       try {
@@ -253,7 +737,7 @@ class PrayerWallService {
     final res = await http.delete(
       Uri.parse(PrayerWallApiConstant.likes),
       headers: _jsonHeaders,
-      body: jsonEncode(body),
+      body: _encodeBody(body),
     );
     if (res.statusCode >= 200 && res.statusCode < 300) return;
     throw Exception('Unlike failed (${res.statusCode}): ${res.body}');
@@ -304,7 +788,7 @@ class PrayerWallService {
     final res = await http.post(
       Uri.parse(PrayerWallApiConstant.comments),
       headers: _jsonHeaders,
-      body: jsonEncode({
+      body: _encodeBody({
         'prayerId': prayerId,
         'comment_text': commentText,
         'isAnonymous': isAnonymous,
@@ -326,7 +810,7 @@ class PrayerWallService {
     required String commentId,
     required String commentText,
   }) async {
-    final body = jsonEncode({
+    final body = _encodeBody({
       // Support multiple backend shapes without changing UI logic.
       'commentId': commentId,
       '_id': commentId,
@@ -366,7 +850,7 @@ class PrayerWallService {
   }
 
   static Future<void> deleteComment(String commentId) async {
-    final body = jsonEncode({
+    final body = _encodeBody({
       // Support multiple backend shapes without changing UI logic.
       'commentId': commentId,
       '_id': commentId,
@@ -393,4 +877,540 @@ class PrayerWallService {
 
     throw Exception('Delete comment failed (${res.statusCode}): ${res.body}');
   }
+
+  /// POST `/api/prayer-reports`
+  static Future<void> reportPrayer({
+    required String prayerId,
+    required String reporterId,
+    required String reportReason,
+  }) async {
+    final url = PrayerWallApiConstant.prayerReports;
+    final payload = {
+      'prayerId': prayerId,
+      'reporter_id': PrayerWallLocalStore.normalizeReporterId(reporterId),
+      'report_reason': reportReason,
+    };
+    final body = _encodeBody(payload);
+    print('PrayerWallService.reportPrayer URL: $url');
+    print('PrayerWallService.reportPrayer headers: $_jsonHeaders');
+    print('PrayerWallService.reportPrayer request body: $body');
+    final res = await http.post(
+      Uri.parse(url),
+      headers: _jsonHeaders,
+      body: body,
+    );
+    print(
+      'PrayerWallService.reportPrayer response: '
+      'status=${res.statusCode} body=${res.body}',
+    );
+    if (res.statusCode >= 200 && res.statusCode < 300) return;
+    throw Exception('Report prayer failed (${res.statusCode}): ${res.body}');
+  }
+
+  /// Additive: ids + optional display names from GET /api/blocked-users.
+  static ({Set<String> ids, Map<String, String> names}) _parseBlockedUsers(
+    dynamic decoded,
+  ) {
+    final out = <String>{};
+    final names = <String, String>{};
+
+    void addEntry(String id, String? name) {
+      final sid = id.trim();
+      if (sid.isEmpty) return;
+      out.add(sid);
+      final n = (name ?? '').trim();
+      if (n.isNotEmpty && n.toLowerCase() != 'blocked prayer') {
+        names[sid] = n;
+      }
+    }
+
+    void addFromList(dynamic list) {
+      if (list is! List) return;
+      for (final e in list) {
+        if (e is Map) {
+          final m = Map<String, dynamic>.from(e);
+          final id = (m['blocked_user_id'] ??
+                  m['blockedUserId'] ??
+                  m['user_id'] ??
+                  m['id'] ??
+                  '')
+              .toString();
+          final name = (m['name'] ??
+                  m['blocked_user_name'] ??
+                  m['blockedUserName'] ??
+                  m['user_name'] ??
+                  m['display_name'] ??
+                  m['displayName'] ??
+                  '')
+              .toString();
+          addEntry(id, name);
+        } else {
+          addEntry(e.toString(), null);
+        }
+      }
+    }
+
+    if (decoded is Map) {
+      final m = Map<String, dynamic>.from(decoded);
+      addFromList(
+        m['blocked_user_ids'] ?? m['blockedUserIds'] ?? m['blocked_users'],
+      );
+      addFromList(m['items']);
+      final data = m['data'];
+      if (data is List) {
+        addFromList(data);
+      } else if (data is Map) {
+        final dm = Map<String, dynamic>.from(data);
+        addFromList(
+          dm['blocked_user_ids'] ??
+              dm['blockedUserIds'] ??
+              dm['blocked_users'] ??
+              dm['items'],
+        );
+      }
+    } else if (decoded is List) {
+      addFromList(decoded);
+    }
+    return (ids: out, names: names);
+  }
+
+  /// Additive: `GET /api/blocked-users?user_id=` — same ids POST stored.
+  /// Does not change POST/DELETE block or unblock.
+  static Future<Set<String>> fetchBlockedUserIds({
+    required String userId,
+  }) async {
+    final detailed = await fetchBlockedUsersDetailed(userId: userId);
+    return detailed.ids;
+  }
+
+  /// Additive: GET blocked users including optional `name` (for Blocked list).
+  static Future<({Set<String> ids, Map<String, String> names})>
+      fetchBlockedUsersDetailed({
+    required String userId,
+  }) async {
+    final uid = userId.trim();
+    if (uid.isEmpty) return (ids: <String>{}, names: <String, String>{});
+    try {
+      final url = PrayerWallApiConstant.blockedUsersForUser(uid);
+      print('========== GET /api/blocked-users ==========');
+      print('URL → $url');
+      print('user_id → $uid');
+      print('============================================');
+      final res = await http
+          .get(
+            Uri.parse(url),
+            headers: _jsonHeaders,
+          )
+          .timeout(const Duration(seconds: 15));
+      print(
+        'GET /api/blocked-users response → '
+        '${res.statusCode} ${res.body}',
+      );
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        return (ids: <String>{}, names: <String, String>{});
+      }
+      if (res.body.isEmpty) {
+        return (ids: <String>{}, names: <String, String>{});
+      }
+      return _parseBlockedUsers(jsonDecode(res.body));
+    } catch (e) {
+      print('PrayerWallService.fetchBlockedUsersDetailed error: $e');
+      return (ids: <String>{}, names: <String, String>{});
+    }
+  }
+
+  /// Additive: restore blocked ids via resolve `user_id` only.
+  static Future<Set<String>> fetchBlockedUserIdsForAccount({
+    required String email,
+    List<PrayerWallItem> wallPrayers = const [],
+    Iterable<String> extraActorIds = const [],
+  }) async {
+    final detailed = await fetchBlockedUsersDetailedForAccount(email: email);
+    return detailed.ids;
+  }
+
+  /// Additive: ids + names for Account Blocked list after reinstall.
+  static Future<({Set<String> ids, Map<String, String> names})>
+      fetchBlockedUsersDetailedForAccount({
+    required String email,
+  }) async {
+    final identity = await ensureIdentityUserId();
+    if (identity == null || identity.isEmpty) {
+      return (ids: <String>{}, names: <String, String>{});
+    }
+    return fetchBlockedUsersDetailed(userId: identity);
+  }
+
+  /// POST `/api/blocked-users` — block a prayer poster for this user.
+  /// Additive [blockedUserName]: sent as `name` for backend to store/return.
+  static Future<void> blockUser({
+    required String userId,
+    required String blockedUserId,
+    String? blockedUserName,
+  }) async {
+    final uid = userId.trim();
+    final blocked = blockedUserId.trim();
+    if (uid.isEmpty || blocked.isEmpty) {
+      throw Exception('blockUser: user_id and blocked_user_id required');
+    }
+    final payload = <String, dynamic>{
+      'user_id': uid,
+      'blocked_user_id': blocked,
+    };
+    final name = (blockedUserName ?? '').trim();
+    if (name.isNotEmpty) {
+      // Additive: backend should persist and return this on GET.
+      payload['name'] = name;
+      payload['blocked_user_name'] = name;
+    }
+    final body = jsonEncode(payload);
+    print('PrayerWallService.blockUser body: $body');
+    final res = await http.post(
+      Uri.parse(PrayerWallApiConstant.blockedUsers),
+      headers: _jsonHeaders,
+      body: body,
+    );
+    print(
+      'PrayerWallService.blockUser response: '
+      'status=${res.statusCode} body=${res.body}',
+    );
+    if (res.statusCode >= 200 && res.statusCode < 300) return;
+    throw Exception('Block user failed (${res.statusCode}): ${res.body}');
+  }
+
+  /// DELETE `/api/blocked-users` — unblock a user for this account.
+  static Future<void> unblockUser({
+    required String userId,
+    required String blockedUserId,
+  }) async {
+    final uid = userId.trim();
+    final blocked = blockedUserId.trim();
+    if (uid.isEmpty || blocked.isEmpty) {
+      throw Exception('unblockUser: user_id and blocked_user_id required');
+    }
+    final body = jsonEncode({
+      'user_id': uid,
+      'blocked_user_id': blocked,
+    });
+    print('PrayerWallService.unblockUser body: $body');
+    final res = await http.delete(
+      Uri.parse(PrayerWallApiConstant.blockedUsers),
+      headers: _jsonHeaders,
+      body: body,
+    );
+    print(
+      'PrayerWallService.unblockUser response: '
+      'status=${res.statusCode} body=${res.body}',
+    );
+    if (res.statusCode >= 200 && res.statusCode < 300) return;
+    throw Exception('Unblock user failed (${res.statusCode}): ${res.body}');
+  }
+
+  /// Additive: POST `/api/follows` — [userId] follows [followingUserId].
+  static Future<void> followUser({
+    required String userId,
+    required String followingUserId,
+  }) async {
+    final uid = userId.trim();
+    final following = followingUserId.trim();
+    if (uid.isEmpty || following.isEmpty) {
+      throw Exception('followUser: user_id and following_user_id required');
+    }
+    final body = jsonEncode({
+      'user_id': uid,
+      'following_user_id': following,
+    });
+    final res = await http.post(
+      Uri.parse(PrayerWallApiConstant.follows),
+      headers: _jsonHeaders,
+      body: body,
+    );
+    print(
+      'PrayerWallService.followUser status=${res.statusCode} body=${res.body}',
+    );
+    if (res.statusCode >= 200 && res.statusCode < 300) return;
+    // Already followed is still success for UI.
+    final lower = res.body.toLowerCase();
+    if (lower.contains('already followed')) return;
+    throw Exception('Follow failed (${res.statusCode}): ${res.body}');
+  }
+
+  /// Additive: DELETE `/api/follows` — unfollow.
+  static Future<void> unfollowUser({
+    required String userId,
+    required String followingUserId,
+  }) async {
+    final uid = userId.trim();
+    final following = followingUserId.trim();
+    if (uid.isEmpty || following.isEmpty) {
+      throw Exception('unfollowUser: user_id and following_user_id required');
+    }
+    final body = jsonEncode({
+      'user_id': uid,
+      'following_user_id': following,
+    });
+    final res = await http.delete(
+      Uri.parse(PrayerWallApiConstant.follows),
+      headers: _jsonHeaders,
+      body: body,
+    );
+    print(
+      'PrayerWallService.unfollowUser status=${res.statusCode} body=${res.body}',
+    );
+    if (res.statusCode >= 200 && res.statusCode < 300) return;
+    throw Exception('Unfollow failed (${res.statusCode}): ${res.body}');
+  }
+
+  /// Additive: GET `/api/follows?user_id=` — who this user follows.
+  static Future<({int count, List<String> followingUserIds})>
+      fetchFollowing({required String userId}) async {
+    final uid = userId.trim();
+    if (uid.isEmpty) return (count: 0, followingUserIds: <String>[]);
+    final res = await http.get(
+      Uri.parse(PrayerWallApiConstant.followsFollowingForUser(uid)),
+      headers: _jsonHeaders,
+    );
+    print(
+      'PrayerWallService.fetchFollowing status=${res.statusCode} body=${res.body}',
+    );
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      return (count: 0, followingUserIds: <String>[]);
+    }
+    try {
+      final decoded = jsonDecode(res.body);
+      if (decoded is! Map) return (count: 0, followingUserIds: <String>[]);
+      final map = Map<String, dynamic>.from(decoded);
+      final ids = <String>[];
+      final rawIds = map['following_user_ids'];
+      if (rawIds is List) {
+        for (final e in rawIds) {
+          final s = e?.toString().trim() ?? '';
+          if (s.isNotEmpty) ids.add(s);
+        }
+      }
+      final count = int.tryParse('${map['count']}') ?? ids.length;
+      return (count: count, followingUserIds: ids);
+    } catch (_) {
+      return (count: 0, followingUserIds: <String>[]);
+    }
+  }
+
+  /// Additive: GET `/api/follows/followers?user_id=` — followers of this user.
+  static Future<({int count, List<String> followerUserIds})> fetchFollowers({
+    required String userId,
+  }) async {
+    final uid = userId.trim();
+    if (uid.isEmpty) return (count: 0, followerUserIds: <String>[]);
+    final res = await http.get(
+      Uri.parse(PrayerWallApiConstant.followsFollowersForUser(uid)),
+      headers: _jsonHeaders,
+    );
+    print(
+      'PrayerWallService.fetchFollowers status=${res.statusCode} body=${res.body}',
+    );
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      return (count: 0, followerUserIds: <String>[]);
+    }
+    try {
+      final decoded = jsonDecode(res.body);
+      if (decoded is! Map) return (count: 0, followerUserIds: <String>[]);
+      final map = Map<String, dynamic>.from(decoded);
+      final ids = <String>[];
+      final rawIds = map['follower_user_ids'];
+      if (rawIds is List) {
+        for (final e in rawIds) {
+          final s = e?.toString().trim() ?? '';
+          if (s.isNotEmpty) ids.add(s);
+        }
+      }
+      final count = int.tryParse('${map['count']}') ?? ids.length;
+      return (count: count, followerUserIds: ids);
+    } catch (_) {
+      return (count: 0, followerUserIds: <String>[]);
+    }
+  }
+
+  /// Same Gemini endpoint used by Chat / Prayer Guidance.
+  static const String _aiBaseUrl =
+      'https://combine-api-ruby.vercel.app/api/chat';
+
+  static const String _toastVulgar =
+      'Please keep your prayer respectful. Inappropriate language is not allowed.';
+  static const String _toastNotPrayer =
+      'Please share a genuine prayer request only.';
+
+  /// Additive: rewrite any-language prayer need into English prayer text.
+  /// Does not change validate/create/moderation paths. Returns null on failure.
+  static Future<String?> formatPrayerInEnglish({
+    required String userWords,
+  }) async {
+    final words = userWords.trim();
+    if (words.isEmpty) return null;
+
+    final prompt = '''
+You are a respectful Christian prayer writer for a Bible app (${BibleInfo.bible_shortName}).
+The user wrote a prayer need in any language (including informal / mixed languages).
+
+Task:
+1) Understand their meaning.
+2) Rewrite it as one clear English prayer suitable for a Prayer Wall community post.
+3) Keep it sincere and SHORT — about 35–55 words, 2–4 sentences max.
+4) Start in a natural prayer style (e.g. Heavenly Father / Lord) and end with Amen when appropriate.
+5) Do NOT include markdown, bullet points, titles, quotes around the whole prayer, or explanations.
+6) Output ONLY the English prayer text. Keep it brief.
+
+User words:
+$words
+''';
+
+    try {
+      final res = await http.post(
+        Uri.parse(_aiBaseUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'input': prompt}),
+      );
+      if (res.statusCode != 200) return null;
+      final text = _extractAiText(res.body).trim();
+      if (text.isEmpty) return null;
+      final lower = text.toLowerCase();
+      if (lower.contains('sorry, i could not') ||
+          lower.contains('could not generate')) {
+        return null;
+      }
+      return text;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// AI validation before publish. Returns [isValid]=true when content may post.
+  /// On AI/network failure returns valid=true so existing publish path still works.
+  static Future<PrayerWallValidationResult> validatePrayerContent({
+    required String prayerTitle,
+    required String prayerDescription,
+  }) async {
+    final prompt = '''
+You are a content moderator for a Christian Prayer Wall in a Bible app (${BibleInfo.bible_shortName}).
+Decide if the user's submission may be published.
+
+Reject as INVALID if ANY of these apply:
+1) Vulgar / profane / abusive / sexual / hateful / highly offensive language.
+2) Not a genuine prayer or prayer request (spam, ads, jokes, random chat, news, opinions, questions that are not prayerful).
+3) Anything beyond prayer — content that is not asking for prayer, giving thanks to God, seeking spiritual support, or sharing a blessing.
+
+Accept as VALID if it is a sincere prayer, prayer request, thanksgiving, or blessing — even if informal, short, or imperfect English.
+
+Respond with EXACTLY one line (no markdown, no extra explanation):
+VALID
+or
+INVALID|vulgar|$_toastVulgar
+or
+INVALID|not_prayer|$_toastNotPrayer
+
+Title: $prayerTitle
+Details: $prayerDescription
+''';
+
+    try {
+      final res = await http.post(
+        Uri.parse(_aiBaseUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'input': prompt}),
+      );
+      if (res.statusCode != 200) {
+        return const PrayerWallValidationResult(isValid: true);
+      }
+
+      final text = _extractAiText(res.body).trim();
+      if (text.isEmpty) {
+        return const PrayerWallValidationResult(isValid: true);
+      }
+
+      final upper = text.toUpperCase();
+      if (upper.startsWith('VALID') && !upper.startsWith('INVALID')) {
+        return const PrayerWallValidationResult(isValid: true);
+      }
+
+      if (upper.contains('INVALID')) {
+        final toast = _toastFromInvalidAiLine(text);
+        return PrayerWallValidationResult(isValid: false, toastMessage: toast);
+      }
+
+      // Unclear AI reply — allow existing publish path.
+      return const PrayerWallValidationResult(isValid: true);
+    } catch (_) {
+      return const PrayerWallValidationResult(isValid: true);
+    }
+  }
+
+  static String _toastFromInvalidAiLine(String text) {
+    final lower = text.toLowerCase();
+    if (lower.contains('vulgar') ||
+        lower.contains('profan') ||
+        lower.contains('inappropriate') ||
+        lower.contains('offensive')) {
+      return _toastVulgar;
+    }
+    if (lower.contains('not_prayer') ||
+        lower.contains('not a prayer') ||
+        lower.contains('beyond')) {
+      return _toastNotPrayer;
+    }
+    // Prefer AI-provided toast after second pipe, if present.
+    final parts = text.split('|');
+    if (parts.length >= 3) {
+      final custom = parts.sublist(2).join('|').trim();
+      if (custom.isNotEmpty && custom.length < 160) return custom;
+    }
+    return _toastNotPrayer;
+  }
+
+  static String _extractAiText(String body) {
+    try {
+      final responseData = jsonDecode(body);
+      if (responseData is! Map) return body;
+      if (responseData['output'] != null) {
+        if (responseData['output'] is String) {
+          return responseData['output'].toString();
+        }
+        if (responseData['output'] is Map) {
+          final output = responseData['output'] as Map;
+          if (output['candidates'] is List &&
+              (output['candidates'] as List).isNotEmpty) {
+            final candidate = (output['candidates'] as List)[0];
+            if (candidate is Map &&
+                candidate['content'] is Map &&
+                candidate['content']['parts'] is List &&
+                (candidate['content']['parts'] as List).isNotEmpty) {
+              final part = (candidate['content']['parts'] as List)[0];
+              if (part is Map && part['text'] != null) {
+                return part['text'].toString();
+              }
+            }
+          }
+        }
+      }
+      if (responseData['response'] != null) {
+        return responseData['response'].toString();
+      }
+      if (responseData['text'] != null) {
+        return responseData['text'].toString();
+      }
+      if (responseData['message'] != null) {
+        return responseData['message'].toString();
+      }
+    } catch (_) {}
+    return body;
+  }
+}
+
+/// Result of Prayer Wall AI content validation.
+class PrayerWallValidationResult {
+  const PrayerWallValidationResult({
+    required this.isValid,
+    this.toastMessage,
+  });
+
+  final bool isValid;
+  final String? toastMessage;
 }
