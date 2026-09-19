@@ -696,11 +696,17 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     if (list == null) return const [];
     final curPos = _queueCurrent?.position ?? list.currentPosition;
     final nextId = (_queueCurrent?.nextPrayerId ?? '').trim();
+    final shownNextId = (_queueComingUpNext?.id ?? '').trim();
+    final shownHotspotId = (_queueHotspotPrayer?.id ?? '').trim();
     final filtered = list.items.where((slot) {
       if (slot.isCurrent) return false;
       if (_isItemBlocked(slot.prayer)) return false;
       if (_reportedPrayerIds.contains(slot.prayer.id)) return false;
       if (nextId.isNotEmpty && slot.prayer.id == nextId) return false;
+      if (shownNextId.isNotEmpty && slot.prayer.id == shownNextId) return false;
+      if (shownHotspotId.isNotEmpty && slot.prayer.id == shownHotspotId) {
+        return false;
+      }
       return true;
     }).toList();
     filtered.sort((a, b) => a.position.compareTo(b.position));
@@ -719,25 +725,36 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     for (final slot in list.items) {
       if (slot.isCurrent && !_isItemBlocked(slot.prayer)) return slot.prayer;
     }
-    return null;
+    // Current hotspot is blocked — show the next available prayer.
+    return _nextUnblockedQueuePrayer();
   }
 
   PrayerWallItem? get _queueComingUpNext {
     final nextId = (_queueCurrent?.nextPrayerId ?? '').trim();
     final list = _queueList;
     if (list == null) return null;
-    if (nextId.isNotEmpty) {
+    final skipHotspotId = (_queueHotspotPrayer?.id ?? '').trim();
+    if (nextId.isNotEmpty && nextId != skipHotspotId) {
       for (final slot in list.items) {
         if (slot.prayer.id == nextId && !_isItemBlocked(slot.prayer)) {
           return slot.prayer;
         }
       }
     }
+    return _nextUnblockedQueuePrayer(skipPrayerId: skipHotspotId);
+  }
+
+  /// Next unblocked queue prayer after the current slot (wraps when `loops`).
+  PrayerWallItem? _nextUnblockedQueuePrayer({String? skipPrayerId}) {
+    final list = _queueList;
+    if (list == null) return null;
+    final skip = (skipPrayerId ?? '').trim();
     final curPos = _queueCurrent?.position ?? list.currentPosition;
     final candidates = list.items.where((slot) {
       if (slot.isCurrent) return false;
       if (_isItemBlocked(slot.prayer)) return false;
       if (_reportedPrayerIds.contains(slot.prayer.id)) return false;
+      if (skip.isNotEmpty && slot.prayer.id == skip) return false;
       return true;
     }).toList()
       ..sort((a, b) => a.position.compareTo(b.position));
@@ -1118,10 +1135,47 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     }).toList();
   }
 
+  /// UI-only: one wall card per blocked person (not one per prayer).
+  /// Hide/block APIs still use [_blockedUserIds] unchanged.
+  List<PrayerWallItem> get _blockedPeopleOnWall {
+    final unique = <PrayerWallItem>[];
+    final consumed = <String>{};
+    for (final item in _blockedItemsOnWall) {
+      final seed = (_blockTargetId(item) ?? item.id).trim();
+      if (seed.isEmpty) continue;
+      if (consumed.contains(item.id) || consumed.contains(seed)) continue;
+      if (consumed.any((id) => _itemMatchesBlockedId(item, id))) continue;
+      unique.add(item);
+      consumed.addAll(_relatedLocalBlockedIds(seed));
+      consumed.add(item.id);
+    }
+    return unique;
+  }
+
+  /// UI-only: leftover blocked ids that are not already in a person row.
+  List<String> get _blockedPeopleIdsNotOnWall {
+    final consumed = <String>{};
+    for (final item in _blockedPeopleOnWall) {
+      final seed = (_blockTargetId(item) ?? item.id).trim();
+      consumed.addAll(_relatedLocalBlockedIds(seed));
+      consumed.add(item.id);
+    }
+    final leftover = <String>[];
+    for (final id in _blockedIdsNotOnWall) {
+      if (consumed.contains(id)) continue;
+      final related = _relatedLocalBlockedIds(id);
+      if (related.any(consumed.contains)) continue;
+      leftover.add(id);
+      consumed.addAll(related);
+      consumed.add(id);
+    }
+    return leftover;
+  }
+
   /// UI-only: count of Blocked list rows (not raw stored ids).
   /// Hide/block APIs still use [_blockedUserIds] unchanged.
   int get _blockedListDisplayCount =>
-      _blockedItemsOnWall.length + _blockedIdsNotOnWall.length;
+      _blockedPeopleOnWall.length + _blockedPeopleIdsNotOnWall.length;
 
   Future<void> _openBlockedList() async {
     // Blocked list lives inside My Prayer — open that section first.
@@ -1882,7 +1936,17 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     final brown = const Color(0xFF5C4033);
 
     final titleCtrl = TextEditingController(text: item.title);
-    final descCtrl = TextEditingController(text: item.description);
+    final descCtrl = TextEditingController(
+      text: PrayerDualDescription.isDual(item.description)
+          ? (PrayerDualDescription.aiPrayer(item.description) ??
+                  PrayerDualDescription.myWords(item.description) ??
+                  '')
+              .trim()
+          : item.description
+              .replaceAll(PrayerDualDescription.myWordsMarker, '')
+              .replaceAll(PrayerDualDescription.aiMarker, '')
+              .trim(),
+    );
     final scrollCtrl = ScrollController();
 
     void scrollFieldIntoView() {
@@ -2225,7 +2289,16 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
 
     if (action == 'save') {
       final newTitle = titleCtrl.text.trim();
-      final newDesc = descCtrl.text.trim();
+      var newDesc = descCtrl.text
+          .replaceAll(PrayerDualDescription.myWordsMarker, '')
+          .replaceAll(PrayerDualDescription.aiMarker, '')
+          .trim();
+      if (PrayerDualDescription.isDual(item.description)) {
+        newDesc = PrayerDualDescription.encode(
+          originalWords: PrayerDualDescription.myWords(item.description) ?? '',
+          englishPrayer: newDesc,
+        );
+      }
       try {
         await PrayerWallService.updatePrayer(
           prayerId: item.id,
@@ -2377,8 +2450,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     required Color brown,
     required bool isDark,
   }) {
-    final items = _blockedItemsOnWall;
-    final leftover = _blockedIdsNotOnWall;
+    final items = _blockedPeopleOnWall;
+    final leftover = _blockedPeopleIdsNotOnWall;
     // UI-only: match tab/header count to visible rows (ids may be > people).
     final count = _blockedListDisplayCount;
     final cardBg = isDark ? const Color(0xFF2C2118) : const Color(0xFFFFF9F3);

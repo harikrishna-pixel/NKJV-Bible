@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 class BibleInfo {
   static String apple_AppId = "6459818399";
 
@@ -12,8 +15,22 @@ class BibleInfo {
 //IAP
   static String sixMonthPlanid =
       'com.balaklrapps.newlivingtranslation.sixmonthadsfree';
+
+  /// Paywall 1 classic short plan (1 Month card).
+  static String oneMonthPlanid =
+      'com.balaklrapps.newlivingtranslation.onemonthadsfree';
+
   static String oneYearPlanid =
       'com.balaklrapps.newlivingtranslation.oneyearadsfree';
+
+  /// Paywall 2 (`paywallShows == 2`) auto-renewable IDs. Paywall 1 keeps classic IDs.
+  static String arOneMonthPlanid =
+      'com.balaklrapps.newlivingtranslation.onemonthauto';
+  static String arSixMonthPlanid =
+      'com.balaklrapps.newlivingtranslation.arsixmadfree';
+  static String arOneYearPlanid =
+      'com.balaklrapps.newlivingtranslation.oneyearauto';
+
   static String twoYearPlanid =
       'com.balaklrapps.newkingsjamesversion.twoyearadsfree';
   static String lifeTimePlanid =
@@ -24,10 +41,16 @@ class BibleInfo {
 
   // IAP Discounts (for offline mode)
   static String sixMonthPlanDiscount = '0';
+  static String oneMonthPlanDiscount = '0';
   static String oneYearPlanDiscount = '30';
   static String twoYearPlanDiscount = '50';
   static String lifeTimePlanDiscount = 'Best Value';
   static String exitOfferPlanDiscount = '0';
+
+  /// Fallback display discount for AR one-month (paywall 2).
+  static String arOneMonthPlanDiscount = '0';
+  static String arSixMonthPlanDiscount = '0';
+  static String arOneYearPlanDiscount = '30';
 
   // Coin Pack IDs
   static String coinPack1Id =
@@ -53,6 +76,122 @@ class BibleInfo {
   static String coinPack3Price = '\$6.99';
 
   static bool enableIAP = true;
+
+  /// Paywall UI mode: `1` = classic single paywall, `2` = multi / auto-renewable.
+  static int paywallShows = 2;
+
+  static bool get isAutoRenewablePaywallMode => paywallShows == 2;
+
+  /// When [paywallShows] is `2`, Chat & Prayer may skip credits for AI Premium.
+  /// Prefer [shouldSkipChatPrayerCredits] (checks plan). Free/Lifetime use coins.
+  static bool get skipsChatPrayerCredits => isAutoRenewablePaywallMode;
+
+  /// Same key as [DownloadProvider] subscription plan storage.
+  static const String _subscriptionPlanPrefsKey = 'subscription_plan';
+
+  /// Set only when Buy/Restore writes silver/gold/twoyear via [DownloadProvider].
+  static const String aiPremiumCreditSkipGrantedKey =
+      'ai_premium_credit_skip_granted_v2';
+
+  static Future<void> setAiPremiumCreditSkipGranted(bool granted) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(aiPremiumCreditSkipGrantedKey, granted);
+    } catch (_) {}
+  }
+
+  static Future<void> clearOrphanAiPremiumCreditSkipIfNeeded() async {
+    if (!isAutoRenewablePaywallMode) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final plan =
+          prefs.getString(_subscriptionPlanPrefsKey)?.toLowerCase().trim();
+
+      if (plan != 'silver' && plan != 'gold' && plan != 'twoyear') {
+        if (prefs.getBool(aiPremiumCreditSkipGrantedKey) == true) {
+          await prefs.setBool(aiPremiumCreditSkipGrantedKey, false);
+        }
+        return;
+      }
+
+      final granted = prefs.getBool(aiPremiumCreditSkipGrantedKey) == true;
+      final expiryRaw = prefs.getString('isRewardAdViewTime');
+      final expiry = (expiryRaw != null && expiryRaw.isNotEmpty)
+          ? DateTime.tryParse(expiryRaw)
+          : null;
+
+      final hasActivePremium = expiry != null && expiry.isAfter(DateTime.now());
+
+      if (granted && hasActivePremium) return;
+
+      await prefs.setString(_subscriptionPlanPrefsKey, '');
+      await prefs.setBool(aiPremiumCreditSkipGrantedKey, false);
+
+      debugPrint(
+        'BibleInfo: cleared orphan AI premium plan=$plan '
+        'granted=$granted hasActivePremium=$hasActivePremium',
+      );
+    } catch (_) {}
+  }
+
+  static Future<bool> shouldSkipChatPrayerCredits() async {
+    if (!isAutoRenewablePaywallMode) return false;
+    try {
+      await clearOrphanAiPremiumCreditSkipIfNeeded();
+      final prefs = await SharedPreferences.getInstance();
+      final plan =
+          prefs.getString(_subscriptionPlanPrefsKey)?.toLowerCase().trim();
+
+      if (plan != 'silver' && plan != 'gold' && plan != 'twoyear') {
+        return false;
+      }
+
+      if (prefs.getBool(aiPremiumCreditSkipGrantedKey) != true) {
+        return false;
+      }
+
+      final expiryRaw = prefs.getString('isRewardAdViewTime');
+      final expiry = (expiryRaw != null && expiryRaw.isNotEmpty)
+          ? DateTime.tryParse(expiryRaw)
+          : null;
+
+      if (expiry == null || !expiry.isAfter(DateTime.now())) {
+        return false;
+      }
+
+      return true;
+    } catch (_) {}
+
+    return false;
+  }
+
+  static bool isClassicOneMonthProductId(String productId) {
+    final id = productId.toLowerCase();
+    return productId == oneMonthPlanid || id.contains('onemonth');
+  }
+
+  static bool isOneMonthProductId(String productId) =>
+      isClassicOneMonthProductId(productId) || isArOneMonthProductId(productId);
+
+  static bool isArOneMonthProductId(String productId) {
+    final id = productId.toLowerCase();
+    return productId == arOneMonthPlanid ||
+        id.contains('onemonthauto') ||
+        id.contains('aronemadfree') ||
+        id.contains('aronem.');
+  }
+
+  static bool isArSixMonthProductId(String productId) {
+    final id = productId.toLowerCase();
+    return productId == arSixMonthPlanid || id.contains('arsixm');
+  }
+
+  static bool isArOneYearProductId(String productId) {
+    final id = productId.toLowerCase();
+    return productId == arOneYearPlanid ||
+        id.contains('oneyearauto') ||
+        id.contains('aroney');
+  }
 
   // enable-> true or disable-> false e-products here
   static bool enableEShop = false;

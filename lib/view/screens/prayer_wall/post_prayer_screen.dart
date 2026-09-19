@@ -844,6 +844,7 @@ class _PrayerDetailsComposeScreenState
     // image — content sits below it.
     final topTitle = _reviewStep ? 'Review & Confirm' : 'Type Your Prayer';
     final media = MediaQuery.of(context);
+    final isTablet = media.size.shortestSide >= 600;
     final bgAsset = _reviewStep ? _reviewBg : _typeBg;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -865,7 +866,7 @@ class _PrayerDetailsComposeScreenState
             Positioned.fill(
               child: Image.asset(
                 bgAsset,
-                fit: BoxFit.cover,
+                fit: isTablet ? BoxFit.fitWidth : BoxFit.cover,
                 alignment: Alignment.topCenter,
                 filterQuality: FilterQuality.medium,
                 excludeFromSemantics: true,
@@ -920,132 +921,166 @@ class _PrayerDetailsComposeScreenState
   }
 
   Widget _buildType() {
+    final media = MediaQuery.of(context);
+    final isTablet = media.size.shortestSide >= 600;
+    final keyboard = media.viewInsets.bottom;
+    final isLandscape = media.size.width > media.size.height;
+    // iPad only: push title + field below the BG pen/ink (was overlapping).
+    final topGap = isTablet
+        ? (keyboard > 0
+            ? (isLandscape ? 80.0 : 48.0)
+            : (isLandscape
+                ? (media.size.height * 0.42).clamp(240.0, 360.0)
+                : (media.size.height * 0.28).clamp(220.0, 340.0)))
+        : 156.0;
+    final hPad = isTablet ? 48.0 : 22.0;
+    final maxW = isTablet ? 560.0 : double.infinity;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(22, 0, 22, 12),
+      padding: EdgeInsets.fromLTRB(hPad, 0, hPad, isTablet ? 20 : 12),
       child: Column(
         children: [
           Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  // Push title / field below the BG quill.
-                  const SizedBox(height: 156),
-                  const Text(
-                    'Tell us your prayer need',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      color: _brown,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Type in your own words (any language)',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: _brown.withOpacity(0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _wordsCtrl,
-                    maxLines: 6,
-                    maxLength: _maxChars,
-                    enabled: !_creating,
-                    textCapitalization: TextCapitalization.sentences,
-                    onTapOutside: (_) => _dismissKeyboard(),
-                    style: const TextStyle(color: _brown, height: 1.35),
-                    decoration: InputDecoration(
-                      hintText: 'Share what is on your heart...',
-                      hintStyle: TextStyle(color: Colors.grey.shade600),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.92),
-                      counterStyle: TextStyle(color: _brown.withOpacity(0.6)),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxW),
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      // Phone: sit below the BG quill. iPad: below pen/ink; up a little when typing.
+                      SizedBox(height: topGap),
+                      Text(
+                        'Tell us your prayer need',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Georgia',
+                          fontSize: isTablet ? 26 : 22,
+                          fontWeight: FontWeight.w700,
+                          color: _brown,
+                        ),
                       ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide:
-                            const BorderSide(color: _brown, width: 1.5),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Type in your own words (any language)',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: isTablet ? 16 : 14,
+                          color: _brown.withOpacity(0.7),
+                        ),
                       ),
-                    ),
+                      SizedBox(height: isTablet ? 20 : 16),
+                      TextField(
+                        controller: _wordsCtrl,
+                        maxLines: isTablet ? 8 : 6,
+                        maxLength: _maxChars,
+                        enabled: !_creating,
+                        textCapitalization: TextCapitalization.sentences,
+                        onTapOutside: (_) => _dismissKeyboard(),
+                        style: const TextStyle(color: _brown, height: 1.35),
+                        decoration: InputDecoration(
+                          hintText: 'Share what is on your heart...',
+                          hintStyle: TextStyle(color: Colors.grey.shade600),
+                          filled: true,
+                          fillColor: Colors.white.withOpacity(0.92),
+                          counterStyle:
+                              TextStyle(color: _brown.withOpacity(0.6)),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide:
+                                const BorderSide(color: _brown, width: 1.5),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
           // AI note sits just above the Create Prayer CTA.
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.9),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _brown.withOpacity(0.12)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.volunteer_activism_outlined,
-                  size: 22,
-                  color: _brown.withOpacity(0.85),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Our AI will turn this into a meaningful prayer request for the community.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.35,
-                      color: _brown.withOpacity(0.85),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxW),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _brown.withOpacity(0.12)),
                     ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _creating ? null : _onCreatePrayer,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _brown,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: _creating
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.auto_awesome, size: 18),
-                        SizedBox(width: 8),
-                        Text(
-                          'Create Prayer',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
+                        Icon(
+                          Icons.volunteer_activism_outlined,
+                          size: 22,
+                          color: _brown.withOpacity(0.85),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Our AI will turn this into a meaningful prayer request for the community.',
+                            style: TextStyle(
+                              fontSize: isTablet ? 15 : 13,
+                              height: 1.35,
+                              color: _brown.withOpacity(0.85),
+                            ),
                           ),
                         ),
                       ],
                     ),
+                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _creating ? null : _onCreatePrayer,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _brown,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(
+                          vertical: isTablet ? 17 : 15,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: _creating
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.auto_awesome, size: 18),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Create Prayer',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

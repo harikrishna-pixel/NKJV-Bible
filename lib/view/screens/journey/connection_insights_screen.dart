@@ -86,53 +86,134 @@ class _ConnectionInsightsScreenState extends State<ConnectionInsightsScreen> {
     return _barColors[_dominantIndex];
   }
 
+  IconData _dominantIcon(int dominant) {
+    switch (dominant) {
+      case 0:
+      case 1:
+        return Icons.spa_outlined;
+      case 2:
+        return Icons.park_rounded;
+      case 3:
+        return Icons.eco_rounded;
+      default:
+        return Icons.favorite;
+    }
+  }
+
   String _headerCopy(int dominant) {
-    final label = ConnectionCheckinStore.labels[dominant].toLowerCase();
-    return 'Most of your check-ins have felt $label. Keep seeking God\'s presence!';
+    if (_rangeDays == 7) {
+      switch (dominant) {
+        case 0:
+          return 'This week has felt distant. God is still near — take one small step.';
+        case 1:
+          return 'This week has felt far. Keep reaching for Him.';
+        case 2:
+          return 'You\'re building a stronger connection. Keep going!';
+        case 3:
+          return 'Most of your check-ins this week have felt close. Keep seeking God\'s presence!';
+        default:
+          return 'You\'ve stayed close to God this week. Keep it up!';
+      }
+    }
+    if (_rangeDays == 90) {
+      switch (dominant) {
+        case 0:
+          return 'The last 90 days have felt distant. His love has not left you.';
+        case 1:
+          return 'The last 90 days have felt far. Keep seeking God\'s presence!';
+        case 2:
+          return 'You\'ve been growing with God over the last 90 days. Keep going!';
+        case 3:
+          return 'Most of your check-ins have felt close over the last 90 days. Keep seeking God\'s presence!';
+        default:
+          return 'You\'ve been consistently connected with God over the last 90 days. Keep it up!';
+      }
+    }
+    switch (dominant) {
+      case 0:
+        return 'The last 30 days have felt distant. Come as you are — He is near.';
+      case 1:
+        return 'The last 30 days have felt far. Keep seeking God\'s presence!';
+      case 2:
+        return 'You\'re growing closer over the last 30 days. Keep going!';
+      case 3:
+        return 'Most of your check-ins have felt close. Keep seeking God\'s presence!';
+      default:
+        return 'You\'ve stayed close to God over the last 30 days. Keep it up!';
+    }
   }
 
   ({String title, String body, Color tint, Color accent}) _motive(int dominant) {
-    switch (dominant) {
-      case 0:
-        return (
-          title: 'Come As You Are',
-          body:
-              'No matter how distant you feel, His love never leaves you. Take one step toward Him today.',
-          tint: const Color(0xFFF8EFE4),
-          accent: const Color(0xFFC47A4A),
-        );
-      case 1:
+    if (_rangeDays == 7) {
+      if (dominant <= 1) {
         return (
           title: 'Keep Seeking',
           body:
-              'Every step toward God is a step worth taking. Keep moving forward in faith.',
+              'Every step toward God this week is a step worth taking. Keep moving forward in faith.',
           tint: const Color(0xFFF8EFE4),
-          accent: const Color(0xFFD0894A),
+          accent: const Color(0xFFC47A4A),
         );
-      case 2:
+      }
+      return (
+        title: 'Keep Going',
+        body:
+            'You\'re making progress this week. Small steps bring you closer to God!',
+        tint: const Color(0xFFFFF6E8),
+        accent: const Color(0xFFD0894A),
+      );
+    }
+    if (_rangeDays == 90) {
+      if (dominant >= 3) {
+        return (
+          title: 'Consistently Connected',
+          body:
+              'You\'ve maintained a strong connection over the past 90 days. Keep seeking His presence!',
+          tint: const Color(0xFFEEF4FF),
+          accent: const Color(0xFF3D6FD9),
+        );
+      }
+      if (dominant == 2) {
         return (
           title: 'Keep Growing',
-          body: 'Keep seeking, keep growing. Stay rooted in His Word.',
+          body:
+              'You\'ve been growing over the past 90 days. Keep seeking His presence!',
           tint: const Color(0xFFFBF3D8),
           accent: const Color(0xFFD2A83A),
         );
-      case 4:
-        return (
-          title: 'Walking Closely',
-          body:
-              'You\'ve chosen Very Close more often. Abide in Him and keep shining.',
-          tint: const Color(0xFFE8F4E4),
-          accent: const Color(0xFF2E7D32),
-        );
-      default:
-        return (
-          title: 'Moving Closer',
-          body:
-              'You\'ve chosen Close or Very Close more often. That\'s a beautiful step!',
-          tint: const Color(0xFFE8F4E4),
-          accent: const Color(0xFF4FA05A),
-        );
+      }
+      return (
+        title: 'Keep Seeking',
+        body:
+            'The last 90 days have had hard days. His love never leaves you. Take one step toward Him today.',
+        tint: const Color(0xFFF8EFE4),
+        accent: const Color(0xFFC47A4A),
+      );
     }
+    if (dominant >= 3) {
+      return (
+        title: 'You\'re Closer',
+        body:
+            'You\'ve chosen Close or Very Close more often in the last 30 days. That\'s wonderful!',
+        tint: const Color(0xFFE8F4E4),
+        accent: const Color(0xFF4FA05A),
+      );
+    }
+    if (dominant == 2) {
+      return (
+        title: 'Keep Growing',
+        body:
+            'You\'re growing closer over the last 30 days. Stay rooted in His Word.',
+        tint: const Color(0xFFFBF3D8),
+        accent: const Color(0xFFD2A83A),
+      );
+    }
+    return (
+      title: 'Keep Seeking',
+      body:
+          'Every step toward God in the last 30 days is a step worth taking. Keep moving forward in faith.',
+      tint: const Color(0xFFF8EFE4),
+      accent: const Color(0xFFC47A4A),
+    );
   }
 
   String _checkinWhen(String key) {
@@ -235,7 +316,13 @@ class _ConnectionInsightsScreenState extends State<ConnectionInsightsScreen> {
                               color: heart.withOpacity(0.16),
                               shape: BoxShape.circle,
                             ),
-                            child: Icon(Icons.favorite, size: 38, color: heart),
+                            child: Icon(
+                              dominant < 0
+                                  ? Icons.favorite
+                                  : _dominantIcon(dominant),
+                              size: 38,
+                              color: heart,
+                            ),
                           ),
                           const SizedBox(width: 14),
                           Expanded(

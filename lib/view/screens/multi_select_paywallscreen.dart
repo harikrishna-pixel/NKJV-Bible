@@ -205,14 +205,31 @@ await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
 
 /// Restore uses existing SubscriptionScreen restore path (UI host, same logic).
 Future<void> _restorePurchases() async {
+if (!await SubscriptionScreen.isDashboardIapEnabled()) return;
 await SharPreferences.setBoolean('restorepurches', true);
 if (!mounted) return;
-await SubscriptionScreen.openPaywallStacked(
+final ok = await Navigator.of(context).push<bool>(
+PageRouteBuilder<bool>(
+opaque: false,
+barrierDismissible: false,
+barrierColor: Colors.transparent,
+pageBuilder: (ctx, _, __) => SubscriptionScreen(
 sixMonthPlan: widget.sixMonthPlan,
 oneYearPlan: widget.oneYearPlan,
 lifeTimePlan: widget.lifeTimePlan,
 checkad: widget.checkad,
+invisiblePurchaseHost: true,
+autoStartRestore: true,
+),
+),
 );
+if (ok == true && mounted) {
+if (Get.isRegistered<DashBoardController>()) {
+await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
+}
+if (!mounted) return;
+await StreakFlowNavigation.navigateToStreakFlowOrHome(context);
+}
 }
 
 @override

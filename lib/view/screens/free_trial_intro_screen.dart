@@ -1,5 +1,5 @@
 import 'package:biblebookapp/view/screens/intro_subcribtion_screen.dart';
-import 'package:biblebookapp/view/screens/multi_select_paywall.dart';
+import 'package:biblebookapp/view/screens/paywall_navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -33,7 +33,7 @@ class _FreeTrialIntroScreenState extends State<FreeTrialIntroScreen> {
 
   void _continueToPlans() {
     Get.offAll(
-      () => MultiSelectPaywall(
+      () => PaywallNavigation.buildVisiblePaywall(
         sixMonthPlan: widget.sixMonthPlan,
         oneYearPlan: widget.oneYearPlan,
         lifeTimePlan: widget.lifeTimePlan,

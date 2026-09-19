@@ -101,7 +101,7 @@ class ReadingActivityService {
         if (row is Map) {
           final item =
               ReadingActivity.fromJson(Map<String, dynamic>.from(row));
-          if (item != null) items.add(item);
+          if (item != null && !item.inferred) items.add(item);
         }
       }
       items.sort((a, b) => b.at.compareTo(a.at));
@@ -158,52 +158,10 @@ class ReadingActivityService {
     );
   }
 
-  /// Fill Recent Activity from already-read chapters (existing users / update).
-  /// Does not change is_read or read_per. Does not overwrite newer Mark as Read rows.
+  /// Recent Activity is Mark as Read completions only (no inferred rows).
   static Future<List<ReadingActivity>> mergeExistingReads({
     required List<({int bookNum, int chapter, String bookName})> reads,
   }) async {
-    if (reads.isEmpty) return loadAll();
-    final existing = await loadAll();
-    final keys = existing
-        .map((e) => _keyFor(e.bookNum, e.bookName, e.chapter))
-        .toSet();
-    var added = 0;
-    for (var i = 0; i < reads.length; i++) {
-      final read = reads[i];
-      if (read.chapter <= 0 || read.bookName.isEmpty) continue;
-      final key = _keyFor(read.bookNum, read.bookName, read.chapter);
-      if (keys.contains(key)) continue;
-      existing.add(
-        ReadingActivity(
-          bookName: read.bookName,
-          chapter: read.chapter,
-          bookNum: read.bookNum,
-          at: DateTime(2000, 1, 1).add(Duration(minutes: i)),
-          inferred: true,
-        ),
-      );
-      keys.add(key);
-      added++;
-    }
-    if (added > 0) {
-      existing.sort((a, b) {
-        if (a.inferred != b.inferred) return a.inferred ? 1 : -1;
-        return b.at.compareTo(a.at);
-      });
-      final trimmed = existing.length > _maxItems
-          ? existing.take(_maxItems).toList()
-          : existing;
-      await SharPreferences.setString(
-        SharPreferences.readingRecentActivity,
-        jsonEncode(trimmed.map((e) => e.toJson()).toList()),
-      );
-      return trimmed;
-    }
-    existing.sort((a, b) {
-      if (a.inferred != b.inferred) return a.inferred ? 1 : -1;
-      return b.at.compareTo(a.at);
-    });
-    return existing;
+    return loadAll();
   }
 }

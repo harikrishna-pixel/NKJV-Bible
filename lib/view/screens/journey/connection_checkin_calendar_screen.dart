@@ -210,10 +210,10 @@ class _ConnectionCheckinCalendarScreenState
           const SizedBox(height: 20),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             decoration: BoxDecoration(
               color: _quoteBg,
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.04),
@@ -226,14 +226,14 @@ class _ConnectionCheckinCalendarScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Padding(
-                  padding: EdgeInsets.only(top: 2),
+                  padding: EdgeInsets.only(top: 1),
                   child: Icon(
                     Icons.bookmark_rounded,
-                    size: 22,
+                    size: 18,
                     color: _gold,
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -241,30 +241,30 @@ class _ConnectionCheckinCalendarScreenState
                       Text(
                         DateFormat('MMM d, yyyy').format(_selected),
                         style: const TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           fontWeight: FontWeight.w500,
                           color: _muted,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
                         selectedLevel == null
                             ? 'No Check-in'
                             : ConnectionCheckinStore.labels[selectedLevel],
                         style: const TextStyle(
-                          fontSize: 20,
+                          fontSize: 16,
                           fontWeight: FontWeight.w700,
                           color: _ink,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
                         selectedLevel == null
                             ? 'No connection check-in on this day.'
                             : '“${_quotes[selectedLevel]}”',
                         style: const TextStyle(
-                          fontSize: 14,
-                          height: 1.4,
+                          fontSize: 13,
+                          height: 1.3,
                           fontStyle: FontStyle.italic,
                           color: _ink,
                         ),
