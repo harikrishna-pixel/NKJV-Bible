@@ -1723,6 +1723,156 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     }
   }
 
+  /// Owner only: same confirm + server delete as the old wall card.
+  Future<bool> _confirmAndDeleteOwnPrayer(PrayerWallItem item) async {
+    if (!_isMyPrayer(item)) return false;
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDark = themeProvider.themeMode == ThemeMode.dark;
+    const cream = Color(0xFFFFF9F3);
+    const ink = Color(0xFF4B3423);
+    const muted = Color(0xFF6B4E3D);
+    const deleteRed = Color(0xFFC62828);
+    final bg = isDark ? CommanColor.darkPrimaryColor : cream;
+    final titleColor = isDark ? Colors.white : ink;
+    final bodyColor = isDark ? Colors.white70 : muted;
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+          child: Material(
+            color: bg,
+            borderRadius: BorderRadius.circular(22),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Delete Prayer?',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Georgia',
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: titleColor,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Are you sure you want to delete this prayer request? This action cannot be undone.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          height: 1.4,
+                          fontWeight: FontWeight.w500,
+                          color: bodyColor,
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 46,
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: titleColor,
+                                  side: BorderSide(
+                                    color: titleColor.withValues(
+                                      alpha: isDark ? 0.55 : 0.75,
+                                    ),
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Cancel',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: SizedBox(
+                              height: 46,
+                              child: ElevatedButton(
+                                onPressed: () => Navigator.pop(ctx, true),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: deleteRed,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Delete',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  top: 2,
+                  right: 2,
+                  child: IconButton(
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => Navigator.pop(ctx, false),
+                    icon: Icon(
+                      Icons.close,
+                      color: bodyColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (ok != true) return false;
+    try {
+      await PrayerWallService.deletePrayer(item.id);
+      await PrayerWallLocalStore.removePrayerAuthor(prayerId: item.id);
+      await PrayerWallLocalStore.removePrayerDurationMeta(prayerId: item.id);
+      await PrayerWallLocalStore.removeMyPrayerId(item.id);
+      if (!mounted) return false;
+      await _hydratePrayerAuthorsFromDisk();
+      await _hydrateMyPrayerIdsFromDisk();
+      await _refresh();
+      if (!mounted) return false;
+      Constants.showToast('Post deleted.');
+      return true;
+    } catch (e) {
+      if (!mounted) return false;
+      _showAppleToast(_looksOffline(e)
+          ? 'No internet connection. Please try again.'
+          : 'Could not delete. Please try again.');
+      return false;
+    }
+  }
+
   Future<void> _openPrayerActions(PrayerWallItem item) async {
     final isMine = _isMyPrayer(item);
     if (!isMine) return;
@@ -2069,149 +2219,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     if (action == null || action == 'cancel') return;
 
     if (action == 'delete') {
-      final ok = await showDialog<bool>(
-        context: context,
-        barrierDismissible: true,
-        builder: (ctx) {
-          const cream = Color(0xFFFFF9F3);
-          const ink = Color(0xFF4B3423);
-          const muted = Color(0xFF6B4E3D);
-          const deleteRed = Color(0xFFC62828);
-          final bg = isDark ? CommanColor.darkPrimaryColor : cream;
-          final titleColor = isDark ? Colors.white : ink;
-          final bodyColor = isDark ? Colors.white70 : muted;
-          return Dialog(
-            backgroundColor: Colors.transparent,
-            insetPadding:
-                const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-            child: Material(
-              color: bg,
-              borderRadius: BorderRadius.circular(22),
-              clipBehavior: Clip.antiAlias,
-              child: Stack(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Delete Prayer?',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: 'Georgia',
-                            fontSize: 24,
-                            fontWeight: FontWeight.w700,
-                            color: titleColor,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Are you sure you want to delete this prayer request? This action cannot be undone.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            height: 1.4,
-                            fontWeight: FontWeight.w500,
-                            color: bodyColor,
-                          ),
-                        ),
-                        const SizedBox(height: 22),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: SizedBox(
-                                height: 46,
-                                child: OutlinedButton(
-                                  onPressed: () =>
-                                      Navigator.pop(ctx, false),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: titleColor,
-                                    side: BorderSide(
-                                      color: titleColor.withValues(
-                                        alpha: isDark ? 0.55 : 0.75,
-                                      ),
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Cancel',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: SizedBox(
-                                height: 46,
-                                child: ElevatedButton(
-                                  onPressed: () =>
-                                      Navigator.pop(ctx, true),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: deleteRed,
-                                    foregroundColor: Colors.white,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Delete',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  Positioned(
-                    top: 2,
-                    right: 2,
-                    child: IconButton(
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () => Navigator.pop(ctx, false),
-                      icon: Icon(
-                        Icons.close,
-                        color: bodyColor,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      );
-      if (ok != true) return;
-      try {
-        await PrayerWallService.deletePrayer(item.id);
-        await PrayerWallLocalStore.removePrayerAuthor(prayerId: item.id);
-        await PrayerWallLocalStore.removePrayerDurationMeta(prayerId: item.id);
-        await PrayerWallLocalStore.removeMyPrayerId(item.id);
-        if (!mounted) return;
-        await _hydratePrayerAuthorsFromDisk();
-        await _hydrateMyPrayerIdsFromDisk();
-        await _refresh();
-        if (!mounted) return;
-        Constants.showToast('Post deleted.');
-      } catch (e) {
-        if (!mounted) return;
-        _showAppleToast(_looksOffline(e)
-            ? 'No internet connection. Please try again.'
-            : 'Could not delete. Please try again.');
-      }
+      await _confirmAndDeleteOwnPrayer(item);
       return;
     }
 
@@ -2747,6 +2755,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
               );
             },
             onMore: () => _showQueueCardMoreMenu(item),
+            onDeleteOwn: () => _confirmAndDeleteOwnPrayer(item),
+            isMine: _isMyPrayer(item),
             onProfileTap: () => _openUserProfile(item),
           ),
         ),
@@ -3402,6 +3412,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     final likeBusy = _likeToggleBusy.contains(item.id);
     final title = _queueCardTitle(item);
     final subtitle = _queueCardSubtitle(item);
+    final isMine = _isMyPrayer(item);
 
     return Material(
       color: Colors.transparent,
@@ -3464,13 +3475,28 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          name,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: ink,
-                            fontSize: 14,
-                          ),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                name,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: ink,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            if (isMine) ...[
+                              const SizedBox(width: 6),
+                              _metaChip(
+                                label: 'You',
+                                brown: brown,
+                                isDark: isDark,
+                              ),
+                            ],
+                          ],
                         ),
                         Text(
                           time,
@@ -3564,7 +3590,17 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                     ),
                   ),
                   const Spacer(),
-                  IconButton(
+                  if (isMine)
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => _openPrayerActions(item),
+                      icon: Icon(
+                        Icons.edit_outlined,
+                        color: isDark ? Colors.white70 : brown,
+                      ),
+                    )
+                  else
+                    IconButton(
                     visualDensity: VisualDensity.compact,
                     onPressed: () => _showQueueCardMoreMenu(item),
                     icon: Icon(
@@ -5402,6 +5438,8 @@ class _QueuePrayerDetailScreen extends StatefulWidget {
     required this.onOpenComments,
     required this.onShare,
     required this.onMore,
+    required this.isMine,
+    this.onDeleteOwn,
     this.onProfileTap,
   });
 
@@ -5418,6 +5456,8 @@ class _QueuePrayerDetailScreen extends StatefulWidget {
   final Future<void> Function() onOpenComments;
   final VoidCallback onShare;
   final Future<void> Function() onMore;
+  final bool isMine;
+  final Future<bool> Function()? onDeleteOwn;
   final VoidCallback? onProfileTap;
 
   @override
@@ -5633,6 +5673,14 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
                                     color: _ink,
                                   ),
                                 ),
+                                if (widget.isMine) ...[
+                                  const SizedBox(height: 4),
+                                  _metaChip(
+                                    label: 'You',
+                                    brown: _brown,
+                                    isDark: false,
+                                  ),
+                                ],
                                 const SizedBox(height: 2),
                                 Text(
                                   widget.timeLabel,
@@ -5802,7 +5850,21 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
                       label: 'Share',
                       onTap: widget.onShare,
                     ),
-                    _bottomAction(
+                    if (widget.isMine)
+                      _bottomAction(
+                        icon: Icons.delete_outline,
+                        label: 'Delete',
+                        onTap: widget.onDeleteOwn == null
+                            ? null
+                            : () async {
+                                final deleted = await widget.onDeleteOwn!();
+                                if (deleted && mounted) {
+                                  Navigator.of(context).pop();
+                                }
+                              },
+                      )
+                    else
+                      _bottomAction(
                       icon: Icons.more_horiz,
                       label: 'More',
                       onTap: () async {

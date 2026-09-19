@@ -159,6 +159,10 @@ class SharPreferences {
   /// User closed the update alert — do not show it again.
   static const upgradeAlertDismissedPermanently =
       'upgrade_alert_dismissed_permanently';
+  /// Recent reading activities (JSON). Additive log for Reading Progress UI.
+  static const readingRecentActivity = 'reading_recent_activity';
+  /// Daily connection check-in levels (JSON map YYYY-MM-DD -> 0..4). Additive.
+  static const connectionCheckinByDay = 'connection_checkin_by_day';
 
   static Future<bool?> getBoolean(String key) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();

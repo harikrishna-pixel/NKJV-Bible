@@ -10,6 +10,8 @@ import 'package:biblebookapp/streak_flow/mood_prayer_data.dart';
 import 'package:biblebookapp/streak_flow/streak_saved_storage.dart';
 import 'package:biblebookapp/streak/streak_service.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
+import 'package:biblebookapp/home_widget/widget_prompt_cards.dart';
+import 'package:biblebookapp/home_widget/widget_prompt_service.dart';
 import 'package:biblebookapp/live_activity/live_activity_queue.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -1659,6 +1661,11 @@ Future<String> _currentStreakFlowProgressDayKey() async {
 Future<void> _storeActiveStreakFlowSteps(int steps) async {
   final dayKey = await _currentStreakFlowProgressDayKey();
   await _storeStreakFlowStepsForDay(dayKey, steps);
+  final today = DateTime.now().toIso8601String().split('T')[0];
+  if (dayKey == today) {
+    await SharPreferences.setInt(
+        SharPreferences.streakFlowStepsCompletedToday, steps);
+  }
 }
 
 Future<Map<String, dynamic>> _readStreakFlowItemByDay() async {
@@ -1785,8 +1792,6 @@ Future<void> _startNewJourneyFromPaused(BuildContext context) async {
   await SharPreferences.setString(SharPreferences.streakFlowRestoreDate, '');
   await SharPreferences.setString(SharPreferences.streakFlowPausedDate, '');
   await SharPreferences.setString(SharPreferences.streakFlowPausedAt, '');
-  await SharPreferences.setString(
-      SharPreferences.streakFlowLastShownDate, today);
   await SharPreferences.setInt(SharPreferences.streakFlowStepsCompletedToday, 0);
   await SharPreferences.setString(
       SharPreferences.streakFlowStartedDate, today);
@@ -3456,9 +3461,6 @@ class _StreakConnectionScreenState extends State<StreakConnectionScreen> {
                         await _storeActiveStreakFlowItem(
                           item.copyWith(connectionSliderValue: _value),
                         );
-                        await SharPreferences.setInt(
-                            SharPreferences.streakFlowStepsCompletedToday,
-                            1);
                         await _storeActiveStreakFlowSteps(1);
                         if (!mounted) return;
                         final storedItem =
@@ -3957,9 +3959,6 @@ class _StreakVerseScreenState extends State<StreakVerseScreen> {
                           context: context,
                           label: 'Read Devotional',
                           onPressed: () async {
-                            await SharPreferences.setInt(
-                                SharPreferences.streakFlowStepsCompletedToday,
-                                2);
                             await _storeActiveStreakFlowSteps(2);
                             if (!mounted) return;
                             if (widget.faithJourneyPageController != null) {
@@ -4237,9 +4236,6 @@ class _StreakDevotionalScreenState extends State<StreakDevotionalScreen> {
                           context: context,
                           label: 'Continue to Prayer',
                           onPressed: () async {
-                            await SharPreferences.setInt(
-                                SharPreferences.streakFlowStepsCompletedToday,
-                                3);
                             await _storeActiveStreakFlowSteps(3);
                             if (!mounted) return;
                             if (widget.faithJourneyPageController != null) {
@@ -4698,11 +4694,11 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                               ) ??
                                   false;
                               if (!context.mounted) return;
+                              await SharPreferences.setInt(
+                                  SharPreferences
+                                      .streakFlowStepsCompletedToday,
+                                  0);
                               if (startToday) {
-                                await SharPreferences.setInt(
-                                    SharPreferences
-                                        .streakFlowStepsCompletedToday,
-                                    0);
                                 await SharPreferences.setString(
                                   SharPreferences.streakFlowStartedDate,
                                   DateTime.now()
@@ -5197,7 +5193,15 @@ class _StreakCompletedScreenState extends State<StreakCompletedScreen>
                         const SizedBox(height: 14),
                         SlideTransition(
                           position: _cardSlide,
-                          child: _StreakCompleteMotivationCard(),
+                          child: WidgetPromptGate(
+                            id: WidgetPromptId.a2,
+                            triggerMet: streakDays >= 3,
+                            fallback: _StreakCompleteMotivationCard(),
+                            builder: (context, onDismiss) => WidgetPromptA2Card(
+                              streakDays: streakDays,
+                              onDismiss: onDismiss,
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 14),
                         SlideTransition(

@@ -14,6 +14,8 @@ import 'package:biblebookapp/view/screens/profile/model/library_status_model.dar
 import 'package:biblebookapp/view/screens/profile/view/edit_profile_screen.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/referral_code_bottom_sheet.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:provider/provider.dart' as P;
@@ -55,12 +57,21 @@ void confirmLogoutAccount(BuildContext context) {
                     final cacheprovider =
                     P.Provider.of<CacheNotifier>(context, listen: false);
 
+                    final logoutEmail =
+                        (await cacheprovider.readCache(key: 'user') ?? '')
+                            .toString();
+                    await PrayerWallLocalStore.snapshotBlockedIdsForEmail(
+                      logoutEmail,
+                    );
+
                     await cacheprovider.removeCache(key: 'userid');
                     await cacheprovider.removeCache(key: 'user');
                     await cacheprovider.removeCache(key: 'name');
                     await cacheprovider.removeCache(key: 'authtoken');
+                    await cacheprovider.removeCache(key: 'profile_image');
                     await cacheprovider.removeCache(
                         key: OwnReferralCodeDialog.referralCacheKey);
+                    await PrayerWallLocalStore.clearAccountScopedData();
                     //   FirebaseAuth.instance.signOut();
                     Constants.showToast("Logged Out Successfully");
                     Get.offAll(() => HomeScreen(
@@ -601,6 +612,87 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                               const SizedBox(height: 2),
                                               Text(
                                                 'Last Backup Date: ${(lastExportedDate) == null ? 'Not Yet' : DateFormat('yyyy/MM/dd').format(lastExportedDate!)}',
+                                                style: TextStyle(
+                                                  letterSpacing:
+                                                  BibleInfo.letterSpacing,
+                                                  fontSize:
+                                                  BibleInfo.fontSizeScale *
+                                                      12,
+                                                  fontWeight: FontWeight.w400,
+                                                  color: CommanColor.whiteBlack(
+                                                      context)
+                                                      .withOpacity(0.62),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Icon(
+                                          Icons.chevron_right,
+                                          color: CommanColor.whiteBlack(context)
+                                              .withOpacity(0.7),
+                                          size: 24,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(height: mheight * 0.016),
+                                InkWell(
+                                  onTap: () {
+                                    Get.to(() => const PrayerWallScreen(
+                                          openMyProfile: true,
+                                        ));
+                                  },
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 14, horizontal: 14),
+                                    decoration: BoxDecoration(
+                                      color: CommanColor
+                                          .lightDarkPrimary200(context)
+                                          .withOpacity(0.28),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 40,
+                                          height: 40,
+                                          decoration: const BoxDecoration(
+                                            color: Color(0xFF472F1F),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.volunteer_activism_outlined,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Prayer Profile',
+                                                style: TextStyle(
+                                                  letterSpacing:
+                                                  BibleInfo.letterSpacing,
+                                                  fontSize:
+                                                  BibleInfo.fontSizeScale *
+                                                      16,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontFamily: 'Georgia',
+                                                  color: CommanColor.whiteBlack(
+                                                      context),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                'View your Prayer Wall profile',
                                                 style: TextStyle(
                                                   letterSpacing:
                                                   BibleInfo.letterSpacing,

@@ -28,6 +28,8 @@ class ReferralCodeBottomSheet extends StatefulWidget {
   /// When true, apply via profile API (Account section) — no password needed.
   final bool useLoggedInSession;
 
+  static void resetPresentationLock() {}
+
   static Future<void> show({
     required BuildContext context,
     required String email,

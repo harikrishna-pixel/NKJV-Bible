@@ -247,4 +247,46 @@ class NotificationsServices {
   void stopNotification(int id) async {
     await _plugin.cancel(id);
   }
+
+  Future<void> showImmediateNotification({
+    required int id,
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    await ensureInitialized();
+    if (!await isNotificationPermissionGranted()) {
+      log('Notification permission not granted — skipped immediate id $id');
+      return;
+    }
+
+    await _plugin.show(
+      id,
+      title,
+      body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          'prayer_wall_activity_channel_v2',
+          'Prayer Wall Activity',
+          channelDescription:
+              'Alerts for new prayers, likes, and comments on Prayer Wall',
+          importance: Importance.max,
+          priority: Priority.max,
+          icon: '@drawable/ic_prayer_wall_notif',
+          playSound: true,
+          enableVibration: true,
+          styleInformation: BigTextStyleInformation(
+            body,
+            contentTitle: title,
+          ),
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+      payload: payload,
+    );
+  }
 }

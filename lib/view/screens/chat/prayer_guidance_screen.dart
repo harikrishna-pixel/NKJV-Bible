@@ -9,6 +9,8 @@ import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/milestone_lifetime_paywall_coordinator.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
+import 'package:biblebookapp/home_widget/widget_prompt_cards.dart';
+import 'package:biblebookapp/home_widget/widget_prompt_service.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
@@ -19,7 +21,7 @@ import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/setting_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/post_prayer_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
-import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_maintenance_screen.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
 import 'package:biblebookapp/view/screens/wallet/wallet_screen.dart';
 import 'package:biblebookapp/view/widget/ai_gemini_privacy_banner.dart';
@@ -234,43 +236,114 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
             ),
           ),
           const SizedBox(width: 10),
-          GestureDetector(
-            onTap: () async {
-              await Get.to(
-                () => const SettingScreen(notificationValue: false),
-              );
-              if (mounted) _refreshPrayerReminderPrompt();
-            },
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    _kPrayerBrownMid,
-                    _kPrayerBrownDark,
+          WidgetPromptGate(
+            id: WidgetPromptId.a8,
+            triggerMet: true,
+            fallback: GestureDetector(
+              onTap: () async {
+                await Get.to(
+                  () => const SettingScreen(notificationValue: false),
+                );
+                if (mounted) _refreshPrayerReminderPrompt();
+              },
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      _kPrayerBrownMid,
+                      _kPrayerBrownDark,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Set Reminder',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                    SizedBox(width: 6),
+                    Icon(Icons.chevron_right, size: 16, color: Colors.white),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Set Reminder',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                  ),
-                  SizedBox(width: 6),
-                  Icon(Icons.chevron_right, size: 16, color: Colors.white),
-                ],
               ),
             ),
+            builder: (context, onDismiss) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  GestureDetector(
+                    onTap: () async {
+                      await Get.to(
+                        () => const SettingScreen(notificationValue: false),
+                      );
+                      if (mounted) _refreshPrayerReminderPrompt();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            _kPrayerBrownMid,
+                            _kPrayerBrownDark,
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'Set Reminder',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  GestureDetector(
+                    onTap: () =>
+                        WidgetPromptService.openHowToAdd(WidgetPromptId.a8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white.withOpacity(0.1)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _kPrayerBrownMid.withOpacity(0.55),
+                        ),
+                      ),
+                      child: Text(
+                        'Add widget',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : _kPrayerBrownMid,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -714,6 +787,7 @@ ${category.prompt}
           responseText.toLowerCase().contains('sorry, i could not generate') ||
               responseText.toLowerCase().startsWith('error:');
       if (!isErrorResponse) {
+        await WidgetPromptService.notePrayerGenerated();
         await WalletService.deductCredits(chatCost);
         if (mounted && requestId == _prayerRequestGeneration) {
           final prefs = await SharedPreferences.getInstance();
@@ -1142,6 +1216,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
           responseText.toLowerCase().contains('sorry, i could not generate') ||
               responseText.toLowerCase().startsWith('error:');
       if (!isErrorResponse) {
+        await WidgetPromptService.notePrayerGenerated();
         await WalletService.deductCredits(chatCost);
         if (mounted && requestId == _prayerRequestGeneration) {
           final prefs = await SharedPreferences.getInstance();
@@ -1260,7 +1335,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                 if (posted == true) {
                   await nav.push(
                     MaterialPageRoute(
-                      builder: (_) => const PrayerWallMaintenanceScreen(),
+                      builder: (_) => const PrayerWallScreen(),
                     ),
                   );
                 }
@@ -4246,7 +4321,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                                             Navigator.of(context).push(
                                               MaterialPageRoute(
                                                 builder: (_) =>
-                                                    const PrayerWallMaintenanceScreen(),
+                                                    const PrayerWallScreen(),
                                               ),
                                             ).then((_) {
                                               if (!mounted) return;

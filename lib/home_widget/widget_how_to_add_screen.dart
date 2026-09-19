@@ -1,5 +1,5 @@
-import 'package:biblebookapp/home_widget/widget_preview_gallery_screen.dart';
 import 'package:biblebookapp/home_widget/widget_prompt_service.dart';
+import 'package:biblebookapp/view/screens/dashboard/add_widget_intro_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -190,8 +190,9 @@ class WidgetHowToAddScreen extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: () {
                   Get.to(
-                    () => WidgetPreviewGalleryScreen(promptId: promptId),
+                    () => const AddWidgetIntroScreen(),
                     transition: Transition.cupertino,
+                    duration: const Duration(milliseconds: 350),
                   );
                 },
                 style: ElevatedButton.styleFrom(

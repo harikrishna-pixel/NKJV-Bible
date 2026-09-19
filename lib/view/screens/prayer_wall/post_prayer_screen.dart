@@ -55,6 +55,8 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
   bool _submitting = false;
   /// Raw words from the Type Your Prayer step (any language).
   String _rawPrayerWords = '';
+  /// Encoded original+AI payload for POST; the details field stays tag-free.
+  String _encodedDetails = '';
   bool _openingDetailsComposer = false;
 
   @override
@@ -65,7 +67,19 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
     }
     if (widget.initialDescription != null &&
         widget.initialDescription!.trim().isNotEmpty) {
-      _detailsCtrl.text = _clip(widget.initialDescription!.trim(), 500);
+      final raw = widget.initialDescription!.trim();
+      if (PrayerDualDescription.isDual(raw)) {
+        _encodedDetails = raw;
+        _detailsCtrl.text = _clip(
+          (PrayerDualDescription.aiPrayer(raw) ??
+                  PrayerDualDescription.myWords(raw) ??
+                  raw)
+              .trim(),
+          500,
+        );
+      } else {
+        _detailsCtrl.text = _clip(raw, 500);
+      }
     }
     if (widget.initialCategory != null &&
         _categories.contains(widget.initialCategory)) {
@@ -123,10 +137,11 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
       if (!mounted || result == null) return;
       setState(() {
         _rawPrayerWords = result.originalWords;
-        _detailsCtrl.text = PrayerDualDescription.encode(
+        _encodedDetails = PrayerDualDescription.encode(
           originalWords: result.originalWords,
           englishPrayer: result.englishPrayer,
         );
+        _detailsCtrl.text = result.englishPrayer.trim();
       });
     } finally {
       _openingDetailsComposer = false;
@@ -162,7 +177,9 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
 
   Future<void> _submit() async {
     final title = _titleCtrl.text.trim();
-    final details = _detailsCtrl.text.trim();
+    final details = _encodedDetails.trim().isNotEmpty
+        ? _encodedDetails.trim()
+        : _detailsCtrl.text.trim();
     if (title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a prayer title.')),
@@ -761,7 +778,12 @@ class _PrayerDetailsComposeScreenState
     super.dispose();
   }
 
+  void _dismissKeyboard() {
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
   Future<void> _onCreatePrayer() async {
+    _dismissKeyboard();
     final words = _wordsCtrl.text.trim();
     if (words.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -800,6 +822,7 @@ class _PrayerDetailsComposeScreenState
   }
 
   void _onConfirmPrayer() {
+    _dismissKeyboard();
     final english = _englishCtrl.text.trim();
     if (english.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -833,7 +856,10 @@ class _PrayerDetailsComposeScreenState
       ),
       child: Material(
         color: const Color(0xFFF5F0E6),
-        child: Stack(
+        child: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: _dismissKeyboard,
+          child: Stack(
           fit: StackFit.expand,
           children: [
             Positioned.fill(
@@ -888,6 +914,7 @@ class _PrayerDetailsComposeScreenState
             ),
           ],
         ),
+        ),
       ),
     );
   }
@@ -929,6 +956,7 @@ class _PrayerDetailsComposeScreenState
                     maxLength: _maxChars,
                     enabled: !_creating,
                     textCapitalization: TextCapitalization.sentences,
+                    onTapOutside: (_) => _dismissKeyboard(),
                     style: const TextStyle(color: _brown, height: 1.35),
                     decoration: InputDecoration(
                       hintText: 'Share what is on your heart...',
@@ -1128,6 +1156,7 @@ class _PrayerDetailsComposeScreenState
                   controller: _englishCtrl,
                   maxLines: null,
                   minLines: 3,
+                  onTapOutside: (_) => _dismissKeyboard(),
                   style: TextStyle(
                     fontFamily: 'Georgia',
                     fontSize: 15.5,

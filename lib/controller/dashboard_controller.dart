@@ -21,6 +21,7 @@ import 'package:scroll_to_index/scroll_to_index.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../Model/get_audio_model.dart';
 import '../Model/verseBookContentModel.dart';
+import '../services/reading_activity_service.dart';
 import '../view/constants/share_preferences.dart';
 import 'api_service.dart';
 import 'dpProvider.dart';
@@ -992,6 +993,8 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     final stored = next >= 99.9 ? '100' : next.toStringAsFixed(1);
     await DBHelper().updateBookData(bookId, 'read_per', stored);
     bookReadPer.value = stored;
+    // Additive: Recent Activity log only. Does not change read_per / is_read.
+    unawaited(ReadingActivityService.recordFromController(this));
   }
 
   /// Persist −1 chapter from this book's read_per (unmark).
@@ -1009,6 +1012,15 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     final stored = next <= 0 ? '0' : next.toStringAsFixed(1);
     await DBHelper().updateBookData(bookId, 'read_per', stored);
     bookReadPer.value = stored;
+  }
+
+  /// Display-only book % (avoids float truncation showing 49/99).
+  /// Does not change Mark-as-Read eligibility or ad/streak logic.
+  static int displayBookReadPercent(String? readPer) {
+    final raw = double.tryParse((readPer ?? '0').trim()) ?? 0.0;
+    if (raw <= 0) return 0;
+    if (raw >= 99.5) return 100;
+    return raw.round().clamp(0, 100);
   }
 
   int _chapterLoadGeneration = 0;

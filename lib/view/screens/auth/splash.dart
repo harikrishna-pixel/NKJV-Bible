@@ -180,6 +180,12 @@ class _SplashScreenState extends State<SplashScreen>
     if (pendingStreakRating >= 1) return false;
 
     final prefs = await SharedPreferences.getInstance();
+    final onboardingDone =
+        await SharPreferences.getBoolean(SharPreferences.onboarding);
+    if (onboardingDone != true) return false;
+    final launchCount = prefs.getInt('launchCount') ?? 0;
+    if (launchCount <= 1) return false;
+
     final data = prefs.getString('showopenad');
     if (data != "true") return false;
 
@@ -2076,6 +2082,13 @@ class _UpgradeCheckWrapperState extends State<UpgradeCheckWrapper> {
       if (pendingStreakRating >= 1) {
         await prefs.setString("showopenad", "false");
         await SharPreferences.setString('OpenAd', '1');
+        await _markOpenAdFlowComplete();
+        return;
+      }
+      final onboardingDone =
+          await SharPreferences.getBoolean(SharPreferences.onboarding);
+      final launchCount = prefs.getInt('launchCount') ?? 0;
+      if (onboardingDone != true || launchCount <= 1) {
         await _markOpenAdFlowComplete();
         return;
       }

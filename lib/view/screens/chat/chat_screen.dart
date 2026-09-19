@@ -33,6 +33,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher_string.dart';
+import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/widget/ai_gemini_privacy_banner.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
@@ -4656,6 +4657,21 @@ Your 3 questions (exactly 3 lines):''';
               SharPreferences.selectedChapter,
               chapter.toString(),
             );
+
+            try {
+              final controller = Get.find<DashBoardController>();
+              controller.selectedBook.value = bookName;
+              controller.selectedBookNum.value = bookNum.toString();
+              controller.selectedChapter.value = chapter.toString();
+              controller.selectChapterChange.value = chapter;
+              controller.selectedBookNameForRead.value = bookName;
+              controller.selectedBookNumForRead.value = bookNum.toString();
+              controller.selectedChapterForRead.value = chapter.toString();
+              controller.selectedVerseForRead.value = verse.toString();
+              controller.selectedBookContent.clear();
+              controller.selectedVersesContent.clear();
+              controller.isFetchContent.value = true;
+            } catch (_) {}
 
             // Navigate to HomeScreen with verse details
             Get.to(() => HomeScreen(

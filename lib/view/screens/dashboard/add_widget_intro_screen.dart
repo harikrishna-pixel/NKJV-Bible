@@ -1,8 +1,10 @@
 import 'package:biblebookapp/home_widget/bible_home_widget.dart';
+import 'package:biblebookapp/home_widget/widget_preview_gallery_screen.dart';
 import 'package:biblebookapp/home_widget/widget_prompt_service.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
+import 'package:biblebookapp/view/screens/chat/chat_history_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -234,23 +236,49 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
 
   bool _showAvailableWidgets = false;
   bool _showHowToGuide = false;
+  bool _showWidgetsHub = false;
   bool _hubPreviewActive = false;
+  DateTime? _hubOpenedAt;
   String? _drawerGalleryTitle;
   List<String>? _drawerGalleryImages;
   int _hubRefreshToken = 0;
+  int _cachedHubKindsToken = -1;
+  Future<Map<String, Set<String>>>? _cachedHubKindsFuture;
   late final PageController _galleryPageController;
   late final ScrollController _bodyScrollController;
   int _galleryDotIndex = 0;
 
+  bool get _blockHubItemNavigation {
+    final opened = _hubOpenedAt;
+    if (opened == null) return false;
+    return DateTime.now().difference(opened) < const Duration(seconds: 2);
+  }
+
+  Future<Map<String, Set<String>>> _hubKindsFuture() {
+    if (_cachedHubKindsFuture == null ||
+        _cachedHubKindsToken != _hubRefreshToken) {
+      _cachedHubKindsToken = _hubRefreshToken;
+      _cachedHubKindsFuture = _loadDrawerHubKinds();
+    }
+    return _cachedHubKindsFuture!;
+  }
+
   Future<Map<String, Set<String>>> _loadDrawerHubKinds() async {
-    final results = await Future.wait([
-      WidgetPromptService.previewedWidgetKinds(),
-      WidgetPromptService.installedDrawerWidgetKinds(),
-    ]);
-    return {
-      'previewed': results[0],
-      'installed': results[1],
-    };
+    try {
+      final results = await Future.wait([
+        WidgetPromptService.previewedWidgetKinds(),
+        WidgetPromptService.installedDrawerWidgetKinds(),
+      ]).timeout(const Duration(seconds: 2));
+      return {
+        'previewed': results[0],
+        'installed': results[1],
+      };
+    } catch (_) {
+      return {
+        'previewed': <String>{},
+        'installed': <String>{},
+      };
+    }
   }
 
   List<String> get _galleryPreviewImages {
@@ -282,12 +310,14 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
 
   /// Available widgets: open How to add steps (old flow) for this widget.
   Future<void> _openDrawerWidgetHowTo(_DrawerWidgetCatalogItem item) async {
+    if (_blockHubItemNavigation) return;
     await WidgetPromptService.noteWidgetPreviewed(
       iosWidgetKind: item.iosWidgetKind,
       widgetTitle: item.title,
     );
     if (!mounted) return;
     setState(() {
+      _showWidgetsHub = false;
       _hubPreviewActive = true;
       _drawerGalleryTitle = item.title;
       _drawerGalleryImages = item.previewImages;
@@ -300,12 +330,14 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
 
   /// Already-added widgets: swipe preview only (no How to add).
   Future<void> _openDrawerWidgetPreview(_DrawerWidgetCatalogItem item) async {
+    if (_blockHubItemNavigation) return;
     await WidgetPromptService.noteWidgetPreviewed(
       iosWidgetKind: item.iosWidgetKind,
       widgetTitle: item.title,
     );
     if (!mounted) return;
     setState(() {
+      _showWidgetsHub = false;
       _hubPreviewActive = true;
       _drawerGalleryTitle = item.title;
       _drawerGalleryImages = item.previewImages;
@@ -322,6 +354,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
 
   void _closeDrawerWidgetPreview() {
     setState(() {
+      _showWidgetsHub = true;
       _hubPreviewActive = false;
       _drawerGalleryTitle = null;
       _drawerGalleryImages = null;
@@ -332,7 +365,28 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
     _scrollBodyToTop();
   }
 
+  /// Full 9-widget catalog: `_drawerWidgetsHub()` on this same screen.
+  /// Do not open AddWidgetIntroScreen again — that is this how-to page.
+  void _openFullWidgetsHub() {
+    if (!mounted) return;
+    _hubOpenedAt = DateTime.now();
+    setState(() {
+      _showWidgetsHub = true;
+      _showHowToGuide = false;
+      _showAvailableWidgets = false;
+      _hubPreviewActive = false;
+      _drawerGalleryTitle = null;
+      _drawerGalleryImages = null;
+    });
+    _scrollBodyToTop();
+  }
+
   void _handleAppBarBack() {
+    if (_showWidgetsHub) {
+      setState(() => _showWidgetsHub = false);
+      _scrollBodyToTop();
+      return;
+    }
     if (_showAvailableWidgets) {
       setState(() {
         _showAvailableWidgets = false;
@@ -847,16 +901,23 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
   Widget _drawerWidgetsHub() {
     return FutureBuilder<Map<String, Set<String>>>(
       key: ValueKey(_hubRefreshToken),
-      future: _loadDrawerHubKinds(),
+      initialData: const {
+        'previewed': <String>{},
+        'installed': <String>{},
+      },
+        future: _hubKindsFuture(),
       builder: (context, snap) {
-        final previewed = snap.data?['previewed'] ?? const {};
-        final installed = snap.data?['installed'] ?? const {};
+        final previewed = snap.data?['previewed'] ?? <String>{};
+        final installed = snap.data?['installed'] ?? <String>{};
         final installedItems = _drawerCatalog
             .where((item) => item.isAdded(installed))
             .toList();
-        final availableItems = _drawerCatalog
+        var availableItems = _drawerCatalog
             .where((item) => !item.isAdded(installed))
             .toList();
+        if (availableItems.isEmpty) {
+          availableItems = _drawerCatalog.toList();
+        }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1090,27 +1151,17 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
           width: double.infinity,
           height: 52,
           child: ElevatedButton(
-            onPressed: () async {
-              await WidgetPromptService.noteWidgetPreviewed(
-                iosWidgetKind: _activeWidgetKind,
-                widgetTitle: _activeWidgetTitle,
-              );
-              if (!mounted) return;
-              // Show ALL widgets (full hub), not only this prompt's one widget.
-              if (_isDrawerEntry) {
-                // Additive: same hub as prompt. In-place setState was this
-                // route already, so the tap looked like no action.
-                await Get.off(
-                  () => const AddWidgetIntroScreen(),
-                  transition: Transition.cupertino,
-                  duration: const Duration(milliseconds: 350),
-                  preventDuplicates: false,
-                );
-                return;
-              }
-              // Prompt flow (e.g. Bookmarks alert): replace with full Widgets hub.
-              await Get.off(
-                () => const AddWidgetIntroScreen(),
+            onPressed: () {
+              final images = _previewImages
+                  .map(
+                    (p) => p.replaceFirst(
+                      'assets/bible_widget/',
+                      'assets/bible_widget_comopressed/',
+                    ),
+                  )
+                  .toList();
+              Get.to(
+                () => WidgetPreviewGalleryScreen(previewImages: images),
                 transition: Transition.cupertino,
                 duration: const Duration(milliseconds: 350),
               );
@@ -1135,20 +1186,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
         const SizedBox(height: 14),
         TextButton(
           onPressed: () {
-            // Drawer hub: stay on Widgets screen. Prompt flow: pop as before.
-            if (_isDrawerEntry) {
-              setState(() {
-                _showHowToGuide = false;
-                _showAvailableWidgets = false;
-                _hubPreviewActive = false;
-                _drawerGalleryTitle = null;
-                _drawerGalleryImages = null;
-                _hubRefreshToken++;
-              });
-              _scrollBodyToTop();
-              return;
-            }
-            Get.back();
+            _openFullWidgetsHub();
           },
           child: Text(
             'Got It',
@@ -1224,6 +1262,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
   }
 
   Widget _bodyContent() {
+    if (_showWidgetsHub) return _drawerWidgetsHub();
     if (_showAvailableWidgets) return _availableWidgetsGallery();
     // Explore → How to add steps (old screen).
     if (_isDrawerEntry && _showHowToGuide) return _howToContent();
@@ -1245,7 +1284,16 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
         ? CommanColor.darkPrimaryColor
         : (isVintage ? _cream : themeProvider.backgroundColor);
 
-    return Scaffold(
+    return PopScope(
+      canPop: !_showWidgetsHub,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (_showWidgetsHub) {
+          setState(() => _showWidgetsHub = false);
+          _scrollBodyToTop();
+        }
+      },
+      child: Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
         backgroundColor: CommanColor.lightDarkPrimary(context),
@@ -1284,6 +1332,7 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
             child: _bodyContent(),
           ),
         ),
+      ),
       ),
     );
   }

@@ -4,9 +4,15 @@ import 'package:flutter/material.dart';
 /// Swipe gallery of widget mockups from `assets/bible_widget_comopressed`.
 /// Marks the drawer "added" count when this screen is closed after viewing.
 class WidgetPreviewGalleryScreen extends StatefulWidget {
-  const WidgetPreviewGalleryScreen({super.key, this.promptId});
+  const WidgetPreviewGalleryScreen({
+    super.key,
+    this.promptId,
+    this.previewImages,
+  });
 
   final WidgetPromptId? promptId;
+  /// One widget family, different sizes only (from bible_widget_comopressed).
+  final List<String>? previewImages;
 
   @override
   State<WidgetPreviewGalleryScreen> createState() =>
@@ -25,7 +31,9 @@ class _WidgetPreviewGalleryScreenState extends State<WidgetPreviewGalleryScreen>
   @override
   void initState() {
     super.initState();
-    _assets = WidgetPromptService.previewAssetsFor(widget.promptId);
+    _assets = (widget.previewImages != null && widget.previewImages!.isNotEmpty)
+        ? widget.previewImages!
+        : WidgetPromptService.previewAssetsFor(widget.promptId);
     _pageController = PageController();
   }
 
@@ -84,6 +92,13 @@ class _WidgetPreviewGalleryScreenState extends State<WidgetPreviewGalleryScreen>
                         child: Image.asset(
                           _assets[i],
                           fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) {
+                            final fallback = _assets[i].replaceFirst(
+                              'assets/bible_widget_comopressed/',
+                              'assets/bible_widget/',
+                            );
+                            return Image.asset(fallback, fit: BoxFit.contain);
+                          },
                         ),
                       );
                     },

@@ -28,9 +28,13 @@ import 'package:biblebookapp/view/screens/calendar_screen/view/calendar_screen.d
 import 'package:biblebookapp/view/screens/category_detail_screen/view/image_detail_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/add_widget_intro_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/ios_style_app_drawer.dart';
+import 'package:biblebookapp/view/screens/journey/connection_insights_screen.dart';
+import 'package:biblebookapp/view/screens/journey/reading_progress_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/social_link_screen.dart';
 import 'package:biblebookapp/view/screens/verse_topics/verse_topics_screen.dart';
-import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_maintenance_screen.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_home_expiry_banner.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
+import 'package:biblebookapp/services/prayer_wall_activity_notifier.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/eproducts_screen.dart';
@@ -1536,6 +1540,8 @@ class _HomeScreenState extends State<HomeScreen>
     ]);
     if (!mounted) return;
 
+    unawaited(PrayerWallActivityNotifier.checkAndNotify());
+
     await _maybeShowContinueJourneySheet();
     if (!mounted) return;
 
@@ -1763,6 +1769,9 @@ class _HomeScreenState extends State<HomeScreen>
         break;
       case 'open_quiz':
         // Stay on Home; quiz screen can be added later
+        break;
+      case 'open_prayer_wall':
+        Get.to(() => const PrayerWallScreen());
         break;
       default:
         break;
@@ -3844,7 +3853,9 @@ class _HomeScreenState extends State<HomeScreen>
               (!hasCachedContent || _homeEntryRequiresContentReload())) {
           _loadInitialData(state);
           }
-          if (hasCachedContent && !widgetReaderHandledEarly) {
+          if (hasCachedContent &&
+              !widgetReaderHandledEarly &&
+              widget.From.toString() != 'chat') {
             cachedController.isFetchContent.value = false;
             _hasDisplayedChapterContent = true;
             if (skipReloadPath) {
@@ -4593,7 +4604,12 @@ class _HomeScreenState extends State<HomeScreen>
                                 );
                                 return false;
                               },
-                              child: ListView.builder(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  const PrayerWallHomeExpiryBanner(),
+                                  Expanded(
+                                    child: ListView.builder(
                               key: ValueKey(
                                   'reader_chapter_${controller.selectedChapter.value}'),
                               scrollDirection: controller.scrollDirection,
@@ -5345,6 +5361,9 @@ class _HomeScreenState extends State<HomeScreen>
                                 );
                               },
                             ),
+                                  ),
+                                ],
+                              ),
                 ),
               ),
             ),
@@ -6119,6 +6138,20 @@ class _HomeScreenState extends State<HomeScreen>
               transition: Transition.cupertino,
               duration: const Duration(milliseconds: 350));
         },
+        onReadingProgressTap: () {
+          Get.to(
+            () => const ReadingProgressScreen(),
+            transition: Transition.cupertino,
+            duration: const Duration(milliseconds: 350),
+          );
+        },
+        onConnectionInsightsTap: () {
+          Get.to(
+            () => const ConnectionInsightsScreen(),
+            transition: Transition.cupertino,
+            duration: const Duration(milliseconds: 350),
+          );
+        },
         onWallpapersTap: () async {
           if (controller.adFree.value == false) {
             Future(() {
@@ -6209,7 +6242,7 @@ class _HomeScreenState extends State<HomeScreen>
         onPrayerWallTap: () {
           SharPreferences.setString('OpenAd', '1');
           Get.to(
-            () => const PrayerWallMaintenanceScreen(),
+            () => const PrayerWallScreen(),
             transition: Transition.cupertino,
             duration: const Duration(milliseconds: 250),
           );
@@ -6696,6 +6729,11 @@ class _HomeScreenState extends State<HomeScreen>
       // Set highlight for Read, Daily, or chat
       state.controller!.readHighlight.value = isReadOrDaily || isFromChat;
 
+      if (isFromChat) {
+        state.controller!.selectedBookContent.clear();
+        state.controller!.selectedVersesContent.clear();
+        state.controller!.isFetchContent.value = true;
+      }
       if (isReadOrDaily || isFromChat) {
         // Use getBookContentForRead for Read, Daily, and chat to properly load content
         await state.controller!.getBookContentForRead();

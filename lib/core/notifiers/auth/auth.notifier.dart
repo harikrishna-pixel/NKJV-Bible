@@ -20,6 +20,8 @@ import '../../api/auth/register.api.dart';
 import 'dart:developer' as devtools show log;
 
 import '../cache.notifier.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
 
 class AuthNotifier extends ChangeNotifier {
   final RegisterApi registerApi = RegisterApi();
@@ -177,6 +179,7 @@ class AuthNotifier extends ChangeNotifier {
           await cacheNotifier.removeCache(key: 'user');
           await cacheNotifier.removeCache(key: 'name');
           await cacheNotifier.removeCache(key: 'authtoken');
+          await PrayerWallLocalStore.clearAccountScopedData();
           //   FirebaseAuth.instance.signOut();
           Constants.showToast("$msg");
           Get.offAll(() => const SplashScreen());
@@ -229,6 +232,12 @@ class AuthNotifier extends ChangeNotifier {
           await cacheNotifier.writeCache(key: "skip", value: "false");
 
           LibraryBackupUploadService.runAfterLogin();
+
+          await PrayerWallLocalStore.clearAccountScopedData();
+          await PrayerWallService.resolveIdentityUser(
+            email: '${datafn['data']['user']['email']}',
+            userName: '${datafn['data']['user']['name']}',
+          );
 
           if (context.mounted) {
             // context.pushReplacementNamed(AppRouteConst.navhomeRoute,

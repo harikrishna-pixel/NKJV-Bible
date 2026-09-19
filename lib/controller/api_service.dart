@@ -8,6 +8,8 @@ import 'package:biblebookapp/Model/image_model.dart';
 import 'package:biblebookapp/core/api/auth/profile_update.api.dart';
 import 'package:biblebookapp/core/library_backup_upload_service.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
 import 'package:biblebookapp/view/constants/assets_constants.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
@@ -1010,6 +1012,11 @@ Future<String?> registerUser(
             fromApi.isNotEmpty ? fromApi : inviteCode;
         await cacheNotifier.writeCache(key: 'referred_by', value: stored);
       }
+      await PrayerWallLocalStore.clearAccountScopedData();
+      await PrayerWallService.resolveIdentityUser(
+        email: '${data['data']['user']['email']}',
+        userName: '${data['data']['user']['name']}',
+      );
       Constants.showToast("Account Created Successfully");
       return registeredReferralCode;
     } else {
@@ -1090,6 +1097,12 @@ Future<UserModel> loginUser(
       }
 
       LibraryBackupUploadService.runAfterLogin();
+
+      await PrayerWallLocalStore.clearAccountScopedData();
+      await PrayerWallService.resolveIdentityUser(
+        email: '${data['data']['user']['email']}',
+        userName: '${data['data']['user']['name']}',
+      );
 
       // Constants.showToast(
       //     "Hi ${data['data']['user']['name']}, Welcome to ${BibleInfo.bible_shortName}");

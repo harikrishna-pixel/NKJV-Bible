@@ -191,14 +191,14 @@ class EditProfileScreenState extends State<EditProfileScreen> {
           child: Container(
             height: MediaQuery.of(context).size.height,
             width: MediaQuery.of(context).size.width,
-            decoration:
-                p.Provider.of<ThemeProvider>(context).currentCustomTheme ==
-                        AppCustomTheme.vintage
-                    ? BoxDecoration(
-                        image: DecorationImage(
-                            image: AssetImage(Images.bgImage(context)),
-                            fit: BoxFit.fill))
-                    : null,
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage(
+                  'assets/prayer_wall/edit_bible_profile_bg.jpg',
+                ),
+                fit: BoxFit.cover,
+              ),
+            ),
             child: isLoading
                 ? const Center(
                     child: CircularProgressIndicator.adaptive(),
@@ -581,14 +581,14 @@ class EditProfileScreen1 extends HookConsumerWidget with ImagePickerMixin {
           child: Container(
             height: MediaQuery.of(context).size.height,
             width: MediaQuery.of(context).size.width,
-            decoration:
-                p.Provider.of<ThemeProvider>(context).currentCustomTheme ==
-                        AppCustomTheme.vintage
-                    ? BoxDecoration(
-                        image: DecorationImage(
-                            image: AssetImage(Images.bgImage(context)),
-                            fit: BoxFit.fill))
-                    : null,
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage(
+                  'assets/prayer_wall/edit_bible_profile_bg.jpg',
+                ),
+                fit: BoxFit.cover,
+              ),
+            ),
             child: editProfileState.isLoading
                 ? const Center(
                     child: CircularProgressIndicator.adaptive(),
