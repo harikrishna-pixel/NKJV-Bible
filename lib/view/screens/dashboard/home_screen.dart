@@ -12,6 +12,7 @@ import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/core/notifiers/auth/auth.notifier.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
+import 'package:biblebookapp/services/premium_entitlement_label_sync.dart';
 import 'package:biblebookapp/main.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
 import 'package:biblebookapp/utils/emoji_text_style.dart';
@@ -3109,6 +3110,16 @@ class _HomeScreenState extends State<HomeScreen>
     if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
     if (!Get.isRegistered<DashBoardController>()) return;
     await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
+    try {
+      if (!mounted) return;
+      final downloadProvider =
+          Provider.of<DownloadProvider>(context, listen: false);
+      await PremiumEntitlementLabelSync.syncPlanLabelFromRememberedProduct(
+        downloadProvider,
+      );
+    } catch (e) {
+      debugPrint('Premium plan label sync error: $e');
+    }
   }
 
   /// After Mark as Read / chapter picker pops, ensure verses match the header chapter.
@@ -5982,6 +5993,15 @@ class _HomeScreenState extends State<HomeScreen>
       );
       // Paywall may pop back onto this Home — refresh so Free Plan / banner update.
       await controller.refreshPremiumStatusFromPrefs();
+      try {
+        final downloadProvider =
+            Provider.of<DownloadProvider>(context, listen: false);
+        await PremiumEntitlementLabelSync.syncPlanLabelFromRememberedProduct(
+          downloadProvider,
+        );
+      } catch (e) {
+        debugPrint('Premium plan label sync error: $e');
+      }
     }
 
     void showSubscriptionInfoSheet() {
@@ -6094,7 +6114,16 @@ class _HomeScreenState extends State<HomeScreen>
         onUpgradeTap: () {
           openPaywallFromDrawer();
         },
-        onPremiumInfoTap: () {
+        onPremiumInfoTap: () async {
+          try {
+            final downloadProvider =
+                Provider.of<DownloadProvider>(context, listen: false);
+            await PremiumEntitlementLabelSync.syncPlanLabelFromRememberedProduct(
+              downloadProvider,
+            );
+          } catch (e) {
+            debugPrint('Premium Info plan sync error: $e');
+          }
           if (DateTime.tryParse('${controller.RewardAdExpireDate}') != null) {
             showSubscriptionInfoSheet();
           } else if (controller.isSubscriptionEnabled ?? false) {

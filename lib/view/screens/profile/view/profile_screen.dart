@@ -12,7 +12,9 @@ import 'package:biblebookapp/view/screens/dashboard/myLibrary.dart';
 import 'package:biblebookapp/view/screens/profile/bloc/user_bloc.dart';
 import 'package:biblebookapp/view/screens/profile/model/library_status_model.dart';
 import 'package:biblebookapp/view/screens/profile/view/edit_profile_screen.dart';
+import 'package:biblebookapp/core/api/auth/profile_update.api.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/referral_code_bottom_sheet.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
@@ -155,6 +157,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   String? _referralCode = '';
   String? _referredBy = '';
   int? _referralRewardClaimed;
+  String? _profileImageUrl;
   loadDB() async {
     final db = DBHelper();
     if (mounted) {
@@ -204,13 +207,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       });
       // Additive: pick up referrer credits when referral_count grew on backend.
       syncReferrerCreditsFromSession();
+      // Additive: show cached / API profile photo (does not change login logic).
+      _loadProfileImage();
     } else {
       setState(() {
         user = '';
         _referralCode = '';
         _referredBy = '';
         _referralRewardClaimed = null;
+        _profileImageUrl = null;
       });
+    }
+  }
+
+  Future<void> _loadProfileImage() async {
+    try {
+      final url = await ProfileUpdateApi().loadAndCacheProfileImageUrl();
+      if (!mounted) return;
+      setState(() => _profileImageUrl = url);
+    } catch (e) {
+      debugPrint('_loadProfileImage: $e');
     }
   }
 
@@ -419,18 +435,54 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                         color: Color(0xFFFBD5B2),
                                         shape: BoxShape.circle,
                                       ),
-                                      child: Center(
-                                        child: Text(
-                                          _safeInitials,
-                                          style: TextStyle(
-                                            fontSize: 30,
-                                            fontWeight: FontWeight.w700,
-                                            fontFamily: 'Georgia',
-                                            color: CommanColor.whiteBlack(
-                                                context),
-                                          ),
-                                        ),
-                                      ),
+                                      clipBehavior: Clip.antiAlias,
+                                      child: (_profileImageUrl != null &&
+                                              _profileImageUrl!.trim().isNotEmpty)
+                                          ? CachedNetworkImage(
+                                              imageUrl: _profileImageUrl!.trim(),
+                                              width: 92,
+                                              height: 92,
+                                              fit: BoxFit.cover,
+                                              placeholder: (context, url) =>
+                                                  Center(
+                                                child: Text(
+                                                  _safeInitials,
+                                                  style: TextStyle(
+                                                    fontSize: 30,
+                                                    fontWeight: FontWeight.w700,
+                                                    fontFamily: 'Georgia',
+                                                    color: CommanColor
+                                                        .whiteBlack(context),
+                                                  ),
+                                                ),
+                                              ),
+                                              errorWidget:
+                                                  (context, url, error) =>
+                                                      Center(
+                                                child: Text(
+                                                  _safeInitials,
+                                                  style: TextStyle(
+                                                    fontSize: 30,
+                                                    fontWeight: FontWeight.w700,
+                                                    fontFamily: 'Georgia',
+                                                    color: CommanColor
+                                                        .whiteBlack(context),
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                          : Center(
+                                              child: Text(
+                                                _safeInitials,
+                                                style: TextStyle(
+                                                  fontSize: 30,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontFamily: 'Georgia',
+                                                  color: CommanColor.whiteBlack(
+                                                      context),
+                                                ),
+                                              ),
+                                            ),
                                     ),
                                     const SizedBox(width: 16),
                                     Expanded(

@@ -11,6 +11,7 @@ class UserModel {
   final String? referredBy;
   final int? referralCount;
   final int? referralRewardClaimed;
+  final int? walletBalance;
 
   UserModel({
     this.address,
@@ -25,6 +26,7 @@ class UserModel {
     this.referredBy,
     this.referralCount,
     this.referralRewardClaimed,
+    this.walletBalance,
   });
 
   static int? _parseInt(dynamic value) {
@@ -47,6 +49,7 @@ class UserModel {
       referredBy: json['referred_by'] as String?,
       referralCount: _parseInt(json['referral_count']),
       referralRewardClaimed: _parseInt(json['referral_reward_claimed']),
+      walletBalance: _parseInt(json['wallet_balance']),
     );
   }
 
@@ -64,6 +67,7 @@ class UserModel {
       'referred_by': referredBy,
       'referral_count': referralCount,
       'referral_reward_claimed': referralRewardClaimed,
+      'wallet_balance': walletBalance,
     };
   }
 }

@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:biblebookapp/core/api/auth/profile_update.api.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 
@@ -19,6 +22,46 @@ class WalletService {
   static const int _smallAnswerCost = 20;
   static const int _mediumAnswerCost = 50;
   static const int _largeAnswerCost = 100;
+
+  /// Additive: upload current balance via profile-update action=4 (fire-and-forget).
+  static void _scheduleWalletBackup(int balance) {
+    unawaited(() async {
+      try {
+        final ok =
+            await ProfileUpdateApi().updateWalletBalanceAction4(balance);
+        debugPrint(
+          'WalletService: cloud backup action=4 balance=$balance ok=$ok',
+        );
+      } catch (e) {
+        debugPrint('WalletService: cloud backup error: $e');
+      }
+    }());
+  }
+
+  /// Additive: restore server wallet_balance into local credits (login/profile).
+  /// Does not change how chat deduct/add works — only sets stored balance.
+  /// Never replace a higher local balance with a lower/zero server snapshot
+  /// (AuthHub often returns wallet_balance:0 while referrer reward is unclaimed).
+  static Future<void> applyServerWalletBalance(int? serverBalance) async {
+    if (serverBalance == null || serverBalance < 0) return;
+    final prefs = await SharedPreferences.getInstance();
+    final local = prefs.getInt(_creditsKey) ?? 0;
+    if (serverBalance < local) {
+      debugPrint(
+        'WalletService: keep local wallet=$local (server=$serverBalance)',
+      );
+      return;
+    }
+    await prefs.setInt(_creditsKey, serverBalance);
+    debugPrint(
+      'WalletService: restored server wallet_balance=$serverBalance',
+    );
+  }
+
+  /// Additive: when UI writes credits outside add/deduct, still backup to cloud.
+  static void notifyLocalBalanceChanged(int balance) {
+    _scheduleWalletBackup(balance < 0 ? 0 : balance);
+  }
 
   /// Initialize wallet for new users (give 100 free credits)
   static Future<void> initializeWallet() async {
@@ -45,6 +88,7 @@ class WalletService {
     final newBalance = current + amount;
     await prefs.setInt(_creditsKey, newBalance);
     debugPrint('WalletService: Added $amount credits. New balance: $newBalance');
+    _scheduleWalletBackup(newBalance);
     return newBalance;
   }
 
@@ -56,6 +100,7 @@ class WalletService {
       final newBalance = current - amount;
       await prefs.setInt(_creditsKey, newBalance);
       debugPrint('WalletService: Deducted $amount credits. New balance: $newBalance');
+      _scheduleWalletBackup(newBalance);
       return true;
     }
     debugPrint('WalletService: Insufficient credits. Required: $amount, Available: $current');

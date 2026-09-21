@@ -640,6 +640,7 @@ Future<void> syncReferrerCreditsFromSession() async {
     debugPrint('syncReferrerCreditsFromSession referral_count → '
         '${user.referralCount}');
     await syncReferrerCreditsFromProfile(user);
+    await WalletService.applyServerWalletBalance(user.walletBalance);
   } catch (e) {
     debugPrint('syncReferrerCreditsFromSession: $e');
   }
@@ -1127,6 +1128,7 @@ Future<UserModel> loginUser(
           '  referral_reward_claimed  → ${user.referralRewardClaimed}');
       // Additive: credit referrer locally when backend referral_count grew.
       await syncReferrerCreditsFromProfile(user);
+      await WalletService.applyServerWalletBalance(user.walletBalance);
       return user;
     } else {
       throw data['message'] ?? 'Failed to login';

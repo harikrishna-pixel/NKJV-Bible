@@ -788,16 +788,27 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Future<void> _addLifetimeWalletBonus() async {
-    final amount = widget.invisiblePurchaseHost ? 1000 : 5000;
+    // MultiSelect / visible Lifetime: 5,000. Milestone invisible host: 1,000.
+    final isMilestoneHost = widget.checkad.startsWith('milestone_');
+    final amount =
+        (widget.invisiblePurchaseHost && isMilestoneHost) ? 1000 : 5000;
     await WalletService.addCredits(amount);
   }
 
   Future<bool> _tryMarkLifetimeWalletBonusGrantedOnce() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final key = 'lifetime_wallet_bonus_granted_v1_${widget.checkad}';
-      final already = prefs.getBool(key) ?? false;
-      if (already) return false;
+      // Stable once-key (not per checkad) so Lifetime 5k is granted once app-wide.
+      const key = 'lifetime_wallet_bonus_granted_v1';
+      if (prefs.getBool(key) == true) return false;
+      // Honor legacy per-checkad marks so existing users are not granted again.
+      for (final existing in prefs.getKeys()) {
+        if (existing.startsWith('lifetime_wallet_bonus_granted_v1_') &&
+            prefs.getBool(existing) == true) {
+          await prefs.setBool(key, true);
+          return false;
+        }
+      }
       await prefs.setBool(key, true);
       return true;
     } catch (_) {
@@ -865,9 +876,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Future<void> _navigateAfterNonLifetimePurchaseSuccess() async {
-    if (widget.invisiblePurchaseHost) {
-      await _addLifetimeWalletBonusOnce();
-    }
+    // Lifetime 5k bonus must never run for 1M/1Y/2Y (incl. AR invisible host).
     await _navigateToHomeAfterPurchaseSuccess(invisibleHostPopValue: true);
   }
 
@@ -2116,7 +2125,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         if (startFlag == true) {
           await _addLifetimeWalletBonusOnce();
         }
-        Constants.showToast(successToastMessage);
+        Constants.showToast(
+          successToastMessage,
+          startFlag == true ? 1000 : 2000,
+        );
+        if (startFlag != true) {
+          await Future.delayed(const Duration(seconds: 2));
+        }
         await SharPreferences.setBoolean('closead', true);
         await _completePaywallSubscriptionNavigation(
           startFlag: startFlag == true,
@@ -2146,12 +2161,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         }
         await Future.delayed(Duration(seconds: 1));
         EasyLoading.dismiss();
-        Constants.showToast(successToastMessage);
+        Constants.showToast(
+          successToastMessage,
+          startFlag == true ? 1000 : 2000,
+        );
+        if (startFlag != true) {
+          await Future.delayed(const Duration(seconds: 2));
+        }
         await SharPreferences.setBoolean('closead', true);
         await _completePaywallSubscriptionNavigation(
           startFlag: startFlag == true,
-          lifetimeWalletBonus:
-              startFlag == true && widget.invisiblePurchaseHost,
           invisiblePopSuccess: true,
         );
         return;
@@ -2175,7 +2194,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         }
         await Future.delayed(Duration(seconds: 1));
         EasyLoading.dismiss();
-        Constants.showToast(successToastMessage);
+        Constants.showToast(
+          successToastMessage,
+          startFlag == true ? 1000 : 2000,
+        );
+        if (startFlag != true) {
+          await Future.delayed(const Duration(seconds: 2));
+        }
         await SharPreferences.setBoolean('closead', true);
         await _completePaywallSubscriptionNavigation(
           startFlag: startFlag == true,
@@ -2202,7 +2227,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         }
         await Future.delayed(Duration(seconds: 1));
         EasyLoading.dismiss();
-        Constants.showToast(successToastMessage);
+        Constants.showToast(
+          successToastMessage,
+          startFlag == true ? 1000 : 2000,
+        );
+        if (startFlag != true) {
+          await Future.delayed(const Duration(seconds: 2));
+        }
         await SharPreferences.setBoolean('closead', true);
         await _completePaywallSubscriptionNavigation(
           startFlag: startFlag == true,
@@ -2230,7 +2261,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           }
           await Future.delayed(Duration(seconds: 1));
           EasyLoading.dismiss();
-          Constants.showToast(successToastMessage);
+          Constants.showToast(
+            successToastMessage,
+            startFlag == true ? 1000 : 2000,
+          );
+          if (startFlag != true) {
+            await Future.delayed(const Duration(seconds: 2));
+          }
           await SharPreferences.setBoolean('closead', true);
           await _completePaywallSubscriptionNavigation(
             startFlag: startFlag == true,
@@ -2245,7 +2282,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         }
         await Future.delayed(Duration(seconds: 1));
         EasyLoading.dismiss();
-        Constants.showToast(successToastMessage);
+        Constants.showToast(
+          successToastMessage,
+          startFlag == true ? 1000 : 2000,
+        );
+        if (startFlag != true) {
+          await Future.delayed(const Duration(seconds: 2));
+        }
         await SharPreferences.setBoolean('closead', true);
         await _completePaywallSubscriptionNavigation(
           startFlag: startFlag == true,
