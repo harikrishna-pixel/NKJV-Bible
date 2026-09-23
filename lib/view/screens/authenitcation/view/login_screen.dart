@@ -342,3 +342,33 @@ class LoginScreen extends HookConsumerWidget {
     );
   }
 }
+
+/// UI-only: one Navigator route for Prayer Wall Login.
+/// Does not use Get.offAll so the Prayer Wall stack stays.
+class PrayerWallEmbeddedAuthHost extends StatefulWidget {
+  const PrayerWallEmbeddedAuthHost({
+    super.key,
+    this.replaceOnSuccess,
+  });
+
+  final VoidCallback? replaceOnSuccess;
+
+  static const routeName = '/prayer-wall-embedded-auth';
+
+  @override
+  State<PrayerWallEmbeddedAuthHost> createState() =>
+      _PrayerWallEmbeddedAuthHostState();
+}
+
+class _PrayerWallEmbeddedAuthHostState
+    extends State<PrayerWallEmbeddedAuthHost> {
+  @override
+  Widget build(BuildContext context) {
+    return LoginScreen(
+      key: const ValueKey('prayer-wall-embedded-login'),
+      hasSkip: false,
+      popOnSuccess: true,
+      replaceOnSuccess: widget.replaceOnSuccess,
+    );
+  }
+}

@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:biblebookapp/constant/app_api_constant.dart';
 import 'package:biblebookapp/constant/size_config.dart';
 import 'package:biblebookapp/services/background_api_service.dart';
+import 'package:biblebookapp/services/reading_activity_service.dart';
 import 'package:biblebookapp/utils/book_apps_helper.dart';
 import 'package:biblebookapp/utils/debugprint.dart';
 import 'package:biblebookapp/utils/levelplay_ads.dart';
@@ -864,20 +865,21 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         'SELECT MIN(chapter_num) AS m FROM verse WHERE book_num = ?',
         [bookNum],
       );
-      // Additive: only cache when MIN is real. Empty/null used to be stored as
-      // zero-based and made Next Chapter reload the previous chapter.
+      // Additive: only cache when MIN is real. Empty/null used to default
+      // zero-based and made first-open Next Chapter reload the previous chapter.
+      // Unknown → 1-based; _rawQueryVerseChapter still tries the other basis.
       if (rows.isEmpty || rows.first['m'] == null) {
-        return _zeroBasedChapterByBook[bookNum] ?? true;
+        return _zeroBasedChapterByBook[bookNum] ?? false;
       }
       final minCh = int.tryParse('${rows.first['m']}');
       if (minCh == null) {
-        return _zeroBasedChapterByBook[bookNum] ?? true;
+        return _zeroBasedChapterByBook[bookNum] ?? false;
       }
       final zeroBased = minCh == 0;
       _zeroBasedChapterByBook[bookNum] = zeroBased;
       return zeroBased;
     } catch (_) {
-      return _zeroBasedChapterByBook[bookNum] ?? true;
+      return _zeroBasedChapterByBook[bookNum] ?? false;
     }
   }
 
@@ -1100,6 +1102,14 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     return selectedBookId.value.trim().isNotEmpty;
   }
 
+  /// Display-only: round stored read_per for Reading Progress UI.
+  static int displayBookReadPercent(String? readPer) {
+    final raw = double.tryParse((readPer ?? '0').trim()) ?? 0.0;
+    if (raw <= 0) return 0;
+    if (raw >= 99.5) return 100;
+    return raw.round().clamp(0, 100);
+  }
+
   /// Persist +1 chapter toward this book's read_per. Always writes the row for
   /// [selectedBookNum] (not a stale previous book id).
   Future<void> persistMarkChapterReadProgress() async {
@@ -1115,6 +1125,7 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     final stored = next >= 99.9 ? '100' : next.toStringAsFixed(1);
     await DBHelper().updateBookData(bookId, 'read_per', stored);
     bookReadPer.value = stored;
+    unawaited(ReadingActivityService.recordFromController(this));
   }
 
   /// Persist −1 chapter from this book's read_per (unmark).
@@ -1318,6 +1329,7 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
   }
 
   Future<void> getBookContentForRead() async {
+    int? loadId;
     try {
       if (_canSkipChapterReloadSync() &&
           selectedChapter.value == selectedChapterForRead.value &&
@@ -1335,12 +1347,23 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
         return;
       }
 
-      // Avoid clearing visible content while a reload is in flight.
-      // Only enter "loading" state when we truly have nothing to show.
-      final hadVisibleContent = selectedBookContent.isNotEmpty;
+      // Cancel in-flight last-read loads so Daily/Read cannot be overwritten.
+      loadId = ++_chapterLoadGeneration;
+      final targetReadRaw = int.tryParse(selectedChapterForRead.value.trim()) ??
+          int.tryParse(selectedChapter.value.trim()) ??
+          1;
+      final targetRead = targetReadRaw <= 0 ? 1 : targetReadRaw;
+      // Keep on-screen verses only when they already are the ForRead chapter.
+      final hadVisibleContent = selectedBookContent.isNotEmpty &&
+          _displayedContentMatchesUiChapter(targetRead) &&
+          _displayedContentMatchesSelectedBook();
       if (!hadVisibleContent) {
         selectedBookContent.clear();
-        selectedVersesContent.clear();
+        final forReadNum = int.tryParse(selectedBookNumForRead.value.trim()) ??
+            int.tryParse(selectedBookNum.value.trim());
+        if (forReadNum == null || !_versesCacheMatchesBook(forReadNum)) {
+          selectedVersesContent.clear();
+        }
         isFetchContent.value = true;
         loadTextToSpeech.value = true;
       } else {
@@ -1449,6 +1472,7 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
       // Display-only: strip any accidental chapter merge before paint.
       chapterContent =
           versesForUiChapterOnly(chapterContent, parsedChapterForRead);
+      if (loadId != _chapterLoadGeneration) return;
       if (chapterContent.isNotEmpty) {
         selectedBookContent.value = chapterContent;
       }
@@ -1484,6 +1508,7 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
     } catch (e, st) {
       log('Error: $e,$st');
     } finally {
+      if (loadId == null || loadId != _chapterLoadGeneration) return;
       if (loadTextToSpeech.value) {
         loadTextToSpeech.value = false;
       }
@@ -1528,12 +1553,18 @@ class DashBoardController extends GetxController with WidgetsBindingObserver {
 
     final loadId = ++_chapterLoadGeneration;
     try {
-      // Avoid clearing visible content while a reload is in flight.
-      // Only enter "loading" state when we truly have nothing to show.
-      final hadVisibleContent = selectedBookContent.isNotEmpty;
+      final safeForVisible = targetChapter <= 0 ? 1 : targetChapter;
+      // Keep on-screen verses only when they already are the target chapter
+      // (Next Chapter used to keep the previous chapter until DB returned).
+      final hadVisibleContent = selectedBookContent.isNotEmpty &&
+          _displayedContentMatchesUiChapter(safeForVisible) &&
+          _displayedContentMatchesSelectedBook();
       if (!hadVisibleContent) {
         selectedBookContent.clear();
-        selectedVersesContent.clear();
+        final bookNum = int.tryParse(selectedBookNum.value.trim());
+        if (bookNum == null || !_versesCacheMatchesBook(bookNum)) {
+          selectedVersesContent.clear();
+        }
         isFetchContent.value = true;
         loadTextToSpeech.value = true;
       }

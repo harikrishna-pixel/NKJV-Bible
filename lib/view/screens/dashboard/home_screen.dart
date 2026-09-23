@@ -34,7 +34,10 @@ import 'package:biblebookapp/view/screens/dashboard/add_widget_intro_screen.dart
 import 'package:biblebookapp/view/screens/dashboard/ios_style_app_drawer.dart';
 import 'package:biblebookapp/view/screens/dashboard/social_link_screen.dart';
 import 'package:biblebookapp/view/screens/verse_topics/verse_topics_screen.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_home_expiry_banner.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
+import 'package:biblebookapp/view/screens/journey/reading_progress_screen.dart';
+import 'package:biblebookapp/view/screens/journey/connection_insights_screen.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/eproducts_screen.dart';
@@ -1545,6 +1548,9 @@ class _HomeScreenState extends State<HomeScreen>
         break;
       case 'open_quiz':
         // Stay on Home; quiz screen can be added later
+        break;
+      case 'open_prayer_wall':
+        Get.to(() => const PrayerWallScreen());
         break;
       default:
         break;
@@ -4217,7 +4223,12 @@ class _HomeScreenState extends State<HomeScreen>
                                 );
                                 return false;
                               },
-                              child: ListView.builder(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  const PrayerWallHomeExpiryBanner(),
+                                  Expanded(
+                                    child: ListView.builder(
                               key: ValueKey(
                                   'reader_chapter_${controller.selectedChapter.value}'),
                               scrollDirection: controller.scrollDirection,
@@ -4975,6 +4986,9 @@ class _HomeScreenState extends State<HomeScreen>
                                 );
                               },
                             ),
+                                  ),
+                                ],
+                              ),
                 ),
               ),
             ),
@@ -5721,6 +5735,24 @@ class _HomeScreenState extends State<HomeScreen>
           Future.microtask(() {
             Get.to(
               () => const DailyJourneyScreen(),
+              transition: Transition.cupertino,
+              duration: const Duration(milliseconds: 350),
+            );
+          });
+        },
+        onReadingProgressTap: () {
+          Future.microtask(() {
+            Get.to(
+              () => const ReadingProgressScreen(),
+              transition: Transition.cupertino,
+              duration: const Duration(milliseconds: 350),
+            );
+          });
+        },
+        onConnectionInsightsTap: () {
+          Future.microtask(() {
+            Get.to(
+              () => const ConnectionInsightsScreen(),
               transition: Transition.cupertino,
               duration: const Duration(milliseconds: 350),
             );

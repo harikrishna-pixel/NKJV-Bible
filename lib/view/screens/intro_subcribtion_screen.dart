@@ -164,6 +164,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   bool _shouldShowRestoreDialog =
       false; // Track if restore dialog should be shown
   String? _pendingRestoreProductId; // Store product ID for pending restore
+  /// The plan the user tapped Buy on. Used so iOS "restored" buy events
+  /// complete purchase and do not run the Restore path.
+  String? _pendingBuyProductId;
   Timer? _loadingTimeoutTimer; // Timer for 6-second loading timeout
   bool _autoPurchaseTriggered = false;
   bool _autoRestoreTriggered = false;
@@ -449,9 +452,18 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   /// UI-only: mark restore success so a late failure toast is suppressed.
-  void _showRestoreOrPurchaseSuccessToast(String message) {
+  /// Restore toast stays up so it is readable before navigation.
+  Future<void> _showRestoreOrPurchaseSuccessToast(String message) async {
     if (message == 'Restore Successful') {
       _restoreSuccessToastShown = true;
+      Constants.showToast(message, 2500);
+      await Future<void>.delayed(const Duration(milliseconds: 2200));
+      return;
+    }
+    if (message == 'Purchase Successful') {
+      Constants.showToast(message, 2500);
+      await Future<void>.delayed(const Duration(milliseconds: 2200));
+      return;
     }
     Constants.showToast(message);
   }
@@ -620,7 +632,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       );
     } finally {
       _forceApplyCollectedRestoreBest = false;
-      EasyLoading.dismiss();
+      // Do not dismiss here after Restore Successful — that toast is EasyLoading
+      // and a second dismiss removed it before it could be read.
+      if (!_restoreSuccessToastShown) {
+        EasyLoading.dismiss();
+      }
     }
   }
 
@@ -758,7 +774,22 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
     }
     if (widget.invisiblePurchaseHost) {
-      Navigator.of(context).pop(invisibleHostPopValue);
+      await SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, true);
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('premiumalrt', '1');
+      } catch (_) {}
+      if (!mounted) return;
+      Get.offAll(
+        () => HomeScreen(
+          From: "premium",
+          selectedVerseNumForRead: "",
+          selectedBookForRead: "",
+          selectedChapterForRead: "",
+          selectedBookNameForRead: "",
+          selectedVerseForRead: "",
+        ),
+      );
       return;
     }
     try {
@@ -1083,6 +1114,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
         await SharPreferences.setString('OpenAd', '1');
         await SharPreferences.setBoolean('startpurches', true);
+        _pendingBuyProductId = prod.id;
 
         // Check again before purchase (in case subscription status changed)
         final hasActiveSubscriptionCheck =
@@ -1995,7 +2027,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         if (startFlag == true) {
           await _addLifetimeWalletBonusOnce();
         }
-        _showRestoreOrPurchaseSuccessToast(successToastMessage);
+        await _showRestoreOrPurchaseSuccessToast(successToastMessage);
         await SharPreferences.setBoolean('closead', true);
         await _completePaywallSubscriptionNavigation(
           startFlag: startFlag == true,
@@ -2022,7 +2054,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         }
         await Future.delayed(Duration(seconds: 1));
         EasyLoading.dismiss();
-        _showRestoreOrPurchaseSuccessToast(successToastMessage);
+        await _showRestoreOrPurchaseSuccessToast(successToastMessage);
         await SharPreferences.setBoolean('closead', true);
         await _completePaywallSubscriptionNavigation(
           startFlag: startFlag == true,
@@ -2048,7 +2080,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         }
         await Future.delayed(Duration(seconds: 1));
         EasyLoading.dismiss();
-        _showRestoreOrPurchaseSuccessToast(successToastMessage);
+        await _showRestoreOrPurchaseSuccessToast(successToastMessage);
         await SharPreferences.setBoolean('closead', true);
         await _completePaywallSubscriptionNavigation(
           startFlag: startFlag == true,
@@ -2071,7 +2103,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         }
         await Future.delayed(Duration(seconds: 1));
         EasyLoading.dismiss();
-        _showRestoreOrPurchaseSuccessToast(successToastMessage);
+        await _showRestoreOrPurchaseSuccessToast(successToastMessage);
         await SharPreferences.setBoolean('closead', true);
         await _completePaywallSubscriptionNavigation(
           startFlag: startFlag == true,
@@ -2124,7 +2156,20 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           }
         } else if (purchaseDetails.status == PurchaseStatus.purchased ||
             purchaseDetails.status == PurchaseStatus.restored) {
-          if (purchaseDetails.status == PurchaseStatus.purchased) {
+          final startFlagForBuy =
+              await SharPreferences.getBoolean('startpurches');
+          final restoreFlagForBuy =
+              await SharPreferences.getBoolean('restorepurches');
+          // iOS often reports a successful Buy as "restored". Finish that Buy
+          // only for the tapped product — leftover Lifetime is not applied.
+          final isBuyReportedAsRestored =
+              purchaseDetails.status == PurchaseStatus.restored &&
+                  startFlagForBuy == true &&
+                  restoreFlagForBuy != true &&
+                  _pendingBuyProductId != null &&
+                  purchaseDetails.productID == _pendingBuyProductId;
+          if (purchaseDetails.status == PurchaseStatus.purchased ||
+              isBuyReportedAsRestored) {
             final data1 = await SharPreferences.getBoolean('startpurches');
             debugPrint("purchase data 5 is $data1");
             if (data1 == true) {
@@ -2138,12 +2183,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',
                   },
-                  body: {
+                  body: jsonEncode({
                     'receipt-data':
                         purchaseDetails.verificationData.localVerificationData,
                     'exclude-old-transactions': true,
                     'password': controller.sharedSecret
-                  },
+                  }),
                 );
 
                 // DebugConsole.log(
@@ -2182,7 +2227,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     await _inAppPurchase.completePurchase(purchaseDetails);
                   }
                   EasyLoading.dismiss();
-                  Constants.showToast('Purchase Successful');
+                  await _showRestoreOrPurchaseSuccessToast(
+                      'Purchase Successful');
                   await SharPreferences.setBoolean('closead', true);
                   debugPrint("restore data 2");
                   await _navigateAfterNonLifetimePurchaseSuccess();
@@ -2210,7 +2256,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     await _inAppPurchase.completePurchase(purchaseDetails);
                   }
                   EasyLoading.dismiss();
-                  Constants.showToast('Purchase Successful');
+                  await _showRestoreOrPurchaseSuccessToast(
+                      'Purchase Successful');
                   await SharPreferences.setBoolean('closead', true);
                   debugPrint("restore data 3 ");
                   await _navigateAfterNonLifetimePurchaseSuccess();
@@ -2237,7 +2284,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     await _inAppPurchase.completePurchase(purchaseDetails);
                   }
                   EasyLoading.dismiss();
-                  Constants.showToast('Purchase Successful');
+                  await _showRestoreOrPurchaseSuccessToast(
+                      'Purchase Successful');
                   await SharPreferences.setBoolean('closead', true);
                   debugPrint("restore data 3b (2 year)");
                   await _navigateAfterNonLifetimePurchaseSuccess();
@@ -2265,7 +2313,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   }
                   EasyLoading.dismiss();
                   await _addLifetimeWalletBonusOnce();
-                  Constants.showToast('Purchase Successful');
+                  await _showRestoreOrPurchaseSuccessToast(
+                      'Purchase Successful');
                   await SharPreferences.setBoolean('closead', true);
                   debugPrint("restore data 4 ");
                   await _finishAfterLifetimePurchaseSuccess();
@@ -2302,7 +2351,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     }
                     EasyLoading.dismiss();
                     await _addLifetimeWalletBonusOnce();
-                    Constants.showToast('Purchase Successful');
+                    await _showRestoreOrPurchaseSuccessToast(
+                      'Purchase Successful');
                     await SharPreferences.setBoolean('closead', true);
                     debugPrint(
                         "exit offer purchase success - redirecting to home");
@@ -2322,7 +2372,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     }
                     EasyLoading.dismiss();
                     await _addLifetimeWalletBonusOnce();
-                    Constants.showToast('Purchase Successful');
+                    await _showRestoreOrPurchaseSuccessToast(
+                      'Purchase Successful');
                     await SharPreferences.setBoolean('closead', true);
                     debugPrint(
                         "purchase success (fallback) - redirecting to home");
@@ -2339,35 +2390,25 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             }
             final restoreFlag =
                 await SharPreferences.getBoolean('restorepurches');
-            final startFlag = await SharPreferences.getBoolean('startpurches');
             debugPrint("restore data 5 is $restoreFlag");
 
-            // If Apple reports "restored" during a Buy flow (already subscribed),
-            // check if we should show restore dialog first
-            if (restoreFlag == true || startFlag == true) {
-              // Check if user tapped on a plan they already own (should show dialog)
+            // Restore only when the user tapped Restore (same as nkjv-bible 130).
+            // Do not apply leftover StoreKit "restored" items (e.g. Lifetime)
+            // during Buy — that overwrote 6M/1Y Subscription Info.
+            if (restoreFlag == true) {
               if (_shouldShowRestoreDialog &&
                   _pendingRestoreProductId == purchaseDetails.productID) {
-                // Show restore dialog instead of auto-restoring
                 if (mounted) {
                   await _showRestoreDialogForRestoredPurchase(
                       purchaseDetails, controller);
                 }
-                // Reset flags
                 _shouldShowRestoreDialog = false;
                 _pendingRestoreProductId = null;
-              } else {
-                // Normal restore flow (from restore button)
-                if (restoreFlag != true) {
-                  await SharPreferences.setBoolean('restorepurches', true);
-                }
-                // debugPrint("restore data 6 is $data");
-                // await restorePurchaseHandle(purchaseDetails.productID,
-                //     purchaseDetails.transactionDate ?? '', controller);
-                if (mounted) {
-                  _handleRestore(purchaseDetails, controller);
-                }
+              } else if (mounted) {
+                _handleRestore(purchaseDetails, controller);
               }
+            } else if (purchaseDetails.pendingCompletePurchase) {
+              await InAppPurchase.instance.completePurchase(purchaseDetails);
             }
           }
         } else if (purchaseDetails.pendingCompletePurchase) {

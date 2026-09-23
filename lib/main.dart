@@ -4,6 +4,7 @@ import 'package:biblebookapp/core/notifiers/bottom.notifier.dart';
 import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/services/background_api_service.dart';
+import 'package:biblebookapp/services/prayer_wall_activity_notifier.dart';
 import 'package:biblebookapp/core/library_backup_upload_service.dart';
 import 'package:biblebookapp/services/analytics/analytics_service.dart';
 import 'package:biblebookapp/streak_flow/leave_rating_screen.dart';
@@ -237,6 +238,7 @@ class _LifecycleWrapperState extends State<LifecycleWrapper>
         // Display-only: one Live Activity + streak widget for current device date.
         unawaited(LiveActivityQueue.sync());
         unawaited(syncWeeklyStreakWidget());
+        unawaited(PrayerWallActivityNotifier.checkAndNotify());
 
         final checkad = await SharPreferences.getString('OpenAd') ?? "1";
         final closead = await SharPreferences.getBoolean('closead') ?? true;

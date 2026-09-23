@@ -266,3 +266,177 @@ class PrayerWallItem {
     return out;
   }
 }
+
+/// One slot row from `GET /api/prayer-queue` `items[]`.
+class PrayerQueueSlotItem {
+  PrayerQueueSlotItem({
+    required this.position,
+    required this.isCurrent,
+    required this.prayer,
+  });
+
+  final int position;
+  final bool isCurrent;
+  final PrayerWallItem prayer;
+
+  static PrayerQueueSlotItem? fromDynamic(dynamic raw) {
+    if (raw is! Map) return null;
+    final map = Map<String, dynamic>.from(raw);
+    final prayer = PrayerWallItem.fromDynamic(map['prayer']);
+    if (prayer == null) return null;
+    final posRaw = map['position'];
+    final position = posRaw is int
+        ? posRaw
+        : int.tryParse(posRaw?.toString() ?? '') ?? 0;
+    final isCurrent = map['isCurrent'] == true;
+    return PrayerQueueSlotItem(
+      position: position,
+      isCurrent: isCurrent,
+      prayer: prayer,
+    );
+  }
+}
+
+/// Parsed `GET /api/prayer-queue` body.
+class PrayerQueueListResult {
+  PrayerQueueListResult({
+    required this.slotSeconds,
+    required this.queueCount,
+    required this.currentPosition,
+    required this.msRemaining,
+    required this.loops,
+    required this.items,
+    this.slotStartedAt,
+    this.slotEndsAt,
+  });
+
+  final int slotSeconds;
+  final int queueCount;
+  final int currentPosition;
+  final int msRemaining;
+  final bool loops;
+  final List<PrayerQueueSlotItem> items;
+  final DateTime? slotStartedAt;
+  final DateTime? slotEndsAt;
+
+  static PrayerQueueListResult? fromResponseBody(String body) {
+    final decoded = jsonDecode(body);
+    if (decoded is! Map) return null;
+    final map = Map<String, dynamic>.from(decoded);
+    final rawItems = map['items'];
+    final items = <PrayerQueueSlotItem>[];
+    if (rawItems is List) {
+      for (final e in rawItems) {
+        final slot = PrayerQueueSlotItem.fromDynamic(e);
+        if (slot != null) items.add(slot);
+      }
+    }
+    int asInt(dynamic v, [int fallback = 0]) {
+      if (v is int) return v;
+      return int.tryParse(v?.toString() ?? '') ?? fallback;
+    }
+
+    DateTime? asDate(dynamic v) {
+      if (v == null) return null;
+      return DateTime.tryParse(v.toString());
+    }
+
+    return PrayerQueueListResult(
+      slotSeconds: asInt(map['slotSeconds'], 420),
+      queueCount: asInt(map['queueCount'], items.length),
+      currentPosition: asInt(map['currentPosition'] ?? map['position']),
+      msRemaining: asInt(map['msRemaining']),
+      loops: map['loops'] == true,
+      items: items,
+      slotStartedAt: asDate(map['slotStartedAt']),
+      slotEndsAt: asDate(map['slotEndsAt']),
+    );
+  }
+}
+
+/// Parsed `GET /api/prayer-queue/current` body.
+class PrayerQueueCurrentResult {
+  PrayerQueueCurrentResult({
+    required this.slotSeconds,
+    required this.queueCount,
+    required this.position,
+    required this.msRemaining,
+    required this.loops,
+    this.slotStartedAt,
+    this.slotEndsAt,
+    this.prayer,
+    this.nextPrayerId,
+  });
+
+  final int slotSeconds;
+  final int queueCount;
+  final int position;
+  final int msRemaining;
+  final bool loops;
+  final DateTime? slotStartedAt;
+  final DateTime? slotEndsAt;
+  final PrayerWallItem? prayer;
+  final String? nextPrayerId;
+
+  static PrayerQueueCurrentResult? fromResponseBody(String body) {
+    final decoded = jsonDecode(body);
+    if (decoded is! Map) return null;
+    final map = Map<String, dynamic>.from(decoded);
+    int asInt(dynamic v, [int fallback = 0]) {
+      if (v is int) return v;
+      return int.tryParse(v?.toString() ?? '') ?? fallback;
+    }
+
+    DateTime? asDate(dynamic v) {
+      if (v == null) return null;
+      return DateTime.tryParse(v.toString());
+    }
+
+    final nextId = map['nextPrayerId']?.toString().trim();
+    return PrayerQueueCurrentResult(
+      slotSeconds: asInt(map['slotSeconds'], 420),
+      queueCount: asInt(map['queueCount']),
+      position: asInt(map['position'] ?? map['currentPosition']),
+      msRemaining: asInt(map['msRemaining']),
+      loops: map['loops'] == true,
+      slotStartedAt: asDate(map['slotStartedAt']),
+      slotEndsAt: asDate(map['slotEndsAt']),
+      prayer: PrayerWallItem.fromDynamic(map['prayer']),
+      nextPrayerId: (nextId == null || nextId.isEmpty) ? null : nextId,
+    );
+  }
+}
+
+/// Encodes original + AI prayer into one `prayer_description` for the wall.
+class PrayerDualDescription {
+  static const myWordsMarker = '<<<MY_WORDS>>>';
+  static const aiMarker = '<<<AI_PRAYER>>>';
+
+  static String encode({
+    required String originalWords,
+    required String englishPrayer,
+  }) {
+    return '$myWordsMarker\n${originalWords.trim()}\n$aiMarker\n${englishPrayer.trim()}';
+  }
+
+  static bool isDual(String description) {
+    final s = description.trim();
+    return s.contains(myWordsMarker) && s.contains(aiMarker);
+  }
+
+  static String? myWords(String description) {
+    if (!isDual(description)) return null;
+    final start = description.indexOf(myWordsMarker) + myWordsMarker.length;
+    final end = description.indexOf(aiMarker);
+    if (end <= start) return null;
+    final v = description.substring(start, end).trim();
+    return v.isEmpty ? null : v;
+  }
+
+  static String? aiPrayer(String description) {
+    if (!isDual(description)) return null;
+    final start = description.indexOf(aiMarker) + aiMarker.length;
+    final v = description.substring(start).trim();
+    return v.isEmpty ? null : v;
+  }
+}

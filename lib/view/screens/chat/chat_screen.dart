@@ -62,7 +62,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   String? _currentConversationId;
   bool _openedRecentFromHome = false;
   static const String _baseUrl =
-      'https://my-backend-one-eta.vercel.app/api/gemini';
+      'https://combine-api-ruby.vercel.app/api/chat';
   int? _selectedTopicIndex; // Track which topic button is selected
   int?
       _selectedExampleQuestionIndex; // Track which example question button is tapped
@@ -2146,9 +2146,9 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
       conversationContext += '\nUser: ${userMessageWithContext}\n';
       conversationContext += 'Assistant:';
 
-      // Build request body with simple prompt format - exactly as API expects
+      // Combine API: { "input": "..." }. Parse output string first, else Gemini shape.
       final requestBody = {
-        'prompt': conversationContext,
+        'input': conversationContext,
       };
 
       // Debug: Print request for troubleshooting
@@ -2176,8 +2176,13 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
           // Debug: Print parsed response data
           debugPrint('Parsed Response Data: $responseData');
 
-          // Try output.candidates structure first (your API format)
-          if (responseData['output'] != null && responseData['output'] is Map) {
+          // New combine API: { "output": "..." }
+          if (responseData['output'] != null &&
+              responseData['output'] is String) {
+            responseText = responseData['output'] as String;
+          }
+          // Try output.candidates structure (legacy Gemini format)
+          else if (responseData['output'] != null && responseData['output'] is Map) {
             final output = responseData['output'] as Map;
             if (output['candidates'] != null &&
                 output['candidates'] is List &&
@@ -3677,7 +3682,7 @@ Your 3 questions (exactly 3 lines):''';
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'prompt': prompt}),
+        body: jsonEncode({'input': prompt}),
       );
       if (response.statusCode != 200 || !mounted) return;
       var raw = _extractTextFromChatApiBody(response.body);

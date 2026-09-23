@@ -1,3 +1,4 @@
+import 'package:biblebookapp/utils/network_error_message.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
@@ -70,7 +71,8 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        // UI-only: never show raw exception / API URL to users.
+        _error = userFacingNetworkMessage(e);
         _loading = false;
       });
     }

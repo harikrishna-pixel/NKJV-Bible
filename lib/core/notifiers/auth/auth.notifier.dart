@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:biblebookapp/Model/bookoffer_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:biblebookapp/core/api/bookoffer_api.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/screens/auth/splash.dart';
@@ -22,6 +24,50 @@ import 'dart:developer' as devtools show log;
 import '../cache.notifier.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
+
+/// Pull profile image URL from profile-update / auth JSON shapes.
+String? _profileImageUrlFromResponse(dynamic decoded) {
+  if (decoded is! Map) return null;
+  final map = Map<String, dynamic>.from(decoded);
+
+  String? fromMap(Map<String, dynamic> m) {
+    for (final key in [
+      'profile_image',
+      'profileImage',
+      'profile_image_url',
+      'image_url',
+      'photoURL',
+      'photo_url',
+      'avatar',
+      'avatar_url',
+    ]) {
+      final v = m[key]?.toString().trim();
+      if (v != null && v.isNotEmpty) return v;
+    }
+    return null;
+  }
+
+  final top = fromMap(map);
+  if (top != null) return top;
+
+  final data = map['data'];
+  if (data is Map) {
+    final dataMap = Map<String, dynamic>.from(data);
+    final fromData = fromMap(dataMap);
+    if (fromData != null) return fromData;
+    final user = dataMap['user'];
+    if (user is Map) {
+      final fromUser = fromMap(Map<String, dynamic>.from(user));
+      if (fromUser != null) return fromUser;
+    }
+  }
+
+  final user = map['user'];
+  if (user is Map) {
+    return fromMap(Map<String, dynamic>.from(user));
+  }
+  return null;
+}
 
 class AuthNotifier extends ChangeNotifier {
   final RegisterApi registerApi = RegisterApi();
@@ -69,6 +115,7 @@ class AuthNotifier extends ChangeNotifier {
             await PrayerWallLocalStore.clearAccountScopedData();
             await PrayerWallService.resolveIdentityUser(
               email: data.data!.user!.email.toString(),
+              userName: data.data!.user!.name.toString(),
             );
           } catch (_) {}
           return showDialog(
@@ -185,6 +232,7 @@ class AuthNotifier extends ChangeNotifier {
           await cacheNotifier.removeCache(key: 'user');
           await cacheNotifier.removeCache(key: 'name');
           await cacheNotifier.removeCache(key: 'authtoken');
+          await cacheNotifier.removeCache(key: 'profile_image');
           await PrayerWallLocalStore.clearAccountScopedData();
           //   FirebaseAuth.instance.signOut();
           Constants.showToast("$msg");
@@ -243,6 +291,7 @@ class AuthNotifier extends ChangeNotifier {
             await PrayerWallLocalStore.clearAccountScopedData();
             await PrayerWallService.resolveIdentityUser(
               email: '${datafn['data']['user']['email']}',
+              userName: '${datafn['data']['user']['name']}',
             );
           } catch (_) {}
 
@@ -595,13 +644,21 @@ class AuthNotifier extends ChangeNotifier {
   }
 
   Future updateprofle(
-      {required email, required name, required BuildContext context}) async {
+      {required email,
+      required name,
+      required BuildContext context,
+      File? profileImage}) async {
     //final email = await cacheNotifier.readCache(key: 'useremail');
     // final otp = await cacheNotifier.readCache(key: 'otp');
     // final token = await cacheNotifier.readCache(key: 'otptoken');
     try {
-      var appdata =
-          await profileUpdateApi.updateprofile(email: email, name: name);
+      print(
+          'updateprofle Data → email=$email name=$name profile_image=${profileImage?.path}');
+      var appdata = await profileUpdateApi.updateprofile(
+        email: email,
+        name: name,
+        profileImage: profileImage,
+      );
 
       final datafn = jsonDecode(appdata);
 
@@ -617,6 +674,20 @@ class AuthNotifier extends ChangeNotifier {
         if (status == true) {
           await cacheNotifier.writeCache(key: "user", value: email.toString());
           await cacheNotifier.writeCache(key: "name", value: name.toString());
+          final imageUrl = _profileImageUrlFromResponse(datafn);
+          if (imageUrl != null && imageUrl.isNotEmpty) {
+            await cacheNotifier.writeCache(
+                key: 'profile_image', value: imageUrl);
+            print('Cached profile_image URL → $imageUrl');
+          } else {
+            final firebaseUrl =
+                FirebaseAuth.instance.currentUser?.photoURL?.trim();
+            if (firebaseUrl != null && firebaseUrl.isNotEmpty) {
+              await cacheNotifier.writeCache(
+                  key: 'profile_image', value: firebaseUrl);
+              print('Cached profile_image from Firebase → $firebaseUrl');
+            }
+          }
           if (context.mounted) {
             SnackbarUtil.showSnackbar(
               context: context,

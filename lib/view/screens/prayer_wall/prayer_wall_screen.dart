@@ -8,6 +8,7 @@ import 'package:biblebookapp/view/screens/authenitcation/view/login_screen.dart'
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/referral_code_bottom_sheet.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/post_prayer_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_comments_sheet.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_follow_people_sheet.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_login_required_dialog.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_models.dart';
@@ -15,6 +16,9 @@ import 'package:biblebookapp/view/screens/prayer_wall/prayer_share_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_report_dialog.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_status_dialog.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_user_profile_screen.dart';
+import 'package:biblebookapp/view/screens/profile/view/edit_profile_screen.dart';
+import 'package:biblebookapp/view/screens/profile/view/profile_screen.dart';
 import 'package:biblebookapp/utils/network_error_message.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:flutter/material.dart';
@@ -24,7 +28,13 @@ import 'package:provider/provider.dart';
 
 /// Prayer Wall — lists `GET /api/prayers`, supports category filter, like & comment counts.
 class PrayerWallScreen extends StatefulWidget {
-  const PrayerWallScreen({super.key});
+  const PrayerWallScreen({
+    super.key,
+    this.openMyProfile = false,
+  });
+
+  /// Additive: open Prayer Profile (My Profile) after login check.
+  final bool openMyProfile;
 
   @override
   State<PrayerWallScreen> createState() => _PrayerWallScreenState();
@@ -60,6 +70,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   Set<String> _reportedPrayerIds = {};
   /// UI-only: prayer `_id`s blocked on this device (hide those prayers).
   Set<String> _blockedUserIds = {};
+  /// UI-only: blocked id → display name for Blocked list (local cache).
+  Map<String, String> _blockedDisplayNames = {};
   String _filter = 'All';
   String _sort = 'Latest';
   /// Inside My Prayers: Current (active) vs Expired (prayer-history).
@@ -77,6 +89,14 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   String? _localDisplayName;
   /// Cached profile photo URL (fallback for my posts if API omits image).
   String? _viewerProfileImage;
+  /// Country saved on Edit Bible Profile (show on Prayer Profile if set).
+  String? _viewerCountry;
+  int _ownFollowersCount = 0;
+  int _ownFollowingCount = 0;
+  List<String> _ownFollowerIds = const [];
+  List<String> _ownFollowingIds = const [];
+  final Set<String> _expandedOwnRecentPrayerIds = {};
+  bool _didAutoOpenMyProfile = false;
   final CacheNotifier _cacheNotifier = CacheNotifier();
 
   /// Logged-in name if any, otherwise last locally saved post name.
@@ -101,6 +121,17 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   List<PrayerWallItem> _expiredHistoryItems = [];
   bool _openingHistory = false;
 
+  /// Additive: rotating queue (Hotspot / In Waiting / Coming Up Next).
+  PrayerQueueCurrentResult? _queueCurrent;
+  PrayerQueueListResult? _queueList;
+  String? _queueError;
+  bool _queueLoading = false;
+  Timer? _queueTickTimer;
+  DateTime? _queueSlotEndsAt;
+  bool _waitingViewAll = false;
+  /// Prevents double-tap from stacking multiple Hotspot/Prayer detail routes.
+  bool _openingQueueDetail = false;
+
   /// UI-only: blocked prayers list (unblock + count).
   bool _showingBlocked = false;
   /// True when My Prayers sort is Expired.
@@ -114,6 +145,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
 
   /// True when keyboard is up or a text field is focused (hide FAB overlay).
   bool get _hideFabForInput {
+    // While Login/Sign Up covers Wall, keep FAB hidden and ignore underlaid focus.
+    if (_suspendFocusFabListener) return true;
     final mqBottom = MediaQuery.viewInsetsOf(context).bottom;
     if (mqBottom > 0) return true;
     final view = View.maybeOf(context);
@@ -128,7 +161,15 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         focusCtx.widget is EditableText;
   }
 
+  /// UI-only: pause FAB focus rebuilds while Login/Sign Up covers the Wall.
+  bool _suspendFocusFabListener = false;
+
+  /// UI-only: freeze Wall MediaQuery while auth is open so keyboard insets
+  /// on Sign Up do not rebuild Wall and dismiss the keypad.
+  MediaQueryData? _frozenMediaQueryDuringAuth;
+
   void _onFocusOrMetricsChanged() {
+    if (_suspendFocusFabListener) return;
     if (mounted) setState(() {});
   }
 
@@ -183,11 +224,14 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     _hydrateReportedPrayerIdsFromDisk();
     _hydrateBlockedUserIdsFromDisk();
     _loadAuthAndLocalName();
+    // Load queue immediately so Hotspot UI is not blocked on wall GET.
+    unawaited(_refreshQueue());
     _refresh();
   }
 
   @override
   void dispose() {
+    _queueTickTimer?.cancel();
     FocusManager.instance.removeListener(_onFocusOrMetricsChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -206,6 +250,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       final emailCache = await _cacheNotifier.readCache(key: 'user');
       final profileImage =
           await _cacheNotifier.readCache(key: 'profile_image');
+      final countryCache = await _cacheNotifier.readCache(key: 'country');
       final localName = await PrayerWallLocalStore.loadLastDisplayName();
 
       final loggedIn = (authtoken != null && authtoken.toString().isNotEmpty) ||
@@ -221,12 +266,16 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         _localDisplayName = localName;
         final img = profileImage?.toString().trim() ?? '';
         _viewerProfileImage = img.isNotEmpty ? img : null;
+        final country = countryCache?.toString().trim() ?? '';
+        _viewerCountry = country.isNotEmpty ? country : null;
         _authLoading = false;
       });
       if (loggedIn && email.isNotEmpty) {
         await _syncBlockedUserIdsForAccount(email);
         await _syncMyPrayerIdsForAccount(email);
         await _hydrateResolveUserId();
+        // Rebuild again once resolve user_id is ready (re-login ownership).
+        await _rebuildMyPrayerIdsForCurrentAccount();
       } else {
         await _syncBlockedUserIdsForAccount(null);
         await _syncMyPrayerIdsForAccount(null);
@@ -235,6 +284,13 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       }
       if (!mounted) return;
       unawaited(_restoreBlockedUserIdsFromApi());
+      if (widget.openMyProfile &&
+          loggedIn &&
+          !_didAutoOpenMyProfile &&
+          !_showingHistory) {
+        _didAutoOpenMyProfile = true;
+        unawaited(_openMyPrayerHistory());
+      }
     } catch (_) {
       if (!mounted) return;
       final localName = await PrayerWallLocalStore.loadLastDisplayName();
@@ -246,6 +302,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         _userEmail = null;
         _localDisplayName = localName;
         _viewerProfileImage = null;
+        _viewerCountry = null;
         _resolveUserId = null;
         _authLoading = false;
       });
@@ -280,7 +337,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     final m = await PrayerWallLocalStore.loadPrayerAuthorUserIdMap();
     var changed = false;
     for (final p in prayers) {
-      final uid = (p.authorUserId ?? '').trim();
+      // Prefer resolve identityUserId (person id) when API sends it.
+      final uid = (p.identityUserId ?? p.authorUserId ?? '').trim();
       if (uid.isEmpty) continue;
       if (m[p.id] == uid) continue;
       m[p.id] = uid;
@@ -300,7 +358,46 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     return prayerEmail.isNotEmpty && prayerEmail == want;
   }
 
-  /// Drop previous account's posted-id cache when login email changes.
+  /// Additive: rebuild My Prayer ids for this login from device-owned + wall
+  /// email/identity matches (fixes empty My Prayers after logout → login).
+  Future<void> _rebuildMyPrayerIdsForCurrentAccount() async {
+    final want = (_userEmail ?? '').trim().toLowerCase();
+    if (want.isEmpty) {
+      await PrayerWallLocalStore.saveMyPrayerIds({});
+      if (!mounted) return;
+      setState(() => _myPrayerIds = {});
+      return;
+    }
+
+    final owned = await PrayerWallLocalStore.loadOwnedPrayerIds();
+    final merged = <String>{...owned};
+    final resolveId = (_resolveUserId ?? '').trim();
+
+    for (final p in _all) {
+      final prayerEmail = (p.email ?? '').trim().toLowerCase();
+      if (prayerEmail.isNotEmpty && prayerEmail == want) {
+        merged.add(p.id);
+        continue;
+      }
+      if (resolveId.isEmpty) continue;
+      if ((p.identityUserId ?? '').trim() == resolveId) {
+        merged.add(p.id);
+        continue;
+      }
+      final mapped = (_prayerAuthorUserIdMap[p.id] ?? '').trim();
+      final authorUid = (p.authorUserId ?? '').trim();
+      if (mapped == resolveId || authorUid == resolveId) {
+        merged.add(p.id);
+      }
+    }
+
+    await PrayerWallLocalStore.saveMyPrayerIds(merged);
+    if (!mounted) return;
+    setState(() => _myPrayerIds = merged);
+  }
+
+  /// Drop previous account's posted-id cache when login email changes,
+  /// then rebuild for the current account (do not leave My Prayers empty).
   Future<void> _syncMyPrayerIdsForAccount(String? email) async {
     final key = (email ?? '').trim().toLowerCase();
     if (key.isEmpty) {
@@ -312,30 +409,24 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       await PrayerWallLocalStore.saveMyPrayerIds({});
       return;
     }
-    if (_myPrayerListAccountEmail == key) return;
-    await PrayerWallLocalStore.saveMyPrayerIds({});
+    final switched = _myPrayerListAccountEmail != key;
     if (!mounted) return;
-    setState(() {
-      _myPrayerIds = {};
-      _myPrayerListAccountEmail = key;
-    });
+    setState(() => _myPrayerListAccountEmail = key);
+    if (switched) {
+      await PrayerWallLocalStore.saveMyPrayerIds({});
+      if (!mounted) return;
+      setState(() => _myPrayerIds = {});
+    }
+    await _rebuildMyPrayerIdsForCurrentAccount();
   }
 
   Future<void> _hydrateMyPrayerIdsFromDisk() async {
     final want = (_userEmail ?? '').trim().toLowerCase();
     if (want.isNotEmpty && _myPrayerListAccountEmail != want) {
       await _syncMyPrayerIdsForAccount(_userEmail);
-      if (!mounted) return;
       return;
     }
-    // Owner ids = only prayers this device posted (meta/author on create).
-    final owned = await PrayerWallLocalStore.loadOwnedPrayerIds();
-    final raw = await PrayerWallLocalStore.loadMyPrayerIds();
-    if (owned.length != raw.length || !owned.containsAll(raw)) {
-      await PrayerWallLocalStore.saveMyPrayerIds(owned);
-    }
-    if (!mounted) return;
-    setState(() => _myPrayerIds = owned);
+    await _rebuildMyPrayerIdsForCurrentAccount();
   }
 
   Future<void> _hydrateReportedPrayerIdsFromDisk() async {
@@ -362,7 +453,10 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   Future<void> _hydrateBlockedUserIdsFromDisk() async {
     // Account-scoped list loads in [_loadAuthAndLocalName]; avoid stale device-wide ids.
     if (!mounted) return;
-    setState(() => _blockedUserIds = {});
+    setState(() {
+      _blockedUserIds = {};
+      _blockedDisplayNames = {};
+    });
   }
 
   /// Load blocked ids for the current login email only (not other accounts).
@@ -372,15 +466,19 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       if (!mounted) return;
       setState(() {
         _blockedUserIds = {};
+        _blockedDisplayNames = {};
         _blockedListAccountEmail = null;
       });
       return;
     }
     final forAccount =
         await PrayerWallLocalStore.loadBlockedUserIdsForEmail(key);
+    final names =
+        await PrayerWallLocalStore.loadBlockedDisplayNamesForEmail(key);
     if (!mounted) return;
     setState(() {
       _blockedUserIds = forAccount;
+      _blockedDisplayNames = names;
       _blockedListAccountEmail = key;
     });
   }
@@ -418,15 +516,38 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     if (_blockedApiRestoreBusy) return;
     _blockedApiRestoreBusy = true;
     try {
-      final fromApi = await PrayerWallService.fetchBlockedUserIdsForAccount(
+      final fromApi =
+          await PrayerWallService.fetchBlockedUsersDetailedForAccount(
         email: email,
       );
       if (!mounted) return;
-      // Replace with this account's server list — do not union other accounts' ids.
-      await PrayerWallLocalStore.saveBlockedUserIds(fromApi, email: email);
+      // Additive: empty GET must not wipe local blocks (race after Block).
+      if (fromApi.ids.isEmpty) {
+        print(
+          'PrayerWall restore blocked: GET empty — keep local '
+          '(${_blockedUserIds.length})',
+        );
+        return;
+      }
+      // Merge server + this account's local ids (do not drop local person ids).
+      final merged = <String>{..._blockedUserIds, ...fromApi.ids};
+      await PrayerWallLocalStore.saveBlockedUserIds(merged, email: email);
+      // Additive: persist names from GET for Blocked list (after reinstall).
+      final mergedNames = Map<String, String>.from(_blockedDisplayNames);
+      for (final e in fromApi.names.entries) {
+        final n = e.value.trim();
+        if (n.isEmpty) continue;
+        mergedNames[e.key] = n;
+        await PrayerWallLocalStore.rememberBlockedDisplayName(
+          e.key,
+          displayName: n,
+          email: email,
+        );
+      }
       if (!mounted) return;
       setState(() {
-        _blockedUserIds = fromApi;
+        _blockedUserIds = merged;
+        _blockedDisplayNames = mergedNames;
         _blockedListAccountEmail = emailKey;
       });
     } catch (e) {
@@ -441,6 +562,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       _likeIdByPrayerId.containsKey(prayerId);
 
   Future<void> _refresh() async {
+    // Queue drives main wall UI — refresh it in parallel with wall/likes.
+    unawaited(_refreshQueue());
     setState(() {
       _loading = true;
       _error = null;
@@ -467,6 +590,10 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         _prayerAuthorUserIdMap = mergedAuthorUserIdMap;
         _loading = false;
       });
+      // Additive: after wall load, restore My Prayer ids for this login email.
+      if (_isLoggedIn && (_userEmail ?? '').trim().isNotEmpty) {
+        await _rebuildMyPrayerIdsForCurrentAccount();
+      }
       unawaited(_restoreBlockedUserIdsFromApi(prayers: prayers));
       await _maybeShowExpiredStatusPrompt();
     } catch (e) {
@@ -476,6 +603,176 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         _loading = false;
       });
     }
+  }
+
+  /// Additive: `GET /api/prayer-queue` + `/current` — does not change wall GET.
+  Future<void> _refreshQueue() async {
+    if (!mounted) return;
+    setState(() {
+      _queueLoading = true;
+      _queueError = null;
+    });
+    try {
+      final results = await Future.wait([
+        PrayerWallService.fetchPrayerQueueCurrent(),
+        PrayerWallService.fetchPrayerQueue(),
+      ]);
+      if (!mounted) return;
+      final current = results[0] as PrayerQueueCurrentResult;
+      final list = results[1] as PrayerQueueListResult;
+      setState(() {
+        _queueCurrent = current;
+        _queueList = list;
+        _queueSlotEndsAt = current.slotEndsAt ?? list.slotEndsAt;
+        _queueLoading = false;
+        _queueError = null;
+      });
+      _armQueueTickTimer();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        if (_queueCurrent == null && _queueList == null) {
+          _queueError = _friendlyError(e);
+        }
+        _queueLoading = false;
+      });
+    }
+  }
+
+  void _armQueueTickTimer() {
+    _queueTickTimer?.cancel();
+    _queueTickTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      final ends = _queueSlotEndsAt;
+      if (ends == null) {
+        setState(() {});
+        return;
+      }
+      final left = ends.toLocal().difference(DateTime.now()).inMilliseconds;
+      if (left <= 0) {
+        _queueTickTimer?.cancel();
+        unawaited(_refreshQueue());
+        return;
+      }
+      setState(() {});
+    });
+  }
+
+  int get _queueMsRemaining {
+    final ends = _queueSlotEndsAt;
+    if (ends != null) {
+      final left = ends.toLocal().difference(DateTime.now()).inMilliseconds;
+      return left < 0 ? 0 : left;
+    }
+    return _queueCurrent?.msRemaining ?? _queueList?.msRemaining ?? 0;
+  }
+
+  String _formatQueueCountdown(int ms) {
+    final totalSec = (ms / 1000).floor().clamp(0, 999999);
+    final m = (totalSec ~/ 60).toString().padLeft(2, '0');
+    final s = (totalSec % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  String _formatStartsInLabel({
+    required int position,
+    required int currentPosition,
+    required int slotSeconds,
+    required int queueCount,
+    required bool loops,
+  }) {
+    var steps = position - currentPosition;
+    if (steps <= 0) {
+      if (!loops || queueCount <= 0) return 'Soon';
+      steps = queueCount - currentPosition + position;
+    }
+    final ms = _queueMsRemaining;
+    final totalSec =
+        ((steps - 1) * slotSeconds) + (ms / 1000).floor();
+    if (totalSec <= 0) return 'Soon';
+    final mins = (totalSec / 60).ceil();
+    if (mins <= 1) return 'STARTS IN 1 MIN';
+    return 'STARTS IN $mins MIN';
+  }
+
+  /// Waiting slots after current, wrapping when `loops` (excludes next/hotspot).
+  List<PrayerQueueSlotItem> get _queueWaitingOrdered {
+    final list = _queueList;
+    if (list == null) return const [];
+    final curPos = _queueCurrent?.position ?? list.currentPosition;
+    final nextId = (_queueCurrent?.nextPrayerId ?? '').trim();
+    final hotspotId = (_queueHotspotPrayer?.id ?? '').trim();
+    final comingId = (_queueComingUpNext?.id ?? '').trim();
+    final filtered = list.items.where((slot) {
+      if (slot.isCurrent) return false;
+      if (_isQueueHiddenForViewer(slot.prayer)) return false;
+      if (nextId.isNotEmpty && slot.prayer.id == nextId) return false;
+      if (hotspotId.isNotEmpty && slot.prayer.id == hotspotId) return false;
+      if (comingId.isNotEmpty && slot.prayer.id == comingId) return false;
+      return true;
+    }).toList();
+    filtered.sort((a, b) => a.position.compareTo(b.position));
+    final after = filtered.where((s) => s.position > curPos).toList();
+    final before = filtered.where((s) => s.position < curPos).toList();
+    return [...after, ...before];
+  }
+
+  bool _isQueueHiddenForViewer(PrayerWallItem p) {
+    return _isItemBlocked(p) || _reportedPrayerIds.contains(p.id);
+  }
+
+  PrayerWallItem? _nextUnblockedQueuePrayer({String? skipPrayerId}) {
+    final list = _queueList;
+    if (list == null) return null;
+    final skip = (skipPrayerId ?? '').trim();
+    final curPos = _queueCurrent?.position ?? list.currentPosition;
+    final candidates = list.items.where((slot) {
+      if (slot.isCurrent) return false;
+      if (_isQueueHiddenForViewer(slot.prayer)) return false;
+      if (skip.isNotEmpty && slot.prayer.id == skip) return false;
+      return true;
+    }).toList()
+      ..sort((a, b) => a.position.compareTo(b.position));
+    for (final slot in candidates) {
+      if (slot.position > curPos) return slot.prayer;
+    }
+    if (list.loops && candidates.isNotEmpty) return candidates.first.prayer;
+    return null;
+  }
+
+  PrayerWallItem? get _queueHotspotPrayer {
+    final fromCurrent = _queueCurrent?.prayer;
+    if (fromCurrent != null && !_isQueueHiddenForViewer(fromCurrent)) {
+      return fromCurrent;
+    }
+    final list = _queueList;
+    if (list != null) {
+      for (final slot in list.items) {
+        if (slot.isCurrent && !_isQueueHiddenForViewer(slot.prayer)) {
+          return slot.prayer;
+        }
+      }
+    }
+    return _nextUnblockedQueuePrayer();
+  }
+
+  PrayerWallItem? get _queueComingUpNext {
+    final nextId = (_queueCurrent?.nextPrayerId ?? '').trim();
+    final list = _queueList;
+    if (list == null) return null;
+    final hotspotId = (_queueHotspotPrayer?.id ?? '').trim();
+    if (nextId.isNotEmpty) {
+      for (final slot in list.items) {
+        if (slot.prayer.id == nextId &&
+            !_isQueueHiddenForViewer(slot.prayer) &&
+            slot.prayer.id != hotspotId) {
+          return slot.prayer;
+        }
+      }
+    }
+    return _nextUnblockedQueuePrayer(
+      skipPrayerId: hotspotId.isEmpty ? null : hotspotId,
+    );
   }
 
   /// UI-only: after exact `postedAt + durationDays`, ask for status.
@@ -597,6 +894,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   static bool _embeddedLoginGateBusy = false;
 
   /// UI gate only: show Login Required, then open LoginScreen. No API changes.
+  /// Uses Navigator.push (not Get.to) so Block/Like/Comment/Post/My Prayers
+  /// login shares one stack with Prayer Wall — Login always pops cleanly.
   Future<bool> _ensureLoggedIn({
     required String message,
     VoidCallback? replaceOnSuccess,
@@ -611,22 +910,34 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     if (goLogin != true || !mounted) return false;
 
     _embeddedLoginGateBusy = true;
+    // UI-only: Wall under Login must not rebuild on Sign Up field focus.
+    _frozenMediaQueryDuringAuth = MediaQuery.of(context).copyWith(
+      viewInsets: EdgeInsets.zero,
+    );
+    _suspendFocusFabListener = true;
+    if (mounted) setState(() {});
     try {
-      final result = await Get.to<bool>(
-        () => LoginScreen(
-          hasSkip: false,
-          popOnSuccess: true,
-          replaceOnSuccess: replaceOnSuccess,
+      FocusManager.instance.primaryFocus?.unfocus();
+      final result = await Navigator.of(context).push<bool>(
+        MaterialPageRoute<bool>(
+          settings: const RouteSettings(
+            name: PrayerWallEmbeddedAuthHost.routeName,
+          ),
+          builder: (_) => PrayerWallEmbeddedAuthHost(
+            replaceOnSuccess: replaceOnSuccess,
+          ),
         ),
-        routeName: LoginScreen.embeddedRouteName,
-        preventDuplicates: true,
-      );
-      if (!mounted) return false;
+    );
+    if (!mounted) return false;
       ReferralCodeBottomSheet.resetPresentationLock();
-      await _loadAuthAndLocalName();
-      return _isLoggedIn || result == true;
+      FocusManager.instance.primaryFocus?.unfocus();
+    await _loadAuthAndLocalName();
+    return _isLoggedIn || result == true;
     } finally {
+      _suspendFocusFabListener = false;
+      _frozenMediaQueryDuringAuth = null;
       _embeddedLoginGateBusy = false;
+      if (mounted) setState(() {});
     }
   }
 
@@ -737,11 +1048,12 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
 
   String? _blockPrayerId(PrayerWallItem item) => _mongoPrayerId(item.id);
 
-  /// Additive: block target for two-way feed — their resolve user id when present.
-  /// Falls back to prayer `_id` (existing POST shape).
+  /// Additive: block target = poster resolve id when present (person-level).
+  /// Falls back to cached map, then prayer `_id` (existing POST shape).
   String? _blockTargetId(PrayerWallItem item) {
     return _mongoPrayerId(item.identityUserId) ??
         _mongoPrayerId(item.authorUserId) ??
+        _mongoPrayerId(_prayerAuthorUserIdMap[item.id]) ??
         _blockPrayerId(item);
   }
 
@@ -750,6 +1062,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     if (p.id == id) return true;
     if ((p.identityUserId ?? '').trim() == id) return true;
     if ((p.authorUserId ?? '').trim() == id) return true;
+    if ((_prayerAuthorUserIdMap[p.id] ?? '').trim() == id) return true;
     return false;
   }
 
@@ -761,13 +1074,64 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   }
 
   /// Resolve `user_id` from POST /api/users/resolve (used as block API `user_id`).
+  /// Additive retries when cache is empty (iPad/iPhone after login) — same resolve
+  /// API / JSON body; does not change block/unblock request shape.
   Future<String?> _resolveUserIdForBlock() async {
-    final id = await PrayerWallService.ensureIdentityUserId();
-    final trimmed = (id ?? '').trim();
-    if (trimmed.isNotEmpty) return trimmed;
-    // Additive: Unblock can run before disk cache is ready; reuse session id.
-    final fallback = (_resolveUserId ?? '').trim();
-    return fallback.isEmpty ? null : fallback;
+    Future<String?> readOnce() async {
+      final id = await PrayerWallService.ensureIdentityUserId();
+      final trimmed = (id ?? '').trim();
+      if (trimmed.isNotEmpty) return trimmed;
+      // Additive: Unblock can run before disk cache is ready; reuse session id.
+      final fallback = (_resolveUserId ?? '').trim();
+      return fallback.isEmpty ? null : fallback;
+    }
+
+    Future<String?> forceResolveOnce() async {
+      try {
+        final email = (await _cacheNotifier.readCache(key: 'user') ?? '')
+            .toString()
+            .trim();
+        final name = (await _cacheNotifier.readCache(key: 'name') ?? '')
+            .toString()
+            .trim();
+        if (email.isEmpty) return null;
+        final again = await PrayerWallService.resolveIdentityUser(
+          email: email,
+          userName: name.isEmpty ? null : name,
+        );
+        final t = (again ?? '').trim();
+        return t.isEmpty ? null : t;
+      } catch (e) {
+        print('PrayerWall _resolveUserIdForBlock forceResolve error: $e');
+        return null;
+      }
+    }
+
+    var uid = await readOnce();
+    if (uid != null && uid.isNotEmpty) {
+      if (mounted && (_resolveUserId ?? '').trim() != uid) {
+        setState(() => _resolveUserId = uid);
+      }
+      return uid;
+    }
+
+    // Retries: slower devices (esp. iPad) often miss resolve right after login.
+    for (final delayMs in <int>[450, 900]) {
+      await Future<void>.delayed(Duration(milliseconds: delayMs));
+      if (!mounted) return null;
+      final forced = await forceResolveOnce();
+      if (forced != null && forced.isNotEmpty) {
+        if (mounted) setState(() => _resolveUserId = forced);
+        return forced;
+      }
+      uid = await readOnce();
+      if (uid != null && uid.isNotEmpty) {
+        if (mounted) setState(() => _resolveUserId = uid);
+        return uid;
+      }
+    }
+
+    return null;
   }
 
   List<PrayerWallItem> get _blockedItemsOnWall =>
@@ -782,6 +1146,11 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     }).toList();
   }
 
+  /// UI-only: count of Blocked list rows (not raw stored ids).
+  /// Hide/block APIs still use [_blockedUserIds] unchanged.
+  int get _blockedListDisplayCount =>
+      _blockedItemsOnWall.length + _blockedIdsNotOnWall.length;
+
   Future<void> _openBlockedList() async {
     // Blocked list lives inside My Prayer — open that section first.
     if (!_showingHistory) {
@@ -795,10 +1164,95 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         _myPrayerSort = 'Current';
         _historyError = null;
       });
-      await _reloadMyPrayerHistory();
+      unawaited(_reloadMyPrayerHistory());
+      unawaited(_backfillBlockedDisplayNamesFromWall());
       return;
     }
     setState(() => _showingBlocked = !_showingBlocked);
+    if (_showingBlocked) {
+      unawaited(_backfillBlockedDisplayNamesFromWall());
+    }
+  }
+
+  /// UI-only: ⋮ on Prayer Profile → small menu → Block List.
+  Future<void> _showPrayerProfileOverflowMenu(BuildContext buttonContext) async {
+    final renderObject = buttonContext.findRenderObject();
+    if (renderObject is! RenderBox) {
+      await _openBlockedPeopleFromMenu();
+      return;
+    }
+    final overlayState = Navigator.of(buttonContext).overlay;
+    final overlayBox = overlayState?.context.findRenderObject();
+    if (overlayBox is! RenderBox) {
+      await _openBlockedPeopleFromMenu();
+      return;
+    }
+    final position = RelativeRect.fromRect(
+      Rect.fromPoints(
+        renderObject.localToGlobal(Offset.zero, ancestor: overlayBox),
+        renderObject.localToGlobal(
+          renderObject.size.bottomRight(Offset.zero),
+          ancestor: overlayBox,
+        ),
+      ),
+      Offset.zero & overlayBox.size,
+    );
+    final count = _blockedListDisplayCount;
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDark = themeProvider.themeMode == ThemeMode.dark;
+    const cream = Color(0xFFFFF9F3);
+    const ink = Color(0xFF3D2914);
+    const brown = Color(0xFF5C4033);
+
+    final selected = await showMenu<String>(
+      context: buttonContext,
+      position: position,
+      color: isDark ? const Color(0xFF2C2118) : cream,
+      elevation: 8,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isDark
+              ? const Color(0xFF5A4638)
+              : brown.withValues(alpha: 0.2),
+        ),
+      ),
+      items: [
+        PopupMenuItem<String>(
+          value: 'blocked',
+          child: Row(
+            children: [
+              Icon(
+                Icons.block_outlined,
+                size: 20,
+                color: isDark ? Colors.white : brown,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                count == 0 ? 'Block List' : 'Block List ($count)',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : ink,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    if (!mounted || selected != 'blocked') return;
+    await _openBlockedPeopleFromMenu();
+  }
+
+  /// UI-only: always open blocked people (does not toggle closed).
+  Future<void> _openBlockedPeopleFromMenu() async {
+    if (!_showingHistory) {
+      await _openBlockedList();
+      return;
+    }
+    if (_showingBlocked) return;
+    setState(() => _showingBlocked = true);
+    unawaited(_backfillBlockedDisplayNamesFromWall());
   }
 
   void _selectMyPrayerTab({required bool blocked}) {
@@ -807,6 +1261,39 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       _showingBlocked = blocked;
       if (!blocked) _myPrayerSort = 'Current';
     });
+    // Additive UI: fill missing Blocked-list names from wall cards (no API change).
+    if (blocked) {
+      // Warm resolve so Unblock on iPad works without app restart.
+      unawaited(_resolveUserIdForBlock());
+      unawaited(_backfillBlockedDisplayNamesFromWall());
+    }
+  }
+
+  /// Additive: when a blocked person still has a wall card, copy that name onto
+  /// matching blocked ids that have no cached label yet.
+  Future<void> _backfillBlockedDisplayNamesFromWall() async {
+    if (_blockedUserIds.isEmpty) return;
+    final next = Map<String, String>.from(_blockedDisplayNames);
+    var changed = false;
+    for (final item in _all) {
+      if (!_isItemBlocked(item)) continue;
+      final name = _cardDisplayName(item).trim();
+      if (name.isEmpty || name.toLowerCase() == 'blocked prayer') continue;
+      for (final id in _blockedUserIds) {
+        if (!_itemMatchesBlockedId(item, id)) continue;
+        if ((next[id] ?? '').trim().isNotEmpty) continue;
+        next[id] = name;
+        await PrayerWallLocalStore.rememberBlockedDisplayName(
+          id,
+          displayName: name,
+          email: _userEmail,
+        );
+        changed = true;
+      }
+    }
+    if (changed && mounted) {
+      setState(() => _blockedDisplayNames = next);
+    }
   }
 
   String _avatarInitialsForName(String value) {
@@ -1020,16 +1507,53 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     );
     if (!confirmed || !mounted) return;
     try {
-      await PrayerWallService.unblockUser(
-        userId: uid,
-        blockedUserId: blockedId,
-      );
-      await PrayerWallLocalStore.unmarkBlockedUser(
+      // Same DELETE API. Try seed id first, then related local ids (iPad often
+      // has prayer id in the list while server row used person id at Block).
+      final relatedIds = _relatedLocalBlockedIds(blockedId);
+      final candidates = <String>[
         blockedId,
-        email: _userEmail,
-      );
+        ...relatedIds.where((id) => id != blockedId),
+      ];
+      Object? lastError;
+      var apiOk = false;
+      for (final id in candidates) {
+        try {
+          await PrayerWallService.unblockUser(
+            userId: uid,
+            blockedUserId: id,
+          );
+          apiOk = true;
+          for (final other in candidates) {
+            if (other == id) continue;
+            try {
+              await PrayerWallService.unblockUser(
+                userId: uid,
+                blockedUserId: other,
+              );
+            } catch (_) {}
+          }
+          break;
+        } catch (e) {
+          lastError = e;
+          if (_looksOffline(e)) rethrow;
+        }
+      }
+      if (!apiOk) {
+        throw lastError ?? Exception('Unblock user failed');
+      }
+      for (final id in relatedIds) {
+        await PrayerWallLocalStore.unmarkBlockedUser(
+          id,
+          email: _userEmail,
+        );
+      }
       if (!mounted) return;
-      setState(() => _blockedUserIds.remove(blockedId));
+      setState(() {
+        _blockedUserIds.removeAll(relatedIds);
+        for (final id in relatedIds) {
+          _blockedDisplayNames.remove(id);
+        }
+      });
       Constants.showToast('User unblocked', 2000);
     } catch (e) {
       print('PrayerWall _unblockByPrayerId error: $e');
@@ -1040,25 +1564,68 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     }
   }
 
-  Future<void> _openBlockUser(PrayerWallItem item) async {
+  /// Local ids stored for one blocked person (person id + prayer ids + namesakes).
+  /// Used so Blocked-list Unblock clears the whole row, not one leftover id.
+  Set<String> _relatedLocalBlockedIds(String seedId) {
+    final seed = seedId.trim();
+    if (seed.isEmpty) return {};
+    final related = <String>{seed};
+
+    var changed = true;
+    while (changed) {
+      changed = false;
+      for (final p in _all) {
+        final touches = related.any((id) => _itemMatchesBlockedId(p, id));
+        if (!touches) continue;
+        for (final raw in <String?>[
+          p.id,
+          p.identityUserId,
+          p.authorUserId,
+          _prayerAuthorUserIdMap[p.id],
+        ]) {
+          final c = (raw ?? '').trim();
+          if (c.isNotEmpty && related.add(c)) changed = true;
+        }
+        for (final id in _blockedUserIds) {
+          if (_itemMatchesBlockedId(p, id) && related.add(id)) changed = true;
+        }
+      }
+    }
+
+    // Leftover list rows: sibling ids often share the cached display name.
+    final names = <String>{};
+    for (final id in related) {
+      final n = (_blockedDisplayNames[id] ?? '').trim().toLowerCase();
+      if (n.isNotEmpty) names.add(n);
+    }
+    if (names.isNotEmpty) {
+      for (final id in _blockedUserIds) {
+        final n = (_blockedDisplayNames[id] ?? '').trim().toLowerCase();
+        if (names.contains(n)) related.add(id);
+      }
+    }
+    return related;
+  }
+
+  Future<bool> _openBlockUser(PrayerWallItem item) async {
     print('unique prayer id: ${item.id}');
 
     final prayerId = _blockPrayerId(item);
     final blockedId = _blockTargetId(item);
     if (blockedId == null) {
       _showAppleToast('Cannot block this user right now.');
-      return;
+      return false;
     }
 
     final allowed = await _ensureLoggedIn(
       message: 'Please log in to block users.',
     );
-    if (!allowed || !mounted) return;
+    if (!allowed || !mounted) return false;
 
     final uid = await _resolveUserIdForBlock();
     if (uid == null) {
       _showAppleToast('Cannot block this user right now.');
-      return;
+      return false;
     }
 
     print('block user_id (resolve user_id): $uid');
@@ -1070,66 +1637,117 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       displayName: _cardDisplayName(item),
       profileImageUrl: item.profileImage,
     );
-    if (!confirmed || !mounted) return;
+    if (!confirmed || !mounted) return false;
 
     try {
       if (already) {
-        await PrayerWallService.unblockUser(
-          userId: uid,
-          blockedUserId: blockedId,
-        );
-        if (prayerId != null && prayerId != blockedId) {
+        // Same DELETE API; try person id then related ids (iPad id mismatch).
+        final relatedIds = <String>{blockedId};
+        if (prayerId != null) relatedIds.add(prayerId);
+        for (final p in _all) {
+          if (!_itemMatchesBlockedId(p, blockedId)) continue;
+          relatedIds.add(p.id);
+          final iid = (p.identityUserId ?? '').trim();
+          if (iid.isNotEmpty) relatedIds.add(iid);
+          final aid = (p.authorUserId ?? '').trim();
+          if (aid.isNotEmpty) relatedIds.add(aid);
+        }
+        final candidates = <String>[
+          blockedId,
+          ...relatedIds.where((id) => id != blockedId),
+        ];
+        Object? lastError;
+        var apiOk = false;
+        for (final id in candidates) {
           try {
             await PrayerWallService.unblockUser(
               userId: uid,
-              blockedUserId: prayerId,
+              blockedUserId: id,
             );
-          } catch (_) {}
+            apiOk = true;
+            for (final other in candidates) {
+              if (other == id) continue;
+              try {
+                await PrayerWallService.unblockUser(
+                  userId: uid,
+                  blockedUserId: other,
+                );
+              } catch (_) {}
+            }
+            break;
+          } catch (e) {
+            lastError = e;
+            if (_looksOffline(e)) rethrow;
+          }
         }
-        await PrayerWallLocalStore.unmarkBlockedUser(
-          blockedId,
-          email: _userEmail,
-        );
-        if (prayerId != null) {
+        if (!apiOk) {
+          throw lastError ?? Exception('Unblock user failed');
+        }
+        for (final id in relatedIds) {
           await PrayerWallLocalStore.unmarkBlockedUser(
-            prayerId,
+            id,
             email: _userEmail,
           );
         }
-        if (!mounted) return;
+        if (!mounted) return false;
         setState(() {
-          _blockedUserIds.remove(blockedId);
-          if (prayerId != null) _blockedUserIds.remove(prayerId);
+          _blockedUserIds.removeAll(relatedIds);
+          for (final id in relatedIds) {
+            _blockedDisplayNames.remove(id);
+          }
         });
         Constants.showToast('User unblocked', 2000);
+        return true;
       } else {
         await PrayerWallService.blockUser(
           userId: uid,
           blockedUserId: blockedId,
+          blockedUserName: _cardDisplayName(item),
         );
-        await PrayerWallLocalStore.markBlockedUser(
-          blockedId,
-          email: _userEmail,
-        );
-        if (prayerId != null && prayerId != blockedId) {
+        // Additive: store person id + all their wall prayer ids so every
+        // post from them hides (not only the tapped card).
+        final relatedIds = <String>{blockedId};
+        if (prayerId != null) relatedIds.add(prayerId);
+        for (final p in _all) {
+          if (!_itemMatchesBlockedId(p, blockedId)) continue;
+          relatedIds.add(p.id);
+          final iid = (p.identityUserId ?? '').trim();
+          if (iid.isNotEmpty) relatedIds.add(iid);
+          final aid = (p.authorUserId ?? '').trim();
+          if (aid.isNotEmpty) relatedIds.add(aid);
+        }
+        final displayName = _cardDisplayName(item);
+        for (final id in relatedIds) {
           await PrayerWallLocalStore.markBlockedUser(
-            prayerId,
+            id,
+            email: _userEmail,
+          );
+          // Additive UI: cache name for Blocked list (APIs unchanged).
+          await PrayerWallLocalStore.rememberBlockedDisplayName(
+            id,
+            displayName: displayName,
             email: _userEmail,
           );
         }
-        if (!mounted) return;
+        if (!mounted) return false;
         setState(() {
-          _blockedUserIds.add(blockedId);
-          if (prayerId != null) _blockedUserIds.add(prayerId);
+          _blockedUserIds.addAll(relatedIds);
+          for (final id in relatedIds) {
+            if (displayName.trim().isNotEmpty) {
+              _blockedDisplayNames[id] = displayName.trim();
+            }
+          }
         });
         Constants.showToast('User blocked', 2000);
+        return true;
       }
     } catch (e) {
       print('PrayerWall _openBlockUser error: $e');
-      if (!mounted) return;
+      if (!mounted) return false;
       _showAppleToast(_looksOffline(e)
           ? 'No internet connection. Please try again.'
           : 'Could not update block. Please try again.');
+      return false;
     }
   }
 
@@ -1318,8 +1936,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                                   decoration: InputDecoration(
                                     hintText: 'Enter a short title',
                                     hintStyle: TextStyle(
-                                      color: isDark
-                                          ? Colors.white54
+                                        color: isDark
+                                            ? Colors.white54
                                           : Colors.grey.shade600,
                                     ),
                                     filled: true,
@@ -1362,15 +1980,15 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                                   onTap: scrollFieldIntoView,
                                   cursorColor: brown,
                                   style: TextStyle(
-                                    color: isDark ? Colors.white : brown,
+                                      color: isDark ? Colors.white : brown,
                                     height: 1.35,
                                     fontSize: 15,
                                   ),
                                   decoration: InputDecoration(
                                     hintText: 'Write your prayer details…',
                                     hintStyle: TextStyle(
-                                      color: isDark
-                                          ? Colors.white54
+                                        color: isDark
+                                            ? Colors.white54
                                           : Colors.grey.shade600,
                                     ),
                                     filled: true,
@@ -1407,38 +2025,38 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                                       fontSize: 15,
                                     ),
                                   ),
-                                  style: OutlinedButton.styleFrom(
+                                style: OutlinedButton.styleFrom(
                                     foregroundColor: deleteBorder,
                                     side: const BorderSide(
                                       color: deleteBorder,
                                       width: 1.4,
                                     ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
                                 ),
                               ),
+                            ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: SizedBox(
                                 height: 48,
-                                child: ElevatedButton(
-                                  onPressed: () => Navigator.pop(ctx, 'save'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: brown,
+                              child: ElevatedButton(
+                                onPressed: () => Navigator.pop(ctx, 'save'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: brown,
                                     foregroundColor: const Color(0xFFF5EFE4),
                                     elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
+                                ),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: const [
                                       Text(
-                                        'Save',
+                                  'Save',
                                         style: TextStyle(
                                           fontWeight: FontWeight.w700,
                                           fontSize: 15,
@@ -1685,6 +2303,46 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     return 'Community member';
   }
 
+  /// Additive: open Prayer Wall profile for this prayer's author.
+  Future<void> _openUserProfile(PrayerWallItem item) async {
+    if (item.isAnonymous) {
+      Constants.showToast('This prayer was posted anonymously.');
+      return;
+    }
+    final profileId =
+        ((item.authorUserId ?? '').trim().isNotEmpty
+                ? item.authorUserId
+                : item.identityUserId)
+            ?.trim() ??
+        '';
+    if (profileId.isEmpty) {
+      Constants.showToast('Profile is not available for this user.');
+      return;
+    }
+    var viewerId = (_resolveUserId ?? '').trim();
+    if (viewerId.isEmpty) {
+      viewerId = (await _resolveUserIdForBlock() ?? '').trim();
+    }
+    if (!mounted) return;
+    final photo = (item.profileImage ?? '').trim();
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PrayerWallUserProfileScreen(
+          profileUserId: profileId,
+          displayName: _cardDisplayName(item),
+          profileImageUrl: photo.isNotEmpty
+              ? photo
+              : (_isMyPrayer(item) ? _viewerProfileImage : null),
+          viewerUserId: viewerId.isNotEmpty ? viewerId : null,
+          wallPrayers: List<PrayerWallItem>.from(_all),
+          canBlock: !_isMyPrayer(item),
+          isBlocked: _isItemBlocked(item),
+          onBlockUser: () => _openBlockUser(item),
+        ),
+      ),
+    );
+  }
+
   Widget _myPrayerSegmentChip({
     required String label,
     required bool selected,
@@ -1741,7 +2399,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   }) {
     final items = _blockedItemsOnWall;
     final leftover = _blockedIdsNotOnWall;
-    final count = _blockedUserIds.length;
+    // UI-only: match tab/header count to visible rows (ids may be > people).
+    final count = _blockedListDisplayCount;
     final cardBg = isDark ? const Color(0xFF2C2118) : const Color(0xFFFFF9F3);
     final border = isDark ? const Color(0xFF5A4638) : const Color(0xFFE2D2C0);
     final ink = isDark ? Colors.white : const Color(0xFF3D2914);
@@ -1968,9 +2627,16 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
           );
         }),
         ...leftover.map((id) {
+          final cached = (_blockedDisplayNames[id] ?? '').trim();
+          final fromAuthor = (_prayerAuthorMap[id] ?? '').trim();
+          final name = cached.isNotEmpty
+              ? cached
+              : (fromAuthor.isNotEmpty ? fromAuthor : 'Blocked prayer');
           return blockedCard(
-            name: 'Blocked prayer',
-            subtitle: 'This prayer is hidden from your wall.',
+            name: name,
+            subtitle: name == 'Blocked prayer'
+                ? 'This prayer is hidden from your wall.'
+                : 'This profile is hidden from your wall.',
             onUnblock: () => _unblockByPrayerId(id),
           );
         }),
@@ -1978,26 +2644,1421 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     );
   }
 
+  /// Additive: follow counts for own Prayer Profile (existing Follow APIs).
+  Future<void> _loadOwnFollowStats() async {
+    final id = (_resolveUserId ?? '').trim();
+    if (id.isEmpty) return;
+    try {
+      final followers = await PrayerWallService.fetchFollowers(userId: id);
+      final following = await PrayerWallService.fetchFollowing(userId: id);
+      if (!mounted) return;
+      setState(() {
+        _ownFollowersCount = followers.count;
+        _ownFollowingCount = following.count;
+        _ownFollowerIds = followers.followerUserIds;
+        _ownFollowingIds = following.followingUserIds;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _openEditBibleProfileForPhoto() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+    );
+    if (!mounted) return;
+    await _loadAuthAndLocalName();
+  }
+
+  Future<void> _openAccountProfile() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ProfileScreen()),
+    );
+    if (!mounted) return;
+    await _loadAuthAndLocalName();
+  }
+
+  String _ownRecentPrayerTitle(PrayerWallItem p) {
+    final t = p.title.trim();
+    if (t.isNotEmpty) return t;
+    return (PrayerDualDescription.aiPrayer(p.description) ?? p.description)
+        .trim();
+  }
+
+  String _ownRecentPrayerSubtitle(PrayerWallItem p) {
+    final title = p.title.trim();
+    final ai = (PrayerDualDescription.aiPrayer(p.description) ?? '').trim();
+    final my = (PrayerDualDescription.myWords(p.description) ?? '').trim();
+    final plain = PrayerDualDescription.isDual(p.description)
+        ? ''
+        : p.description.trim();
+    final body = ai.isNotEmpty ? ai : (my.isNotEmpty ? my : plain);
+    if (body.isNotEmpty && body != title) return body;
+    return '';
+  }
+
+  /// Additive: queue card title = user-typed `prayer_title` (max 5 words).
+  String _queueCardTitle(PrayerWallItem p) =>
+      _ellipsisWords(_ownRecentPrayerTitle(p), maxWords: 5);
+
+  /// Additive: waiting cards — short one-line preview.
+  String _queueCardSubtitle(PrayerWallItem p) =>
+      _ellipsisWords(_ownRecentPrayerSubtitle(p), maxWords: 8);
+
+  /// Hotspot subtitle: line1 = 5 words, line2 = 4 words.
+  String _hotspotCardSubtitle(PrayerWallItem p) {
+    final words = _ownRecentPrayerSubtitle(p)
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim()
+        .split(' ')
+        .where((w) => w.isNotEmpty)
+        .toList();
+    if (words.isEmpty) return '';
+    final line1 = words.take(5).join(' ');
+    if (words.length <= 5) return line1;
+    final line2Words = words.skip(5).take(4).toList();
+    final truncated = words.length > 9;
+    final line2 = truncated
+        ? '${line2Words.join(' ')}...'
+        : line2Words.join(' ');
+    return '$line1\n$line2';
+  }
+
+  /// UI-only: keep card preview short by word count.
+  String _ellipsisWords(String raw, {required int maxWords}) {
+    final words = raw
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim()
+        .split(' ')
+        .where((w) => w.isNotEmpty)
+        .toList();
+    if (words.isEmpty) return '';
+    if (words.length <= maxWords) return words.join(' ');
+    return '${words.take(maxWords).join(' ')}...';
+  }
+
+  Future<void> _openQueuePrayerDetail(
+    PrayerWallItem item, {
+    bool fromHotspot = false,
+  }) async {
+    if (!mounted || _openingQueueDetail) return;
+    _openingQueueDetail = true;
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => _QueuePrayerDetailScreen(
+            item: item,
+            fromHotspot: fromHotspot,
+            displayName: _cardDisplayName(item),
+            timeLabel: _timeLabel(item),
+            profileImageUrl: () {
+              final fromApi = item.profileImage?.trim() ?? '';
+              if (fromApi.isNotEmpty) return fromApi;
+              if (_isMyPrayer(item) &&
+                  (_viewerProfileImage?.trim().isNotEmpty ?? false)) {
+                return _viewerProfileImage!.trim();
+              }
+              return null;
+            }(),
+            likeCountOf: () => _likeCounts[item.id] ?? 0,
+            likedOf: () => _isLiked(item.id),
+            likeBusyOf: () => _likeToggleBusy.contains(item.id),
+            commentCountOf: () => _commentCounts[item.id] ?? 0,
+            onToggleLike: () => _toggleLike(item),
+            onOpenComments: () => _openQueueComments(item),
+            onShare: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => PrayerShareScreen(
+                    prayerId: item.id,
+                    title: item.title,
+                    description: item.description,
+                  ),
+                ),
+              );
+            },
+            onMore: () => _showQueueCardMoreMenu(item),
+            onProfileTap: () => _openUserProfile(item),
+          ),
+        ),
+      );
+    } finally {
+      _openingQueueDetail = false;
+      if (mounted) setState(() {});
+    }
+  }
+
+  Widget _ownProfileStatCell(
+    String value,
+    String label,
+    bool isDark, {
+    VoidCallback? onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontFamily: 'Georgia',
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : const Color(0xFF5C4033),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? Colors.white60 : const Color(0xFF6B5344),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openQueueComments(PrayerWallItem item) async {
+    final ok = await _ensureCanComment();
+    if (!ok || !mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.72,
+            minChildSize: 0.4,
+            maxChildSize: 0.95,
+            builder: (_, __) {
+              return Material(
+                color: Theme.of(ctx).scaffoldBackgroundColor,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(18)),
+                child: PrayerWallCommentsSheet(
+                  prayerId: item.id,
+                  titlePreview:
+                      item.title.isNotEmpty ? item.title : item.description,
+                  embedded: true,
+                  onEnsureCanPost: _ensureCanPostComment,
+                  onChanged: () {
+                    unawaited(_refreshCommentCountsOnly());
+                  },
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+    if (mounted) unawaited(_refreshCommentCountsOnly());
+  }
+
+  Future<void> _showQueueCardMoreMenu(PrayerWallItem item) async {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final isDark = themeProvider.themeMode == ThemeMode.dark;
+    final brown = isDark ? Colors.brown.shade200 : const Color(0xFF5C4033);
+    const cream = Color(0xFFFFF9F3);
+    const ink = Color(0xFF4B3423);
+    final sheetBg = isDark ? const Color(0xFF2C2118) : cream;
+    final isReported = _reportedPrayerIds.contains(item.id);
+    final isBlocked = _isItemBlocked(item);
+    final canBlock = !_isMyPrayer(item);
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Material(
+              color: sheetBg,
+              borderRadius: BorderRadius.circular(20),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 10),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Colors.white24
+                          : const Color(0xFFD0C4B4),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  ListTile(
+                    leading: Icon(
+                      isReported ? Icons.flag_rounded : Icons.flag_outlined,
+                      color: isReported
+                          ? const Color(0xFFC45C3A)
+                          : (isDark ? Colors.white : brown),
+                    ),
+                    title: Text(
+                      'Report Prayer',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : ink,
+                      ),
+                    ),
+                    onTap: () => Navigator.of(ctx).pop('report'),
+                  ),
+                  if (canBlock)
+                    ListTile(
+                      leading: Icon(
+                        isBlocked
+                            ? Icons.block_rounded
+                            : Icons.block_outlined,
+                        color: isBlocked
+                            ? const Color(0xFFC45C3A)
+                            : (isDark ? Colors.white : brown),
+                      ),
+                      title: Text(
+                        isBlocked ? 'Unblock User' : 'Block User',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white : ink,
+                        ),
+                      ),
+                      onTap: () => Navigator.of(ctx).pop('block'),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: brown,
+                          side: BorderSide(
+                              color: brown.withValues(alpha: 0.55)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    if (!mounted || action == null) return;
+    if (action == 'report') {
+      await _openReport(item);
+    } else if (action == 'block') {
+      await _openBlockUser(item);
+    }
+  }
+
+  Widget _buildQueueWallScroll({
+    required Color brown,
+    required bool isDark,
+  }) {
+    if (_queueLoading && _queueCurrent == null && _queueList == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_queueError != null && _queueCurrent == null && _queueList == null) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                Text(
+                  _queueError!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: isDark ? Colors.white70 : Colors.grey.shade800,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _refreshQueue,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: brown,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    final hotspot = _queueHotspotPrayer;
+    final waiting = _queueWaitingOrdered;
+    final visibleWaiting =
+        _waitingViewAll ? waiting : waiting.take(3).toList();
+    final comingNext = _queueComingUpNext;
+    final queueCount = _queueList?.queueCount ?? waiting.length;
+    final slotSeconds =
+        _queueCurrent?.slotSeconds ?? _queueList?.slotSeconds ?? 420;
+    final curPos =
+        _queueCurrent?.position ?? _queueList?.currentPosition ?? 1;
+    final loops = _queueCurrent?.loops ?? _queueList?.loops ?? true;
+    final ink = isDark ? Colors.white : const Color(0xFF3D2914);
+    final muted = isDark ? Colors.white70 : const Color(0xFF6B5344);
+
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+      children: [
+        if (hotspot != null) ...[
+          _buildHotspotCard(
+            item: hotspot,
+            brown: brown,
+            isDark: isDark,
+          ),
+          const SizedBox(height: 22),
+        ] else
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Text(
+              'No hotspot prayer right now.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: muted),
+            ),
+          ),
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'COMING UP NEXT',
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      letterSpacing: 0.4,
+                      color: ink,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Next in fair rotation',
+                    style: TextStyle(fontSize: 12, color: muted),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (comingNext == null)
+          Text('No upcoming prayer.', style: TextStyle(color: muted))
+        else
+          _buildQueueWaitingCard(
+            item: comingNext,
+            badge: 'UP NEXT',
+            brown: brown,
+            isDark: isDark,
+            upNext: true,
+          ),
+        const SizedBox(height: 18),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'IN WAITING • $queueCount PRAYERS',
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      letterSpacing: 0.4,
+                      color: ink,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'New prayers are waiting for their turn.',
+                    style: TextStyle(fontSize: 12, color: muted),
+                  ),
+                ],
+              ),
+            ),
+            if (waiting.length > 3)
+              TextButton(
+                onPressed: () =>
+                    setState(() => _waitingViewAll = !_waitingViewAll),
+                child: Text(
+                  _waitingViewAll ? 'Show Less' : 'View All >',
+                  style: TextStyle(
+                    color: brown,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (visibleWaiting.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              'No prayers waiting.',
+              style: TextStyle(color: muted),
+            ),
+          )
+        else
+          ...visibleWaiting.map((slot) {
+            return _buildQueueWaitingCard(
+              item: slot.prayer,
+              badge: _formatStartsInLabel(
+                position: slot.position,
+                currentPosition: curPos,
+                slotSeconds: slotSeconds,
+                queueCount: queueCount,
+                loops: loops,
+              ),
+              brown: brown,
+              isDark: isDark,
+            );
+          }),
+      ],
+    );
+  }
+
+  Widget _buildHotspotCard({
+    required PrayerWallItem item,
+    required Color brown,
+    required bool isDark,
+  }) {
+    final name = _cardDisplayName(item);
+    final time = _timeLabel(item);
+    final photo = (item.profileImage ?? '').trim();
+    final countdown = _formatQueueCountdown(_queueMsRemaining);
+    final likeBusy = _likeToggleBusy.contains(item.id);
+    final liked = _isLiked(item.id);
+    final commentCount = _commentCounts[item.id] ?? 0;
+    final title = _queueCardTitle(item);
+    final subtitle = _hotspotCardSubtitle(item);
+
+    // Referral Hotspot CTA (paywall dark brown).
+    const ctaBrown = Color(0xFF3A2B18);
+    const ink = Color(0xFF3D2914);
+    const mutedInk = Color(0xFF6B5344);
+    const creamPill = Color(0xFFF3E6D6);
+
+    return SizedBox(
+      height: 242,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _openQueuePrayerDetail(item, fromHotspot: true),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Image.asset(
+                    'assets/prayer_wall/hotspot_prayer_bg.jpg',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Image.asset(
+                      'assets/prayer_wall/prayer_review_bg.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: isDark ? const Color(0xFF2C2118) : brown,
+                      ),
+                    ),
+                  ),
+                ),
+                // Light parchment wash so cross/mountain bg stays visible.
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          const Color(0xFFF5EFE4).withValues(alpha: 0.18),
+                          const Color(0xFFF5EFE4).withValues(alpha: 0.28),
+                          const Color(0xFFE8DCC8).withValues(alpha: 0.38),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 12, 11),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'HOTSPOT PRAYER',
+                              style: TextStyle(
+                                color: ink,
+                                fontFamily: 'Georgia',
+                                fontWeight: FontWeight.w800,
+                                fontSize: 11,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: creamPill,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.timer_outlined,
+                                    color: ink, size: 13),
+                                const SizedBox(width: 3),
+                                Text(
+                                  countdown,
+                                  style: const TextStyle(
+                                    color: ink,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () => _openUserProfile(item),
+                            child: CircleAvatar(
+                              radius: 16,
+                              backgroundColor: creamPill,
+                              backgroundImage: photo.isNotEmpty
+                                  ? NetworkImage(photo)
+                                  : null,
+                              onBackgroundImageError:
+                                  photo.isNotEmpty ? (_, __) {} : null,
+                              child: photo.isNotEmpty
+                                  ? null
+                                  : Text(
+                                      name.isEmpty
+                                          ? '?'
+                                          : name.trim()[0].toUpperCase(),
+                                      style: const TextStyle(
+                                        color: ink,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => _openUserProfile(item),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name,
+                                    style: const TextStyle(
+                                      color: ink,
+                                      fontFamily: 'Georgia',
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  Text(
+                                    time,
+                                    style: const TextStyle(
+                                      color: mutedInk,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: ink,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
+                        ),
+                      ),
+                      if (subtitle.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: mutedInk,
+                            fontSize: 12,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                      if (item.category.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: creamPill,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            item.category,
+                            style: const TextStyle(
+                              color: ink,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                      const Spacer(),
+                      Row(
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed:
+                                likeBusy ? null : () => _toggleLike(item),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: ctaBrown,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(0, 34),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            icon: Icon(
+                              liked
+                                  ? Icons.favorite
+                                  : Icons.volunteer_activism,
+                              size: 14,
+                            ),
+                            label: Text(
+                              liked ? 'Prayed for $name' : 'Pray for $name',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          InkWell(
+                            onTap: () => _openQueueComments(item),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.chat_bubble_outline,
+                                    color: ink, size: 17),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$commentCount',
+                                  style: const TextStyle(
+                                    color: ink,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => _showQueueCardMoreMenu(item),
+                            icon: const Icon(Icons.more_horiz, color: ink),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQueueWaitingCard({
+    required PrayerWallItem item,
+    required String badge,
+    required Color brown,
+    required bool isDark,
+    bool upNext = false,
+  }) {
+    final name = _cardDisplayName(item);
+    final time = _timeLabel(item);
+    final photo = (item.profileImage ?? '').trim();
+    final cardBg =
+        isDark ? const Color(0xFF2C2118) : Colors.white.withValues(alpha: 0.92);
+    final ink = isDark ? Colors.white : const Color(0xFF3D2914);
+    final muted = isDark ? Colors.white70 : const Color(0xFF6B5344);
+    final commentCount = _commentCounts[item.id] ?? 0;
+    final liked = _isLiked(item.id);
+    final likeBusy = _likeToggleBusy.contains(item.id);
+    final title = _queueCardTitle(item);
+    final subtitle = _queueCardSubtitle(item);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _openQueuePrayerDetail(item, fromHotspot: false),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.fromLTRB(14, 12, 10, 10),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDark
+                  ? const Color(0xFF5A4638)
+                  : brown.withValues(alpha: 0.12),
+            ),
+            boxShadow: isDark
+                ? null
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  GestureDetector(
+                    onTap: () => _openUserProfile(item),
+                    child: CircleAvatar(
+                      radius: 20,
+                      backgroundColor: isDark
+                          ? const Color(0xFF4A382C)
+                          : brown.withValues(alpha: 0.15),
+                      backgroundImage:
+                          photo.isNotEmpty ? NetworkImage(photo) : null,
+                      onBackgroundImageError:
+                          photo.isNotEmpty ? (_, __) {} : null,
+                      child: photo.isNotEmpty
+                          ? null
+                          : Text(
+                              name.isEmpty
+                                  ? '?'
+                                  : name.trim()[0].toUpperCase(),
+                              style: TextStyle(
+                                color: isDark ? Colors.white : brown,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: ink,
+                            fontSize: 14,
+                          ),
+                        ),
+                        Text(
+                          time,
+                          style: TextStyle(fontSize: 11, color: muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: upNext
+                          ? brown.withValues(alpha: isDark ? 0.35 : 0.12)
+                          : (isDark
+                              ? Colors.white12
+                              : const Color(0xFFF3E6D6)),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      badge,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : brown,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: ink,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  height: 1.3,
+                ),
+              ),
+              if (subtitle.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: muted,
+                    fontSize: 13,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  InkWell(
+                    onTap: likeBusy ? null : () => _toggleLike(item),
+                    child: Icon(
+                      liked
+                          ? Icons.favorite
+                          : Icons.volunteer_activism_outlined,
+                      size: 18,
+                      color: liked
+                          ? const Color(0xFFC45C3A)
+                          : (isDark ? Colors.white70 : brown),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  InkWell(
+                    onTap: () => _openQueueComments(item),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.chat_bubble_outline,
+                          size: 18,
+                          color: isDark ? Colors.white70 : brown,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$commentCount',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white70 : brown,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => _showQueueCardMoreMenu(item),
+                    icon: Icon(
+                      Icons.more_horiz,
+                      color: isDark ? Colors.white70 : Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+    /// Own Prayer Profile header (My Profile) — UI only.
+  Widget _buildOwnPrayerProfileHeader({
+    required Color brown,
+    required bool isDark,
+  }) {
+    final name = _viewerDisplayName.isEmpty ? 'You' : _viewerDisplayName;
+    final photo = (_viewerProfileImage ?? '').trim();
+    final country = (_viewerCountry ?? '').trim();
+    final initials = () {
+      final raw = name.replaceAll(RegExp(r'\s+'), '');
+      if (raw.isEmpty) return '?';
+      if (raw.length == 1) return raw[0].toUpperCase();
+      return '${raw[0].toUpperCase()}${raw[1].toUpperCase()}';
+    }();
+    final cardBg =
+        isDark ? const Color(0xFF2C2118) : Colors.white.withOpacity(0.9);
+    final ink = isDark ? Colors.white : const Color(0xFF3D2914);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 28, 22, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GestureDetector(
+                onTap: _openEditBibleProfileForPhoto,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    CircleAvatar(
+                      radius: 48,
+                      backgroundColor: isDark
+                          ? const Color(0xFF4A382C)
+                          : brown.withOpacity(0.18),
+                      backgroundImage:
+                          photo.isNotEmpty ? NetworkImage(photo) : null,
+                      onBackgroundImageError:
+                          photo.isNotEmpty ? (_, __) {} : null,
+                      child: photo.isNotEmpty
+                          ? null
+                          : Text(
+                              initials,
+                              style: TextStyle(
+                                color: isDark ? Colors.white : brown,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 24,
+                              ),
+                            ),
+                    ),
+                    Positioned(
+                      bottom: 2,
+                      right: 2,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF5C4033),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isDark
+                                ? const Color(0xFF2C2118)
+                                : const Color(0xFFF5F0E6),
+                            width: 2,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.camera_alt,
+                          color: Colors.white,
+                          size: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 18),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: TextStyle(
+                          fontFamily: 'Georgia',
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
+                          color: ink,
+                        ),
+                      ),
+                      if (country.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on,
+                              size: 16,
+                              color: isDark ? Colors.white70 : brown,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                country,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: isDark ? Colors.white70 : brown,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      Text(
+                        '“Trust in the Lord always.”',
+                        style: TextStyle(
+                          fontFamily: 'Georgia',
+                          fontSize: 14,
+                          height: 1.35,
+                          fontStyle: FontStyle.italic,
+                          color: isDark
+                              ? Colors.white70
+                              : const Color(0xFF5C4A3A),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Proverbs 3:5',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark
+                              ? Colors.white54
+                              : const Color(0xFF6B5344),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark
+                    ? const Color(0xFF5A4638)
+                    : brown.withOpacity(0.12),
+              ),
+              boxShadow: [
+                if (!isDark)
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+              ],
+            ),
+            child: Row(
+              children: [
+                _ownProfileStatCell(
+                  '${_historyItems.where((p) => !p.isDurationExpired).length}',
+                  'Prayers Shared',
+                  isDark,
+                ),
+                Container(
+                  width: 1,
+                  height: 38,
+                  color: isDark ? Colors.white24 : brown.withOpacity(0.15),
+                ),
+                _ownProfileStatCell(
+                  '$_ownFollowersCount',
+                  'Followers',
+                  isDark,
+                  onTap: () => showPrayerWallFollowPeopleSheet(
+                    context: context,
+                    title: 'Followers',
+                    userIds: _ownFollowerIds,
+                    wallPrayers: _all,
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 38,
+                  color: isDark ? Colors.white24 : brown.withOpacity(0.15),
+                ),
+                _ownProfileStatCell(
+                  '$_ownFollowingCount',
+                  'Following',
+                  isDark,
+                  onTap: () => showPrayerWallFollowPeopleSheet(
+                    context: context,
+                    title: 'Following',
+                    userIds: _ownFollowingIds,
+                    wallPrayers: _all,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _openAccountProfile,
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark
+                        ? const Color(0xFF5A4638)
+                        : brown.withOpacity(0.12),
+                  ),
+                  boxShadow: [
+                    if (!isDark)
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: brown.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(Icons.menu_book_outlined, color: brown),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Account Profile',
+                            style: TextStyle(
+                              fontFamily: 'Georgia',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                              color: ink,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'Reading, library, backup & account',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark
+                                  ? Colors.white60
+                                  : const Color(0xFF6B5344),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right,
+                      color: isDark ? Colors.white54 : brown,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 28),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Recent Prayers',
+                  style: TextStyle(
+                    fontFamily: 'Georgia',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: ink,
+                  ),
+                ),
+              ),
+              DropdownButton<String>(
+                value: _myPrayerSort,
+                underline: const SizedBox.shrink(),
+                dropdownColor:
+                    isDark ? CommanColor.darkPrimaryColor : Colors.white,
+                items: _myPrayerSortOptions
+                    .map(
+                      (s) => DropdownMenuItem(
+                        value: s,
+                        child: Text(
+                          s,
+                          style: TextStyle(
+                            color: isDark ? Colors.white : brown,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) {
+                  if (v == null) return;
+                  setState(() => _myPrayerSort = v);
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOwnRecentPrayerTile({
+    required PrayerWallItem item,
+    required Color brown,
+    required bool isDark,
+  }) {
+    final title = _ownRecentPrayerTitle(item);
+    final subtitle = _ownRecentPrayerSubtitle(item);
+    final expanded = _expandedOwnRecentPrayerIds.contains(item.id);
+    final cardBg =
+        isDark ? const Color(0xFF2C2118) : Colors.white.withOpacity(0.9);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          setState(() {
+            if (expanded) {
+              _expandedOwnRecentPrayerIds.remove(item.id);
+            } else {
+              _expandedOwnRecentPrayerIds.add(item.id);
+            }
+          });
+        },
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isDark ? const Color(0xFF5A4638) : brown.withOpacity(0.12),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (title.isNotEmpty && subtitle.isNotEmpty) ...[
+                Text(
+                  title,
+                  maxLines: expanded ? null : 1,
+                  overflow:
+                      expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : const Color(0xFF3D2914),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  subtitle,
+                  maxLines: expanded ? null : 2,
+                  overflow:
+                      expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: isDark ? Colors.white70 : const Color(0xFF5C4A3A),
+                  ),
+                ),
+              ] else
+                Text(
+                  title.isNotEmpty ? title : subtitle,
+                  maxLines: expanded ? null : 2,
+                  overflow:
+                      expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : const Color(0xFF3D2914),
+                  ),
+                ),
+              const SizedBox(height: 6),
+              Text(
+                _timeLabel(item),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? Colors.white54 : Colors.grey.shade700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// UI-only: header uses profile photo (or person icon) — same tap target.
   Widget _buildHeaderProfileIcon() {
     final url = (_viewerProfileImage ?? '').trim();
+    const size = 34.0;
     if (url.isNotEmpty) {
       return ClipOval(
         child: Image.network(
           url,
-          width: 28,
-          height: 28,
+          width: size,
+          height: size,
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => const Icon(
             Icons.person_outline,
-            color: Colors.white,
+            size: size,
+            color: Color(0xFF5C4033),
           ),
         ),
       );
     }
     return const Icon(
       Icons.person_outline,
-      color: Colors.white,
+      size: size,
+      color: Color(0xFF5C4033),
     );
   }
 
@@ -2067,7 +4128,8 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       _showingBlocked = false;
       _myPrayerSort = 'Current';
     });
-    await _reloadMyPrayerHistory();
+    // Do not await — show Prayer Profile immediately; load prayers in background.
+    unawaited(_reloadMyPrayerHistory());
   }
 
   Future<void> _reloadMyPrayerHistory() async {
@@ -2082,17 +4144,23 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
 
       if (!mounted) return;
       await _syncMyPrayerIdsForAccount(_userEmail);
+      if ((_resolveUserId ?? '').trim().isEmpty) {
+        await _hydrateResolveUserId();
+      }
+      if (!mounted) return;
 
-      final postedIds = await PrayerWallLocalStore.loadOwnedPrayerIds();
-      await PrayerWallLocalStore.saveMyPrayerIds(postedIds);
+      // Prefer rebuilt ids (wall email/identity + device-owned) after re-login.
+      final postedIds = await PrayerWallLocalStore.loadMyPrayerIds();
+      final ownedFallback = await PrayerWallLocalStore.loadOwnedPrayerIds();
+      final effectiveOwned = postedIds.isNotEmpty
+          ? postedIds
+          : ownedFallback;
+      await PrayerWallLocalStore.saveMyPrayerIds(effectiveOwned);
       if (!mounted) return;
 
       final fromIdentity =
           await PrayerWallService.fetchPrayersByIdentityUserId();
       if (!mounted) return;
-      if ((_resolveUserId ?? '').trim().isEmpty) {
-        await _hydrateResolveUserId();
-      }
       final myEmail = (_userEmail ?? '').trim().toLowerCase();
       final mine = myEmail.isEmpty
           ? fromIdentity
@@ -2101,12 +4169,39 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
               .toList();
       final historyItemsRaw = await _mergeDevicePostedIntoHistory(
         fromIdentity: mine,
-        ownedIds: postedIds,
+        ownedIds: effectiveOwned,
         accountEmail: myEmail.isEmpty ? null : myEmail,
       );
+      // Additive: include wall posts matching this login (visible on Wall but
+      // missing from identity GET after logout → login).
+      var wallForMerge = _all;
+      if (wallForMerge.isEmpty && myEmail.isNotEmpty) {
+        try {
+          wallForMerge = await PrayerWallService.fetchPrayers();
+          if (mounted && wallForMerge.isNotEmpty) {
+            setState(() => _all = wallForMerge);
+            await _rebuildMyPrayerIdsForCurrentAccount();
+          }
+        } catch (_) {}
+      }
+      final seen = historyItemsRaw.map((p) => p.id).toSet();
+      final mergedHistory = List<PrayerWallItem>.from(historyItemsRaw);
+      if (myEmail.isNotEmpty) {
+        for (final p in wallForMerge) {
+          if (seen.contains(p.id)) continue;
+          if (!_prayerMatchesLoginEmail(p, myEmail)) continue;
+          mergedHistory.add(p);
+          seen.add(p.id);
+        }
+      }
+      mergedHistory.sort((a, b) {
+        final am = a.createdAt?.millisecondsSinceEpoch ?? 0;
+        final bm = b.createdAt?.millisecondsSinceEpoch ?? 0;
+        return bm.compareTo(am);
+      });
       final historyItems = myEmail.isEmpty
-          ? historyItemsRaw
-          : historyItemsRaw
+          ? mergedHistory
+          : mergedHistory
               .where((p) => _prayerMatchesLoginEmail(p, myEmail))
               .toList();
       final ids = historyItems.map((p) => p.id).toSet();
@@ -2162,6 +4257,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         _expiredHistoryItems = expired;
         _historyLoading = false;
       });
+      unawaited(_loadOwnFollowStats());
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -2179,48 +4275,42 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     if (_openingPostPrayer) return;
     if (mounted) setState(() => _openingPostPrayer = true);
     try {
-      final isConnected = await InternetConnection().hasInternetAccess;
-      if (!isConnected) {
-        Constants.showToast('No internet connection', 1000);
-        return;
-      }
+    final isConnected = await InternetConnection().hasInternetAccess;
+    if (!isConnected) {
+      Constants.showToast('No internet connection', 1000);
+      return;
+    }
       if (!mounted) return;
 
+      // Login first (same as Like/Block), then one Post a Prayer push.
+      // Do not Get.off Login → Post (that left stacked routes).
       if (!_isLoggedIn) {
         final allowed = await _ensureLoggedIn(
           message:
               'Please log in to support this prayer request and leave a comment.',
-          replaceOnSuccess: () {
-            Get.off(
-              () => const PostPrayerScreen(),
-              routeName: PostPrayerScreen.routeName,
-              preventDuplicates: true,
-              transition: Transition.noTransition,
-              duration: Duration.zero,
-            );
-          },
         );
         if (!allowed || !mounted) return;
-        // Login was replaced with Post a Prayer — do not push it again.
-        return;
       }
 
       if (!mounted) return;
-      final posted = await Get.to<bool>(
-        () => const PostPrayerScreen(),
-        routeName: PostPrayerScreen.routeName,
-        preventDuplicates: true,
-      );
-      if (posted == true && mounted) {
-        await _reloadLocalDisplayName();
-        await _hydratePrayerAuthorsFromDisk();
+      // Same Get stack as Wall: Home → Wall → Post → Details.
+      // Navigator.push on top of Get.to(Wall) made system/Get.back pop Wall.
+    final posted = await Get.to<bool>(
+      () => const PostPrayerScreen(),
+      routeName: PostPrayerScreen.routeName,
+      preventDuplicates: true,
+      transition: Transition.cupertino,
+    );
+    if (posted == true && mounted) {
+      await _reloadLocalDisplayName();
+      await _hydratePrayerAuthorsFromDisk();
         await _hydrateMyPrayerIdsFromDisk();
-        await _refresh();
+      await _refresh();
         if (_showingHistory && mounted) {
           await _reloadMyPrayerHistory();
         }
-        if (showSuccessToast && mounted) {
-          _showAppleToast('Prayer posted successfully.');
+      if (showSuccessToast && mounted) {
+        _showAppleToast('Prayer posted successfully.');
         }
       }
     } finally {
@@ -2269,11 +4359,24 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       );
     }
 
-    return Scaffold(
+    // UI-only: while Login/Sign Up is open, Wall must not resize for keyboard
+    // insets (that steals/dismisses Sign Up keypad under the auth route).
+    final wallIgnoresKeyboard = _suspendFocusFabListener;
+    Widget page = Scaffold(
+      resizeToAvoidBottomInset: !wallIgnoresKeyboard,
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: isVintage
+        decoration: (_showingHistory || _showingBlocked)
+            ? const BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage(
+                    'assets/prayer_wall/prayer_profile_bg.png',
+                  ),
+                  fit: BoxFit.cover,
+                ),
+              )
+            : isVintage
             ? BoxDecoration(
                 image: DecorationImage(
                   image: AssetImage(Images.bgImage(context)),
@@ -2282,231 +4385,122 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
               )
             : BoxDecoration(color: cream),
         child: Scaffold(
+          resizeToAvoidBottomInset: !wallIgnoresKeyboard,
           backgroundColor: Colors.transparent,
-      floatingActionButton: (_hideFabForInput || _showingBlocked)
+      floatingActionButton: (_hideFabForInput || _showingBlocked || _showingHistory)
           ? null
           : FloatingActionButton(
-              backgroundColor: isDark ? brown.withValues(alpha: 0.9) : brown,
-              foregroundColor: Colors.white,
-              elevation: isDark ? 8 : 6,
+        backgroundColor: isDark ? brown.withValues(alpha: 0.9) : brown,
+        foregroundColor: Colors.white,
+        elevation: isDark ? 8 : 6,
               onPressed: _openingPostPrayer ? null : () => _openPostPrayerScreen(),
-              child: const Icon(Icons.add),
-            ),
+        child: const Icon(Icons.add),
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-              decoration: BoxDecoration(
-                color: brown,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.12),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
+            if (_showingHistory)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-                    onPressed: () {
-                      if (_showingHistory && _showingBlocked) {
-                        setState(() => _showingBlocked = false);
-                        return;
-                      }
-                      if (_showingHistory) {
+                      icon: Icon(Icons.arrow_back_ios,
+                          color: isDark ? Colors.white : brown),
+                      onPressed: () {
+                        if (_showingBlocked) {
+                          setState(() => _showingBlocked = false);
+                          return;
+                        }
+                        if (widget.openMyProfile) {
+                          Get.back();
+                          return;
+                        }
                         setState(() {
                           _showingHistory = false;
                           _showingBlocked = false;
                           _myPrayerSort = 'Current';
                           _historyError = null;
                         });
-                        return;
-                      }
-                      Navigator.of(context).pop();
-                    },
+                      },
                   ),
                   Expanded(
-                    child: Center(
                       child: Text(
-                        _showingHistory ? 'My Profile' : 'Prayer Wall',
+                        _showingBlocked
+                            ? (_blockedListDisplayCount == 0
+                                ? 'Blocked'
+                                : 'Blocked ($_blockedListDisplayCount)')
+                            : 'Prayer Profile',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : brown,
                           fontSize: 18,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                           fontFamily: 'Georgia',
                         ),
                       ),
                     ),
-                  ),
-                  // My Prayer: no header action icons (back only).
-                  if (_showingHistory)
-                    const SizedBox(width: 48)
-                  else
-                    IconButton(
-                      tooltip: 'My Profile',
-                      icon: _buildHeaderProfileIcon(),
-                      onPressed:
-                          _openingHistory ? null : _openMyPrayerHistory,
-                    ),
+                    if (!_showingBlocked)
+                      Builder(
+                        builder: (btnCtx) => IconButton(
+                          tooltip: 'More',
+                          icon: Icon(Icons.more_vert,
+                              color: isDark ? Colors.white : brown),
+                          onPressed: () =>
+                              _showPrayerProfileOverflowMenu(btnCtx),
+                        ),
+                      )
+                    else
+                  const SizedBox(width: 48),
                 ],
               ),
-            ),
-            if (_showingHistory)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _myPrayerSegmentChip(
-                        label: 'My Prayers',
-                        selected: !_showingBlocked,
-                        brown: brown,
-                        isDark: isDark,
-                        onTap: () => _selectMyPrayerTab(blocked: false),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _myPrayerSegmentChip(
-                        label: _blockedUserIds.isEmpty
-                            ? 'Blocked'
-                            : 'Blocked (${_blockedUserIds.length})',
-                        selected: _showingBlocked,
-                        brown: brown,
-                        isDark: isDark,
-                        onTap: () => _selectMyPrayerTab(blocked: true),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            if (!_showingHistory)
-            SizedBox(
-              // Increased height so category chips have enough vertical
-              // space and don't get visually cut off on some devices.
-              height: 56,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(16, 10, 24, 10),
-                itemCount: _filterCategories.length,
-                itemBuilder: (context, i) {
-                  final c = _filterCategories[i];
-                  final sel = _filter == c;
-                  return Padding(
-                    padding: EdgeInsets.only(
-                      right: i == _filterCategories.length - 1 ? 0 : 10,
-                    ),
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => setState(() => _filter = c),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: sel
-                              ? brown
-                              : (isDark ? Colors.white12 : Colors.white),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: sel ? brown : Colors.grey.shade400,
+              )
+            else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 10, 8, 6),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.arrow_back_ios,
+                        color: isDark ? Colors.white : brown),
+                    onPressed: () {
+                      Get.back();
+                    },
+                  ),
+                  Expanded(
+                    child: Column(
+                children: [
+                  Text(
+                          'Prayer Wall',
+                          textAlign: TextAlign.center,
+                    style: TextStyle(
+                            color: isDark ? Colors.white : brown,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'Georgia',
                           ),
                         ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          c,
-                          style: TextStyle(
-                            color: sel
-                                ? Colors.white
-                                : (isDark ? Colors.white : brown),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Grow Closer Every Day',
+                          textAlign: TextAlign.center,
+                              style: TextStyle(
+                            color: isDark
+                                ? Colors.white70
+                                : brown.withValues(alpha: 0.75),
+                            fontSize: 12,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            if (!_showingHistory)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              child: Row(
-                children: [
-                  Text(
-                    'Sort:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white70 : brown,
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  DropdownButton<String>(
-                    value: _sort,
-                    underline: const SizedBox.shrink(),
-                    dropdownColor: isDark ? CommanColor.darkPrimaryColor : Colors.white,
-                    items: _sortOptions
-                        .map(
-                          (s) => DropdownMenuItem(
-                            value: s,
-                            child: Text(
-                              s,
-                              style: TextStyle(
-                                color: isDark ? Colors.white : brown,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (v) {
-                      if (v == null) return;
-                      setState(() => _sort = v);
-                    },
-                  ),
-                ],
-              ),
-            ),
-            if (_showingHistory && !_showingBlocked)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              child: Row(
-                children: [
-                  Text(
-                    'Sort:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white70 : brown,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  DropdownButton<String>(
-                    value: _myPrayerSort,
-                    underline: const SizedBox.shrink(),
-                    dropdownColor: isDark ? CommanColor.darkPrimaryColor : Colors.white,
-                    items: _myPrayerSortOptions
-                        .map(
-                          (s) => DropdownMenuItem(
-                            value: s,
-                            child: Text(
-                              s,
-                              style: TextStyle(
-                                color: isDark ? Colors.white : brown,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (v) {
-                      if (v == null) return;
-                      setState(() => _myPrayerSort = v);
-                    },
+                  IconButton(
+                    tooltip: 'My Profile',
+                    iconSize: 34,
+                    icon: _buildHeaderProfileIcon(),
+                    onPressed:
+                        _openingHistory ? null : _openMyPrayerHistory,
                   ),
                 ],
               ),
@@ -2514,9 +4508,15 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
             Expanded(
               child: _showingBlocked
                   ? _buildBlockedList(brown: brown, isDark: isDark)
-                  : (_showingHistory ? _historyLoading : _loading)
+                  : (!_showingHistory &&
+                          _queueCurrent == null &&
+                          _queueList == null &&
+                          (_queueLoading || _loading))
                   ? const Center(child: CircularProgressIndicator())
-                  : (_showingHistory ? _historyError : _error) != null
+                      : (!_showingHistory &&
+                              _error != null &&
+                              _queueCurrent == null &&
+                              _queueList == null)
                       ? Center(
                           child: Padding(
                             padding: const EdgeInsets.all(24),
@@ -2524,7 +4524,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  (_showingHistory ? _historyError : _error)!,
+                                  _error!,
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     color: isDark
@@ -2534,9 +4534,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                                 ),
                                 const SizedBox(height: 16),
                                 ElevatedButton(
-                                  onPressed: _showingHistory
-                                      ? _reloadMyPrayerHistory
-                                      : _refresh,
+                                  onPressed: _refresh,
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: brown,
                                     foregroundColor: Colors.white,
@@ -2548,91 +4546,100 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                           ),
                         )
                       : RefreshIndicator(
-                          onRefresh: _showingHistory
-                              ? _reloadMyPrayerHistory
-                              : _refresh,
-                          child: _visible.isEmpty
+                              onRefresh: _showingHistory
+                                  ? _reloadMyPrayerHistory
+                                  : _refresh,
+                              child: _showingHistory
                               ? ListView(
+                                      padding:
+                                          const EdgeInsets.only(bottom: 24),
                                   children: [
-                                    SizedBox(
-                                      height:
-                                          MediaQuery.of(context).size.height *
-                                              0.25,
-                                    ),
-                                    Center(
-                                      child: Text(
-                                        _showingExpired
-                                            ? 'No expired prayers yet.'
-                                            : _showingHistory
-                                            ? 'No prayers in My Prayer yet.'
-                                            : 'No prayers in this category yet.',
+                                        _buildOwnPrayerProfileHeader(
+                                          brown: brown,
+                                          isDark: isDark,
+                                        ),
+                                        if (_historyLoading)
+                                          const Padding(
+                                            padding: EdgeInsets.symmetric(
+                                                vertical: 28),
+                                            child: Center(
+                                              child: SizedBox(
+                                                width: 28,
+                                                height: 28,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                        strokeWidth: 3),
+                                              ),
+                                            ),
+                                          )
+                                        else if (_historyError != null)
+                                          Padding(
+                                            padding: const EdgeInsets.fromLTRB(
+                                                20, 12, 20, 0),
+                                            child: Column(
+                                              children: [
+                                                Text(
+                                                  _historyError!,
+                                                  textAlign: TextAlign.center,
                                         style: TextStyle(
                                           color: isDark
                                               ? Colors.white70
-                                              : Colors.grey.shade700,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : ListView.builder(
+                                                        : Colors
+                                                            .grey.shade800,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 12),
+                                                ElevatedButton(
+                                                  onPressed:
+                                                      _reloadMyPrayerHistory,
+                                                  style:
+                                                      ElevatedButton.styleFrom(
+                                                    backgroundColor: brown,
+                                                    foregroundColor:
+                                                        Colors.white,
+                                                  ),
+                                                  child: const Text('Retry'),
+                                                ),
+                                              ],
+                                            ),
+                                          )
+                                        else if (_visible.isEmpty)
+                                          Padding(
                                   padding: const EdgeInsets.fromLTRB(
-                                      16, 0, 16, 100),
-                                  itemCount: _visible.length,
-                                  itemBuilder: (context, index) {
-                                    final item = _visible[index];
-                                    return _PrayerCard(
+                                                20, 12, 20, 0),
+                                            child: Text(
+                                              _showingExpired
+                                                  ? 'No expired prayers yet.'
+                                                  : 'No prayers in My Prayer yet.',
+                                              style: TextStyle(
+                                                color: isDark
+                                                    ? Colors.white70
+                                                    : Colors.grey.shade700,
+                                              ),
+                                            ),
+                                          )
+                                        else
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 20),
+                                            child: Column(
+                                              children: _visible
+                                                  .map(
+                                                    (item) =>
+                                                        _buildOwnRecentPrayerTile(
                                       item: item,
                                       brown: brown,
                                       isDark: isDark,
-                                      timeLabel: _timeLabel(item),
-                                      displayName: _cardDisplayName(item),
-                                      profileImageUrl: () {
-                                        final fromApi =
-                                            item.profileImage?.trim() ?? '';
-                                        if (fromApi.isNotEmpty) return fromApi;
-                                        if (_isMyPrayer(item) &&
-                                            (_viewerProfileImage
-                                                    ?.trim()
-                                                    .isNotEmpty ??
-                                                false)) {
-                                          return _viewerProfileImage!.trim();
-                                        }
-                                        return null;
-                                      }(),
-                                      isMine: _isMyPrayer(item),
-                                      onOpen: () => _openPrayerActions(item),
-                                      onShare: () {
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                            builder: (_) => PrayerShareScreen(
-                                              prayerId: item.id,
-                                              title: item.title,
-                                              description: item.description,
+                                                    ),
+                                                  )
+                                                  .toList(),
                                             ),
                                           ),
-                                        );
-                                      },
-                                      onReport: () => _openReport(item),
-                                      isReported:
-                                          _reportedPrayerIds.contains(item.id),
-                                      onBlock: () => _openBlockUser(item),
-                                      isBlocked: _isItemBlocked(item),
-                                      canBlock: !_isMyPrayer(item),
-                                      likeCount: _likeCounts[item.id] ?? 0,
-                                      liked: _isLiked(item.id),
-                                      likeBusy:
-                                          _likeToggleBusy.contains(item.id),
-                                      onToggleLike: () => _toggleLike(item),
-                                      commentCount:
-                                          _commentCounts[item.id] ?? 0,
-                                      onEnsureCanComment: _ensureCanComment,
-                                      onEnsureCanPostComment:
-                                          _ensureCanPostComment,
-                                      onCommentsChanged:
-                                          _refreshCommentCountsOnly,
-                                    );
-                                  },
+                                      ],
+                                    )
+                                  : _buildQueueWallScroll(
+                                      brown: brown,
+                                      isDark: isDark,
                                 ),
                         ),
             ),
@@ -2665,6 +4672,13 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         )
       )
     );
+    // Freeze MediaQuery while auth is open — do not re-read live viewInsets
+    // (that rebuilds Wall when Sign Up keyboard opens and closes the keypad).
+    final frozen = _frozenMediaQueryDuringAuth;
+    if (wallIgnoresKeyboard && frozen != null) {
+      return MediaQuery(data: frozen, child: page);
+    }
+    return page;
   }
 }
 
@@ -2735,6 +4749,7 @@ class _PrayerCard extends StatefulWidget {
     required this.onEnsureCanComment,
     required this.onEnsureCanPostComment,
     required this.onCommentsChanged,
+    this.onProfileTap,
   });
 
   final PrayerWallItem item;
@@ -2760,6 +4775,8 @@ class _PrayerCard extends StatefulWidget {
   final Future<bool> Function() onEnsureCanComment;
   final Future<bool> Function() onEnsureCanPostComment;
   final Future<void> Function() onCommentsChanged;
+  /// Additive: tap avatar / name → Prayer Wall user profile.
+  final VoidCallback? onProfileTap;
 
   @override
   State<_PrayerCard> createState() => _PrayerCardState();
@@ -2976,7 +4993,10 @@ class _PrayerCardState extends State<_PrayerCard> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  CircleAvatar(
+                  InkWell(
+                    onTap: widget.onProfileTap,
+                    borderRadius: BorderRadius.circular(24),
+                    child: CircleAvatar(
                     radius: 20,
                     backgroundColor: isDark
                         ? const Color(0xFF4A382C)
@@ -2992,6 +5012,7 @@ class _PrayerCardState extends State<_PrayerCard> {
                               color: isDark ? Colors.white : brown,
                               fontWeight: FontWeight.w700,
                               fontSize: 13,
+                              ),
                             ),
                           ),
                   ),
@@ -3000,14 +5021,19 @@ class _PrayerCardState extends State<_PrayerCard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        InkWell(
+                          onTap: widget.onProfileTap,
+                          child: Text(
                           displayName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 15,
-                            color: isDark ? Colors.white : const Color(0xFF3D2914),
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF3D2914),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -3059,17 +5085,17 @@ class _PrayerCardState extends State<_PrayerCard> {
                   ),
                   // UI-only: owner sees Edit; others see ⋮ (Report / Block).
                   if (isMine)
-                    InkWell(
+                  InkWell(
                       onTap: widget.onOpen,
-                      borderRadius: BorderRadius.circular(20),
-                      child: Padding(
-                        padding: const EdgeInsets.all(6),
-                        child: Icon(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Icon(
                           Icons.edit_outlined,
-                          size: 20,
-                          color: isDark ? Colors.white : brown,
-                        ),
+                        size: 20,
+                        color: isDark ? Colors.white : brown,
                       ),
+                    ),
                     )
                   else
                     InkWell(
@@ -3086,7 +5112,7 @@ class _PrayerCardState extends State<_PrayerCard> {
                           color: isDark ? Colors.white : brown,
                         ),
                       ),
-                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 10),
@@ -3149,6 +5175,99 @@ class _PrayerCardState extends State<_PrayerCard> {
                 const SizedBox(height: 6),
                 LayoutBuilder(
                   builder: (ctx, constraints) {
+                    final myWords =
+                        PrayerDualDescription.myWords(item.description);
+                    final aiPrayer =
+                        PrayerDualDescription.aiPrayer(item.description);
+                    final isDual = myWords != null && aiPrayer != null;
+
+                    if (isDual) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'My Words',
+                            style: TextStyle(
+                              fontFamily: 'Georgia',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: isDark
+                                  ? const Color(0xFFE8C9A0)
+                                  : brown,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            myWords,
+                            maxLines: _descExpanded ? null : 3,
+                            overflow: _descExpanded
+                                ? TextOverflow.visible
+                                : TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: 'Georgia',
+                              fontStyle: FontStyle.italic,
+                              fontSize: 13,
+                              height: 1.35,
+                              color: isDark
+                                  ? const Color(0xFFE8DDD0)
+                                  : const Color(0xFF4A4A4A),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Prayer Created for You',
+                            style: TextStyle(
+                              fontFamily: 'Georgia',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: isDark
+                                  ? const Color(0xFFE8C9A0)
+                                  : brown,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            aiPrayer,
+                            maxLines: _descExpanded ? null : 4,
+                            overflow: _descExpanded
+                                ? TextOverflow.visible
+                                : TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: 'Georgia',
+                              fontSize: 12.5,
+                              height: 1.4,
+                              color: isDark
+                                  ? const Color(0xFFE8DDD0)
+                                  : const Color(0xFF4A4A4A),
+                            ),
+                          ),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton(
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: const Size(0, 30),
+                                tapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              onPressed: () => setState(
+                                () => _descExpanded = !_descExpanded,
+                              ),
+                              child: Text(
+                                _descExpanded ? 'Show less' : 'Read more',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark
+                                      ? const Color(0xFFE8C9A0)
+                                      : brown,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+
                     final descStyle = TextStyle(
                       fontSize: 14,
                       height: 1.4,
@@ -3291,9 +5410,9 @@ class _PrayerCardState extends State<_PrayerCard> {
                               const SizedBox(width: 6),
                               Text(
                                 '$commentCount',
-                                style: TextStyle(
+                                  style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  color: isDark ? Colors.white : brown,
+                                    color: isDark ? Colors.white : brown,
                                 ),
                               ),
                             ],
@@ -3323,3 +5442,439 @@ class _PrayerCardState extends State<_PrayerCard> {
     );
   }
 }
+
+/// Additive UI: full prayer detail (Hotspot / Waiting tap) — referral layout.
+class _QueuePrayerDetailScreen extends StatefulWidget {
+  const _QueuePrayerDetailScreen({
+    required this.item,
+    required this.fromHotspot,
+    required this.displayName,
+    required this.timeLabel,
+    this.profileImageUrl,
+    required this.likeCountOf,
+    required this.likedOf,
+    required this.likeBusyOf,
+    required this.commentCountOf,
+    required this.onToggleLike,
+    required this.onOpenComments,
+    required this.onShare,
+    required this.onMore,
+    this.onProfileTap,
+  });
+
+  final PrayerWallItem item;
+  final bool fromHotspot;
+  final String displayName;
+  final String timeLabel;
+  final String? profileImageUrl;
+  final int Function() likeCountOf;
+  final bool Function() likedOf;
+  final bool Function() likeBusyOf;
+  final int Function() commentCountOf;
+  final Future<void> Function() onToggleLike;
+  final Future<void> Function() onOpenComments;
+  final VoidCallback onShare;
+  final Future<void> Function() onMore;
+  final VoidCallback? onProfileTap;
+
+  @override
+  State<_QueuePrayerDetailScreen> createState() =>
+      _QueuePrayerDetailScreenState();
+}
+
+class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
+  static const _brown = Color(0xFF5C4033);
+  static const _ink = Color(0xFF3D2914);
+  static const _muted = Color(0xFF6B5344);
+  static const _cream = Color(0xFFF5EFE4);
+
+  String get _chosenTitle {
+    final t = widget.item.title.trim();
+    if (t.isNotEmpty) return t;
+    final ai = PrayerDualDescription.aiPrayer(widget.item.description);
+    if (ai != null && ai.trim().isNotEmpty) return ai.trim();
+    return widget.item.description.trim();
+  }
+
+  String? get _myWords => PrayerDualDescription.myWords(widget.item.description);
+
+  String? get _aiPrayer => PrayerDualDescription.aiPrayer(widget.item.description);
+
+  String get _plainBody {
+    if (PrayerDualDescription.isDual(widget.item.description)) return '';
+    return widget.item.description.trim();
+  }
+
+  String _formatCount(int n) {
+    if (n >= 1000000) {
+      return '${(n / 1000000).toStringAsFixed(n % 1000000 == 0 ? 0 : 1)}M';
+    }
+    if (n >= 1000) {
+      final v = n / 1000.0;
+      return '${v.toStringAsFixed(v >= 10 || n % 1000 == 0 ? 0 : 1)}K';
+    }
+    return '$n';
+  }
+
+  Widget _bottomAction({
+    required IconData icon,
+    required String label,
+    String? count,
+    required VoidCallback? onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: _brown, size: 22),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: _ink,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (count != null)
+                Text(
+                  count,
+                  style: const TextStyle(
+                    color: _muted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionCard({
+    required String heading,
+    required Widget body,
+    Widget? leading,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _brown.withValues(alpha: 0.35), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (leading != null) ...[leading, const SizedBox(width: 6)],
+              Text(
+                heading,
+                style: const TextStyle(
+                  fontFamily: 'Georgia',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: _ink,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          body,
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final photo = (widget.profileImageUrl ?? '').trim();
+    final name = widget.displayName;
+    final myWords = _myWords?.trim();
+    final ai = _aiPrayer?.trim();
+    final plain = _plainBody;
+    final liked = widget.likedOf();
+    final likeBusy = widget.likeBusyOf();
+    final likeCount = widget.likeCountOf();
+    final commentCount = widget.commentCountOf();
+    final category = widget.item.category.trim();
+
+    return Scaffold(
+      backgroundColor: _cream,
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage(Images.bgImage(context)),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back_ios, color: _brown),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                    Expanded(
+                      child: Text(
+                        widget.fromHotspot ? 'Hotspot Prayer' : 'Prayer',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontFamily: 'Georgia',
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: _brown,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 48),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                  children: [
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: widget.onProfileTap,
+                          child: CircleAvatar(
+                            radius: 28,
+                            backgroundColor: _brown.withValues(alpha: 0.15),
+                            backgroundImage:
+                                photo.isNotEmpty ? NetworkImage(photo) : null,
+                            onBackgroundImageError:
+                                photo.isNotEmpty ? (_, __) {} : null,
+                            child: photo.isNotEmpty
+                                ? null
+                                : Text(
+                                    name.isEmpty
+                                        ? '?'
+                                        : name.trim()[0].toUpperCase(),
+                                    style: const TextStyle(
+                                      color: _brown,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 20,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: widget.onProfileTap,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  name,
+                                  style: const TextStyle(
+                                    fontFamily: 'Georgia',
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w700,
+                                    color: _ink,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  widget.timeLabel,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: _muted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _chosenTitle,
+                      style: const TextStyle(
+                        fontFamily: 'Georgia',
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: _ink,
+                      ),
+                    ),
+                    if (category.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const Text(
+                            'Category',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: _ink,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8D9C4),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              category,
+                              style: const TextStyle(
+                                color: _ink,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 18),
+                    if (myWords != null && myWords.isNotEmpty) ...[
+                      _sectionCard(
+                        heading: 'My Words',
+                        body: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Image.asset(
+                              'assets/take_moment/apostrophe_icon.png',
+                              width: 28,
+                              height: 28,
+                              color: _brown,
+                              errorBuilder: (_, __, ___) => const Text(
+                                '“',
+                                style: TextStyle(
+                                  fontFamily: 'Georgia',
+                                  fontSize: 36,
+                                  color: _brown,
+                                  height: 0.8,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              myWords,
+                              style: const TextStyle(
+                                fontFamily: 'Georgia',
+                                fontSize: 15,
+                                height: 1.45,
+                                color: _ink,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            const Text(
+                              '(This is what I expressed)',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: _muted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+                    if (ai != null && ai.isNotEmpty)
+                      _sectionCard(
+                        heading: 'Prayer Created for You',
+                        leading: const Icon(Icons.auto_awesome,
+                            size: 18, color: _brown),
+                        body: Text(
+                          ai,
+                          style: const TextStyle(
+                            fontFamily: 'Georgia',
+                            fontSize: 15,
+                            height: 1.5,
+                            color: _ink,
+                          ),
+                        ),
+                      )
+                    else if (plain.isNotEmpty)
+                      _sectionCard(
+                        heading: 'Prayer',
+                        body: Text(
+                          plain,
+                          style: const TextStyle(
+                            fontFamily: 'Georgia',
+                            fontSize: 15,
+                            height: 1.5,
+                            color: _ink,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.72),
+                  border: Border(
+                    top: BorderSide(color: _brown.withValues(alpha: 0.15)),
+                  ),
+                ),
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                child: Row(
+                  children: [
+                    _bottomAction(
+                      icon: liked
+                          ? Icons.volunteer_activism
+                          : Icons.volunteer_activism_outlined,
+                      label: 'Prayed',
+                      count: _formatCount(likeCount),
+                      onTap: likeBusy
+                          ? null
+                          : () async {
+                              await widget.onToggleLike();
+                              if (mounted) setState(() {});
+                            },
+                    ),
+                    _bottomAction(
+                      icon: Icons.chat_bubble_outline,
+                      label: 'Comments',
+                      count: _formatCount(commentCount),
+                      onTap: () async {
+                        await widget.onOpenComments();
+                        if (mounted) setState(() {});
+                      },
+                    ),
+                    _bottomAction(
+                      icon: Icons.ios_share_outlined,
+                      label: 'Share',
+                      onTap: widget.onShare,
+                    ),
+                    _bottomAction(
+                      icon: Icons.more_horiz,
+                      label: 'More',
+                      onTap: () async {
+                        await widget.onMore();
+                        if (mounted) setState(() {});
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+

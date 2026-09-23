@@ -1786,8 +1786,6 @@ Future<void> _startNewJourneyFromPaused(BuildContext context) async {
   await SharPreferences.setString(SharPreferences.streakFlowRestoreDate, '');
   await SharPreferences.setString(SharPreferences.streakFlowPausedDate, '');
   await SharPreferences.setString(SharPreferences.streakFlowPausedAt, '');
-  await SharPreferences.setString(
-      SharPreferences.streakFlowLastShownDate, today);
   await SharPreferences.setInt(SharPreferences.streakFlowStepsCompletedToday, 0);
   await SharPreferences.setString(
       SharPreferences.streakFlowStartedDate, today);
@@ -4698,11 +4696,11 @@ class _StreakPrayerScreenState extends State<StreakPrayerScreen> {
                               ) ??
                                   false;
                               if (!context.mounted) return;
+                              await SharPreferences.setInt(
+                                  SharPreferences
+                                      .streakFlowStepsCompletedToday,
+                                  0);
                               if (startToday) {
-                                await SharPreferences.setInt(
-                                    SharPreferences
-                                        .streakFlowStepsCompletedToday,
-                                    0);
                                 await SharPreferences.setString(
                                   SharPreferences.streakFlowStartedDate,
                                   DateTime.now()

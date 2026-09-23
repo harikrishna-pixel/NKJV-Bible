@@ -1,5 +1,7 @@
 import 'package:biblebookapp/controller/api_service.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
+import 'package:biblebookapp/core/api/auth/profile_update.api.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/images.dart';
@@ -10,6 +12,7 @@ import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/myLibrary.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/screens/profile/bloc/user_bloc.dart';
 import 'package:biblebookapp/view/screens/profile/model/library_status_model.dart';
 import 'package:biblebookapp/view/screens/profile/view/edit_profile_screen.dart';
@@ -67,6 +70,7 @@ void confirmLogoutAccount(BuildContext context) {
                     await cacheprovider.removeCache(key: 'user');
                     await cacheprovider.removeCache(key: 'name');
                     await cacheprovider.removeCache(key: 'authtoken');
+                    await cacheprovider.removeCache(key: 'profile_image');
                     await cacheprovider.removeCache(
                         key: OwnReferralCodeDialog.referralCacheKey);
                     await PrayerWallLocalStore.clearAccountScopedData();
@@ -153,6 +157,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   String? _referralCode = '';
   String? _referredBy = '';
   int? _referralRewardClaimed;
+  String? _profileImageUrl;
   loadDB() async {
     final db = DBHelper();
     if (mounted) {
@@ -202,13 +207,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       });
       // Additive: pick up referrer credits when referral_count grew on backend.
       syncReferrerCreditsFromSession();
+      _loadProfileImage();
     } else {
       setState(() {
         user = '';
         _referralCode = '';
         _referredBy = '';
         _referralRewardClaimed = null;
+        _profileImageUrl = null;
       });
+    }
+  }
+
+  Future<void> _loadProfileImage() async {
+    try {
+      final url = await ProfileUpdateApi().loadAndCacheProfileImageUrl();
+      if (!mounted) return;
+      setState(() => _profileImageUrl = url);
+    } catch (e) {
+      debugPrint('_loadProfileImage: $e');
     }
   }
 
@@ -417,18 +434,57 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                         color: Color(0xFFFBD5B2),
                                         shape: BoxShape.circle,
                                       ),
-                                      child: Center(
-                                        child: Text(
-                                          _safeInitials,
-                                          style: TextStyle(
-                                            fontSize: 30,
-                                            fontWeight: FontWeight.w700,
-                                            fontFamily: 'Georgia',
-                                            color: CommanColor.whiteBlack(
-                                                context),
-                                          ),
-                                        ),
-                                      ),
+                                      clipBehavior: Clip.antiAlias,
+                                      child: (_profileImageUrl != null &&
+                                              _profileImageUrl!
+                                                  .trim()
+                                                  .isNotEmpty)
+                                          ? CachedNetworkImage(
+                                              imageUrl:
+                                                  _profileImageUrl!.trim(),
+                                              width: 92,
+                                              height: 92,
+                                              fit: BoxFit.cover,
+                                              placeholder: (context, url) =>
+                                                  Center(
+                                                child: Text(
+                                                  _safeInitials,
+                                                  style: TextStyle(
+                                                    fontSize: 30,
+                                                    fontWeight: FontWeight.w700,
+                                                    fontFamily: 'Georgia',
+                                                    color: CommanColor
+                                                        .whiteBlack(context),
+                                                  ),
+                                                ),
+                                              ),
+                                              errorWidget:
+                                                  (context, url, error) =>
+                                                      Center(
+                                                child: Text(
+                                                  _safeInitials,
+                                                  style: TextStyle(
+                                                    fontSize: 30,
+                                                    fontWeight: FontWeight.w700,
+                                                    fontFamily: 'Georgia',
+                                                    color: CommanColor
+                                                        .whiteBlack(context),
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                          : Center(
+                                              child: Text(
+                                                _safeInitials,
+                                                style: TextStyle(
+                                                  fontSize: 30,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontFamily: 'Georgia',
+                                                  color: CommanColor.whiteBlack(
+                                                      context),
+                                                ),
+                                              ),
+                                            ),
                                     ),
                                     const SizedBox(width: 16),
                                     Expanded(
@@ -543,6 +599,89 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                   ),
                                 ),
                                 SizedBox(height: mheight * 0.028),
+                                InkWell(
+                                  onTap: () {
+                                    Get.to(() => const PrayerWallScreen(
+                                          openMyProfile: true,
+                                        ));
+                                  },
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 14, horizontal: 14),
+                                    decoration: BoxDecoration(
+                                      color: CommanColor
+                                          .lightDarkPrimary200(context)
+                                          .withOpacity(0.28),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 40,
+                                          height: 40,
+                                          decoration: const BoxDecoration(
+                                            color: Color(0xFF472F1F),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.volunteer_activism_outlined,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Prayer Profile',
+                                                style: TextStyle(
+                                                  letterSpacing:
+                                                      BibleInfo.letterSpacing,
+                                                  fontSize:
+                                                      BibleInfo.fontSizeScale *
+                                                          16,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontFamily: 'Georgia',
+                                                  color:
+                                                      CommanColor.whiteBlack(
+                                                          context),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                'View your Prayer Wall profile',
+                                                style: TextStyle(
+                                                  letterSpacing:
+                                                      BibleInfo.letterSpacing,
+                                                  fontSize:
+                                                      BibleInfo.fontSizeScale *
+                                                          12,
+                                                  fontWeight: FontWeight.w400,
+                                                  color:
+                                                      CommanColor.whiteBlack(
+                                                              context)
+                                                          .withOpacity(0.62),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Icon(
+                                          Icons.chevron_right,
+                                          color: CommanColor.whiteBlack(context)
+                                              .withOpacity(0.7),
+                                          size: 24,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(height: mheight * 0.016),
                                 InkWell(
                                   onTap: () async {
                                     await SharPreferences.setString(

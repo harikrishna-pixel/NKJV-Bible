@@ -19,7 +19,6 @@ import 'package:biblebookapp/utils/email_validator.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/login_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/post_prayer_screen.dart';
-import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/social_auth_widget.dart';
 import 'package:biblebookapp/view/screens/authenitcation/widgets/text_form_field.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
@@ -337,9 +336,8 @@ class SignupScreen extends HookConsumerWidget {
                                               }
                                               if (!context.mounted) return;
                                               if (openPostPrayerOnSuccess) {
-                                                Get.offAll(
-                                                  () => const PrayerWallScreen(),
-                                                );
+                                                Get.back();
+                                                Get.back();
                                                 WidgetsBinding.instance
                                                     .addPostFrameCallback((_) {
                                                   Get.to(
@@ -352,10 +350,8 @@ class SignupScreen extends HookConsumerWidget {
                                                   );
                                                 });
                                               } else if (popOnSuccess) {
-                                                Get.offAll(
-                                                  () =>
-                                                      const PrayerWallScreen(),
-                                                );
+                                                Get.back();
+                                                Get.back();
                                               } else {
                                                 Get.offAll(() => HomeScreen(
                                                       From: "splash",

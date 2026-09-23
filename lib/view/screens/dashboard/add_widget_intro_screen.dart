@@ -950,30 +950,6 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
     final appName = BibleInfo.bible_shortName;
     return Column(
       children: [
-        if (_isDrawerEntry && _showHowToGuide) ...[
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => setState(() {
-                _showHowToGuide = false;
-                _hubPreviewActive = false;
-                _drawerGalleryTitle = null;
-                _drawerGalleryImages = null;
-                _hubRefreshToken++;
-              }),
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 14),
-              label: const Text(
-                'Back to widget list',
-                style: TextStyle(
-                  fontFamily: 'Georgia',
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              style: TextButton.styleFrom(foregroundColor: _titleInk),
-            ),
-          ),
-          const SizedBox(height: 4),
-        ],
         const SizedBox(height: 8),
         Icon(Icons.menu_book_rounded, size: 48, color: _titleInk),
         const SizedBox(height: 16),
@@ -1056,22 +1032,10 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
           ),
         ),
         const SizedBox(height: 14),
-        Container(
+        _previewImage(
+          _previewImages.first,
+          height: _isWidePreviewAsset(_previewImages.first) ? 96 : 140,
           width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: const Color(0xFFEFE4D4).withOpacity(0.9),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: _brown.withOpacity(0.18)),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: _previewImage(
-              _previewImages.first,
-              height: _isWidePreviewAsset(_previewImages.first) ? 96 : 140,
-              width: double.infinity,
-            ),
-          ),
         ),
         const SizedBox(height: 10),
         Text(
@@ -1188,25 +1152,13 @@ class _AddWidgetIntroScreenState extends State<AddWidgetIntroScreen>
               final pageHeight = _galleryPreviewHeight(imagePath);
               return Align(
                 alignment: Alignment.center,
-                child: Container(
+                child: SizedBox(
                   width: pageWidth,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEFE4D4).withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: _brown.withOpacity(0.18)),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: SizedBox(
-                      width: pageWidth - 24,
-                      height: pageHeight,
-                      child: _previewImage(
-                        imagePath,
-                        width: pageWidth - 24,
-                        height: pageHeight,
-                      ),
-                    ),
+                  height: pageHeight,
+                  child: _previewImage(
+                    imagePath,
+                    width: pageWidth,
+                    height: pageHeight,
                   ),
                 ),
               );
