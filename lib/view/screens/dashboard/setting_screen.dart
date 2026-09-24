@@ -531,6 +531,10 @@ class _SettingScreenState extends State<SettingScreen>
     return time.replaceAll(':', '.');
   }
 
+  Color _settingsRowInk(BuildContext context) {
+    return const Color(0xFF2C1810);
+  }
+
   Color _settingsSectionBarColor(BuildContext context) {
     final isDark =
         Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark;
@@ -570,7 +574,7 @@ class _SettingScreenState extends State<SettingScreen>
     final isDark =
         Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark;
     final primary = CommanColor.lightDarkPrimary(context);
-    final textColor = CommanColor.whiteBlack(context);
+    final textColor = _settingsRowInk(context);
     final time = _formatNotificationTimeDisplay(
         _notificationTimeLabel(notificationTime));
     final enabled = _notificationEnabled(notificationTime);
@@ -584,9 +588,9 @@ class _SettingScreenState extends State<SettingScreen>
     final Color rowBorder;
     final Color iconRingColor;
     if (isDark) {
-      rowFill = Colors.white.withOpacity(0.08);
-      rowBorder = Colors.white.withOpacity(0.45);
-      iconRingColor = Colors.white.withOpacity(0.85);
+      rowFill = Colors.transparent;
+      rowBorder = primary.withOpacity(0.5);
+      iconRingColor = primary.withOpacity(0.85);
     } else {
       rowFill = Colors.transparent;
       rowBorder = primary.withOpacity(0.5);
@@ -1219,14 +1223,15 @@ class _SettingScreenState extends State<SettingScreen>
                         child: Icon(
                           Icons.arrow_back_ios,
                           size: 20,
-                          color: CommanColor.whiteBlack(context),
+                          color: _settingsRowInk(context),
                         ),
                       ),
                     ),
                     Padding(
                       padding: const EdgeInsets.only(right: 15.0),
                       child: Text("Settings",
-                          style: CommanStyle.appBarStyle(context)),
+                          style: CommanStyle.appBarStyle(context)
+                              .copyWith(color: _settingsRowInk(context))),
                     ),
                     const SizedBox()
                   ],
@@ -1271,12 +1276,13 @@ class _SettingScreenState extends State<SettingScreen>
                       children: [
                         Text(
                           "Change Preferences",
-                          style: CommanStyle.bw16500(context),
+                          style: CommanStyle.bw16500(context)
+                            .copyWith(color: _settingsRowInk(context)),
                         ),
                         const Spacer(),
                         Icon(
                           Icons.navigate_next,
-                          color: CommanColor.whiteBlack(context),
+                          color: _settingsRowInk(context),
                           size: 24,
                         )
                       ],
@@ -1303,7 +1309,8 @@ class _SettingScreenState extends State<SettingScreen>
                     children: [
                       Text(
                         themeProvider.isDarkMode ? "Light Mode" : "Dark Mode",
-                        style: CommanStyle.bw16500(context),
+                        style: CommanStyle.bw16500(context)
+                            .copyWith(color: _settingsRowInk(context)),
                       ),
                       const Spacer(),
                       ChangeThemeButtonWidget()
@@ -1321,7 +1328,8 @@ class _SettingScreenState extends State<SettingScreen>
                       children: [
                         Text(
                           "Themes",
-                          style: CommanStyle.bw16500(context),
+                          style: CommanStyle.bw16500(context)
+                            .copyWith(color: _settingsRowInk(context)),
                         ),
                         const Spacer(),
                         Container(
@@ -1382,12 +1390,13 @@ class _SettingScreenState extends State<SettingScreen>
                       children: [
                         Text(
                           "Font Type",
-                          style: CommanStyle.bw16500(context),
+                          style: CommanStyle.bw16500(context)
+                            .copyWith(color: _settingsRowInk(context)),
                         ),
                         const Spacer(),
                         Icon(
                           Icons.navigate_next,
-                          color: CommanColor.whiteBlack(context),
+                          color: _settingsRowInk(context),
                           size: 24,
                         )
                       ],
@@ -1409,12 +1418,13 @@ class _SettingScreenState extends State<SettingScreen>
                 //       children: [
                 //         Text(
                 //           "Saved from Daily Journey",
-                //           style: CommanStyle.bw16500(context),
+                //           style: CommanStyle.bw16500(context)
+                //               .copyWith(color: _settingsRowInk(context)),
                 //         ),
                 //         const Spacer(),
                 //         Icon(
                 //           Icons.navigate_next,
-                //           color: CommanColor.whiteBlack(context),
+                //           color: _settingsRowInk(context),
                 //           size: 24,
                 //         )
                 //       ],
@@ -1446,12 +1456,13 @@ class _SettingScreenState extends State<SettingScreen>
                       children: [
                         Text(
                           "Prayer Wall",
-                          style: CommanStyle.bw16500(context),
+                          style: CommanStyle.bw16500(context)
+                            .copyWith(color: _settingsRowInk(context)),
                         ),
                         const Spacer(),
                         Icon(
                           Icons.navigate_next,
-                          color: CommanColor.whiteBlack(context),
+                          color: _settingsRowInk(context),
                           size: 24,
                         )
                       ],
@@ -1472,12 +1483,13 @@ class _SettingScreenState extends State<SettingScreen>
                       children: [
                         Text(
                           "Feedback",
-                          style: CommanStyle.bw16500(context),
+                          style: CommanStyle.bw16500(context)
+                            .copyWith(color: _settingsRowInk(context)),
                         ),
                         const Spacer(),
                         Icon(
                           Icons.navigate_next,
-                          color: CommanColor.whiteBlack(context),
+                          color: _settingsRowInk(context),
                           size: 24,
                         )
                       ],
@@ -1512,12 +1524,13 @@ class _SettingScreenState extends State<SettingScreen>
                       children: [
                         Text(
                           "Rate Us",
-                          style: CommanStyle.bw16500(context),
+                          style: CommanStyle.bw16500(context)
+                            .copyWith(color: _settingsRowInk(context)),
                         ),
                         const Spacer(),
                         Icon(
                           Icons.navigate_next,
-                          color: CommanColor.whiteBlack(context),
+                          color: _settingsRowInk(context),
                           size: 24,
                         )
                       ],
@@ -1545,13 +1558,14 @@ class _SettingScreenState extends State<SettingScreen>
                 //         },
                 //         child: Text(
                 //           "Survey",
-                //           style: CommanStyle.bw16500(context),
+                //           style: CommanStyle.bw16500(context)
+                //               .copyWith(color: _settingsRowInk(context)),
                 //         ),
                 //       ),
                 //       const Spacer(),
                 //       Icon(
                 //         Icons.navigate_next,
-                //         color: CommanColor.whiteBlack(context),
+                //         color: _settingsRowInk(context),
                 //         size: 24,
                 //       )
                 //     ],
@@ -1584,12 +1598,13 @@ class _SettingScreenState extends State<SettingScreen>
                       children: [
                         Text(
                           "FAQ",
-                          style: CommanStyle.bw16500(context),
+                          style: CommanStyle.bw16500(context)
+                            .copyWith(color: _settingsRowInk(context)),
                         ),
                         const Spacer(),
                         Icon(
                           Icons.navigate_next,
-                          color: CommanColor.whiteBlack(context),
+                          color: _settingsRowInk(context),
                           size: 24,
                         )
                       ],
@@ -1619,12 +1634,13 @@ class _SettingScreenState extends State<SettingScreen>
                       children: [
                         Text(
                           "About Us",
-                          style: CommanStyle.bw16500(context),
+                          style: CommanStyle.bw16500(context)
+                            .copyWith(color: _settingsRowInk(context)),
                         ),
                         const Spacer(),
                         Icon(
                           Icons.navigate_next,
-                          color: CommanColor.whiteBlack(context),
+                          color: _settingsRowInk(context),
                           size: 24,
                         )
                       ],
@@ -1658,12 +1674,13 @@ class _SettingScreenState extends State<SettingScreen>
                       children: [
                         Text(
                           "More Apps",
-                          style: CommanStyle.bw16500(context),
+                          style: CommanStyle.bw16500(context)
+                            .copyWith(color: _settingsRowInk(context)),
                         ),
                         const Spacer(),
                         Icon(
                           Icons.navigate_next,
-                          color: CommanColor.whiteBlack(context),
+                          color: _settingsRowInk(context),
                           size: 24,
                         ),
                       ],

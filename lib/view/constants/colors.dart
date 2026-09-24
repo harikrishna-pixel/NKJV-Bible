@@ -15,15 +15,16 @@ class CommanColor {
   static const lightModePrimary200 = Color(0xFFab8d6f);
   static const backgrondcolor = Color(0xffFFF6E8);
 
-  static bool isDarkTheme(BuildContext context) =>
-      Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark;
+  static bool isDarkTheme(BuildContext context) {
+    return Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark;
+  }
 
-  /// White / yellow themes always use a light surface, even when Dark Mode is on.
+  /// White / yellow stay light only in Light Mode. Dark Mode uses night parchment.
   static bool usesLightCustomSurface(BuildContext context) {
-    final theme =
-        Provider.of<ThemeProvider>(context, listen: false).currentCustomTheme;
-    return theme == AppCustomTheme.white ||
-        theme == AppCustomTheme.lightbrown;
+    final provider = Provider.of<ThemeProvider>(context, listen: false);
+    if (provider.themeMode == ThemeMode.dark) return false;
+    return provider.currentCustomTheme == AppCustomTheme.white ||
+        provider.currentCustomTheme == AppCustomTheme.lightbrown;
   }
 
   static Color lightDarkPrimary(BuildContext context) {
@@ -79,12 +80,7 @@ class CommanColor {
         : Colors.black;
   }
 
-  /// Text on solid custom backgrounds (yellow/white themes) stays dark even in dark mode.
   static Color contentTextColor(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    if (themeProvider.currentCustomTheme != AppCustomTheme.vintage) {
-      return Colors.black;
-    }
     return whiteBlack(context);
   }
 

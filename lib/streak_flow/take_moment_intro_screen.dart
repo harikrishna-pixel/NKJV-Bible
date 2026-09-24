@@ -7,7 +7,13 @@ import 'package:provider/provider.dart';
 
 /// "Take a Moment With God" intro - first screen of Find Peace flow.
 class TakeMomentIntroScreen extends StatelessWidget {
-  const TakeMomentIntroScreen({super.key});
+  const TakeMomentIntroScreen({
+    super.key,
+    this.worryText,
+  });
+
+  /// User thoughts from Pour Out Your Worries (display on Let's Pray).
+  final String? worryText;
 
   static const Color _brown = Color(0xFF3D2914);
   static const Color _cream = Color(0xFFF5F0E6);
@@ -21,7 +27,7 @@ class TakeMomentIntroScreen extends StatelessWidget {
     return Scaffold(
       body: TakeMomentRestScreen.peaceBackgroundStack(
         isDark: isDark,
-        birdWidthFactor: 0.62,
+        showBird: false,
         child: SafeArea(
           child: Column(
             children: [
@@ -36,21 +42,47 @@ class TakeMomentIntroScreen extends StatelessWidget {
                   _dot(active: false, textColor: textColor),
                 ],
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
+              // Same hands + dove icon as Give It to God banner
+              Container(
+                width: isTablet ? 180 : 150,
+                height: isTablet ? 144 : 120,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.white.withOpacity(isDark ? 0.2 : 0.65),
+                      blurRadius: 28,
+                      spreadRadius: 4,
+                    ),
+                    BoxShadow(
+                      color: const Color(0xFFC9A227).withOpacity(0.18),
+                      blurRadius: 20,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+                child: Image.asset(
+                  'assets/take_moment/give_it_to_god_icon.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const SizedBox(height: 28),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 28),
                 child: Text(
                   'Take a Moment With God',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: isTablet ? 28 : 24,
+                    fontSize: isTablet ? 32 : 28,
                     fontWeight: FontWeight.w600,
                     color: textColor,
                     fontFamily: 'Georgia',
+                    height: 1.25,
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 28),
                 child: Text(
@@ -63,23 +95,41 @@ class TakeMomentIntroScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 36),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 40),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _bullet('Breathe in God\'s peace', textColor),
-                    _bullet('Rest in His presence', textColor),
-                    _bullet('Release your worries to Him', textColor),
-                  ],
+                child: Center(
+                  child: IntrinsicWidth(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _bullet(
+                          Icons.air_rounded,
+                          'Breathe in God\'s peace',
+                          textColor,
+                        ),
+                        _bullet(
+                          Icons.wb_sunny_outlined,
+                          'Rest in His presence',
+                          textColor,
+                        ),
+                        _bullet(
+                          Icons.volunteer_activism_outlined,
+                          'Release your worries to Him',
+                          textColor,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
               const Spacer(),
               _parchmentButton(
                 context,
                 label: 'Start',
-                onPressed: () => Get.to(() => const TakeMomentRestScreen()),
+                onPressed: () => Get.to(
+                  () => TakeMomentRestScreen(worryText: worryText),
+                ),
               ),
               const SizedBox(height: 36),
             ],
@@ -112,31 +162,42 @@ class TakeMomentIntroScreen extends StatelessWidget {
     );
   }
 
-  Widget _bullet(String text, Color textColor) {
+  Widget _bullet(IconData icon, String text, Color textColor) {
+    const gold = Color(0xFFC9A227);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 22),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            margin: const EdgeInsets.only(top: 8),
-            width: 6,
-            height: 6,
+            width: 28,
+            height: 28,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: textColor,
+              color: Colors.white.withOpacity(0.55),
+              boxShadow: [
+                BoxShadow(
+                  color: gold.withOpacity(0.28),
+                  blurRadius: 10,
+                  spreadRadius: 0.5,
+                ),
+              ],
+            ),
+            child: Icon(
+              icon,
+              size: 16,
+              color: gold,
             ),
           ),
           const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 16,
-                height: 1.4,
-                color: textColor,
-                fontFamily: 'Georgia',
-              ),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 16,
+              height: 1.4,
+              color: textColor,
+              fontFamily: 'Georgia',
             ),
           ),
         ],

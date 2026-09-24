@@ -37,6 +37,9 @@ class _WalletScreenState extends State<WalletScreen> {
   bool _isAvailable = false;
   String? _loadingProductId; // Track which specific product is loading
   String? _selectedProductId; // Track which product is selected/tapped
+  /// Set only on Credits Buy tap. Leftover StoreKit restored/purchased
+  /// on screen-open must not add coins (creditpack1 = 500).
+  String? _walletBuyProductId;
   int _currentCredits = 0;
   List<Map<String, dynamic>> _coinPacks = [];
   Timer? _creditsTimer;
@@ -788,11 +791,30 @@ class _WalletScreenState extends State<WalletScreen> {
     }
 
     // Listen to purchase updates
+    await _subscription?.cancel();
     _subscription = _inAppPurchase.purchaseStream.listen(
       (List<PurchaseDetails> purchaseDetailsList) {
         _listenToPurchaseUpdated(purchaseDetailsList);
       },
     );
+  }
+
+  bool _isUserStartedWalletBuy(String productId) {
+    return _walletBuyProductId != null && _walletBuyProductId == productId;
+  }
+
+  void _clearWalletBuyIfMatch(String productId) {
+    if (_walletBuyProductId == productId) {
+      _walletBuyProductId = null;
+    }
+  }
+
+  Future<void> _finishLeftoverWalletPurchase(PurchaseDetails details) async {
+    if (details.pendingCompletePurchase) {
+      try {
+        await _inAppPurchase.completePurchase(details);
+      } catch (_) {}
+    }
   }
 
   void _listenToPurchaseUpdated(
@@ -802,6 +824,10 @@ class _WalletScreenState extends State<WalletScreen> {
       final productId = purchaseDetails.productID;
 
       if (purchaseDetails.status == PurchaseStatus.purchased) {
+        if (!_isUserStartedWalletBuy(productId)) {
+          await _finishLeftoverWalletPurchase(purchaseDetails);
+          continue;
+        }
         // Additive UI only: keep Processing...... until success toast.
         _purchaseTimeouts[productId]?.cancel();
         _purchaseTimeouts.remove(productId);
@@ -815,6 +841,7 @@ class _WalletScreenState extends State<WalletScreen> {
           }
         } finally {
           await EasyLoading.dismiss();
+          _clearWalletBuyIfMatch(productId);
         }
 
         if (mounted && _loadingProductId == productId) {
@@ -838,11 +865,18 @@ class _WalletScreenState extends State<WalletScreen> {
           _purchaseTimeouts.remove(productId);
         }
         Constants.showToast('Purchase failed. Please try again.');
+        _clearWalletBuyIfMatch(productId);
       } else if (purchaseDetails.status == PurchaseStatus.pending) {
         // UI only: same Processing...... text while store is pending.
-        EasyLoading.show(status: 'Processing......');
+        if (_isUserStartedWalletBuy(productId)) {
+          EasyLoading.show(status: 'Processing......');
+        }
         debugPrint('Purchase pending...');
       } else if (purchaseDetails.status == PurchaseStatus.restored) {
+        if (!_isUserStartedWalletBuy(productId)) {
+          await _finishLeftoverWalletPurchase(purchaseDetails);
+          continue;
+        }
         // Some stores report "already owned" as restored; grant credits once.
         // UI only: same Processing...... as purchased (not "Please wait...").
         _purchaseTimeouts[productId]?.cancel();
@@ -852,6 +886,7 @@ class _WalletScreenState extends State<WalletScreen> {
           await _grantCreditsForPurchase(purchaseDetails);
         } finally {
           await EasyLoading.dismiss();
+          _clearWalletBuyIfMatch(productId);
         }
         if (mounted && _loadingProductId == productId) {
           setState(() {
@@ -874,6 +909,7 @@ class _WalletScreenState extends State<WalletScreen> {
           _purchaseTimeouts[productId]?.cancel();
           _purchaseTimeouts.remove(productId);
         }
+        _clearWalletBuyIfMatch(productId);
       }
     }
   }
@@ -892,6 +928,7 @@ class _WalletScreenState extends State<WalletScreen> {
     final productId = product.id;
     setState(() {
       _loadingProductId = productId; // Track which product is loading
+      _walletBuyProductId = productId;
     });
     // UI only: show Processing...... from buy tap until stream completes.
     EasyLoading.show(status: 'Processing......');
@@ -933,6 +970,7 @@ class _WalletScreenState extends State<WalletScreen> {
           _selectedProductId = null; // Clear selected state
         });
       }
+      _clearWalletBuyIfMatch(productId);
       debugPrint('WalletScreen: Purchase initiation error: $e');
       Constants.showToast('Something went wrong. Please try again.');
     }

@@ -36,6 +36,8 @@ class floatingButton extends StatefulWidget {
   List<ConnectivityResult>? internetConnection;
   bool textToSpeechLoad;
   late AudioPlayer audioPlayer;
+  /// Display-only: Home repaints after audio/TTS chapter sync.
+  final VoidCallback? onReadingChapterSynced;
 
   floatingButton(
       {super.key,
@@ -47,7 +49,8 @@ class floatingButton extends StatefulWidget {
       required this.audioData,
       required this.bookNum,
       required this.internetConnection,
-      required this.audioPlayer});
+      required this.audioPlayer,
+      this.onReadingChapterSynced});
 
   @override
   State<floatingButton> createState() => floatingButtonState();
@@ -1302,6 +1305,8 @@ class floatingButtonState extends State<floatingButton>
         controller.selectedChapter.value = chapterNum.toString();
         controller.selectedChapterForRead.value = chapterNum.toString();
         controller.selectChapterChange.value = chapterNum;
+        controller.selectedChapter.refresh();
+        widget.onReadingChapterSynced?.call();
       }
 
       await SharPreferences.setString(
@@ -1385,6 +1390,8 @@ class floatingButtonState extends State<floatingButton>
           controller.selectedBookContent.value =
               List.from(controller.selectedBookContent);
         }
+        controller.selectedChapter.refresh();
+        widget.onReadingChapterSynced?.call();
 
         final scrollCtrl = controller.autoScrollController.value;
         if (scrollCtrl.hasClients) {
@@ -3701,6 +3708,8 @@ class floatingButtonState extends State<floatingButton>
                                         const Duration(milliseconds: 50));
                                     // Load chapter content and wait for it to complete
                                     await setChapterContent();
+                                    await updateReadingScreenChapter(
+                                        selectedChapter);
                                     if (mounted &&
                                         selectedChapterContent.isNotEmpty &&
                                         curretNo >= 0 &&
@@ -3782,6 +3791,8 @@ class floatingButtonState extends State<floatingButton>
                                       const Duration(milliseconds: 50));
                                   // Load chapter content and wait for it to complete
                                   await setChapterContent();
+                                  await updateReadingScreenChapter(
+                                      selectedChapter);
                                   if (mounted &&
                                       selectedChapterContent.isNotEmpty) {
                                     setState(() {

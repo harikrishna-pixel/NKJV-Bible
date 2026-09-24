@@ -182,9 +182,10 @@ class _AboutUsState extends State<AboutUs> {
               Center(
                 child: SizedBox(
                     width: MediaQuery.of(context).size.width * 0.8,
-                    child: const Text(
+                    child: Text(
                       "Thanks for downloading the app. We continually strive to provide user with best possible features and options to read the Bible App. Please send us your feedback.",
                       textAlign: TextAlign.center,
+                      style: CommanStyle.bw14500(context),
                     )),
               ),
               const SizedBox(

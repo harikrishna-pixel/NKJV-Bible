@@ -1,4 +1,5 @@
 import 'package:biblebookapp/controller/api_service.dart';
+import 'package:biblebookapp/main.dart';
 import 'package:biblebookapp/controller/dpProvider.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
@@ -15,7 +16,6 @@ import 'package:biblebookapp/view/screens/profile/view/edit_profile_screen.dart'
 import 'package:biblebookapp/core/api/auth/profile_update.api.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:biblebookapp/view/screens/authenitcation/view/widget/referral_code_bottom_sheet.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:flutter/material.dart';
@@ -26,6 +26,15 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart' as p;
 import '../../../../core/notifiers/cache.notifier.dart';
+
+/// Profile stays on cream/parchment in Dark Mode — use dark ink there only.
+Color _profileInk(BuildContext context) {
+  final isDark = p.Provider.of<ThemeProvider>(context, listen: false)
+          .themeMode ==
+      ThemeMode.dark;
+  if (isDark) return const Color(0xFF2C1810);
+  return CommanColor.whiteBlack(context);
+}
 
 void confirmLogoutAccount(BuildContext context) {
   double screenWidth = MediaQuery.of(context).size.width;
@@ -144,7 +153,7 @@ class ProfileScreen extends StatefulHookConsumerWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, RouteAware {
   int bookmarkCount = 0;
   int highlightCount = 0;
   int underlineCount = 0;
@@ -198,6 +207,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     final referredBy = await cacheprovider.readCache(key: 'referred_by');
 
     debugPrint(' name is $dataname');
+    if (!mounted) return;
 
     if (dataname != null) {
       setState(() {
@@ -235,14 +245,31 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
       loadDB();
+      checkuserloggedin();
       syncReferrerCreditsFromSession();
     }
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void didPopNext() {
+    checkuserloggedin();
+    loadDB();
+  }
+
+  @override
   void dispose() {
-    super.dispose();
+    routeObserver.unsubscribe(this);
     WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   @override
@@ -263,32 +290,32 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     List<LibraryStatusModel> status = [
       LibraryStatusModel(
           leading: Icon(Icons.bookmark_outline,
-              size: 32, color: CommanColor.whiteBlack(context)),
+              size: 32, color: _profileInk(context)),
           count: bookmarkCount,
           title: "Bookmark"),
       LibraryStatusModel(
           count: highlightCount,
           leading: Icon(Icons.brush_sharp,
-              size: 32, color: CommanColor.whiteBlack(context)),
+              size: 32, color: _profileInk(context)),
           title: "Highlights"),
       LibraryStatusModel(
           count: underlineCount,
           leading: Icon(Icons.format_underline_sharp,
-              size: 32, color: CommanColor.whiteBlack(context)),
+              size: 32, color: _profileInk(context)),
           title: "Underline"),
       LibraryStatusModel(
           count: notesCount,
-          leading: Image.asset("assets/dark_modes/stickynote.png",height: 32, color: CommanColor.whiteBlack(context)),
+          leading: Image.asset("assets/dark_modes/stickynote.png",height: 32, color: _profileInk(context)),
           title: "Notes"),
       LibraryStatusModel(
           count: imageCount,
           leading: Icon(Icons.image_rounded,
-              size: 32, color: CommanColor.whiteBlack(context)),
+              size: 32, color: _profileInk(context)),
           title: "Images"),
       LibraryStatusModel(
           count: bookmark.wallpaperBookmark.length,
           leading: Icon(Icons.wallpaper_rounded,
-              size: 32, color: CommanColor.whiteBlack(context)),
+              size: 32, color: _profileInk(context)),
           title: "Wallpapers"),
       LibraryStatusModel(
           count: bookmark.quotesBookmark.length,
@@ -296,7 +323,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             Images.quote,
             height: 24,
             width: 32,
-            color: CommanColor.whiteBlack(context),
+            color: _profileInk(context),
             colorBlendMode: BlendMode.srcATop,
           ),
           title: "Quotes"),
@@ -348,7 +375,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                             child: Icon(
                               Icons.arrow_back_ios,
                               size: 20,
-                              color: CommanColor.whiteBlack(context),
+                              color: _profileInk(context),
                             ),
                           ),
                         ),
@@ -358,7 +385,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                         flex: 2,
                         child: Text("Profile",
                             textAlign: TextAlign.center,
-                            style: CommanStyle.appBarStyle(context))),
+                            style: CommanStyle.appBarStyle(context)
+                                .copyWith(color: _profileInk(context)))),
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.only(right: 15),
@@ -389,7 +417,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                               child: Icon(
                                 Icons.logout,
                                 size: 20,
-                                color: CommanColor.whiteBlack(context),
+                                color: _profileInk(context),
                               ),
                             )
                           ],
@@ -451,8 +479,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                                     fontSize: 30,
                                                     fontWeight: FontWeight.w700,
                                                     fontFamily: 'Georgia',
-                                                    color: CommanColor
-                                                        .whiteBlack(context),
+                                                    color: _profileInk(context),
                                                   ),
                                                 ),
                                               ),
@@ -465,8 +492,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                                     fontSize: 30,
                                                     fontWeight: FontWeight.w700,
                                                     fontFamily: 'Georgia',
-                                                    color: CommanColor
-                                                        .whiteBlack(context),
+                                                    color: _profileInk(context),
                                                   ),
                                                 ),
                                               ),
@@ -478,8 +504,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                                   fontSize: 30,
                                                   fontWeight: FontWeight.w700,
                                                   fontFamily: 'Georgia',
-                                                  color: CommanColor.whiteBlack(
-                                                      context),
+                                                  color: _profileInk(context),
                                                 ),
                                               ),
                                             ),
@@ -501,15 +526,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                                   BibleInfo.fontSizeScale * 22,
                                                   fontWeight: FontWeight.w700,
                                                   fontFamily: 'Georgia',
-                                                  color: CommanColor.whiteBlack(
-                                                      context)),
+                                                  color: _profileInk(context)),
                                             ),
                                             const SizedBox(height: 4),
                                             Text(
                                               'Read and study the ${BibleInfo.bible_shortName} with us.',
                                               style: TextStyle(
-                                                color: CommanColor.whiteBlack(
-                                                    context)
+                                                color: _profileInk(context)
                                                     .withOpacity(0.68),
                                                 fontSize:
                                                 BibleInfo.fontSizeScale * 13,
@@ -576,7 +599,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                       letterSpacing: 0.8,
                                       fontSize: BibleInfo.fontSizeScale * 13,
                                       fontWeight: FontWeight.w700,
-                                      color: CommanColor.whiteBlack(context)),
+                                      color: _profileInk(context)),
                                 ),
                                 const SizedBox(height: 14),
                                 GridView.builder(
@@ -657,8 +680,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                                       16,
                                                   fontWeight: FontWeight.w700,
                                                   fontFamily: 'Georgia',
-                                                  color: CommanColor.whiteBlack(
-                                                      context),
+                                                  color: _profileInk(context),
                                                 ),
                                               ),
                                               const SizedBox(height: 2),
@@ -671,8 +693,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                                   BibleInfo.fontSizeScale *
                                                       12,
                                                   fontWeight: FontWeight.w400,
-                                                  color: CommanColor.whiteBlack(
-                                                      context)
+                                                  color: _profileInk(context)
                                                       .withOpacity(0.62),
                                                 ),
                                               ),
@@ -681,7 +702,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                         ),
                                         Icon(
                                           Icons.chevron_right,
-                                          color: CommanColor.whiteBlack(context)
+                                          color: _profileInk(context)
                                               .withOpacity(0.7),
                                           size: 24,
                                         ),
@@ -738,8 +759,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                                       16,
                                                   fontWeight: FontWeight.w700,
                                                   fontFamily: 'Georgia',
-                                                  color: CommanColor.whiteBlack(
-                                                      context),
+                                                  color: _profileInk(context),
                                                 ),
                                               ),
                                               const SizedBox(height: 2),
@@ -752,8 +772,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                                   BibleInfo.fontSizeScale *
                                                       12,
                                                   fontWeight: FontWeight.w400,
-                                                  color: CommanColor.whiteBlack(
-                                                      context)
+                                                  color: _profileInk(context)
                                                       .withOpacity(0.62),
                                                 ),
                                               ),
@@ -762,7 +781,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                         ),
                                         Icon(
                                           Icons.chevron_right,
-                                          color: CommanColor.whiteBlack(context)
+                                          color: _profileInk(context)
                                               .withOpacity(0.7),
                                           size: 24,
                                         ),
@@ -775,22 +794,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                                   referralCode: _referralCode ?? '',
                                   referredBy: _referredBy,
                                   referralRewardClaimed: _referralRewardClaimed,
-                                  onEnterReferralTap: () async {
-                                    await ReferralCodeBottomSheet
-                                        .showForLoggedInUser(
-                                      context: context,
-                                      ownReferralCode:
-                                      (_referralCode ?? '').trim().isEmpty
-                                          ? null
-                                          : _referralCode,
-                                      initialReferredBy: _referredBy,
-                                      initialReferralRewardClaimed:
-                                      _referralRewardClaimed,
-                                    );
-                                    if (mounted) {
-                                      await checkuserloggedin();
-                                    }
-                                  },
                                 ),
                                 SizedBox(height: mheight * 0.02),
                               ],
@@ -821,7 +824,7 @@ class LibraryItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final titleColor = CommanColor.whiteBlack(context);
+    final titleColor = _profileInk(context);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -837,44 +840,48 @@ class LibraryItem extends StatelessWidget {
             color: CommanColor.lightDarkPrimary200(context).withOpacity(0.28),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(
-                width: 22,
-                height: 22,
-                child: FittedBox(
-                  fit: BoxFit.contain,
-                  child: item.leading,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: FittedBox(
+                    fit: BoxFit.contain,
+                    child: item.leading,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                item.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: CommanStyle.bw16500(context).copyWith(
-                  letterSpacing: BibleInfo.letterSpacing,
-                  fontSize: BibleInfo.fontSizeScale * 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: titleColor,
+                const SizedBox(height: 6),
+                Text(
+                  item.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: CommanStyle.bw16500(context).copyWith(
+                    letterSpacing: BibleInfo.letterSpacing,
+                    fontSize: BibleInfo.fontSizeScale * 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: titleColor,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                _countLabel,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: CommanStyle.bw16500(context).copyWith(
-                  letterSpacing: BibleInfo.letterSpacing,
-                  fontSize: BibleInfo.fontSizeScale * 10.5,
-                  fontWeight: FontWeight.w400,
-                  color: titleColor.withOpacity(0.62),
+                const SizedBox(height: 2),
+                Text(
+                  _countLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: CommanStyle.bw16500(context).copyWith(
+                    letterSpacing: BibleInfo.letterSpacing,
+                    fontSize: BibleInfo.fontSizeScale * 10.5,
+                    fontWeight: FontWeight.w400,
+                    color: titleColor.withOpacity(0.62),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

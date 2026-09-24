@@ -1480,6 +1480,11 @@ class _HomeScreenState extends State<HomeScreen>
     // Hold Continue Journey until Premium Unlocked is dismissed (onboarding LT).
     if (widget.From.toString() == 'premium') {
       _awaitingPremiumWelcomeBeforeJourney = true;
+      // Buy Processing...... can still be up after Get.offAll Home.
+      _dismissLeftoverPurchaseOverlay();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _dismissLeftoverPurchaseOverlay();
+      });
     }
     WidgetsBinding.instance.addObserver(this);
     _initializeApp();
@@ -1591,6 +1596,12 @@ class _HomeScreenState extends State<HomeScreen>
         if (!mounted) return;
         _navigateForWidgetRoute(getBibleWidgetRouteFromUri(uri));
       });
+  }
+
+  void _dismissLeftoverPurchaseOverlay() {
+    try {
+      EasyLoading.dismiss();
+    } catch (_) {}
   }
 
   Future<void> _maybeShowContinueJourneySheet() async {
@@ -2049,6 +2060,10 @@ class _HomeScreenState extends State<HomeScreen>
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: CommanStyle.appBarStyle(context).copyWith(
+                color: Provider.of<ThemeProvider>(context).themeMode ==
+                        ThemeMode.dark
+                    ? Colors.white
+                    : CommanColor.whiteBlack(context),
                 fontSize: screenWidth > 450
                     ? BibleInfo.fontSizeScale * 26
                     : BibleInfo.fontSizeScale * 18,
@@ -2060,7 +2075,10 @@ class _HomeScreenState extends State<HomeScreen>
             padding: const EdgeInsets.only(left: 2),
             child: Icon(
               Icons.keyboard_arrow_down_rounded,
-              color: CommanColor.whiteBlack(context),
+              color: Provider.of<ThemeProvider>(context).themeMode ==
+                      ThemeMode.dark
+                  ? Colors.white
+                  : CommanColor.whiteBlack(context),
               size: arrowSize,
             ),
           ),
@@ -3097,12 +3115,29 @@ class _HomeScreenState extends State<HomeScreen>
       restoreReaderAppBarIfNeeded();
     });
     unawaited(_syncReaderChapterAfterChildRoutePop());
+    unawaited(_refreshLoggedInFromCache());
     // Only show verse on Reader screen (Home Screen)
     if (widget.From.toString() == "Read" &&
         mounted &&
         ModalRoute.of(context)?.isCurrent == true) {
       _onVisible();
       _maybeShowPendingFeedbackAfterReadingResume();
+    }
+  }
+
+  /// Re-read session cache so My Account follows Prayer Wall login
+  /// (Home stays on the stack; isLoggedIn was only set once).
+  Future<void> _refreshLoggedInFromCache() async {
+    try {
+      final cacheProvider =
+          Provider.of<CacheNotifier>(context, listen: false);
+      final data = await cacheProvider.readCache(key: 'user');
+      if (!mounted) return;
+      final next = data != null && data.toString().trim().isNotEmpty;
+      if (isLoggedIn == next) return;
+      setState(() => isLoggedIn = next);
+    } catch (e) {
+      debugPrint('refreshLoggedInFromCache: $e');
     }
   }
 
@@ -3901,12 +3936,20 @@ class _HomeScreenState extends State<HomeScreen>
           _initializeRatingDialog(state);
           final prefs = await SharedPreferences.getInstance();
           if (widget.From.toString() == 'premium') {
+            _dismissLeftoverPurchaseOverlay();
             final data = prefs.getString("premiumalrt") ?? "1";
             if (data == '1') {
               await PremiumWelcomeAlert.show(context);
             } else {
               await SharPreferences.setBoolean(
                   SharPreferences.deferUpgradeAlert, false);
+            }
+            _dismissLeftoverPurchaseOverlay();
+            Future.delayed(const Duration(milliseconds: 400), () {
+              if (mounted) _dismissLeftoverPurchaseOverlay();
+            });
+            if (Get.isRegistered<DashBoardController>()) {
+              Get.find<DashBoardController>().isFetchContent.value = false;
             }
             // Reading screen is ready and Premium Unlocked is done — now journey.
             _awaitingPremiumWelcomeBeforeJourney = false;
@@ -3944,10 +3987,14 @@ class _HomeScreenState extends State<HomeScreen>
           final isVintage =
               themeProvider.currentCustomTheme == AppCustomTheme.vintage;
           final isDark = themeProvider.themeMode == ThemeMode.dark;
-          // White/yellow themes always use their light surface (even in Dark Mode).
-          final scaffoldBg = isVintage
-              ? (isDark ? CommanColor.black : const Color(0xFFF5F0E6))
-              : themeProvider.backgroundColor;
+          final scaffoldBg = isDark
+              ? CommanColor.black
+              : (isVintage
+                  ? const Color(0xFFF5F0E6)
+                  : themeProvider.backgroundColor);
+          final usePaperBg = isVintage || isDark;
+          final readerFg =
+              isDark ? Colors.white : CommanColor.whiteBlack(context);
 
           final readerToolbarHeight = screenWidth > 450 ? 70.0 : 55.0;
           final readerChapterBarHeight = screenWidth > 450 ? 45.0 : 30.0;
@@ -3971,30 +4018,16 @@ class _HomeScreenState extends State<HomeScreen>
                     height: readerAppBarHeight,
                     child: AppBar(
                     toolbarHeight: readerToolbarHeight,
-                          iconTheme: IconThemeData(
-                              color: CommanColor.whiteBlack(context)),
+                          iconTheme: IconThemeData(color: readerFg),
                     flexibleSpace: Container(
-                      color: p.Provider.of<ThemeProvider>(context)
-                                  .currentCustomTheme ==
-                              AppCustomTheme.vintage
+                      color: usePaperBg
                           ? null
-                                  : p.Provider.of<ThemeProvider>(context)
-                                      .backgroundColor,
-                      decoration: p.Provider.of<ThemeProvider>(context)
-                                  .currentCustomTheme ==
-                              AppCustomTheme.vintage
+                          : themeProvider.backgroundColor,
+                      decoration: usePaperBg
                           ? BoxDecoration(
-                              color: Provider.of<ThemeProvider>(context)
-                                          .themeMode ==
-                                      ThemeMode.dark
+                              color: isDark
                                   ? CommanColor.black
-                                  : p.Provider.of<ThemeProvider>(context)
-                                              .currentCustomTheme ==
-                                          AppCustomTheme.vintage
-                                      ? CommanColor.darkPrimaryColor
-                                            : p.Provider.of<ThemeProvider>(
-                                                    context)
-                                          .backgroundColor,
+                                  : CommanColor.darkPrimaryColor,
                               image: DecorationImage(
                                       image:
                                           AssetImage(Images.bgImage((context))),
@@ -4003,11 +4036,8 @@ class _HomeScreenState extends State<HomeScreen>
                             )
                           : null,
                     ),
-                    backgroundColor: p.Provider.of<ThemeProvider>(context)
-                                .currentCustomTheme ==
-                            AppCustomTheme.vintage
-                        ? Colors.transparent
-                        : null,
+                    backgroundColor:
+                        usePaperBg ? Colors.transparent : null,
                     leadingWidth: 96,
                     titleSpacing: 0,
                     leading: Row(
@@ -4022,7 +4052,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 child: Icon(
                                   Icons.arrow_back_ios,
                                   size: screenWidth > 450 ? 40 : 24,
-                                  color: CommanColor.whiteBlack(context),
+                                  color: readerFg,
                                 ),
                               )
                             : GestureDetector(
@@ -4036,6 +4066,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 child: Icon(
                                   Icons.menu,
                                   size: screenWidth > 450 ? 40 : 24,
+                                  color: readerFg,
                                 ),
                               ),
                         // SizedBox(width: 12),
@@ -4129,8 +4160,7 @@ class _HomeScreenState extends State<HomeScreen>
                                     "assets/biblebook.png",
                                     height: screenWidth > 450 ? 30 : 24,
                                     width: screenWidth > 450 ? 30 : 24,
-                                          color:
-                                              CommanColor.whiteBlack(context),
+                                          color: readerFg,
                                   )),
                             )
                           : SizedBox(),
@@ -4159,7 +4189,7 @@ class _HomeScreenState extends State<HomeScreen>
                             "assets/home icons/search.png",
                             height: screenWidth > 450 ? 30 : 22,
                             width: screenWidth > 450 ? 30 : 22,
-                            color: CommanColor.whiteBlack(context),
+                            color: readerFg,
                                 ),
                               ),
                             ),
@@ -4206,7 +4236,7 @@ class _HomeScreenState extends State<HomeScreen>
                                   final isVintage =
                                       themeProvider.currentCustomTheme ==
                                 AppCustomTheme.vintage;
-                                  if (isDark && isVintage) {
+                                  if (isDark) {
                                     final base = CommanColor.darkPrimaryColor;
                               return BoxDecoration(
                                 color: Color.lerp(
@@ -4269,6 +4299,7 @@ class _HomeScreenState extends State<HomeScreen>
                                               style: CommanStyle.bw14500(
                                                       context)
                                             .copyWith(
+                                                      color: readerFg,
                                                       fontWeight:
                                                           FontWeight.w400,
                                                       fontSize: screenWidth >
@@ -4284,8 +4315,7 @@ class _HomeScreenState extends State<HomeScreen>
                                             top: 2.0, left: 5),
                                   child: Icon(
                                     Icons.keyboard_arrow_down_rounded,
-                                          color:
-                                              CommanColor.whiteBlack(context),
+                                          color: readerFg,
                                     size: screenWidth > 450 ? 39 : 18,
                                   ),
                                 )
@@ -4441,6 +4471,9 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                       floatingButton(
                         key: _readerAudioFabKey,
+                        onReadingChapterSynced: () {
+                          if (mounted) setState(() {});
+                        },
                                       chapterNum:
                                           controller.selectedChapter.value,
                         bookName: controller.selectedBook.value,
@@ -4555,6 +4588,7 @@ class _HomeScreenState extends State<HomeScreen>
                       await SharPreferences.setString(
                           SharPreferences.selectedChapter,
                           controller.selectedChapter.value);
+                      _restoreReaderAppBarVisibility();
 
                       await controller.getSelectedChapterAndBook();
                       await controller.getFont();
@@ -4586,6 +4620,7 @@ class _HomeScreenState extends State<HomeScreen>
                     await SharPreferences.setString(
                         SharPreferences.selectedChapter,
                         controller.selectedChapter.value);
+                    _restoreReaderAppBarVisibility();
                     await controller.getSelectedChapterAndBook();
                     await controller.getFont();
                   }
@@ -4593,9 +4628,7 @@ class _HomeScreenState extends State<HomeScreen>
                 child: Container(
                   height: MediaQuery.of(context).size.height,
                   width: MediaQuery.of(context).size.width,
-                  decoration: p.Provider.of<ThemeProvider>(context)
-                              .currentCustomTheme ==
-                          AppCustomTheme.vintage
+                  decoration: usePaperBg
                       ? BoxDecoration(
                           // color: Color(0x80605749),
                           image: DecorationImage(
@@ -4616,7 +4649,8 @@ class _HomeScreenState extends State<HomeScreen>
                       // UI-only: while chapter header advanced but verses still
                       // belong to the previous chapter, cover with loader so
                       // the old chapter does not flash/flicker.
-                      : (controller.selectedChapter.value.isNotEmpty &&
+                      : (widget.From.toString() != 'premium' &&
+                              controller.selectedChapter.value.isNotEmpty &&
                               readerVerses.isNotEmpty &&
                               !controller.displayedContentMatchesSelection())
                           ? ColoredBox(
@@ -4639,12 +4673,9 @@ class _HomeScreenState extends State<HomeScreen>
                                 );
                                 return false;
                               },
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                              child: Stack(
                                 children: [
-                                  const PrayerWallHomeExpiryBanner(),
-                                  Expanded(
-                                    child: ListView.builder(
+                                    ListView.builder(
                               key: ValueKey(
                                   'reader_chapter_${controller.selectedChapter.value}'),
                               scrollDirection: controller.scrollDirection,
@@ -4661,7 +4692,6 @@ class _HomeScreenState extends State<HomeScreen>
                                   left: 15,
                                   right: 15,
                                   bottom: 20,
-                                  // Clear status bar + overlay app bar (extendBodyBehindAppBar).
                                   top: controller.selectedChapter.value
                                           .isNotEmpty
                                       ? readerContentTopPadding
@@ -4785,6 +4815,8 @@ class _HomeScreenState extends State<HomeScreen>
                                                             controller
                                                                 .isReadLoad
                                                                 .value = true;
+                                                                  final marked =
+                                                                      <VerseBookContentModel>[];
                                                                   for (var i =
                                                                           0;
                                                                 i <
@@ -4801,7 +4833,7 @@ class _HomeScreenState extends State<HomeScreen>
                                                                       "yes")
                                                                   .then(
                                                                       (value) {});
-                                                              var data = VerseBookContentModel(
+                                                              marked.add(VerseBookContentModel(
                                                                   id: controller
                                                                       .selectedBookContent[
                                                                           i]
@@ -4839,11 +4871,12 @@ class _HomeScreenState extends State<HomeScreen>
                                                                               i]
                                                                           .isUnderlined,
                                                                   isRead:
-                                                                      "yes");
-                                                                    controller.selectedBookContent[
-                                                                            i] =
-                                                                        data;
+                                                                      "yes"));
                                                                   }
+                                                                  controller
+                                                                          .selectedBookContent
+                                                                          .value =
+                                                                      marked;
 
                                                                   Future
                                                                       .delayed(
@@ -5159,13 +5192,14 @@ class _HomeScreenState extends State<HomeScreen>
                                                                               await controller.persistMarkChapterReadProgress();
                                                                             controller.isReadLoad.value =
                                                                                 true;
+                                                                            final marked = <VerseBookContentModel>[];
                                                                             for (var i = 0;
                                                                           i < controller.selectedBookContent.length;
                                                                           i++) {
                                                                               await DBHelper().updateVersesData(int.parse(controller.selectedBookContent[i].id.toString()), "is_read", "yes").then((value) {});
-                                                                              var data = VerseBookContentModel(id: controller.selectedBookContent[i].id, bookNum: controller.selectedBookContent[i].bookNum, chapterNum: controller.selectedBookContent[i].chapterNum, verseNum: controller.selectedBookContent[i].verseNum, content: controller.selectedBookContent[i].content, isBookmarked: controller.selectedBookContent[i].isBookmarked, isHighlighted: controller.selectedBookContent[i].isHighlighted, isNoted: controller.selectedBookContent[i].isNoted, isUnderlined: controller.selectedBookContent[i].isUnderlined, isRead: "yes");
-                                                                              controller.selectedBookContent[i] = data;
+                                                                              marked.add(VerseBookContentModel(id: controller.selectedBookContent[i].id, bookNum: controller.selectedBookContent[i].bookNum, chapterNum: controller.selectedBookContent[i].chapterNum, verseNum: controller.selectedBookContent[i].verseNum, content: controller.selectedBookContent[i].content, isBookmarked: controller.selectedBookContent[i].isBookmarked, isHighlighted: controller.selectedBookContent[i].isHighlighted, isNoted: controller.selectedBookContent[i].isNoted, isUnderlined: controller.selectedBookContent[i].isUnderlined, isRead: "yes"));
                                                                             }
+                                                                            controller.selectedBookContent.value = marked;
 
                                                                             Future.delayed(
                                                                               const Duration(milliseconds: 200),
@@ -5396,7 +5430,14 @@ class _HomeScreenState extends State<HomeScreen>
                                 );
                               },
                             ),
-                                  ),
+                                Positioned(
+                                  left: 0,
+                                  right: 0,
+                                  bottom: MediaQuery.paddingOf(context)
+                                          .bottom +
+                                      (screenWidth > 450 ? 72 : 56),
+                                  child: const PrayerWallHomeExpiryBanner(),
+                                ),
                                 ],
                               ),
                 ),
@@ -6095,7 +6136,9 @@ class _HomeScreenState extends State<HomeScreen>
         showBooks: controller.bookAdsStatus.value == 1,
         showEProducts: BibleInfo.enableEShop == true,
         onAccountTap: () {
-          Future.microtask(() {
+          Future.microtask(() async {
+            await _refreshLoggedInFromCache();
+            if (!mounted) return;
             Get.to(
               () => isLoggedIn
                   ? const ProfileScreen()
@@ -6613,7 +6656,8 @@ class _HomeScreenState extends State<HomeScreen>
           source.where((v) => v.chapterNum?.toInt() == alt).toList();
       if (altOnly.isNotEmpty) return altOnly;
     }
-    return source;
+    // Display-only: do not keep painting another chapter's verses.
+    return [];
   }
 
   bool _homeEntryRequiresContentReload() {
@@ -7529,7 +7573,17 @@ class PremiumWelcomeAlert {
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
-        void close() => Navigator.of(dialogContext).pop();
+        void close() {
+          try {
+            EasyLoading.dismiss();
+          } catch (_) {}
+          Navigator.of(dialogContext).pop();
+          Future.delayed(const Duration(milliseconds: 50), () {
+            try {
+              EasyLoading.dismiss();
+            } catch (_) {}
+          });
+        }
 
         return Dialog(
           backgroundColor: Colors.transparent,

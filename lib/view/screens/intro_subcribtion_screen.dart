@@ -823,9 +823,25 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     await _addLifetimeWalletBonus();
   }
 
+  /// UI only: drop Buy Processing/toast before Get.offAll so Home is not frozen.
+  Future<void> _releasePurchaseUiLock() async {
+    try {
+      await EasyLoading.dismiss();
+    } catch (_) {}
+    try {
+      await SharPreferences.setBoolean('startpurches', false);
+    } catch (_) {}
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    try {
+      await EasyLoading.dismiss();
+    } catch (_) {}
+  }
+
   Future<void> _navigateToHomeAfterPurchaseSuccess({
     required bool invisibleHostPopValue,
   }) async {
+    if (!mounted) return;
+    await _releasePurchaseUiLock();
     if (!mounted) return;
     if (Get.isRegistered<DashBoardController>()) {
       await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
@@ -893,6 +909,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       // Same refresh as full paywall success — keep home drawer in sync.
       if (Get.isRegistered<DashBoardController>()) {
         await Get.find<DashBoardController>().refreshPremiumStatusFromPrefs();
+      }
+      if (invisiblePopSuccess) {
+        await _releasePurchaseUiLock();
       }
       _popInvisiblePurchaseHost(invisiblePopSuccess);
       return;
@@ -2041,7 +2060,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     // keep the newest transaction (and tier only as a same-date tiebreaker).
     if (dataEarly == true || startFlagEarly == true) {
       // UI only: cover the restore/buy delay before success toast.
-      if (startFlagEarly == true) {
+      if (startFlagEarly == true && !_buyDaysApplied) {
         EasyLoading.show(status: 'Processing......');
       }
       if (await _shouldSkipRestoreDowngrade(
@@ -2325,7 +2344,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       await SharPreferences.setString('OpenAd', '1');
       if (purchaseDetails.status == PurchaseStatus.pending) {
         // UI only: keep Processing...... while store payment is pending.
-        EasyLoading.show(status: 'Processing......');
+        if (!_buyDaysApplied) {
+          EasyLoading.show(status: 'Processing......');
+        }
       } else {
         // Cancel loading timeout timer when purchase completes (success or error)
         _loadingTimeoutTimer?.cancel();
@@ -2616,7 +2637,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           } else if (purchaseDetails.status == PurchaseStatus.restored) {
             // UI only: Buy flow often returns "restored" on iOS — keep
             // Processing...... until Purchase Successful (don't clear gap).
-            if (startFlag == true) {
+            if (startFlag == true && !_buyDaysApplied) {
               _loadingTimeoutTimer?.cancel();
               EasyLoading.show(status: 'Processing......');
             } else if (!_restoreCollecting) {

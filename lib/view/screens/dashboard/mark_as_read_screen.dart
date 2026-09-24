@@ -832,8 +832,6 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                         } catch (e) {
                           debugPrint('next chapter book sync: $e');
                         }
-                        controller.selectedBookContent.clear();
-                        controller.selectedVersesContent.clear();
                       }
                       if (!context.mounted) {
                         _isNavigating = false;
@@ -901,8 +899,6 @@ class _MarkAsReadScreenState extends State<MarkAsReadScreen> {
                               controller.selectedBookNumForRead.value =
                                   nextBookNumValue.toString();
                               controller.selectedChapterForRead.value = "1";
-                              controller.selectedBookContent.clear();
-                              controller.selectedVersesContent.clear();
                             }
                             if (!context.mounted) {
                               _isNavigating = false;

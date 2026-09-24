@@ -195,7 +195,11 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     // then go Home. Previously onboard skipped unlock and only left the paywall.
 
     try {
-      EasyLoading.dismiss();
+      await EasyLoading.dismiss();
+    } catch (_) {}
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    try {
+      await EasyLoading.dismiss();
     } catch (_) {}
 
     await SharPreferences.setBoolean(SharPreferences.deferUpgradeAlert, true);
@@ -427,6 +431,426 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
   Future<void> _onClose() async {
     await _navigateAwayFromPaywall();
+  }
+
+  String _formatPlanExpiry(DateTime date) {
+    const months = <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+
+  String? _kindFromStoreProductId(String productId) {
+    final id = productId.toLowerCase();
+    if (id.contains('lifetime')) return 'lifetime';
+    if (BibleInfo.isArOneYearProductId(productId) || id.contains('oneyear')) {
+      return 'year';
+    }
+    if (BibleInfo.isOneMonthProductId(productId) ||
+        BibleInfo.isArSixMonthProductId(productId) ||
+        id.contains('sixmonth')) {
+      return 'month';
+    }
+    return null;
+  }
+
+  DateTime? _parseStoreTransactionDate(String? raw) {
+    if (raw == null) return null;
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+    final iso = DateTime.tryParse(trimmed);
+    if (iso != null) return iso;
+    final numeric = int.tryParse(trimmed);
+    if (numeric == null) return null;
+    if (numeric > 1000000000000) {
+      return DateTime.fromMillisecondsSinceEpoch(numeric);
+    }
+    if (numeric > 1000000000) {
+      return DateTime.fromMillisecondsSinceEpoch(numeric * 1000);
+    }
+    return null;
+  }
+
+  DateTime? _expiryFromLastPurchase(String kind, DateTime? purchasedAt) {
+    if (purchasedAt == null) return null;
+    if (kind == 'year') {
+      return purchasedAt.add(const Duration(days: 366));
+    }
+    if (kind == 'month') {
+      return purchasedAt.add(const Duration(days: 30));
+    }
+    return null;
+  }
+
+  Future<({String kind, DateTime? purchasedAt})?> _ownedKindFromStore() async {
+    StreamSubscription<List<PurchaseDetails>>? sub;
+    try {
+      final dated = <String, DateTime>{};
+      final undated = <String>{};
+      sub = InAppPurchase.instance.purchaseStream.listen((purchases) {
+        for (final p in purchases) {
+          if (p.status == PurchaseStatus.restored ||
+              p.status == PurchaseStatus.purchased) {
+            final at = _parseStoreTransactionDate(p.transactionDate);
+            if (at != null) {
+              final prev = dated[p.productID];
+              if (prev == null || at.isAfter(prev)) {
+                dated[p.productID] = at;
+              }
+            } else {
+              undated.add(p.productID);
+            }
+          }
+          if (p.pendingCompletePurchase) {
+            InAppPurchase.instance.completePurchase(p);
+          }
+        }
+      });
+      await InAppPurchase.instance.restorePurchases();
+      await Future<void>.delayed(const Duration(milliseconds: 2500));
+
+      if (dated.isNotEmpty) {
+        String? lastId;
+        DateTime? lastAt;
+        dated.forEach((id, at) {
+          if (lastAt == null || at.isAfter(lastAt!)) {
+            lastAt = at;
+            lastId = id;
+          }
+        });
+        if (lastId != null) {
+          final kind = _kindFromStoreProductId(lastId!);
+          if (kind != null) {
+            return (kind: kind, purchasedAt: lastAt);
+          }
+        }
+      }
+
+      String? kind;
+      for (final id in undated) {
+        final next = _kindFromStoreProductId(id);
+        if (next == 'year') kind = 'year';
+        if (next == 'month' && kind != 'year') kind = 'month';
+        if (next == 'lifetime' && kind == null) kind = 'lifetime';
+      }
+      if (kind == null) return null;
+      return (kind: kind, purchasedAt: null);
+    } catch (_) {
+      return null;
+    } finally {
+      await sub?.cancel();
+    }
+  }
+
+  Future<String?> _ownedActiveKind() async {
+    try {
+      final download = Provider.of<DownloadProvider>(context, listen: false);
+      final plan = (await download.getSubscriptionPlan())?.toLowerCase().trim();
+      final raw = await SharPreferences.getString(
+        SharPreferences.isRewardAdViewTime,
+      );
+      DateTime? expiry;
+      if (raw != null && raw.isNotEmpty) {
+        expiry = DateTime.tryParse(raw);
+      }
+      final active =
+          expiry != null && !expiry.isBefore(DateTime.now());
+      if (plan == 'platinum') return 'lifetime';
+      if (plan == 'gold') return 'year';
+      if (plan == 'silver') return 'month';
+      if (active) return 'month';
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<DateTime?> _ownedExpiry() async {
+    try {
+      final raw = await SharPreferences.getString(
+        SharPreferences.isRewardAdViewTime,
+      );
+      if (raw == null || raw.isEmpty) return null;
+      return DateTime.tryParse(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String get _tryingKind {
+    if (_sel == _PwCard.lifetime) return 'lifetime';
+    return _dur == _AiDur.oneYear ? 'year' : 'month';
+  }
+
+  Future<void> _onPrimaryCta() async {
+    var owned = await _ownedActiveKind();
+    DateTime? storePurchasedAt;
+    if (!mounted) return;
+    if (owned == null) {
+      EasyLoading.show(status: 'Please wait...');
+      final store = await _ownedKindFromStore();
+      owned = store?.kind;
+      storePurchasedAt = store?.purchasedAt;
+      await EasyLoading.dismiss();
+      if (!mounted) return;
+    }
+    if (owned == null) {
+      await _startPurchase();
+      return;
+    }
+    var expiry = await _ownedExpiry();
+    if (expiry == null && owned != 'lifetime') {
+      expiry = _expiryFromLastPurchase(owned, storePurchasedAt);
+    }
+    if (!mounted) return;
+    final action = await _showAlreadyHavePlanBox(
+      ownedKind: owned,
+      tryingKind: _tryingKind,
+      expiry: expiry,
+    );
+    if (!mounted) return;
+    if (action == 'buy') {
+      await _startPurchase();
+    } else if (action == 'restore') {
+      await _restorePurchases();
+    }
+  }
+
+  Future<String?> _showAlreadyHavePlanBox({
+    required String ownedKind,
+    required String tryingKind,
+    DateTime? expiry,
+  }) {
+    final ownedLifetime = ownedKind == 'lifetime';
+    final tryingLifetime = tryingKind == 'lifetime';
+    final tryingYear = tryingKind == 'year';
+    final lastPlanLabel = ownedKind == 'year' ? '1 Year' : '1 Month';
+    final expired = expiry != null && expiry.isBefore(DateTime.now());
+    final expiryLabel =
+        expiry != null ? _formatPlanExpiry(expiry) : null;
+
+    final title = ownedLifetime
+        ? 'You Already Own\nLifetime'
+        : 'You Already Have\nan Active Plan';
+    final String body;
+    if (ownedLifetime) {
+      body = tryingLifetime
+          ? 'You already have Lifetime Ad-Free Study access.'
+          : 'You have Lifetime Ad-Free Study access. The AI Premium plan adds Unlimited AI without using credits and will renew automatically ${tryingYear ? 'each year' : 'each month'}.';
+    } else if (expired && expiryLabel != null) {
+      body =
+          'Your last plan was $lastPlanLabel. It expired on $expiryLabel. Purchasing another plan will create an additional charge.';
+    } else if (expiryLabel != null) {
+      body =
+          'Your last $lastPlanLabel plan is currently active until $expiryLabel. Purchasing another plan will create an additional charge.';
+    } else {
+      body =
+          'Your last plan is $lastPlanLabel. Purchasing another plan will create an additional charge.';
+    }
+    final addLabel = tryingLifetime
+        ? 'Add Lifetime Access'
+        : (ownedLifetime
+            ? 'Add Unlimited AI'
+            : (tryingYear ? 'Add 1 Year Plan' : 'Add 1 Month Plan'));
+    final showPrice = ownedLifetime && !tryingLifetime;
+    final hideAdd = !ownedLifetime || tryingLifetime;
+
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        final mq = MediaQuery.of(ctx).size;
+        final isTablet = mq.width > 600;
+        final addIsLifetime = tryingLifetime;
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              width: isTablet ? mq.width * 0.45 : mq.width * 0.85,
+              padding: EdgeInsets.fromLTRB(
+                isTablet ? 24 : 20,
+                isTablet ? 18 : 14,
+                isTablet ? 24 : 20,
+                isTablet ? 22 : 18,
+              ),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFF6EBDD), Color(0xFFEBDDC9)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFD2C1A8), width: 1.1),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.10),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      onTap: () => Navigator.of(ctx).pop(),
+                      child: Icon(
+                        Icons.close,
+                        size: isTablet ? 22 : 20,
+                        color: const Color(0xFF7B5536),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    width: isTablet ? 56 : 48,
+                    height: isTablet ? 56 : 48,
+                    decoration: BoxDecoration(
+                      color: ownedLifetime
+                          ? const Color(0xFFF6E8C8)
+                          : const Color(0xFFE7DEFA),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      ownedLifetime
+                          ? Icons.diamond_outlined
+                          : Icons.calendar_today_outlined,
+                      size: isTablet ? 26 : 22,
+                      color: ownedLifetime
+                          ? const Color(0xFFB07A1E)
+                          : const Color(0xFF5B3FBF),
+                    ),
+                  ),
+                  SizedBox(height: isTablet ? 16 : 14),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: isTablet ? 24 : 20,
+                      fontWeight: FontWeight.w800,
+                      height: 1.2,
+                      color: const Color(0xFF101B2B),
+                    ),
+                  ),
+                  SizedBox(height: isTablet ? 12 : 10),
+                  Text(
+                    body,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: isTablet ? 16 : 14,
+                      height: 1.45,
+                      fontWeight: FontWeight.w400,
+                      color: const Color(0xFF5C534C),
+                    ),
+                  ),
+                  if (!ownedLifetime && expiryLabel != null) ...[
+                    SizedBox(height: isTablet ? 10 : 8),
+                    Text(
+                      expired
+                          ? 'Expired on $expiryLabel'
+                          : 'Expires on $expiryLabel',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: isTablet ? 16 : 14,
+                        height: 1.3,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF101B2B),
+                      ),
+                    ),
+                  ],
+                  SizedBox(height: isTablet ? 22 : 18),
+                  if (!hideAdd) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      height: isTablet ? 52 : 48,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: addIsLifetime
+                                ? const [Color(0xFF2E9457), Color(0xFF166438)]
+                                : const [Color(0xFFC08D22), Color(0xFF8E5F10)],
+                          ),
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.of(ctx).pop('buy'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(28),
+                            ),
+                          ),
+                          child: Text(
+                            addLabel,
+                            style: TextStyle(
+                              fontSize: isTablet ? 17 : 15,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: isTablet ? 10 : 8),
+                  ],
+                  SizedBox(
+                    width: double.infinity,
+                    height: isTablet ? 52 : 48,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(ctx).pop('restore'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF7F2EA),
+                        foregroundColor: const Color(0xFF5B3FBF),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                      ),
+                      child: Text(
+                        'Restore My Current Plan',
+                        style: TextStyle(
+                          fontSize: isTablet ? 17 : 15,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF5B3FBF),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (showPrice) ...[
+                    SizedBox(height: isTablet ? 12 : 10),
+                    Text(
+                      _belowCta,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: isTablet ? 12 : 11,
+                        color: const Color(0xFF5B3FBF),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   /// Purchase via existing invisible SubscriptionScreen (unchanged IAP logic).
@@ -1498,7 +1922,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                   ],
                 ),
                 child: ElevatedButton(
-                  onPressed: _startPurchase,
+                  onPressed: _onPrimaryCta,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
                     shadowColor: Colors.transparent,

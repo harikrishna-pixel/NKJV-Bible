@@ -421,7 +421,7 @@ class EditProfileScreenState extends State<EditProfileScreen>
                                     child: Icon(
                                       Icons.arrow_back_ios,
                                       size: 20,
-                                      color: CommanColor.whiteBlack(context),
+                                      color: const Color(0xFF8B5A5A),
                                     ),
                                   ),
                                 ),
@@ -431,7 +431,10 @@ class EditProfileScreenState extends State<EditProfileScreen>
                                 flex: 2,
                                 child: Text("Profile",
                                     textAlign: TextAlign.center,
-                                    style: CommanStyle.appBarStyle(context))),
+                                    style: CommanStyle.appBarStyle(context)
+                                        .copyWith(
+                                      color: const Color(0xFF8B5A5A),
+                                    ))),
                             const Expanded(child: SizedBox.shrink())
                           ],
                         ),
@@ -659,7 +662,7 @@ class EditProfileScreenState extends State<EditProfileScreen>
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
-                                      color: Colors.white,
+                                      color: const Color(0xFF8B5A5A),
                                       width: 1,
                                     ),
                                   ),
@@ -670,9 +673,7 @@ class EditProfileScreenState extends State<EditProfileScreen>
                                       Icon(
                                         Icons.edit_outlined,
                                         size: 18,
-                                        color: CommanColor.isDarkTheme(context)
-                                            ? Colors.white
-                                            : const Color(0xFF8B5A5A),
+                                        color: const Color(0xFF8B5A5A),
                                       ),
                                       const SizedBox(width: 8),
                                       Text(
@@ -685,9 +686,7 @@ class EditProfileScreenState extends State<EditProfileScreen>
                                           letterSpacing: BibleInfo.letterSpacing,
                                           fontSize:
                                               BibleInfo.fontSizeScale * 16,
-                                          color: CommanColor.isDarkTheme(context)
-                                              ? Colors.white
-                                              : const Color(0xFF8B5A5A),
+                                          color: const Color(0xFF8B5A5A),
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
@@ -707,7 +706,7 @@ class EditProfileScreenState extends State<EditProfileScreen>
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
-                                      color: Colors.white,
+                                      color: const Color(0xFF8B5A5A),
                                       width: 1,
                                     ),
                                   ),
@@ -718,9 +717,7 @@ class EditProfileScreenState extends State<EditProfileScreen>
                                       Icon(
                                         Icons.delete_outline,
                                         size: 18,
-                                        color: CommanColor.isDarkTheme(context)
-                                            ? Colors.white
-                                            : const Color(0xFF8B5A5A),
+                                        color: const Color(0xFF8B5A5A),
                                       ),
                                       const SizedBox(width: 8),
                                       Text(
@@ -733,9 +730,7 @@ class EditProfileScreenState extends State<EditProfileScreen>
                                           letterSpacing: BibleInfo.letterSpacing,
                                           fontSize:
                                               BibleInfo.fontSizeScale * 16,
-                                          color: CommanColor.isDarkTheme(context)
-                                              ? Colors.white
-                                              : const Color(0xFF8B5A5A),
+                                          color: const Color(0xFF8B5A5A),
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
@@ -848,7 +843,7 @@ class EditProfileScreen1 extends HookConsumerWidget with ImagePickerMixin {
                                     child: Icon(
                                       Icons.arrow_back_ios,
                                       size: 20,
-                                      color: CommanColor.whiteBlack(context),
+                                      color: const Color(0xFF8B5A5A),
                                     ),
                                   ),
                                 ),
@@ -858,7 +853,10 @@ class EditProfileScreen1 extends HookConsumerWidget with ImagePickerMixin {
                                 flex: 2,
                                 child: Text("Profile",
                                     textAlign: TextAlign.center,
-                                    style: CommanStyle.appBarStyle(context))),
+                                    style: CommanStyle.appBarStyle(context)
+                                        .copyWith(
+                                      color: const Color(0xFF8B5A5A),
+                                    ))),
                             const Expanded(child: SizedBox.shrink())
                           ],
                         ),
@@ -1210,7 +1208,7 @@ class EditProfileScreen1 extends HookConsumerWidget with ImagePickerMixin {
 //                                     child: Icon(
 //                                       Icons.arrow_back_ios,
 //                                       size: 20,
-//                                       color: CommanColor.whiteBlack(context),
+//                                       color: const Color(0xFF8B5A5A),
 //                                     ),
 //                                   ),
 //                                 ),

@@ -1,5 +1,6 @@
 import 'package:biblebookapp/controller/api_service.dart';
 import 'package:biblebookapp/services/wallet_service.dart';
+import 'package:biblebookapp/view/screens/profile/model/user_model.dart';
 import 'package:biblebookapp/view/constants/share_preferences.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -312,46 +313,101 @@ class SignupScreen extends HookConsumerWidget {
                                                   await signupState
                                                       .createAccount();
                                               if (!context.mounted) return;
+                                              UserModel? sessionUser;
                                               if (referralCode == null ||
                                                   referralCode
                                                       .trim()
                                                       .isEmpty) {
                                                 try {
-                                                  final user =
-                                                      await loginUser(
+                                                  sessionUser = await loginUser(
                                                     email: signupState
                                                         .emailCon.text
                                                         .trim(),
-                                                    password:
-                                                        signupState.passCon.text,
+                                                    password: signupState
+                                                        .passCon.text,
                                                   );
-                                                  referralCode =
-                                                      user.referralCode;
+                                                  final fromLogin = sessionUser
+                                                      .referralCode
+                                                      ?.trim();
+                                                  if (fromLogin != null &&
+                                                      fromLogin.isNotEmpty) {
+                                                    referralCode = fromLogin;
+                                                  }
                                                 } catch (_) {}
                                               }
+                                              // Invite must be resolved on
+                                              // this page — do not leave
+                                              // Sign Up first.
+                                              if (inviteCode.isNotEmpty) {
+                                                var applied =
+                                                    await didSignupApplyReferral(
+                                                        inviteCode);
+                                                if (!applied) {
+                                                  try {
+                                                    sessionUser ??=
+                                                        await loginUser(
+                                                      email: signupState
+                                                          .emailCon.text
+                                                          .trim(),
+                                                      password: signupState
+                                                          .passCon.text,
+                                                    );
+                                                    final by = (sessionUser
+                                                                .referredBy ??
+                                                            '')
+                                                        .trim();
+                                                    applied = by.isNotEmpty &&
+                                                        by.toUpperCase() ==
+                                                            inviteCode
+                                                                .toUpperCase();
+                                                    if (!applied &&
+                                                        (sessionUser
+                                                                    .walletBalance ??
+                                                                0) >=
+                                                            100) {
+                                                      applied = true;
+                                                    }
+                                                    final fromLogin =
+                                                        sessionUser
+                                                            .referralCode
+                                                            ?.trim();
+                                                    if (fromLogin != null &&
+                                                        fromLogin.isNotEmpty) {
+                                                      referralCode = fromLogin;
+                                                    }
+                                                  } catch (_) {}
+                                                }
+                                                if (!applied) {
+                                                  Constants.showToast(
+                                                      'Code is invalid');
+                                                } else {
+                                                  const rewardCredits = 100;
+                                                  final alreadyOnServer =
+                                                      (sessionUser
+                                                                  ?.walletBalance ??
+                                                              0) >=
+                                                          100;
+                                                  if (!alreadyOnServer) {
+                                                    await WalletService
+                                                        .addCredits(
+                                                            rewardCredits);
+                                                  }
+                                                  await updateReferralRewardClaimed(
+                                                    value: rewardCredits,
+                                                    referredBy: inviteCode,
+                                                  );
+                                                  Constants.showToast(
+                                                      'You received 100 free coins!');
+                                                }
+                                              }
                                               if (!context.mounted) return;
-                                              if (referralCode != null &&
-                                                  referralCode
-                                                      .trim()
-                                                      .isNotEmpty) {
+                                              final ownCode =
+                                                  referralCode?.trim() ?? '';
+                                              if (ownCode.isNotEmpty) {
                                                 await OwnReferralCodeDialog.show(
                                                   context: context,
-                                                  referralCode: referralCode,
+                                                  referralCode: ownCode,
                                                 );
-                                              }
-                                              // Credits only when invite was
-                                              // sent at register (API cannot
-                                              // apply referred_by afterward).
-                                              if (inviteCode.isNotEmpty) {
-                                                const rewardCredits = 100;
-                                                await WalletService.addCredits(
-                                                    rewardCredits);
-                                                await updateReferralRewardClaimed(
-                                                  value: rewardCredits,
-                                                  referredBy: inviteCode,
-                                                );
-                                                Constants.showToast(
-                                                    'You received 100 free coins!');
                                               }
                                               if (!context.mounted) return;
                                               // UI only: Prayer Wall embedded

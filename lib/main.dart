@@ -344,12 +344,7 @@ class MyApp extends StatelessWidget {
           builder: (context, child) {
             // Bridge color behind route transitions. A fixed cream color caused a
             // bright white flash/line in dark mode (e.g. Read → Home).
-            final usesLightCustom =
-                themeProvider.currentCustomTheme == AppCustomTheme.white ||
-                    themeProvider.currentCustomTheme ==
-                        AppCustomTheme.lightbrown;
-            final isDarkBridge = themeProvider.themeMode == ThemeMode.dark &&
-                !usesLightCustom;
+            final isDarkBridge = themeProvider.themeMode == ThemeMode.dark;
             final bridgeColor =
                 isDarkBridge ? Colors.black : const Color(0xFFF2E6D4);
             return EasyLoading.init()(

@@ -149,6 +149,7 @@ flutter:
     - assets/zipped/NLT Bible/
     - assets/icons/
     - assets/prayer_guidance_icons/
+    - assets/take_moment/
     - assets/onboarding/
     - assets/dark_modes/
     - assets/light_modes/

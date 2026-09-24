@@ -226,10 +226,11 @@ class _ValueChatBodyState extends State<_ValueChatBody> {
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(horizontal: widget.isTablet ? 0 : 0),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const SizedBox(height: 8),
-          _buildOrb(),
-          const SizedBox(height: 7),
+          SizedBox(height: widget.isTablet ? 20 : 16),
+          Center(child: _buildOrb()),
+          SizedBox(height: widget.isTablet ? 14 : 12),
           Text(
             'Answers from Scripture',
             textAlign: TextAlign.center,
@@ -296,21 +297,24 @@ class _ValueChatBodyState extends State<_ValueChatBody> {
   }
 
   Widget _buildOrb() {
-    return Container(
+    return SizedBox(
       width: 52,
       height: 52,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFC89646).withOpacity(0.45),
-            blurRadius: 18,
-            spreadRadius: 2,
-          ),
-        ],
-      ),
-      child: ClipOval(
-        child: _appIconImage(size: 52),
+      child: Container(
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFC89646).withOpacity(0.45),
+              blurRadius: 18,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: ClipOval(
+          child: _appIconImage(size: 52),
+        ),
       ),
     );
   }
@@ -320,6 +324,7 @@ class _ValueChatBodyState extends State<_ValueChatBody> {
       'assets/guidance_brand_icon.png',
       width: size,
       height: size,
+      alignment: Alignment.center,
       fit: BoxFit.cover,
       filterQuality: FilterQuality.high,
       gaplessPlayback: true,
@@ -327,6 +332,7 @@ class _ValueChatBodyState extends State<_ValueChatBody> {
         Images.appIcon1024,
         width: size,
         height: size,
+        alignment: Alignment.center,
         fit: BoxFit.cover,
       ),
     );

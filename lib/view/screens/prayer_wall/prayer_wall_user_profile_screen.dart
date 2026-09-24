@@ -372,9 +372,21 @@ class _PrayerWallUserProfileScreenState
                               children: [
                                 _statCell('${recent.length}', 'Prayers Shared'),
                                 _divider(isDark),
-                                _statCell('$_followersCount', 'Followers'),
+                                _statCell(
+                                  '$_followersCount',
+                                  'Followers',
+                                  onTap: () => unawaited(
+                                    _openFollowPeopleList(followers: true),
+                                  ),
+                                ),
                                 _divider(isDark),
-                                _statCell('$_followingCount', 'Following'),
+                                _statCell(
+                                  '$_followingCount',
+                                  'Following',
+                                  onTap: () => unawaited(
+                                    _openFollowPeopleList(followers: false),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -580,29 +592,268 @@ class _PrayerWallUserProfileScreenState
     );
   }
 
-  Widget _statCell(String value, String label) {
+  Widget _statCell(String value, String label, {VoidCallback? onTap}) {
+    final child = Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            fontFamily: 'Georgia',
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: _brown,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 11,
+            color: _brown.withOpacity(0.7),
+          ),
+        ),
+      ],
+    );
     return Expanded(
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: const TextStyle(
-              fontFamily: 'Georgia',
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: _brown,
+      child: onTap == null
+          ? child
+          : InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: child,
+              ),
+            ),
+    );
+  }
+
+  Future<void> _openFollowPeopleList({required bool followers}) async {
+    final id = widget.profileUserId.trim();
+    if (id.isEmpty || !mounted) return;
+    await showPrayerWallFollowPeopleSheet(
+      context: context,
+      userId: id,
+      followers: followers,
+      wallPrayers: widget.wallPrayers,
+    );
+  }
+}
+
+/// Additive UI: Followers / Following people list from existing follow GETs.
+/// Names + photos come from wall prayers until a name API is added.
+Future<void> showPrayerWallFollowPeopleSheet({
+  required BuildContext context,
+  required String userId,
+  required bool followers,
+  required List<PrayerWallItem> wallPrayers,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      return _PrayerWallFollowPeopleSheet(
+        userId: userId,
+        followers: followers,
+        wallPrayers: wallPrayers,
+      );
+    },
+  );
+}
+
+class _PrayerWallFollowPeopleSheet extends StatefulWidget {
+  const _PrayerWallFollowPeopleSheet({
+    required this.userId,
+    required this.followers,
+    required this.wallPrayers,
+  });
+
+  final String userId;
+  final bool followers;
+  final List<PrayerWallItem> wallPrayers;
+
+  @override
+  State<_PrayerWallFollowPeopleSheet> createState() =>
+      _PrayerWallFollowPeopleSheetState();
+}
+
+class _PrayerWallFollowPeopleSheetState
+    extends State<_PrayerWallFollowPeopleSheet> {
+  static const _brown = Color(0xFF5C4033);
+
+  bool _loading = true;
+  List<String> _ids = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final ids = widget.followers
+          ? (await PrayerWallService.fetchFollowers(userId: widget.userId))
+              .followerUserIds
+          : (await PrayerWallService.fetchFollowing(userId: widget.userId))
+              .followingUserIds;
+      if (!mounted) return;
+      setState(() {
+        _ids = ids;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _ids = const [];
+        _loading = false;
+      });
+    }
+  }
+
+  PrayerWallItem? _wallMatch(String id) {
+    for (final p in widget.wallPrayers) {
+      if (p.isAnonymous) continue;
+      if ((p.identityUserId ?? '').trim() == id) return p;
+      if ((p.authorUserId ?? '').trim() == id) return p;
+    }
+    return null;
+  }
+
+  String _nameFor(String id) {
+    final item = _wallMatch(id);
+    final n = (item?.authorName ?? '').trim();
+    if (n.isNotEmpty) return n;
+    return 'Community member';
+  }
+
+  String? _photoFor(String id) {
+    final photo = (_wallMatch(id)?.profileImage ?? '').trim();
+    return photo.isEmpty ? null : photo;
+  }
+
+  String _initials(String value) {
+    final raw = value.trim().replaceAll(RegExp(r'\s+'), '');
+    if (raw.isEmpty) return '?';
+    if (raw.length == 1) return raw[0].toUpperCase();
+    return '${raw[0].toUpperCase()}${raw[1].toUpperCase()}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final usesLightCustom = themeProvider.currentCustomTheme ==
+            AppCustomTheme.white ||
+        themeProvider.currentCustomTheme == AppCustomTheme.lightbrown;
+    final isDark =
+        themeProvider.themeMode == ThemeMode.dark && !usesLightCustom;
+    final title = widget.followers ? 'Followers' : 'Following';
+    final empty = widget.followers
+        ? 'No followers yet.'
+        : 'Not following anyone yet.';
+    final sheetBg = isDark ? const Color(0xFF2C2118) : const Color(0xFFFFFBF5);
+    final ink = isDark ? Colors.white : _brown;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Material(
+          color: sheetBg,
+          borderRadius: BorderRadius.circular(20),
+          clipBehavior: Clip.antiAlias,
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.62,
+            child: Column(
+              children: [
+                const SizedBox(height: 10),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white24 : _brown.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: ink,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _ids.isEmpty
+                          ? Center(
+                              child: Text(
+                                empty,
+                                style: TextStyle(
+                                  color: isDark
+                                      ? Colors.white60
+                                      : _brown.withOpacity(0.7),
+                                ),
+                              ),
+                            )
+                          : ListView.separated(
+                              padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+                              itemCount: _ids.length,
+                              separatorBuilder: (_, __) => Divider(
+                                height: 1,
+                                color: isDark
+                                    ? Colors.white12
+                                    : _brown.withOpacity(0.08),
+                              ),
+                              itemBuilder: (_, i) {
+                                final id = _ids[i];
+                                final name = _nameFor(id);
+                                final photo = _photoFor(id);
+                                return ListTile(
+                                  leading: CircleAvatar(
+                                    radius: 20,
+                                    backgroundColor: isDark
+                                        ? const Color(0xFF4A382C)
+                                        : _brown.withOpacity(0.18),
+                                    backgroundImage: photo != null
+                                        ? NetworkImage(photo)
+                                        : null,
+                                    onBackgroundImageError: photo != null
+                                        ? (_, __) {}
+                                        : null,
+                                    child: photo != null
+                                        ? null
+                                        : Text(
+                                            _initials(name),
+                                            style: TextStyle(
+                                              color: ink,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                  ),
+                                  title: Text(
+                                    name,
+                                    style: TextStyle(
+                                      fontFamily: 'Georgia',
+                                      fontWeight: FontWeight.w700,
+                                      color: ink,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 11,
-              color: _brown.withOpacity(0.7),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

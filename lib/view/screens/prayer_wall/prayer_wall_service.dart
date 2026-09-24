@@ -214,16 +214,53 @@ class PrayerWallService {
     );
   }
 
+  /// Viewer resolve id for two-way `excludeBlockedForUserId`.
+  /// Guest / no login → null (plain GET, no block filter).
+  static Future<String?> _excludeBlockedViewerId() async {
+    var uid = (await PrayerWallLocalStore.loadIdentityUserId() ?? '').trim();
+    if (uid.isNotEmpty) return uid;
+    try {
+      final email = (await CacheNotifier().readCache(key: 'user') ?? '')
+          .toString()
+          .trim();
+      final token = (await CacheNotifier().readCache(key: 'authtoken') ?? '')
+          .toString()
+          .trim();
+      final userid = (await CacheNotifier().readCache(key: 'userid') ?? '')
+          .toString()
+          .trim();
+      if (email.isEmpty && token.isEmpty && userid.isEmpty) return null;
+      uid = (await ensureIdentityUserId() ?? '').trim();
+    } catch (e) {
+      print('PrayerWallService._excludeBlockedViewerId: $e');
+    }
+    return uid.isEmpty ? null : uid;
+  }
+
   /// Additive: `GET /api/prayer-queue` — full rotating wait list.
   static Future<PrayerQueueListResult> fetchPrayerQueue() async {
-    final url = PrayerWallApiConstant.prayerQueue;
+    final uid = await _excludeBlockedViewerId();
+    final url = (uid != null && uid.isNotEmpty)
+        ? PrayerWallApiConstant.prayerQueueExcludingBlockedForUser(uid)
+        : PrayerWallApiConstant.prayerQueue;
     print('========== GET /api/prayer-queue ==========');
     print('URL → $url');
     print('==========================================');
-    final res = await http.get(Uri.parse(url), headers: _jsonHeaders);
+    var res = await http.get(Uri.parse(url), headers: _jsonHeaders);
     print(
       'GET /api/prayer-queue response → ${res.statusCode} ${res.body}',
     );
+    if (uid != null &&
+        uid.isNotEmpty &&
+        (res.statusCode < 200 || res.statusCode >= 300)) {
+      res = await http.get(
+        Uri.parse(PrayerWallApiConstant.prayerQueue),
+        headers: _jsonHeaders,
+      );
+      print(
+        'GET /api/prayer-queue fallback → ${res.statusCode} ${res.body}',
+      );
+    }
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception('Prayer queue failed (${res.statusCode}): ${res.body}');
     }
@@ -236,14 +273,28 @@ class PrayerWallService {
 
   /// Additive: `GET /api/prayer-queue/current` — active hotspot slot.
   static Future<PrayerQueueCurrentResult> fetchPrayerQueueCurrent() async {
-    final url = PrayerWallApiConstant.prayerQueueCurrent;
+    final uid = await _excludeBlockedViewerId();
+    final url = (uid != null && uid.isNotEmpty)
+        ? PrayerWallApiConstant.prayerQueueCurrentExcludingBlockedForUser(uid)
+        : PrayerWallApiConstant.prayerQueueCurrent;
     print('========== GET /api/prayer-queue/current ==========');
     print('URL → $url');
     print('==================================================');
-    final res = await http.get(Uri.parse(url), headers: _jsonHeaders);
+    var res = await http.get(Uri.parse(url), headers: _jsonHeaders);
     print(
       'GET /api/prayer-queue/current response → ${res.statusCode} ${res.body}',
     );
+    if (uid != null &&
+        uid.isNotEmpty &&
+        (res.statusCode < 200 || res.statusCode >= 300)) {
+      res = await http.get(
+        Uri.parse(PrayerWallApiConstant.prayerQueueCurrent),
+        headers: _jsonHeaders,
+      );
+      print(
+        'GET /api/prayer-queue/current fallback → ${res.statusCode} ${res.body}',
+      );
+    }
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception(
         'Prayer queue current failed (${res.statusCode}): ${res.body}',
@@ -257,52 +308,24 @@ class PrayerWallService {
   }
 
   static Future<List<PrayerWallItem>> fetchPrayers() async {
-    // Wall feed stays GET /api/prayers. When logged in, also pass
-    // excludeBlockedForUserId (viewer resolve user_id). Guest = full list.
-    // identityUserId query is not used here (filters to one user).
-    var url = PrayerWallApiConstant.prayers;
-    var usedExclude = false;
-    try {
-      var uid = (await PrayerWallLocalStore.loadIdentityUserId() ?? '').trim();
-      if (uid.isEmpty) {
-        var email = '';
-        try {
-          email = (await CacheNotifier().readCache(key: 'user') ?? '')
-              .toString()
-              .trim();
-        } catch (_) {}
-        if (email.isNotEmpty) {
-          uid = (await ensureIdentityUserId() ?? '').trim();
-        }
-      }
-      if (uid.isNotEmpty) {
-        url = PrayerWallApiConstant.prayersExcludingBlockedForUser(uid);
-        usedExclude = true;
-      }
-    } catch (e) {
-      print('fetchPrayers excludeBlockedForUserId skip: $e');
-    }
+    // Two-way block: GET /api/prayers?excludeBlockedForUserId=<viewer id>.
+    // Backend hides both sides (A blocked B → A does not see B, B does not see A).
+    // Do not fall back to plain GET — that shows everyone, including the other side.
+    // Guest / no resolve id = plain GET.
+    final uid = await _excludeBlockedViewerId();
+    final url = (uid != null && uid.isNotEmpty)
+        ? PrayerWallApiConstant.prayersExcludingBlockedForUser(uid)
+        : PrayerWallApiConstant.prayers;
     print('========== GET /api/prayers ==========');
     print('URL → $url');
     print('======================================');
-    var res = await http.get(
+    final res = await http.get(
       Uri.parse(url),
       headers: _jsonHeaders,
     );
     print(
       'GET /api/prayers response → ${res.statusCode} ${res.body}',
     );
-    if (usedExclude &&
-        (res.statusCode < 200 || res.statusCode >= 300)) {
-      print('excludeBlockedForUserId failed; fallback GET /api/prayers');
-      res = await http.get(
-        Uri.parse(PrayerWallApiConstant.prayers),
-        headers: _jsonHeaders,
-      );
-      print(
-        'GET /api/prayers fallback → ${res.statusCode} ${res.body}',
-      );
-    }
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception('Prayers failed (${res.statusCode}): ${res.body}');
     }
@@ -352,6 +375,30 @@ class PrayerWallService {
     return list
         .where((p) => (p.email ?? '').trim().toLowerCase() == want)
         .toList();
+  }
+
+  /// Additive: prayers posted by this resolve id (Blocked-list name lookup).
+  /// Same `GET /api/prayers?identityUserId=` URL; does not change wall GET.
+  static Future<List<PrayerWallItem>> fetchPrayersPostedByIdentity(
+    String identityUserId,
+  ) async {
+    final id = identityUserId.trim();
+    if (id.isEmpty) return [];
+    try {
+      final res = await http.get(
+        Uri.parse(PrayerWallApiConstant.prayersForIdentityUserId(id)),
+        headers: _jsonHeaders,
+      );
+      if (res.statusCode < 200 || res.statusCode >= 300) return [];
+      final list = PrayerWallItem.listFromResponseBody(res.body);
+      return list.where((p) {
+        return (p.identityUserId ?? '').trim() == id ||
+            (p.authorUserId ?? '').trim() == id;
+      }).toList();
+    } catch (e) {
+      print('PrayerWallService.fetchPrayersPostedByIdentity error: $e');
+      return [];
+    }
   }
 
   /// Additive: `GET /api/prayer-history?user_id=<resolve user_id>`.
@@ -929,13 +976,14 @@ class PrayerWallService {
       for (final e in list) {
         if (e is Map) {
           final m = Map<String, dynamic>.from(e);
-          final id = (m['blocked_user_id'] ??
+          final nested = m['user'] ?? m['blocked_user'] ?? m['blockedUser'];
+          var id = (m['blocked_user_id'] ??
                   m['blockedUserId'] ??
                   m['user_id'] ??
                   m['id'] ??
                   '')
               .toString();
-          final name = (m['name'] ??
+          var name = (m['name'] ??
                   m['blocked_user_name'] ??
                   m['blockedUserName'] ??
                   m['user_name'] ??
@@ -943,6 +991,25 @@ class PrayerWallService {
                   m['displayName'] ??
                   '')
               .toString();
+          if (nested is Map) {
+            final u = Map<String, dynamic>.from(nested);
+            if (id.trim().isEmpty) {
+              id = (u['user_id'] ??
+                      u['blocked_user_id'] ??
+                      u['_id'] ??
+                      u['id'] ??
+                      '')
+                  .toString();
+            }
+            if (name.trim().isEmpty) {
+              name = (u['name'] ??
+                      u['user_name'] ??
+                      u['display_name'] ??
+                      u['displayName'] ??
+                      '')
+                  .toString();
+            }
+          }
           addEntry(id, name);
         } else {
           addEntry(e.toString(), null);
@@ -953,7 +1020,10 @@ class PrayerWallService {
     if (decoded is Map) {
       final m = Map<String, dynamic>.from(decoded);
       addFromList(
-        m['blocked_user_ids'] ?? m['blockedUserIds'] ?? m['blocked_users'],
+        m['blocked_user_ids'] ??
+            m['blockedUserIds'] ??
+            m['blocked_users'] ??
+            m['users'],
       );
       addFromList(m['items']);
       final data = m['data'];
@@ -965,6 +1035,7 @@ class PrayerWallService {
           dm['blocked_user_ids'] ??
               dm['blockedUserIds'] ??
               dm['blocked_users'] ??
+              dm['users'] ??
               dm['items'],
         );
       }
@@ -1230,7 +1301,7 @@ class PrayerWallService {
     }
   }
 
-  /// Same Gemini endpoint used by Chat / Prayer Guidance.
+  /// Same Combine chat endpoint used by Chat / Prayer Guidance.
   static const String _aiBaseUrl =
       'https://combine-api-ruby.vercel.app/api/chat';
 

@@ -56,6 +56,16 @@ class PrayerWallApiConstant {
   /// Additive: rotating spotlight queue — `GET /api/prayer-queue`.
   static String get prayerQueue => _path('/api/prayer-queue');
 
+  /// Same two-way block filter as wall GET.
+  /// `GET /api/prayer-queue?excludeBlockedForUserId=`.
+  static String prayerQueueExcludingBlockedForUser(String userId) =>
+      '$prayerQueue?excludeBlockedForUserId=${Uri.encodeQueryComponent(userId)}';
+
   /// Additive: current hotspot prayer — `GET /api/prayer-queue/current`.
   static String get prayerQueueCurrent => _path('/api/prayer-queue/current');
+
+  /// Same two-way block filter as wall GET.
+  /// `GET /api/prayer-queue/current?excludeBlockedForUserId=`.
+  static String prayerQueueCurrentExcludingBlockedForUser(String userId) =>
+      '$prayerQueueCurrent?excludeBlockedForUserId=${Uri.encodeQueryComponent(userId)}';
 }

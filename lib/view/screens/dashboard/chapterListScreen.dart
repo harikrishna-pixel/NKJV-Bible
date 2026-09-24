@@ -106,6 +106,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
     final isVintage =
         themeProvider.currentCustomTheme == AppCustomTheme.vintage;
     final isDark = themeProvider.themeMode == ThemeMode.dark;
+    const paperInk = Color(0xFF3E2A1F);
     // White/yellow themes always use their light surface (even in Dark Mode).
     final scaffoldBg = isVintage
         ? (isDark ? CommanColor.black : const Color(0xFFF5F0E6))
@@ -132,7 +133,8 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                   ? Center(
                       child: Text(
                         'No chapters available',
-                        style: CommanStyle.bw16500(context),
+                        style: CommanStyle.bw16500(context)
+                            .copyWith(color: paperInk),
                       ),
                     )
                   : ListView(
@@ -154,14 +156,15 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                             child: Icon(
                               Icons.arrow_back_ios,
                               size: 20,
-                              color: CommanColor.whiteBlack(context),
+                              color: paperInk,
                             ),
                           ),
                         ),
                         Padding(
                           padding: const EdgeInsets.only(right: 20.0),
                           child: Text("Chapter",
-                              style: CommanStyle.appBarStyle(context)),
+                              style: CommanStyle.appBarStyle(context)
+                                  .copyWith(color: paperInk)),
                         ),
                         const SizedBox()
                       ],
@@ -281,7 +284,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                                         ? CommanColor
                                             .inDarkWhiteAndInLightPrimary(
                                                 context)
-                                        : CommanColor.whiteBlack(context)),
+                                        : paperInk),
                               ),
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -291,7 +294,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                                 style: TextStyle(
                                   color: isChapterRead
                                       ? progressColor
-                                      : CommanColor.whiteBlack(context),
+                                      : paperInk,
                                   fontWeight: isSelected || isChapterRead
                                       ? FontWeight.w700
                                       : FontWeight.w600,

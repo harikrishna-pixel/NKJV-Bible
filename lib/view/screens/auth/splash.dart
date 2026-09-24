@@ -146,12 +146,10 @@ class _SplashScreenState extends State<SplashScreen>
     setState(() {
       _progress = 1.0;
     });
-    // If the open ad did not show, hold at 100% for 3s then enter the app.
-    await Future.delayed(
-      openAdShown
-          ? const Duration(milliseconds: 300)
-          : const Duration(seconds: 3),
-    );
+    // Ad already had 3.5s to appear. If it did not, enter immediately.
+    if (openAdShown) {
+      await Future.delayed(const Duration(milliseconds: 300));
+    }
     if (!mounted) return;
     await handleNavigation();
   }
@@ -183,8 +181,6 @@ class _SplashScreenState extends State<SplashScreen>
     final onboardingDone =
         await SharPreferences.getBoolean(SharPreferences.onboarding);
     if (onboardingDone != true) return false;
-    final launchCount = prefs.getInt('launchCount') ?? 0;
-    if (launchCount <= 1) return false;
 
     final data = prefs.getString('showopenad');
     if (data != "true") return false;
@@ -330,8 +326,13 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     final loaded = await loadDone.future.timeout(
-      const Duration(seconds: 8),
-      onTimeout: () => false,
+      const Duration(milliseconds: 3500),
+      onTimeout: () {
+        _appOpenAd?.dispose();
+        _appOpenAd = null;
+        _completeSplashOpenAd();
+        return false;
+      },
     );
     if (loaded &&
         _appOpenAd != null &&

@@ -180,6 +180,8 @@ class LoginScreen extends HookConsumerWidget {
                       CustomTextFormField(
                         controller: loginState.emailCon,
                         hintText: 'Email',
+                        inputType: TextInputType.emailAddress,
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
                         validator: FormBuilderValidators.compose([
                           FormBuilderValidators.required(
                               errorText: 'Please enter your email address'),

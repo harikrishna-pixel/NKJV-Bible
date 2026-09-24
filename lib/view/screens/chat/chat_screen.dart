@@ -2395,7 +2395,9 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                         IconButton(
                           icon: Icon(
                             Icons.arrow_back_ios_new,
-                            color: CommanColor.whiteBlack(context),
+                            color: isDark
+                                ? const Color(0xFFF7F0E6)
+                                : CommanColor.whiteBlack(context),
                           ),
                           onPressed: () => _handleBack(),
                         ),
@@ -2881,9 +2883,11 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                                 'faith_answers', 'EN'),
                                             style: TextStyle(
                                               fontWeight: FontWeight.w700,
-                                              color: CommanColor.whiteBlack(
-                                                      context)
-                                                  .withOpacity(0.7),
+                                              color: isDark
+                                                  ? const Color(0xFFF7F0E6)
+                                                  : CommanColor.whiteBlack(
+                                                          context)
+                                                      .withOpacity(0.7),
                                               fontSize:
                                                   screenWidth > 450 ? 26 : 23,
                                             ),
@@ -2898,9 +2902,12 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                                   'get_guidance', 'EN'),
                                               textAlign: TextAlign.center,
                                               style: TextStyle(
-                                                color: CommanColor.whiteBlack(
-                                                        context)
-                                                    .withOpacity(0.5),
+                                                color: isDark
+                                                    ? const Color(0xFFF7F0E6)
+                                                        .withOpacity(0.88)
+                                                    : CommanColor.whiteBlack(
+                                                            context)
+                                                        .withOpacity(0.5),
                                                 fontSize:
                                                     screenWidth > 450 ? 16 : 15,
                                               ),
@@ -3074,7 +3081,9 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                       style: TextStyle(
                         color: isSelected
                             ? CommanColor.white
-                            : CommanColor.whiteBlack(context),
+                            : (isDark
+                                ? const Color(0xFFF7F0E6)
+                                : CommanColor.whiteBlack(context)),
                         fontSize: screenWidth > 450 ? 14 : 12,
                         fontWeight:
                             isSelected ? FontWeight.w600 : FontWeight.w500,
@@ -3204,7 +3213,9 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
               Text(
                 ChatTranslations.get('recent_conversations', 'EN'),
                 style: TextStyle(
-                  color: CommanColor.whiteBlack(context).withOpacity(0.8),
+                  color: isDark
+                      ? const Color(0xFFF7F0E6)
+                      : CommanColor.whiteBlack(context).withOpacity(0.8),
                   fontSize: screenWidth > 450 ? 14 : 12,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.5,
@@ -3223,7 +3234,9 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                 child: Text(
                   ChatTranslations.get('view_all', 'EN'),
                   style: TextStyle(
-                    color: CommanColor.whiteBlack(context),
+                    color: isDark
+                        ? const Color(0xFFF7F0E6)
+                        : CommanColor.whiteBlack(context),
                     fontSize: screenWidth > 450 ? 13 : 12,
                     fontWeight: FontWeight.w600,
                     // decoration: TextDecoration.underline,

@@ -21,40 +21,11 @@ class CalendarScreen extends StatefulHookConsumerWidget {
 
 class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   static const Color _tanCircle = Color(0xFFD4A96A);
-  final _eventFieldKey = GlobalKey();
-  FocusNode? _eventFieldNode;
 
   @override
   void initState() {
     super.initState();
-    final bloc = ref.read(calendarDataBloc);
-    bloc.initState();
-    _eventFieldNode = bloc.fieldNode;
-    _eventFieldNode!.addListener(_scrollEventFieldIntoView);
-  }
-
-  @override
-  void dispose() {
-    _eventFieldNode?.removeListener(_scrollEventFieldIntoView);
-    super.dispose();
-  }
-
-  void _scrollEventFieldIntoView() {
-    final fieldNode = _eventFieldNode;
-    if (fieldNode == null || !fieldNode.hasFocus) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(milliseconds: 280), () {
-        if (!mounted || !fieldNode.hasFocus) return;
-        final fieldContext = _eventFieldKey.currentContext;
-        if (fieldContext == null) return;
-        Scrollable.ensureVisible(
-          fieldContext,
-          alignment: 0.35,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
-        );
-      });
-    });
+    ref.read(calendarDataBloc).initState();
   }
 
   Widget _legendItem({
@@ -157,6 +128,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       });
     });
 
+    final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
     final calendarBloc = ref.watch(calendarDataBloc);
     final themeProvider = p.Provider.of<ThemeProvider>(context);
     final isVintageTheme =
@@ -231,24 +203,28 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     }
 
     return Scaffold(
-        resizeToAvoidBottomInset: true,
+        resizeToAvoidBottomInset: false,
         backgroundColor: p.Provider.of<ThemeProvider>(context).backgroundColor,
         body: GestureDetector(
           onTap: () {
             FocusScope.of(context).unfocus();
           },
-          child: Container(
-            width: MediaQuery.of(context).size.width,
-            color: isVintageTheme ? null : themeProvider.backgroundColor,
-            decoration: isVintageTheme
-                ? BoxDecoration(
-                    image: DecorationImage(
-                      image: AssetImage(Images.bgImage(context)),
-                      fit: BoxFit.cover,
-                    ),
-                  )
-                : null,
-            child: Column(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Positioned.fill(
+                child: isVintageTheme
+                    ? DecoratedBox(
+                        decoration: BoxDecoration(
+                          image: DecorationImage(
+                            image: AssetImage(Images.bgImage(context)),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      )
+                    : ColoredBox(color: themeProvider.backgroundColor),
+              ),
+              Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(
@@ -406,7 +382,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     ),
                   ),
                   Padding(
-                    key: _eventFieldKey,
                     padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
                     child: TextFormField(
                       controller: calendarBloc.fieldCon,
@@ -514,13 +489,15 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     ),
                   ),
                 ),
-                SafeArea(
-                  top: false,
-                  minimum: const EdgeInsets.only(bottom: 4),
-                  child: _buildLegend(context),
-                ),
+                if (!keyboardOpen)
+                  SafeArea(
+                    top: false,
+                    minimum: const EdgeInsets.only(bottom: 4),
+                    child: _buildLegend(context),
+                  ),
               ],
             ),
+            ],
           ),
         ));
   }

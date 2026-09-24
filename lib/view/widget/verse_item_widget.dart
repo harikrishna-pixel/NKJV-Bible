@@ -4,8 +4,10 @@ import 'package:html/parser.dart';
 
 import 'package:biblebookapp/Model/verseBookContentModel.dart';
 import 'package:biblebookapp/controller/dashboard_controller.dart';
+import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/dashboard/constants.dart';
 import 'package:html_unescape/html_unescape.dart';
+import 'package:provider/provider.dart';
 
 import '../constants/colors.dart';
 
@@ -138,8 +140,11 @@ class _VerseItemWidgetState extends State<VerseItemWidget> {
       return baseStyle.copyWith(color: CommanColor.black);
     }
 
+    final isDark =
+        Provider.of<ThemeProvider>(context, listen: false).themeMode ==
+            ThemeMode.dark;
     return baseStyle.copyWith(
-      color: CommanColor.whiteBlack(context),
+      color: isDark ? Colors.white : CommanColor.whiteBlack(context),
       backgroundColor: Colors.transparent,
     );
   }

@@ -143,6 +143,9 @@ class AppEmailValidator {
     }
 
     final domain = parts[1];
+    if (domain != 'gmail.com') {
+      return 'Email is not valid';
+    }
     if (domain.startsWith('.') ||
         domain.endsWith('.') ||
         domain.contains('..')) {

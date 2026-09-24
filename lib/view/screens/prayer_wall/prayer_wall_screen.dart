@@ -1037,13 +1037,12 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
 
   String? _blockPrayerId(PrayerWallItem item) => _mongoPrayerId(item.id);
 
-  /// Additive: block target = poster resolve id when present (person-level).
-  /// Falls back to cached map, then prayer `_id` (existing POST shape).
+  /// Block target = poster's resolve user id only (two-way excludeBlocked).
+  /// Never send prayer `_id` as blocked_user_id.
   String? _blockTargetId(PrayerWallItem item) {
     return _mongoPrayerId(item.identityUserId) ??
         _mongoPrayerId(item.authorUserId) ??
-        _mongoPrayerId(_prayerAuthorUserIdMap[item.id]) ??
-        _blockPrayerId(item);
+        _mongoPrayerId(_prayerAuthorUserIdMap[item.id]);
   }
 
   bool _itemMatchesBlockedId(PrayerWallItem p, String id) {
@@ -1295,28 +1294,83 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     }
   }
 
+  bool _isUsableBlockedName(String value) {
+    final n = value.trim();
+    if (n.isEmpty) return false;
+    final lower = n.toLowerCase();
+    return lower != 'blocked prayer' && lower != 'blocked user';
+  }
+
+  /// Cached name for a leftover blocked id (person id or prayer id).
+  String _blockedListNameForId(String id) {
+    String? pick(String? raw) {
+      final n = (raw ?? '').trim();
+      return _isUsableBlockedName(n) ? n : null;
+    }
+
+    final direct = pick(_blockedDisplayNames[id]);
+    if (direct != null) return direct;
+    for (final rid in _relatedLocalBlockedIds(id)) {
+      final named = pick(_blockedDisplayNames[rid]) ??
+          pick(_prayerAuthorMap[rid]);
+      if (named != null) return named;
+    }
+    return pick(_prayerAuthorMap[id]) ?? '';
+  }
+
   /// Additive: when a blocked person still has a wall card, copy that name onto
   /// matching blocked ids that have no cached label yet.
   Future<void> _backfillBlockedDisplayNamesFromWall() async {
     if (_blockedUserIds.isEmpty) return;
     final next = Map<String, String>.from(_blockedDisplayNames);
     var changed = false;
-    for (final item in _all) {
+
+    Future<void> applyName(String id, String name) async {
+      if ((next[id] ?? '').trim().isNotEmpty) return;
+      if (!_isUsableBlockedName(name)) return;
+      next[id] = name.trim();
+      await PrayerWallLocalStore.rememberBlockedDisplayName(
+        id,
+        displayName: name.trim(),
+        email: _userEmail,
+      );
+      changed = true;
+    }
+
+    for (final item in [..._all, ..._historyItems]) {
       if (!_isItemBlocked(item)) continue;
       final name = _cardDisplayName(item).trim();
-      if (name.isEmpty || name.toLowerCase() == 'blocked prayer') continue;
+      if (!_isUsableBlockedName(name)) continue;
       for (final id in _blockedUserIds) {
         if (!_itemMatchesBlockedId(item, id)) continue;
-        if ((next[id] ?? '').trim().isNotEmpty) continue;
-        next[id] = name;
-        await PrayerWallLocalStore.rememberBlockedDisplayName(
-          id,
-          displayName: name,
-          email: _userEmail,
-        );
-        changed = true;
+        await applyName(id, name);
       }
     }
+
+    // Wall GET hides blocked people, so leftover ids have no card. Look up
+    // the prayer/user with existing GETs (not block POST/DELETE).
+    for (final id in List<String>.from(_blockedPeopleIdsNotOnWall)) {
+      if ((next[id] ?? '').trim().isNotEmpty) continue;
+      PrayerWallItem? found;
+      try {
+        found = await PrayerWallService.fetchPrayerByPrayerId(id);
+      } catch (_) {}
+      if (found == null) {
+        try {
+          final posted =
+              await PrayerWallService.fetchPrayersPostedByIdentity(id);
+          if (posted.isNotEmpty) found = posted.first;
+        } catch (_) {}
+      }
+      if (found == null) continue;
+      final name = _cardDisplayName(found).trim();
+      if (!_isUsableBlockedName(name)) continue;
+      await applyName(id, name);
+      for (final rid in _relatedLocalBlockedIds(id)) {
+        await applyName(rid, name);
+      }
+    }
+
     if (changed && mounted) {
       setState(() => _blockedDisplayNames = next);
     }
@@ -2680,16 +2734,11 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
           );
         }),
         ...leftover.map((id) {
-          final cached = (_blockedDisplayNames[id] ?? '').trim();
-          final fromAuthor = (_prayerAuthorMap[id] ?? '').trim();
-          final name = cached.isNotEmpty
-              ? cached
-              : (fromAuthor.isNotEmpty ? fromAuthor : 'Blocked prayer');
+          final name = _blockedListNameForId(id);
+          final shown = name.isNotEmpty ? name : 'Blocked user';
           return blockedCard(
-            name: name,
-            subtitle: name == 'Blocked prayer'
-                ? 'This prayer is hidden from your wall.'
-                : 'This profile is hidden from your wall.',
+            name: shown,
+            subtitle: 'This profile is hidden from your wall.',
             onUnblock: () => _unblockByPrayerId(id),
           );
         }),
@@ -2840,30 +2889,66 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     }
   }
 
-  Widget _ownProfileStatCell(String value, String label, bool isDark) {
+  Widget _ownProfileStatCell(
+    String value,
+    String label,
+    bool isDark, {
+    VoidCallback? onTap,
+  }) {
+    final child = Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontFamily: 'Georgia',
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: isDark ? Colors.white : const Color(0xFF5C4033),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 11,
+            color: isDark ? Colors.white60 : const Color(0xFF6B5344),
+          ),
+        ),
+      ],
+    );
     return Expanded(
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: TextStyle(
-              fontFamily: 'Georgia',
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white : const Color(0xFF5C4033),
+      child: onTap == null
+          ? child
+          : InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: child,
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 11,
-              color: isDark ? Colors.white60 : const Color(0xFF6B5344),
-            ),
-          ),
-        ],
-      ),
+    );
+  }
+
+  Future<void> _openOwnFollowPeopleList({required bool followers}) async {
+    var id = (_resolveUserId ?? '').trim();
+    if (id.isEmpty) {
+      final allowed = await _ensureLoggedIn(
+        message: 'Please log in to view this list.',
+      );
+      if (!allowed || !mounted) return;
+      id = (_resolveUserId ?? '').trim();
+    }
+    if (id.isEmpty) {
+      Constants.showToast('Please log in to view this list.', 2000);
+      return;
+    }
+    await showPrayerWallFollowPeopleSheet(
+      context: context,
+      userId: id,
+      followers: followers,
+      wallPrayers: List<PrayerWallItem>.from(_all),
     );
   }
 
@@ -3869,14 +3954,26 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                   color: isDark ? Colors.white24 : brown.withOpacity(0.15),
                 ),
                 _ownProfileStatCell(
-                    '$_ownFollowersCount', 'Followers', isDark),
+                  '$_ownFollowersCount',
+                  'Followers',
+                  isDark,
+                  onTap: () => unawaited(
+                    _openOwnFollowPeopleList(followers: true),
+                  ),
+                ),
                 Container(
                   width: 1,
                   height: 38,
                   color: isDark ? Colors.white24 : brown.withOpacity(0.15),
                 ),
                 _ownProfileStatCell(
-                    '$_ownFollowingCount', 'Following', isDark),
+                  '$_ownFollowingCount',
+                  'Following',
+                  isDark,
+                  onTap: () => unawaited(
+                    _openOwnFollowPeopleList(followers: false),
+                  ),
+                ),
               ],
             ),
           ),
@@ -5622,7 +5719,7 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.55),
+        color: Colors.white.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: _brown.withValues(alpha: 0.35), width: 1),
       ),
@@ -5662,6 +5759,11 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
     final likeCount = widget.likeCountOf();
     final commentCount = widget.commentCountOf();
     final category = widget.item.category.trim();
+    final isDark =
+        Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark;
+    final onBg = isDark ? const Color(0xFFF5EFE4) : _ink;
+    final onBgBrown = isDark ? const Color(0xFFE8D4B8) : _brown;
+    final onBgMuted = isDark ? const Color(0xFFD8C8B4) : _muted;
 
     return Scaffold(
       backgroundColor: _cream,
@@ -5682,18 +5784,18 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back_ios, color: _brown),
+                      icon: Icon(Icons.arrow_back_ios, color: onBgBrown),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                     Expanded(
                       child: Text(
                         widget.fromHotspot ? 'Hotspot Prayer' : 'Prayer',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'Georgia',
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
-                          color: _brown,
+                          color: onBgBrown,
                         ),
                       ),
                     ),
@@ -5711,7 +5813,7 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
                           onTap: widget.onProfileTap,
                           child: CircleAvatar(
                             radius: 28,
-                            backgroundColor: _brown.withValues(alpha: 0.15),
+                            backgroundColor: onBgBrown.withValues(alpha: 0.22),
                             backgroundImage:
                                 photo.isNotEmpty ? NetworkImage(photo) : null,
                             onBackgroundImageError:
@@ -5722,8 +5824,8 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
                                     name.isEmpty
                                         ? '?'
                                         : name.trim()[0].toUpperCase(),
-                                    style: const TextStyle(
-                                      color: _brown,
+                                    style: TextStyle(
+                                      color: onBgBrown,
                                       fontWeight: FontWeight.w700,
                                       fontSize: 20,
                                     ),
@@ -5739,27 +5841,27 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
                               children: [
                                 Text(
                                   name,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontFamily: 'Georgia',
                                     fontSize: 20,
                                     fontWeight: FontWeight.w700,
-                                    color: _ink,
+                                    color: onBg,
                                   ),
                                 ),
                                 if (widget.isMine) ...[
                                   const SizedBox(height: 4),
                                   _metaChip(
                                     label: 'You',
-                                    brown: _brown,
-                                    isDark: false,
+                                    brown: onBgBrown,
+                                    isDark: isDark,
                                   ),
                                 ],
                                 const SizedBox(height: 2),
                                 Text(
                                   widget.timeLabel,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 13,
-                                    color: _muted,
+                                    color: onBgMuted,
                                   ),
                                 ),
                               ],
@@ -5771,22 +5873,22 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
                     const SizedBox(height: 16),
                     Text(
                       _chosenTitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'Georgia',
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
-                        color: _ink,
+                        color: onBg,
                       ),
                     ),
                     if (category.isNotEmpty) ...[
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          const Text(
+                          Text(
                             'Category',
                             style: TextStyle(
                               fontWeight: FontWeight.w700,
-                              color: _ink,
+                              color: onBg,
                               fontSize: 14,
                             ),
                           ),
@@ -5795,13 +5897,17 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFE8D9C4),
+                              color: isDark
+                                  ? const Color(0xFF4A382C)
+                                  : const Color(0xFFE8D9C4),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
                               category,
-                              style: const TextStyle(
-                                color: _ink,
+                              style: TextStyle(
+                                color: isDark
+                                    ? const Color(0xFFF5EFE4)
+                                    : _ink,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 13,
                               ),

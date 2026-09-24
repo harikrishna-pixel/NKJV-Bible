@@ -39,11 +39,11 @@ class LibraryEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final primary = CommanColor.lightDarkPrimary(context);
     final screenWidth = MediaQuery.of(context).size.width;
-    final isDark = CommanColor.isDarkTheme(context);
-    final titleColor = isDark ? Colors.white : primary;
-    final subtitleColor =
-        isDark ? Colors.white.withOpacity(0.88) : primary.withOpacity(0.85);
-    final iconColor = isDark ? Colors.white : primary;
+    final lightCanvas = !CommanColor.isDarkTheme(context);
+    final ink = lightCanvas ? const Color(0xFF3D2914) : Colors.white;
+    final titleColor = ink;
+    final subtitleColor = ink.withOpacity(lightCanvas ? 0.72 : 0.88);
+    final iconColor = lightCanvas ? primary : Colors.white;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 28),

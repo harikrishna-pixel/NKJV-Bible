@@ -571,6 +571,15 @@ Future<String> getTempToken() async {
   }
 }
 
+/// Signup: true only when register actually stored [inviteCode] as referred_by.
+Future<bool> didSignupApplyReferral(String inviteCode) async {
+  final code = inviteCode.trim();
+  if (code.isEmpty) return false;
+  final raw = await cacheNotifier.readCache(key: 'referred_by');
+  final stored = raw?.toString().trim() ?? '';
+  return stored.isNotEmpty && stored.toUpperCase() == code.toUpperCase();
+}
+
 Future<bool> updateReferralRewardClaimed({
   required int value,
   String? referredBy,
@@ -970,9 +979,10 @@ Future<String?> registerUser(
       'app_id': BibleInfo.appID,
       'interested_vc_tags': selectedCategories.toString()
     };
-    // Backend accepts invite only at register (profile-update cannot set it).
+    // Invite = friend's code on both keys; own code comes back as user.referral_code.
     if (inviteCode.isNotEmpty) {
       body['referred_by'] = inviteCode;
+      body['referral_code'] = inviteCode;
     }
     final resp =
         await http.post(Uri.parse(Api.register), headers: <String, String>{
@@ -1009,9 +1019,45 @@ Future<String?> registerUser(
                 .toString()
                 .trim()
             : '';
-        final stored =
-            fromApi.isNotEmpty ? fromApi : inviteCode;
-        await cacheNotifier.writeCache(key: 'referred_by', value: stored);
+        final responseMap =
+            data is Map<String, dynamic> ? data : <String, dynamic>{};
+        var accepted = fromApi.isNotEmpty &&
+            fromApi.toUpperCase() == inviteCode.toUpperCase();
+        if (!accepted) {
+          accepted = _referralWasAcceptedByApi(
+            responseMap,
+            enteredCode: inviteCode,
+          );
+        }
+        if (!accepted) {
+          try {
+            final body =
+                await ProfileUpdateApi().fetchLoggedInUserProfileSnapshot();
+            if (body != null && body.isNotEmpty) {
+              final parsed = jsonDecode(body);
+              if (parsed is Map<String, dynamic>) {
+                accepted = _referralWasAcceptedByApi(
+                  parsed,
+                  enteredCode: inviteCode,
+                );
+                final snapRef = _readStringField(
+                  _userFromAuthResponse(parsed),
+                  ['referred_by', 'referredBy', 'referrer_code'],
+                );
+                if (snapRef != null &&
+                    snapRef.toUpperCase() == inviteCode.toUpperCase()) {
+                  accepted = true;
+                }
+              }
+            }
+          } catch (_) {}
+        }
+        if (accepted) {
+          await cacheNotifier.writeCache(
+            key: 'referred_by',
+            value: fromApi.isNotEmpty ? fromApi : inviteCode,
+          );
+        }
       }
       await PrayerWallLocalStore.clearAccountScopedData();
       await PrayerWallService.resolveIdentityUser(

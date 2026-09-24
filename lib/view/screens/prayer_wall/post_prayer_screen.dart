@@ -14,6 +14,49 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+/// Pop only leftover Type Your Prayer; stop on Post a Prayer or Wall.
+void _popUntilPostAPrayer(NavigatorState nav) {
+  nav.popUntil((route) {
+    if (route.settings.name == PostPrayerScreen.routeName) return true;
+    if (route.settings.name == _PrayerDetailsComposeScreen.routeName) {
+      return false;
+    }
+    return true;
+  });
+}
+
+void _popComposeRoute(BuildContext context, [Object? result]) {
+  final nav = Navigator.of(context);
+  if (!nav.canPop()) return;
+  nav.pop(result);
+}
+
+/// X / Cancel / system back: drop Details + Post only. Never pop Prayer Wall.
+void _closePostAPrayer(BuildContext context) {
+  final nav = Navigator.of(context);
+  nav.popUntil((route) {
+    if (route.settings.name == _PrayerDetailsComposeScreen.routeName) {
+      return false;
+    }
+    if (route.settings.name == PostPrayerScreen.routeName) {
+      return false;
+    }
+    return true;
+  });
+}
+
+/// iOS/iPad can leave a caret on the previous field. Keep one cursor.
+void _keepOnlyTextFocus(FocusNode keep) {
+  for (final node in FocusManager.instance.rootScope.traversalDescendants) {
+    if (node != keep && node.hasFocus) {
+      node.unfocus();
+    }
+  }
+  if (!keep.hasFocus) {
+    keep.requestFocus();
+  }
+}
+
 /// "Post a Prayer" — POST `/api/prayers`. Duration/credits are UI-only (not sent to API).
 class PostPrayerScreen extends StatefulWidget {
   const PostPrayerScreen({
@@ -48,6 +91,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
 
   final _titleCtrl = TextEditingController();
   final _detailsCtrl = TextEditingController();
+  final _titleFocus = FocusNode();
   String _category = 'Others';
   int _durationDays = 30;
   // Anonymous posting UI disabled for now; posts use author name when provided.
@@ -104,7 +148,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
     final accepted = await PrayerWallJoinSheet.ensureAccepted(context);
     if (!mounted) return;
     if (!accepted) {
-      Navigator.of(context).pop();
+      _closePostAPrayer(context);
       return;
     }
     if (!alreadyAccepted) {
@@ -127,13 +171,24 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
               (PrayerDualDescription.isDual(existingDesc)
                   ? ''
                   : existingDesc));
-      final result = await Navigator.of(context).push<_PrayerDetailsComposeResult>(
+      final nav = Navigator.of(context);
+      // Drop a leftover Type Your Prayer so back cannot stack another one.
+      _popUntilPostAPrayer(nav);
+      if (!mounted) return;
+      final result = await nav.push<_PrayerDetailsComposeResult>(
         MaterialPageRoute(
+          fullscreenDialog: true,
+          settings: const RouteSettings(
+            name: _PrayerDetailsComposeScreen.routeName,
+          ),
           builder: (_) => _PrayerDetailsComposeScreen(
             initialWords: seedWords,
           ),
         ),
       );
+      if (mounted) {
+        _popUntilPostAPrayer(Navigator.of(context));
+      }
       if (!mounted || result == null) return;
       setState(() {
         _rawPrayerWords = result.originalWords;
@@ -239,7 +294,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         final action = await PrayerWallVerifyDialogs.showInappropriate(context);
         if (!mounted) return;
         if (action == 'cancel') {
-          Navigator.of(context).pop(false);
+          _closePostAPrayer(context);
         }
         // 'edit' / dismiss → stay on form so user can revise.
         return;
@@ -342,7 +397,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
           (route) => route.isFirst,
         );
       } else {
-        Navigator.of(context).pop(false);
+        _closePostAPrayer(context);
       }
     } catch (e) {
       if (mounted && verifyingOpen) {
@@ -371,6 +426,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
   void dispose() {
     _titleCtrl.dispose();
     _detailsCtrl.dispose();
+    _titleFocus.dispose();
     super.dispose();
   }
 
@@ -392,7 +448,13 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
             : themeProvider.backgroundColor);
     final dateFmt = DateFormat('MMMM d, yyyy');
 
-    return FocusScope(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _closePostAPrayer(context);
+      },
+      child: FocusScope(
       child: Scaffold(
         resizeToAvoidBottomInset: false,
         body: Container(
@@ -429,7 +491,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: () => Navigator.of(context).pop(false),
+                    onPressed: () => _closePostAPrayer(context),
                   ),
                   Expanded(
                     child: Center(
@@ -476,7 +538,9 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                     const SizedBox(height: 8),
                     TextField(
                       controller: _titleCtrl,
+                      focusNode: _titleFocus,
                       maxLength: 120,
+                      onTap: () => _keepOnlyTextFocus(_titleFocus),
                       style: TextStyle(color: isDark ? Colors.white : brown),
                       decoration: _fieldDecoration(
                         'Enter your prayer title',
@@ -614,7 +678,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                           child: OutlinedButton(
                             onPressed: _submitting
                                 ? null
-                                : () => Navigator.of(context).pop(false),
+                                : () => _closePostAPrayer(context),
                             style: OutlinedButton.styleFrom(
                               foregroundColor:
                                   isDark ? Colors.white70 : brown,
@@ -657,8 +721,9 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
       ),
     ),
   ),
-),
-);
+        ),
+      ),
+    );
   }
 
   Widget _label(String t, Color brown, bool isDark) {
@@ -740,6 +805,8 @@ class _PrayerDetailsComposeResult {
 class _PrayerDetailsComposeScreen extends StatefulWidget {
   const _PrayerDetailsComposeScreen({this.initialWords = ''});
 
+  static const routeName = '/PrayerDetailsCompose';
+
   final String initialWords;
 
   @override
@@ -756,6 +823,8 @@ class _PrayerDetailsComposeScreenState
 
   final _wordsCtrl = TextEditingController();
   final _englishCtrl = TextEditingController();
+  final _wordsFocus = FocusNode();
+  final _englishFocus = FocusNode();
   bool _reviewStep = false;
   bool _creating = false;
   String _originalWords = '';
@@ -775,6 +844,8 @@ class _PrayerDetailsComposeScreenState
   void dispose() {
     _wordsCtrl.dispose();
     _englishCtrl.dispose();
+    _wordsFocus.dispose();
+    _englishFocus.dispose();
     super.dispose();
   }
 
@@ -830,7 +901,8 @@ class _PrayerDetailsComposeScreenState
       );
       return;
     }
-    Navigator.of(context).pop(
+    _popComposeRoute(
+      context,
       _PrayerDetailsComposeResult(
         originalWords: _originalWords,
         englishPrayer: english,
@@ -890,7 +962,7 @@ class _PrayerDetailsComposeScreenState
                             child: IconButton(
                               icon:
                                   const Icon(Icons.arrow_back, color: _brown),
-                              onPressed: () => Navigator.of(context).pop(),
+                              onPressed: () => _popComposeRoute(context),
                             ),
                           ),
                           Text(
@@ -971,10 +1043,12 @@ class _PrayerDetailsComposeScreenState
                       SizedBox(height: isTablet ? 20 : 16),
                       TextField(
                         controller: _wordsCtrl,
+                        focusNode: _wordsFocus,
                         maxLines: isTablet ? 8 : 6,
                         maxLength: _maxChars,
                         enabled: !_creating,
                         textCapitalization: TextCapitalization.sentences,
+                        onTap: () => _keepOnlyTextFocus(_wordsFocus),
                         onTapOutside: (_) => _dismissKeyboard(),
                         style: const TextStyle(color: _brown, height: 1.35),
                         decoration: InputDecoration(
@@ -1189,8 +1263,10 @@ class _PrayerDetailsComposeScreenState
                 const SizedBox(height: 12),
                 TextField(
                   controller: _englishCtrl,
+                  focusNode: _englishFocus,
                   maxLines: null,
                   minLines: 3,
+                  onTap: () => _keepOnlyTextFocus(_englishFocus),
                   onTapOutside: (_) => _dismissKeyboard(),
                   style: TextStyle(
                     fontFamily: 'Georgia',

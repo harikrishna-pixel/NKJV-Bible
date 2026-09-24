@@ -204,12 +204,24 @@ class _LibraryScreenState extends State<LibraryScreen>
     });
   }
 
-  /// Selected tab: white icon on brown chip. Unselected: contrast on chip fill.
+  Color _libraryOnLightInk(BuildContext context) {
+    if (Provider.of<ThemeProvider>(context, listen: false).themeMode ==
+        ThemeMode.dark) {
+      return Colors.white;
+    }
+    if (CommanColor.usesLightCustomSurface(context)) {
+      return const Color(0xFF3D2914);
+    }
+    final theme = Provider.of<ThemeProvider>(context, listen: false);
+    if (theme.currentCustomTheme == AppCustomTheme.vintage) {
+      return const Color(0xFF3D2914);
+    }
+    return CommanColor.whiteBlack(context);
+  }
+
+  /// Selected and unselected chips stay dark so label/icon stay white.
   Color _libraryTabIconColor(BuildContext context, int tabIndex) {
-    if (selectedTap == tabIndex) return Colors.white;
-    return CommanColor.isDarkTheme(context)
-        ? CommanColor.lightDarkPrimary(context)
-        : Colors.white;
+    return Colors.white;
   }
 
   TextStyle _libraryTabTextStyle(
@@ -217,23 +229,20 @@ class _LibraryScreenState extends State<LibraryScreen>
     final fontSize = screenWidth > 450
         ? BibleInfo.fontSizeScale * 17
         : BibleInfo.fontSizeScale * 12;
-    if (selectedTap == tabIndex) {
-      return CommanStyle.white12400.copyWith(fontSize: fontSize);
-    }
-    return CommanStyle.inDarkPrimaryInLightWhite12400(context)
-        .copyWith(fontSize: fontSize);
+    return CommanStyle.white12400.copyWith(fontSize: fontSize);
   }
 
   Widget _libraryBackupHeaderIcon(BuildContext context, double size) {
-    final image = Image.asset(
-      "assets/home icons/Frame 3631.png",
-      height: size,
-      width: size,
-    );
-    if (!CommanColor.isDarkTheme(context)) return image;
     return ColorFiltered(
-      colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-      child: image,
+      colorFilter: ColorFilter.mode(
+        _libraryOnLightInk(context),
+        BlendMode.srcIn,
+      ),
+      child: Image.asset(
+        "assets/home icons/Frame 3631.png",
+        height: size,
+        width: size,
+      ),
     );
   }
 
@@ -252,8 +261,8 @@ class _LibraryScreenState extends State<LibraryScreen>
         ),
       ],
       color: isSelected
-          ? CommanColor.lightDarkPrimary(context)
-          : CommanColor.whiteBlack45(context),
+          ? CommanColor.lightModePrimary
+          : const Color(0xFF5C534C),
     );
   }
 
@@ -291,7 +300,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                         child: Icon(
                           Icons.arrow_back_ios,
                           size: screenWidth > 450 ? 30 : 20,
-                          color: CommanColor.whiteBlack(context),
+                          color: _libraryOnLightInk(context),
                         ),
                       ),
                     ),
@@ -300,6 +309,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       child: Text(
                         "My Library",
                         style: CommanStyle.appBarStyle(context).copyWith(
+                            color: _libraryOnLightInk(context),
                             fontSize: screenWidth > 450
                                 ? BibleInfo.fontSizeScale * 30
                                 : BibleInfo.fontSizeScale * 18,

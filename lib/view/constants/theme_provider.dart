@@ -82,12 +82,6 @@ class MyThemes {
     Color? customBackgroundColor,
     AppCustomTheme? customTheme,
   ]) {
-    // White/yellow custom themes keep a light surface even when Dark Mode is on.
-    if (customTheme != null &&
-        customTheme != AppCustomTheme.vintage &&
-        customBackgroundColor != null) {
-      return lightTheme(context, customBackgroundColor);
-    }
     return ThemeData(
       scaffoldBackgroundColor: CommanColor.darkPrimaryColor,
       primaryColor: Colors.black,

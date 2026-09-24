@@ -192,7 +192,11 @@ class _PourOutWorriesScreenState extends State<PourOutWorriesScreen> {
             child: InkWell(
               onTap: _hasText
                   ? () {
-                      Get.to(() => const TakeMomentIntroScreen());
+                      Get.to(
+                        () => TakeMomentIntroScreen(
+                          worryText: _controller.text.trim(),
+                        ),
+                      );
                     }
                   : null,
               borderRadius: BorderRadius.circular(28),

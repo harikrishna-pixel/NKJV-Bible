@@ -14,6 +14,7 @@ class CustomTextFormField extends StatefulWidget {
       this.inputFormatters,
       this.inputType,
       this.validator,
+      this.autovalidateMode,
       this.onTap,
       this.hintText});
   final TextEditingController controller;
@@ -24,6 +25,7 @@ class CustomTextFormField extends StatefulWidget {
   final Function()? onTap;
   final TextInputType? inputType;
   final String? Function(String?)? validator;
+  final AutovalidateMode? autovalidateMode;
   final List<TextInputFormatter>? inputFormatters;
 
   @override
@@ -32,25 +34,54 @@ class CustomTextFormField extends StatefulWidget {
 
 class _CustomTextFormFieldState extends State<CustomTextFormField> {
   late bool obsecureText;
+  late FocusNode _focusNode;
+  bool _ownsFocusNode = false;
+
   @override
   void initState() {
     super.initState();
     obsecureText = widget.isPassword;
+    _ownsFocusNode = widget.focusNode == null;
+    _focusNode = widget.focusNode ?? FocusNode();
+  }
+
+  @override
+  void dispose() {
+    if (_ownsFocusNode) {
+      _focusNode.dispose();
+    }
+    super.dispose();
+  }
+
+  /// iOS/iPad can leave a caret on the previous field. Drop sibling focus.
+  void _keepOnlyThisField() {
+    widget.onTap?.call();
+    for (final node in FocusManager.instance.rootScope.traversalDescendants) {
+      if (node != _focusNode && node.hasFocus) {
+        node.unfocus();
+      }
+    }
+    if (!_focusNode.hasFocus) {
+      _focusNode.requestFocus();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
-    return SizedBox(
-      height: screenWidth > 450 ? 70 : 50,
-      width: screenWidth,
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        minHeight: screenWidth > 450 ? 70 : 50,
+        minWidth: screenWidth,
+      ),
       child: TextFormField(
-        onTap: widget.onTap,
+        onTap: _keepOnlyThisField,
         controller: widget.controller,
-        focusNode: widget.focusNode,
+        focusNode: _focusNode,
         obscureText: obsecureText,
         readOnly: widget.readOnly ?? false,
         validator: widget.validator,
+        autovalidateMode: widget.autovalidateMode,
         keyboardType: widget.inputType,
         inputFormatters: widget.inputFormatters,
         style: screenWidth > 450
