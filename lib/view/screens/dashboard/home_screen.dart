@@ -147,6 +147,14 @@ String _subscriptionPeriodDisplayText(
   final planKey = plan?.toLowerCase() ?? '';
   // AR paywall only: map from stored days. Classic paywall keeps the old copy.
   if (BibleInfo.isAutoRenewablePaywallMode) {
+    // Additive: trust stored plan key first so Restore info matches the plan
+    // that was applied (silver/gold), not a lifetime day-threshold fallback.
+    if (planKey == 'silver') {
+      return 'Your subscription period is 1 month';
+    }
+    if (planKey == 'gold') {
+      return 'Your subscription period is 1 year';
+    }
     if (planKey == 'platinum' ||
         _isLifetimeSubscriptionDisplay(diffDy)) {
       return 'Your subscription period is lifetime';
@@ -159,13 +167,6 @@ String _subscriptionPeriodDisplayText(
     }
     if (diffDy >= 680 && diffDy <= 800) {
       return 'Your subscription period is 2 years';
-    }
-    // AR short plan is 1 Month (onemonthauto). Do not show 6 months.
-    if (planKey == 'silver') {
-      return 'Your subscription period is 1 month';
-    }
-    if (planKey == 'gold') {
-      return 'Your subscription period is 1 year';
     }
     return 'Your subscription expires on ${DateFormat('dd-MM-yyyy').format(expiryDate)}';
   }

@@ -27,12 +27,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart' as p;
 import '../../../../core/notifiers/cache.notifier.dart';
 
-/// Profile stays on cream/parchment in Dark Mode — use dark ink there only.
 Color _profileInk(BuildContext context) {
-  final isDark = p.Provider.of<ThemeProvider>(context, listen: false)
-          .themeMode ==
-      ThemeMode.dark;
-  if (isDark) return const Color(0xFF2C1810);
   return CommanColor.whiteBlack(context);
 }
 
@@ -342,10 +337,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
     return Scaffold(
         backgroundColor:
-        p.Provider.of<ThemeProvider>(context).currentCustomTheme ==
-            AppCustomTheme.vintage
-            ? const Color(0xFFF5F0E6)
-            : p.Provider.of<ThemeProvider>(context).backgroundColor,
+            p.Provider.of<ThemeProvider>(context).backgroundColor,
         body: Container(
           height: MediaQuery.of(context).size.height,
           width: MediaQuery.of(context).size.width,

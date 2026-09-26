@@ -1321,7 +1321,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                 _sendCustomPrayerRequest(request);
               },
               child: Text(
-                'Chat here',
+                'Generate Prayer',
                 style: TextStyle(
                   color: isDark ? Colors.white70 : brown,
                   fontWeight: FontWeight.w600,

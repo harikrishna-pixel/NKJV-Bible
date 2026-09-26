@@ -533,10 +533,12 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
 
   bool _isSelected(String category) => _selectedCategories.contains(category);
 
-  Widget _buildPreferenceTopicsHeader(double screenWidth) {
+  Widget _buildPreferenceTopicsHeader(double screenWidth, {required bool isDark}) {
     final isTablet = screenWidth > 600;
     final iconOuter = isTablet ? 104.0 : 92.0;
     final iconInner = isTablet ? 82.0 : 72.0;
+    final titleColor = isDark ? Colors.white : const Color(0xFF2D1E12);
+    final subtitleColor = isDark ? Colors.white : const Color(0xFF554D44);
 
     return Column(
       children: [
@@ -574,7 +576,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
           'Which verses speak to you?',
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: const Color(0xFF2D1E12),
+            color: titleColor,
             fontSize: isTablet ? 28 : 24,
             fontWeight: FontWeight.bold,
             fontFamily: 'Georgia',
@@ -587,7 +589,7 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
             'We\'ll shape your daily verses around these.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: const Color(0xFF554D44),
+              color: subtitleColor,
               fontSize: isTablet ? 18 : 15,
               height: 1.4,
             ),
@@ -650,7 +652,9 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                       child: Icon(
                         Icons.arrow_back_ios,
                         size: screenWidth > 600 ? 29 : 20,
-                        color: CommanColor.whiteBlack(context),
+                        color: isDark
+                            ? Colors.white
+                            : CommanColor.whiteBlack(context),
                       ),
                     ),
                     const SizedBox(),
@@ -677,13 +681,15 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                         child: Icon(
                           Icons.arrow_back_ios,
                           size: screenWidth > 600 ? 29 : 20,
-                          color: CommanColor.whiteBlack(context),
+                          color: isDark
+                              ? Colors.white
+                              : CommanColor.whiteBlack(context),
                         ),
                       ),
                     ),
                   ],
                 ),
-              _buildPreferenceTopicsHeader(screenWidth),
+              _buildPreferenceTopicsHeader(screenWidth, isDark: isDark),
               const SizedBox(height: 16),
               Expanded(
                 child: SingleChildScrollView(
@@ -777,16 +783,9 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                                 children: [
                                   ColorFiltered(
                                     colorFilter: ColorFilter.mode(
-                                      // White/Black for normal (unselected) based on theme
-                                      // Theme color (805531) when selected in light mode, white when selected in dark mode
-                                      selected
-                                          ? (isDark
+                                      isDark
                                           ? Colors.white
-                                          : const Color(0xFF805531))
-                                          : (isDark
-                                          ? CommanColor.whiteBlack(
-                                          context)
-                                          : const Color(0xFF805531)),
+                                          : const Color(0xFF805531),
                                       BlendMode.srcIn,
                                     ),
                                     child: Image.asset(
@@ -812,6 +811,9 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                                               size: screenWidth > 600
                                                   ? 28
                                                   : 16,
+                                              color: isDark
+                                                  ? Colors.white
+                                                  : const Color(0xFF805531),
                                             ),
                                           ),
                                     ),
@@ -824,17 +826,9 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                                       style: TextStyle(
                                         fontSize:
                                         screenWidth > 600 ? 19 : null,
-                                        // White/Black for normal (unselected) based on theme
-                                        // Theme color (805531) when selected in light mode, white when selected in dark mode
-                                        color: selected
-                                            ? (isDark
+                                        color: isDark
                                             ? Colors.white
-                                            : const Color(0xFF805531))
-                                            : (isDark
-                                            ? CommanColor.whiteBlack(
-                                            context)
-                                            : const Color(
-                                            0xFF805531)),
+                                            : const Color(0xFF805531),
                                       ),
                                     ),
                                   ),
@@ -858,8 +852,12 @@ class PreferenceSelectionScreenState extends State<PreferenceSelectionScreen> {
                   fontSize: screenWidth > 600 ? 17 : 14,
                   fontWeight: FontWeight.w600,
                   color: _selectedCategories.length >= 3
-                      ? const Color(0xFF6B8F71)
-                      : CommanColor.whiteBlack(context).withOpacity(0.75),
+                      ? (isDark
+                          ? Colors.white
+                          : const Color(0xFF6B8F71))
+                      : (isDark
+                          ? Colors.white
+                          : CommanColor.whiteBlack(context).withOpacity(0.75)),
                 ),
               ),
               const SizedBox(height: 12),

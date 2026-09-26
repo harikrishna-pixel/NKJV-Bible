@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
-import 'package:biblebookapp/view/constants/changeThemeButtun.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/streak_flow/streak_saved_list_screen.dart';
@@ -532,13 +531,15 @@ class _SettingScreenState extends State<SettingScreen>
   }
 
   Color _settingsRowInk(BuildContext context) {
+    final isDark =
+        Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark;
+    if (isDark) return Colors.white;
     return const Color(0xFF2C1810);
   }
 
   Color _settingsSectionBarColor(BuildContext context) {
-    final isDark =
-        Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark;
-    if (isDark) return Colors.black45;
+    final isDark = Provider.of<ThemeProvider>(context).isDarkMode;
+    if (isDark) return Colors.white.withOpacity(0.28);
     return CommanColor.lightDarkPrimary200(context).withOpacity(0.62);
   }
 
@@ -571,8 +572,7 @@ class _SettingScreenState extends State<SettingScreen>
     required NotificationTime notificationTime,
     required double screenWidth,
   }) {
-    final isDark =
-        Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark;
+    final isDark = Provider.of<ThemeProvider>(context).isDarkMode;
     final primary = CommanColor.lightDarkPrimary(context);
     final textColor = _settingsRowInk(context);
     final time = _formatNotificationTimeDisplay(
@@ -589,8 +589,8 @@ class _SettingScreenState extends State<SettingScreen>
     final Color iconRingColor;
     if (isDark) {
       rowFill = Colors.transparent;
-      rowBorder = primary.withOpacity(0.5);
-      iconRingColor = primary.withOpacity(0.85);
+      rowBorder = Colors.white.withOpacity(0.55);
+      iconRingColor = Colors.white.withOpacity(0.75);
     } else {
       rowFill = Colors.transparent;
       rowBorder = primary.withOpacity(0.5);
@@ -1169,10 +1169,7 @@ class _SettingScreenState extends State<SettingScreen>
       },
       child: Scaffold(
         backgroundColor:
-            Provider.of<ThemeProvider>(context).currentCustomTheme ==
-                    AppCustomTheme.vintage
-                ? const Color(0xFFF5F0E6)
-                : Provider.of<ThemeProvider>(context).backgroundColor,
+            Provider.of<ThemeProvider>(context).backgroundColor,
         body: Container(
             height: MediaQuery.of(context).size.height,
             width: MediaQuery.of(context).size.width,
@@ -1302,23 +1299,6 @@ class _SettingScreenState extends State<SettingScreen>
                 ),
                 Padding(
                   padding: EdgeInsets.symmetric(
-                      horizontal: 20, vertical: screenWidth < 380 ? 5 : 10),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      Text(
-                        themeProvider.isDarkMode ? "Light Mode" : "Dark Mode",
-                        style: CommanStyle.bw16500(context)
-                            .copyWith(color: _settingsRowInk(context)),
-                      ),
-                      const Spacer(),
-                      ChangeThemeButtonWidget()
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: EdgeInsets.symmetric(
                       horizontal: 20, vertical: screenWidth < 380 ? 7 : 10),
                   child: GestureDetector(
                     onTap: () => _showThemeDialog(context),
@@ -1337,18 +1317,29 @@ class _SettingScreenState extends State<SettingScreen>
                           width: screenWidth < 380 ? 27 : 32,
                           height: screenWidth < 380 ? 27 : 32,
                           decoration: BoxDecoration(
-                            image: Provider.of<ThemeProvider>(context)
-                                        .currentCustomTheme ==
-                                    AppCustomTheme.vintage
-                                ? DecorationImage(
-                                    image:
-                                        AssetImage(Images.bgImage((context))),
+                            image: themeProvider.isDarkMode
+                                ? const DecorationImage(
+                                    image: AssetImage(
+                                        'assets/nightMode/night_mode.png'),
                                     fit: BoxFit.cover,
                                   )
-                                : null,
-                            color: Provider.of<ThemeProvider>(context)
-                                .backgroundColor,
-                            border: Border.all(color: Colors.black, width: 2),
+                                : (themeProvider.savedCustomTheme ==
+                                        AppCustomTheme.vintage
+                                    ? const DecorationImage(
+                                        image: AssetImage(
+                                            'assets/lightMode/day_bg.png'),
+                                        fit: BoxFit.cover,
+                                      )
+                                    : null),
+                            color: themeProvider.isDarkMode
+                                ? CommanColor.darkPrimaryColor
+                                : themeProvider.customThemeSwatchColor,
+                            border: Border.all(
+                              color: themeProvider.isDarkMode
+                                  ? Colors.white
+                                  : Colors.black,
+                              width: 2,
+                            ),
                             borderRadius: BorderRadius.circular(6),
                           ),
                         ),
@@ -1895,7 +1886,7 @@ class _SettingScreenState extends State<SettingScreen>
       context: context,
       builder: (_) => ThemeDialog(
         selected: Provider.of<ThemeProvider>(context, listen: false)
-            .currentCustomTheme,
+            .savedCustomTheme,
         onPremiumRequired: () => _showPremiumThemeDialog(context),
       ),
     );
@@ -2325,11 +2316,14 @@ class ThemeDialog extends StatefulWidget {
 
 class _ThemeDialogState extends State<ThemeDialog> {
   late AppCustomTheme _selectedTheme;
+  late bool _selectedDarkMode;
 
   @override
   void initState() {
     super.initState();
     _selectedTheme = widget.selected;
+    _selectedDarkMode =
+        Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
   }
 
   @override
@@ -2354,28 +2348,58 @@ class _ThemeDialogState extends State<ThemeDialog> {
       return GestureDetector(
         onTap: () {
           setState(() {
+            _selectedDarkMode = false;
             _selectedTheme = theme;
           });
         },
         child: Container(
-          margin: const EdgeInsets.all(8),
-          width: 70,
-          height: 70,
+          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
             color: color,
             image: theme == AppCustomTheme.vintage
-                ? DecorationImage(
-                    image: AssetImage(Images.bgImage((context))),
+                ? const DecorationImage(
+                    image: AssetImage('assets/lightMode/day_bg.png'),
                     fit: BoxFit.cover,
                   )
                 : null,
             border: Border.all(
-              color: _selectedTheme == theme
+              color: !_selectedDarkMode && _selectedTheme == theme
                   ? Colors.brown
                   : const Color.fromARGB(255, 230, 230, 230),
-              width: 3,
+              width: 2,
             ),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      );
+    }
+
+    Widget darkThemeBox() {
+      return GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedDarkMode = true;
+          });
+        },
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: CommanColor.darkPrimaryColor,
+            image: const DecorationImage(
+              image: AssetImage('assets/nightMode/night_mode.png'),
+              fit: BoxFit.cover,
+            ),
+            border: Border.all(
+              color: _selectedDarkMode
+                  ? Colors.white
+                  : const Color.fromARGB(255, 230, 230, 230),
+              width: 2,
+            ),
+            borderRadius: BorderRadius.circular(8),
           ),
         ),
       );
@@ -2404,7 +2428,10 @@ class _ThemeDialogState extends State<ThemeDialog> {
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: themes.map(themeBox).toList(),
+            children: [
+              ...themes.map(themeBox),
+              darkThemeBox(),
+            ],
           ),
           const SizedBox(height: 20),
           Row(
@@ -2423,7 +2450,17 @@ class _ThemeDialogState extends State<ThemeDialog> {
                 onPressed: () async {
                   final provider =
                       Provider.of<ThemeProvider>(context, listen: false);
-                  if (_selectedTheme == provider.currentCustomTheme) {
+                  if (_selectedDarkMode) {
+                    if (provider.isDarkMode) {
+                      Constants.showToast("This theme is already applied");
+                      return;
+                    }
+                    provider.toggleTheme(true);
+                    Navigator.pop(context);
+                    return;
+                  }
+                  if (!provider.isDarkMode &&
+                      _selectedTheme == provider.savedCustomTheme) {
                     Constants.showToast("This theme is already applied");
                     return;
                   }
@@ -2503,6 +2540,9 @@ class _ThemeDialogState extends State<ThemeDialog> {
                     // User is subscribed, set theme directly without showing premium dialog
                     debugPrint(
                         "ThemeDialog: User is subscribed, setting theme directly");
+                    if (provider.isDarkMode) {
+                      provider.toggleTheme(false);
+                    }
                     provider.setCustomTheme(_selectedTheme);
                     Navigator.pop(context);
                   }

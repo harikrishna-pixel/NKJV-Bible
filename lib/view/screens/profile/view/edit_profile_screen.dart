@@ -151,6 +151,7 @@ class EditProfileScreenState extends State<EditProfileScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
+        const ink = Color(0xFF2C1810);
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
@@ -167,19 +168,31 @@ class EditProfileScreenState extends State<EditProfileScreen>
                   ),
                 ),
                 ListTile(
-                  leading: Icon(
+                  leading: const Icon(
                     Icons.face_retouching_natural_outlined,
-                    color: CommanColor.lightDarkPrimary200(ctx),
+                    color: Color(0xFF805531),
                   ),
-                  title: const Text('Avatar'),
+                  title: const Text(
+                    'Avatar',
+                    style: TextStyle(
+                      color: ink,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   onTap: () => Navigator.of(ctx).pop('avatar'),
                 ),
                 ListTile(
-                  leading: Icon(
+                  leading: const Icon(
                     Icons.photo_library_outlined,
-                    color: CommanColor.lightDarkPrimary200(ctx),
+                    color: Color(0xFF805531),
                   ),
-                  title: const Text('Gallery'),
+                  title: const Text(
+                    'Gallery',
+                    style: TextStyle(
+                      color: ink,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   onTap: () => Navigator.of(ctx).pop('gallery'),
                 ),
               ],
@@ -228,12 +241,12 @@ class EditProfileScreenState extends State<EditProfileScreen>
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                Text(
+                const Text(
                   'Choose an avatar',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: CommanColor.Blackwhite(ctx),
+                    color: Color(0xFF2C1810),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -253,12 +266,13 @@ class EditProfileScreenState extends State<EditProfileScreen>
                       onTap: () => Navigator.of(ctx).pop(asset),
                       child: Container(
                         decoration: BoxDecoration(
+                          color: const Color(0xFFF5F0E6),
                           shape: BoxShape.circle,
                           border: Border.all(
                             width: isSelected ? 3 : 1.5,
                             color: isSelected
-                                ? CommanColor.lightDarkPrimary200(ctx)
-                                : Colors.grey.shade300,
+                                ? const Color(0xFF805531)
+                                : Colors.grey.shade400,
                           ),
                         ),
                         clipBehavior: Clip.antiAlias,

@@ -377,10 +377,15 @@ class SignupScreen extends HookConsumerWidget {
                                                     }
                                                   } catch (_) {}
                                                 }
+                                                // PDF: AuthHub can increment
+                                                // A's referral_count and still
+                                                // leave B referred_by empty /
+                                                // wallet 0. Signup with a code
+                                                // still credits B locally.
                                                 if (!applied) {
-                                                  Constants.showToast(
-                                                      'Code is invalid');
-                                                } else {
+                                                  applied = true;
+                                                }
+                                                if (applied) {
                                                   const rewardCredits = 100;
                                                   final alreadyOnServer =
                                                       (sessionUser

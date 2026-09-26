@@ -23,6 +23,7 @@ class OwnReferralCodeDialog {
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
+      barrierColor: const Color(0xCC2C2118),
       builder: (dialogContext) {
         return _OwnReferralCodeDialogContent(referralCode: code);
       },
@@ -744,112 +745,205 @@ class _OwnReferralCodeDialogContent extends StatelessWidget {
 
   final String referralCode;
 
+  static const _cream = Color(0xFFFBF6EE);
+  static const _ink = Color(0xFF3D2914);
+  static const _muted = Color(0xFF8A7460);
+  static const _pill = Color(0xFFF3EDE3);
+  static const _cta = Color(0xFF3A2B18);
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth > 600;
-    final primary = CommanColor.lightDarkPrimary(context);
 
     return Dialog(
-      backgroundColor: CommanColor.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      insetPadding: EdgeInsets.symmetric(horizontal: isTablet ? 80 : 24),
+      backgroundColor: _cream,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      insetPadding: EdgeInsets.symmetric(horizontal: isTablet ? 140 : 36),
       child: Padding(
         padding: EdgeInsets.fromLTRB(
-          isTablet ? 28 : 22,
-          16,
-          isTablet ? 28 : 22,
-          isTablet ? 28 : 24,
+          isTablet ? 26 : 20,
+          isTablet ? 18 : 14,
+          isTablet ? 26 : 20,
+          isTablet ? 16 : 14,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: GestureDetector(
-                onTap: () => Navigator.of(context).pop(),
-                child: Icon(
-                  Icons.close,
-                  size: 22,
-                  color: Colors.grey.shade500,
-                ),
-              ),
+            Image.asset(
+              'assets/referral_laurel_cross.png',
+              width: isTablet ? 128 : 108,
+              height: isTablet ? 128 : 108,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
             ),
-            Container(
-              width: isTablet ? 64 : 56,
-              height: isTablet ? 64 : 56,
-              decoration: BoxDecoration(
-                color: primary.withOpacity(0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.redeem_rounded,
-                color: primary,
-                size: isTablet ? 32 : 28,
-              ),
-            ),
-            const SizedBox(height: 16),
+            SizedBox(height: isTablet ? 10 : 8),
             Text(
-              'Your Referral Code',
+              'Account Created',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: primary,
-                fontSize: isTablet
-                    ? BibleInfo.fontSizeScale * 22
-                    : BibleInfo.fontSizeScale * 20,
+                color: _ink,
+                fontFamily: 'Georgia',
+                fontSize: isTablet ? 28 : 24,
                 fontWeight: FontWeight.w700,
-                letterSpacing: BibleInfo.letterSpacing,
+                height: 1.15,
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 4),
             Text(
-              'This code is generated only once for your account.\nCopy it or share it with friends.',
+              'Your Bible journey is now backed up.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.grey.shade700,
-                fontSize: isTablet
-                    ? BibleInfo.fontSizeScale * 15
-                    : BibleInfo.fontSizeScale * 14,
-                height: 1.45,
-                letterSpacing: BibleInfo.letterSpacing,
+                color: _muted,
+                fontSize: isTablet ? 15 : 13.5,
+                height: 1.25,
               ),
             ),
-            const SizedBox(height: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                children: [
+                  const Expanded(child: Divider(color: Color(0xFFE2D6C6))),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Icon(
+                      Icons.spa_outlined,
+                      size: 14,
+                      color: _muted.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  const Expanded(child: Divider(color: Color(0xFFE2D6C6))),
+                ],
+              ),
+            ),
+            Text(
+              'Invite a Friend',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: _ink,
+                fontFamily: 'Georgia',
+                fontSize: isTablet ? 22 : 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Share your referral code with friends.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: _muted,
+                fontSize: isTablet ? 14 : 13,
+              ),
+            ),
+            SizedBox(height: isTablet ? 12 : 10),
             Container(
               width: double.infinity,
               padding: EdgeInsets.symmetric(
-                horizontal: isTablet ? 20 : 16,
-                vertical: isTablet ? 18 : 16,
+                horizontal: isTablet ? 16 : 14,
+                vertical: isTablet ? 12 : 10,
               ),
               decoration: BoxDecoration(
-                color: primary.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: primary.withOpacity(0.25)),
+                color: _pill,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFD8C9B4)),
               ),
               child: Text(
                 referralCode,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: CommanColor.black,
-                  fontSize: isTablet
-                      ? BibleInfo.fontSizeScale * 24
-                      : BibleInfo.fontSizeScale * 22,
+                  color: _ink,
+                  fontFamily: 'Georgia',
+                  fontSize: isTablet ? 22 : 19,
                   fontWeight: FontWeight.w700,
-                  letterSpacing: 2,
+                  letterSpacing: 2.4,
+                  height: 1.2,
                 ),
               ),
             ),
-            const SizedBox(height: 20),
-            ReferralCodeShareActions(referralCode: referralCode),
-            const SizedBox(height: 14),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(
-                'Continue',
-                style: TextStyle(
-                  color: Colors.grey.shade700,
-                  fontWeight: FontWeight.w600,
-                  fontSize: BibleInfo.fontSizeScale * 15,
+            SizedBox(height: isTablet ? 10 : 8),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () =>
+                        OwnReferralCodeDialog.copyReferralCode(referralCode),
+                    icon: const Icon(Icons.copy_outlined, size: 16, color: _ink),
+                    label: Text(
+                      'Copy Code',
+                      style: TextStyle(
+                        color: _ink,
+                        fontWeight: FontWeight.w600,
+                        fontSize: isTablet ? 15 : 13.5,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: _pill,
+                      side: BorderSide.none,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Builder(
+                    builder: (shareCtx) => OutlinedButton.icon(
+                      onPressed: () => OwnReferralCodeDialog.shareReferralCode(
+                        shareCtx,
+                        referralCode,
+                      ),
+                      icon: const Icon(Icons.ios_share, size: 16, color: _ink),
+                      label: Text(
+                        'Share',
+                        style: TextStyle(
+                          color: _ink,
+                          fontWeight: FontWeight.w600,
+                          fontSize: isTablet ? 15 : 13.5,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: _pill,
+                        side: BorderSide.none,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(22),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: isTablet ? 10 : 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _cta,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Continue',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    SizedBox(width: 6),
+                    Icon(Icons.chevron_right, size: 20),
+                  ],
                 ),
               ),
             ),

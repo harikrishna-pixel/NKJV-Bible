@@ -171,21 +171,6 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
     _scheduleNextPhase();
   }
 
-  void _stopCountdown() {
-    if (_allCyclesDone) return;
-    _timer?.cancel();
-    _timer = null;
-    _orbController.stop();
-    _orbController.value = 0;
-    if (mounted) {
-      setState(() {
-        _isHolding = false;
-        _breathNumber = 1;
-        _phase = _BreathPhase.inhale;
-      });
-    }
-  }
-
   void _goToPray() {
     Get.off(
       () => TakeMomentPrayScreen(worryText: widget.worryText),
@@ -275,32 +260,52 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.only(top: 12, bottom: 18),
-                child: AnimatedBuilder(
-                  animation: _orbController,
-                  builder: (context, _) {
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(_maxBreaths, (i) {
-                        final completedCount =
-                            _allCyclesDone ? _maxBreaths : (_breathNumber - 1);
-                        double fill = 0;
-                        if (i < completedCount) {
-                          fill = 1;
-                        } else if (!_allCyclesDone &&
-                            _isHolding &&
-                            i == _breathNumber - 1) {
-                          fill = _currentCycleFill;
-                        }
-                        return Padding(
-                          padding: EdgeInsets.only(
-                            left: i == 0 ? 0 : 10,
-                          ),
-                          child: _cycleDot(fill: fill, accentColor: accentColor),
+                padding: const EdgeInsets.only(top: 4, bottom: 18),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    AnimatedBuilder(
+                      animation: _orbController,
+                      builder: (context, _) {
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(_maxBreaths, (i) {
+                            final completedCount = _allCyclesDone
+                                ? _maxBreaths
+                                : (_breathNumber - 1);
+                            double fill = 0;
+                            if (i < completedCount) {
+                              fill = 1;
+                            } else if (!_allCyclesDone &&
+                                _isHolding &&
+                                i == _breathNumber - 1) {
+                              fill = _currentCycleFill;
+                            }
+                            return Padding(
+                              padding: EdgeInsets.only(
+                                left: i == 0 ? 0 : 10,
+                              ),
+                              child: _cycleDot(
+                                fill: fill,
+                                accentColor: accentColor,
+                              ),
+                            );
+                          }),
                         );
-                      }),
-                    );
-                  },
+                      },
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        onPressed: () => Get.back(),
+                        icon: Icon(
+                          Icons.arrow_back_ios,
+                          color: textColor,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Padding(
@@ -382,8 +387,8 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
                         _startCountdown();
                       }
                     },
-                    onPointerUp: (_) => _stopCountdown(),
-                    onPointerCancel: (_) => _stopCountdown(),
+                    // Additive: do not reset mid-cycle. Pointer up/cancel used
+                    // to send the 5-breath session back to breath 1.
                     child: AnimatedBuilder(
                       animation: Listenable.merge([
                         _glowAnimation,

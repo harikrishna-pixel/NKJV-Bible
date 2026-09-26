@@ -7,6 +7,7 @@ import 'package:biblebookapp/controller/dashboard_controller.dart';
 import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 
 import 'package:biblebookapp/services/paywall_preload_service.dart';
+import 'package:biblebookapp/services/premium_entitlement_label_sync.dart';
 
 import 'package:biblebookapp/streak_flow/streak_flow_screens.dart';
 
@@ -553,6 +554,20 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     }
   }
 
+  Future<String?> _ownedKindFromLastBuy() async {
+    try {
+      final id = await PremiumEntitlementLabelSync.readLastProductId();
+      if (id == null || id.isEmpty) return null;
+      final plan = PremiumEntitlementLabelSync.planKeyForProductId(id);
+      if (plan == 'platinum') return 'lifetime';
+      if (plan == 'gold' || plan == 'twoyear') return 'year';
+      if (plan == 'silver') return 'month';
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<String?> _ownedActiveKind() async {
     try {
       final download = Provider.of<DownloadProvider>(context, listen: false);
@@ -596,6 +611,10 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   Future<void> _onPrimaryCta() async {
     var owned = await _ownedActiveKind();
     DateTime? storePurchasedAt;
+    if (!mounted) return;
+    if (owned == null) {
+      owned = await _ownedKindFromLastBuy();
+    }
     if (!mounted) return;
     if (owned == null) {
       EasyLoading.show(status: 'Please wait...');

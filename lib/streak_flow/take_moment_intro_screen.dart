@@ -29,110 +29,153 @@ class TakeMomentIntroScreen extends StatelessWidget {
         isDark: isDark,
         showBird: false,
         child: SafeArea(
-          child: Column(
-            children: [
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxHeight < 700;
+              final iconW = isTablet ? 180.0 : (compact ? 110.0 : 150.0);
+              final iconH = isTablet ? 144.0 : (compact ? 88.0 : 120.0);
+              final gap = compact ? 12.0 : 28.0;
+              return Column(
                 children: [
-                  _dot(active: true, textColor: textColor),
-                  const SizedBox(width: 12),
-                  _dot(active: false, textColor: textColor),
-                  const SizedBox(width: 12),
-                  _dot(active: false, textColor: textColor),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: IconButton(
+                                    onPressed: () => Get.back(),
+                                    icon: Icon(
+                                      Icons.arrow_back_ios,
+                                      color: textColor,
+                                      size: 20,
+                                    ),
+                                  ),
+                                ),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    _dot(active: true, textColor: textColor),
+                                    const SizedBox(width: 12),
+                                    _dot(active: false, textColor: textColor),
+                                    const SizedBox(width: 12),
+                                    _dot(active: false, textColor: textColor),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(height: gap),
+                          Container(
+                            width: iconW,
+                            height: iconH,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.white
+                                      .withOpacity(isDark ? 0.2 : 0.65),
+                                  blurRadius: 28,
+                                  spreadRadius: 4,
+                                ),
+                                BoxShadow(
+                                  color: const Color(0xFFC9A227)
+                                      .withOpacity(0.18),
+                                  blurRadius: 20,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                            child: Image.asset(
+                              'assets/take_moment/give_it_to_god_icon.png',
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                          SizedBox(height: gap),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 28),
+                            child: Text(
+                              'Take a Moment With God',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: isTablet ? 32 : (compact ? 24 : 28),
+                                fontWeight: FontWeight.w600,
+                                color: textColor,
+                                fontFamily: 'Georgia',
+                                height: 1.25,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 28),
+                            child: Text(
+                              'Let\'s slow down and release your worries',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: isTablet ? 17 : 15,
+                                color: textColor.withOpacity(0.9),
+                                fontFamily: 'Georgia',
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: compact ? 16 : 36),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 40),
+                            child: Center(
+                              child: IntrinsicWidth(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _bullet(
+                                      Icons.air_rounded,
+                                      'Breathe in God\'s peace',
+                                      textColor,
+                                      compact: compact,
+                                    ),
+                                    _bullet(
+                                      Icons.wb_sunny_outlined,
+                                      'Rest in His presence',
+                                      textColor,
+                                      compact: compact,
+                                    ),
+                                    _bullet(
+                                      Icons.volunteer_activism_outlined,
+                                      'Release your worries to Him',
+                                      textColor,
+                                      compact: compact,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.only(
+                      top: 8,
+                      bottom: compact ? 16 : 36,
+                    ),
+                    child: _parchmentButton(
+                      context,
+                      label: 'Start',
+                      onPressed: () => Get.to(
+                        () => TakeMomentRestScreen(worryText: worryText),
+                      ),
+                    ),
+                  ),
                 ],
-              ),
-              const SizedBox(height: 28),
-              // Same hands + dove icon as Give It to God banner
-              Container(
-                width: isTablet ? 180 : 150,
-                height: isTablet ? 144 : 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.white.withOpacity(isDark ? 0.2 : 0.65),
-                      blurRadius: 28,
-                      spreadRadius: 4,
-                    ),
-                    BoxShadow(
-                      color: const Color(0xFFC9A227).withOpacity(0.18),
-                      blurRadius: 20,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-                child: Image.asset(
-                  'assets/take_moment/give_it_to_god_icon.png',
-                  fit: BoxFit.contain,
-                ),
-              ),
-              const SizedBox(height: 28),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: Text(
-                  'Take a Moment With God',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: isTablet ? 32 : 28,
-                    fontWeight: FontWeight.w600,
-                    color: textColor,
-                    fontFamily: 'Georgia',
-                    height: 1.25,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: Text(
-                  'Let\'s slow down and release your worries',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: isTablet ? 17 : 15,
-                    color: textColor.withOpacity(0.9),
-                    fontFamily: 'Georgia',
-                  ),
-                ),
-              ),
-              const SizedBox(height: 36),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40),
-                child: Center(
-                  child: IntrinsicWidth(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _bullet(
-                          Icons.air_rounded,
-                          'Breathe in God\'s peace',
-                          textColor,
-                        ),
-                        _bullet(
-                          Icons.wb_sunny_outlined,
-                          'Rest in His presence',
-                          textColor,
-                        ),
-                        _bullet(
-                          Icons.volunteer_activism_outlined,
-                          'Release your worries to Him',
-                          textColor,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const Spacer(),
-              _parchmentButton(
-                context,
-                label: 'Start',
-                onPressed: () => Get.to(
-                  () => TakeMomentRestScreen(worryText: worryText),
-                ),
-              ),
-              const SizedBox(height: 36),
-            ],
+              );
+            },
           ),
         ),
       ),
@@ -162,10 +205,15 @@ class TakeMomentIntroScreen extends StatelessWidget {
     );
   }
 
-  Widget _bullet(IconData icon, String text, Color textColor) {
+  Widget _bullet(
+    IconData icon,
+    String text,
+    Color textColor, {
+    bool compact = false,
+  }) {
     const gold = Color(0xFFC9A227);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 22),
+      padding: EdgeInsets.only(bottom: compact ? 12 : 22),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,

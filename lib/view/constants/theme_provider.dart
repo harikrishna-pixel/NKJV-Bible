@@ -110,7 +110,17 @@ class ThemeProvider extends ChangeNotifier {
   }
 
   ThemeMode themeMode = ThemeMode.system;
-  AppCustomTheme currentCustomTheme = AppCustomTheme.vintage;
+  AppCustomTheme _currentCustomTheme = AppCustomTheme.vintage;
+
+  /// Stored Light Mode theme. Dark Mode does not change these colors.
+  AppCustomTheme get savedCustomTheme => _currentCustomTheme;
+
+  /// Dark Mode is one default night look (Vintage night). White / Light Brown
+  /// colors are not applied until Light Mode.
+  AppCustomTheme get currentCustomTheme {
+    if (themeMode == ThemeMode.dark) return AppCustomTheme.vintage;
+    return _currentCustomTheme;
+  }
 
   bool get isDarkMode {
     if (themeMode == ThemeMode.system) {
@@ -135,7 +145,7 @@ class ThemeProvider extends ChangeNotifier {
     }
 
     if (savedCustom != null) {
-      currentCustomTheme = AppCustomTheme.values.firstWhere(
+      _currentCustomTheme = AppCustomTheme.values.firstWhere(
           (e) => e.toString().split('.').last == savedCustom,
           orElse: () => AppCustomTheme.vintage);
     }
@@ -150,13 +160,27 @@ class ThemeProvider extends ChangeNotifier {
   }
 
   void setCustomTheme(AppCustomTheme theme) {
-    currentCustomTheme = theme;
+    _currentCustomTheme = theme;
     pre.setCustomTheme(theme.toString().split('.').last); // Save as string
     notifyListeners();
   }
 
+  Color get customThemeSwatchColor {
+    switch (_currentCustomTheme) {
+      case AppCustomTheme.vintage:
+        return const Color(0xFFF5F0E6);
+      case AppCustomTheme.white:
+        return Colors.white;
+      case AppCustomTheme.lightbrown:
+        return const Color(0xFFFFF8E1);
+    }
+  }
+
   Color get backgroundColor {
-    switch (currentCustomTheme) {
+    if (themeMode == ThemeMode.dark) {
+      return CommanColor.darkPrimaryColor;
+    }
+    switch (_currentCustomTheme) {
       case AppCustomTheme.vintage:
         // Match reader cream so route transitions do not flash yellow/brown.
         return const Color(0xFFF5F0E6);

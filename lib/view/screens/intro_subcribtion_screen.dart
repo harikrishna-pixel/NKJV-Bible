@@ -283,7 +283,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             id.toLowerCase().contains('exitoffer');
     if (_isLifetimeProductId(id) || isExitOfferLifetime) return 3;
     if (_isTwoYearProductId(id) || _isOneYearProductId(id)) return 2;
-    if (_isSixMonthProductId(id)) return 1;
+    if (BibleInfo.isArOneMonthProductId(id) || _isSixMonthProductId(id)) {
+      return 1;
+    }
     return 0;
   }
 
@@ -459,12 +461,67 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   static const MethodChannel _iapMemoryChannel =
       MethodChannel('com.biblebookapp/iap_memory');
   static const String _lastIapProductPrefKey = 'last_iap_product_id';
+  static const String _lastIapExpiryPrefKey = 'last_iap_expires_at';
 
   /// Additive: remember the plan the user last bought/applied. Keychain keeps
   /// it across delete+reinstall so Restore matches that plan (not highest tier).
+  DateTime? _expiryForRememberedProduct(
+    String productId, {
+    DateTime? purchasedAt,
+  }) {
+    if (_restoreProductTier(productId) >= 3) return null;
+    final start = purchasedAt ?? DateTime.now();
+    if (_isTwoYearProductId(productId)) {
+      return DateTime(start.year + 2, start.month, start.day);
+    }
+    if (_isOneYearProductId(productId)) {
+      return DateTime(start.year + 1, start.month, start.day);
+    }
+    if (BibleInfo.isArOneMonthProductId(productId)) {
+      return start.add(const Duration(days: 30));
+    }
+    if (_isSixMonthProductId(productId)) {
+      return DateTime(start.year, start.month + 6, start.day);
+    }
+    return DateTime(start.year + 1, start.month, start.day);
+  }
+
+  Future<bool> _isRememberedPlanExpired(String productId) async {
+    if (_restoreProductTier(productId) >= 3) return false;
+    final raw = await SharPreferences.getString(_lastIapExpiryPrefKey);
+    if (raw != null && raw.trim().isNotEmpty) {
+      if (raw.trim().toLowerCase() == 'lifetime') return false;
+      final at = DateTime.tryParse(raw.trim());
+      if (at != null) return !at.isAfter(DateTime.now());
+    }
+    DateTime? purchasedAt;
+    for (final item in _restoreCollectedProducts) {
+      final id = item['id'] ?? '';
+      if (!_isSameLastBuyPlan(productId, id) && id != productId) continue;
+      purchasedAt = _parseRestoreTransactionDate(item['date'] ?? '');
+      if (purchasedAt != null) break;
+    }
+    final expiry = _expiryForRememberedProduct(
+      productId,
+      purchasedAt: purchasedAt,
+    );
+    if (expiry == null) return false;
+    if (purchasedAt == null && raw == null) return false;
+    return !expiry.isAfter(DateTime.now());
+  }
+
   Future<void> _rememberLastIapProduct(String productId) async {
     if (productId.isEmpty || _restoreProductTier(productId) <= 0) return;
     await SharPreferences.setString(_lastIapProductPrefKey, productId);
+    final expiry = _expiryForRememberedProduct(productId);
+    if (_restoreProductTier(productId) >= 3) {
+      await SharPreferences.setString(_lastIapExpiryPrefKey, 'lifetime');
+    } else if (expiry != null) {
+      await SharPreferences.setString(
+        _lastIapExpiryPrefKey,
+        expiry.toIso8601String(),
+      );
+    }
     if (!Platform.isIOS) return;
     try {
       await _iapMemoryChannel.invokeMethod('setLastIapProduct', {
@@ -559,8 +616,44 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       }
     }
 
+    final timedForPick = BibleInfo.isAutoRenewablePaywallMode
+        ? timed
+            .where((e) => !_isSixMonthProductId(e['id'] ?? ''))
+            .toList()
+        : timed;
+
     final remembered = await _readLastIapProduct();
-    if (remembered != null && _restoreProductTier(remembered) > 0) {
+    final rememberedTier =
+        remembered != null ? _restoreProductTier(remembered) : 0;
+    // Additive: Restore applies last purchase only. A later 1M/1Y must
+    // replace remembered Lifetime (Lifetime then 1 Month → Restore 1 Month).
+    if (remembered != null &&
+        rememberedTier > 0 &&
+        !await _isRememberedPlanExpired(remembered)) {
+      DateTime? rememberedAt;
+      for (final item in _restoreCollectedProducts) {
+        final id = item['id'] ?? '';
+        if (id != remembered && !_isSameLastBuyPlan(remembered, id)) {
+          continue;
+        }
+        rememberedAt = _parseRestoreTransactionDate(item['date'] ?? '');
+        if (rememberedAt != null) break;
+      }
+      if (rememberedTier >= 3 && timedForPick.isNotEmpty) {
+        final laterTimed = _pickNewestThenHighestTier(timedForPick);
+        final laterAt = laterTimed == null
+            ? null
+            : _parseRestoreTransactionDate(laterTimed['date'] ?? '');
+        if (laterTimed != null &&
+            laterAt != null &&
+            (rememberedAt == null || laterAt.isAfter(rememberedAt))) {
+          debugPrint(
+            'Restore pick: later purchase ${laterTimed['id']} '
+            'after remembered Lifetime',
+          );
+          return laterTimed;
+        }
+      }
       if (byId.containsKey(remembered)) {
         debugPrint(
           'Restore pick: last purchased $remembered '
@@ -583,21 +676,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       return {'id': remembered, 'date': ''};
     }
 
-    final timedForPick = BibleInfo.isAutoRenewablePaywallMode
-        ? timed
-            .where((e) => !_isSixMonthProductId(e['id'] ?? ''))
-            .toList()
-        : timed;
-    if (timedForPick.isNotEmpty) {
-      final picked = _pickNewestThenHighestTier(timedForPick);
+    // No last-buy memory (e.g. Android reinstall): newest dated = last buy.
+    final allForPick = <Map<String, String>>[...timedForPick, ...lifetimeOnly];
+    if (allForPick.isNotEmpty) {
+      final picked = _pickNewestThenHighestTier(allForPick);
       debugPrint(
-        'Restore pick: prefer newest timed ${picked?['id']} '
-        '(ignored ${lifetimeOnly.length} lifetime candidate(s); '
-        'no remembered product match)',
+        'Restore pick: newest store ${picked?['id']} (no remembered last buy)',
       );
       return picked;
     }
-    return _pickNewestThenHighestTier(lifetimeOnly);
+    return null;
   }
 
   bool _isSameLastBuyPlan(String remembered, String productId) {
@@ -2116,9 +2204,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       }
       _claimRestoreCandidate(productId, transactionDate: date);
 
-      // Additive: stamp last Buy product (Keychain) so reinstall Restore
-      // prefers that plan — not highest-tier among all StoreKit history.
-      if (startFlag == true) {
+      // Additive: stamp last Buy/Restore product until that plan expires
+      // so reinstall Restore keeps 1Y and does not flip to old Lifetime.
+      if (startFlag == true || data == true) {
         await _rememberLastIapProduct(productId);
       }
 

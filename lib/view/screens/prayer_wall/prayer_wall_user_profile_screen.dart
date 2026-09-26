@@ -370,11 +370,13 @@ class _PrayerWallUserProfileScreenState
                             ),
                             child: Row(
                               children: [
-                                _statCell('${recent.length}', 'Prayers Shared'),
+                                _statCell('${recent.length}', 'Prayers Shared',
+                                    isDark: isDark),
                                 _divider(isDark),
                                 _statCell(
                                   '$_followersCount',
                                   'Followers',
+                                  isDark: isDark,
                                   onTap: () => unawaited(
                                     _openFollowPeopleList(followers: true),
                                   ),
@@ -383,6 +385,7 @@ class _PrayerWallUserProfileScreenState
                                 _statCell(
                                   '$_followingCount',
                                   'Following',
+                                  isDark: isDark,
                                   onTap: () => unawaited(
                                     _openFollowPeopleList(followers: false),
                                   ),
@@ -592,16 +595,21 @@ class _PrayerWallUserProfileScreenState
     );
   }
 
-  Widget _statCell(String value, String label, {VoidCallback? onTap}) {
+  Widget _statCell(
+    String value,
+    String label, {
+    required bool isDark,
+    VoidCallback? onTap,
+  }) {
     final child = Column(
       children: [
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'Georgia',
             fontSize: 18,
             fontWeight: FontWeight.w700,
-            color: _brown,
+            color: isDark ? Colors.white : _brown,
           ),
         ),
         const SizedBox(height: 4),
@@ -610,7 +618,7 @@ class _PrayerWallUserProfileScreenState
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 11,
-            color: _brown.withOpacity(0.7),
+            color: isDark ? Colors.white70 : _brown.withOpacity(0.7),
           ),
         ),
       ],
