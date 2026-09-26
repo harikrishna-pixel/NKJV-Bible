@@ -961,11 +961,13 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                 children: [
                   CircleAvatar(
                     radius: 14,
-                    backgroundColor: brown.withValues(alpha: 0.15),
+                    backgroundColor: isDark
+                        ? Colors.white.withValues(alpha: 0.16)
+                        : brown.withValues(alpha: 0.15),
                     child: Icon(
                       mine ? Icons.person : Icons.person_outline,
                       size: 16,
-                      color: brown,
+                      color: isDark ? Colors.white : brown,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1071,6 +1073,13 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                     borderRadius: BorderRadius.circular(22),
                     borderSide: BorderSide(
                       color: isDark ? Colors.white24 : const Color(0xFFD4C4B0),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: BorderSide(
+                      color: isDark ? Colors.white : const Color(0xFFD4C4B0),
+                      width: 1.5,
                     ),
                   ),
                   hintStyle: TextStyle(

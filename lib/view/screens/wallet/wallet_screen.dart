@@ -831,7 +831,7 @@ class _WalletScreenState extends State<WalletScreen> {
         // Additive UI only: keep Processing...... until success toast.
         _purchaseTimeouts[productId]?.cancel();
         _purchaseTimeouts.remove(productId);
-        EasyLoading.show(status: 'Processing......');
+        EasyLoading.show(status: 'Processing..');
         try {
           await _grantCreditsForPurchase(purchaseDetails);
 
@@ -869,7 +869,7 @@ class _WalletScreenState extends State<WalletScreen> {
       } else if (purchaseDetails.status == PurchaseStatus.pending) {
         // UI only: same Processing...... text while store is pending.
         if (_isUserStartedWalletBuy(productId)) {
-          EasyLoading.show(status: 'Processing......');
+          EasyLoading.show(status: 'Processing..');
         }
         debugPrint('Purchase pending...');
       } else if (purchaseDetails.status == PurchaseStatus.restored) {
@@ -881,7 +881,7 @@ class _WalletScreenState extends State<WalletScreen> {
         // UI only: same Processing...... as purchased (not "Please wait...").
         _purchaseTimeouts[productId]?.cancel();
         _purchaseTimeouts.remove(productId);
-        EasyLoading.show(status: 'Processing......');
+        EasyLoading.show(status: 'Processing..');
         try {
           await _grantCreditsForPurchase(purchaseDetails);
         } finally {
@@ -931,20 +931,20 @@ class _WalletScreenState extends State<WalletScreen> {
       _walletBuyProductId = productId;
     });
     // UI only: show Processing...... from buy tap until stream completes.
-    EasyLoading.show(status: 'Processing......');
+    EasyLoading.show(status: 'Processing..');
 
     // Set a timeout to clear loading state if purchase dialog is canceled
     // This handles the case where user cancels and no purchase update is sent
     _purchaseTimeouts[productId] = Timer(const Duration(seconds: 10), () {
       if (mounted && _loadingProductId == productId) {
-        // UI only: clear button spinner; keep Processing...... until stream
-        // reports purchased / restored / error / cancel (avoids blank gap).
+        // UI only: Not Now / cancel often sends no stream event.
         setState(() {
           _loadingProductId = null; // Clear loading state after timeout
           _selectedProductId = null; // Clear selected state
         });
+        EasyLoading.dismiss();
         debugPrint(
-            'WalletScreen: Purchase timeout - keep Processing...... until stream');
+            'WalletScreen: Purchase timeout - dismiss Processing..');
         _purchaseTimeouts.remove(productId);
       }
     });

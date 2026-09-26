@@ -864,10 +864,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                                             Images.wallpaper,
                                             width: 20,
                                             height: 15,
-                                            color: selectedTap == 5
-                                                ? Colors.white
-                                                : CommanColor.whiteAndDark(
-                                                    context),
+                                            color: _libraryTabIconColor(
+                                                context, 5),
                                             colorBlendMode: BlendMode.srcATop,
                                           ),
                                           Text(
@@ -894,10 +892,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                                             Images.quote,
                                             width: 20,
                                             height: 15,
-                                            color: selectedTap == 6
-                                                ? Colors.white
-                                                : CommanColor.whiteAndDark(
-                                                    context),
+                                            color: _libraryTabIconColor(
+                                                context, 6),
                                             colorBlendMode: BlendMode.srcATop,
                                           ),
                                           Text(

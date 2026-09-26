@@ -2231,6 +2231,7 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
         if (!didPop) await _handleBack();
       },
       child: Scaffold(
+        resizeToAvoidBottomInset: false,
         backgroundColor: isVintage
             ? (isDark ? CommanColor.black : themeProvider.backgroundColor)
             : (isDark
@@ -2988,7 +2989,12 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                             ),
                     ),
                   ),
-                  _buildInputArea(screenWidth, isDark),
+                  Padding(
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.viewInsetsOf(context).bottom,
+                    ),
+                    child: _buildInputArea(screenWidth, isDark),
+                  ),
                 ],
               ),
             ),

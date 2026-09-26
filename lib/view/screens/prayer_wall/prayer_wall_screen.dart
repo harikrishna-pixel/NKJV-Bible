@@ -643,7 +643,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
         setState(() {});
         return;
       }
-      final left = ends.toLocal().difference(DateTime.now()).inMilliseconds;
+      final left = ends.toUtc().difference(DateTime.now().toUtc()).inMilliseconds;
       if (left <= 0) {
         _queueTickTimer?.cancel();
         unawaited(_refreshQueue());
@@ -656,7 +656,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   int get _queueMsRemaining {
     final ends = _queueSlotEndsAt;
     if (ends != null) {
-      final left = ends.toLocal().difference(DateTime.now()).inMilliseconds;
+      final left = ends.toUtc().difference(DateTime.now().toUtc()).inMilliseconds;
       return left < 0 ? 0 : left;
     }
     return _queueCurrent?.msRemaining ?? _queueList?.msRemaining ?? 0;
@@ -4023,7 +4023,10 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                         color: brown.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(Icons.menu_book_outlined, color: brown),
+                      child: Icon(
+                        Icons.menu_book_outlined,
+                        color: isDark ? Colors.white : brown,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -5715,15 +5718,19 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              if (count != null)
-                Text(
-                  count,
-                  style: const TextStyle(
-                    color: _muted,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+              SizedBox(
+                height: 14,
+                child: count == null
+                    ? null
+                    : Text(
+                        count,
+                        style: const TextStyle(
+                          color: _muted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+              ),
             ],
           ),
         ),
@@ -5944,22 +5951,6 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
                         body: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Image.asset(
-                              'assets/take_moment/apostrophe_icon.png',
-                              width: 28,
-                              height: 28,
-                              color: _brown,
-                              errorBuilder: (_, __, ___) => const Text(
-                                '“',
-                                style: TextStyle(
-                                  fontFamily: 'Georgia',
-                                  fontSize: 36,
-                                  color: _brown,
-                                  height: 0.8,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
                             Text(
                               myWords,
                               style: const TextStyle(
@@ -6022,6 +6013,7 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
                 ),
                 padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _bottomAction(
                       icon: liked

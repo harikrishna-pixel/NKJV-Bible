@@ -16,7 +16,6 @@ import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/screens/authenitcation/bloc/signup_bloc.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/own_referral_code_dialog.dart';
-import 'package:biblebookapp/utils/email_validator.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/login_screen.dart';
 import 'package:biblebookapp/view/screens/dashboard/home_screen.dart';
 import 'package:biblebookapp/view/screens/authenitcation/view/widget/social_auth_widget.dart';
@@ -160,15 +159,12 @@ class SignupScreen extends HookConsumerWidget {
                                   CustomTextFormField(
                                     controller: signupState.emailCon,
                                     hintText: 'Email',
-                                    autovalidateMode:
-                                        AutovalidateMode.onUnfocus,
                                     validator: FormBuilderValidators.compose([
                                       FormBuilderValidators.required(
                                           errorText:
                                               'Please enter your email address'),
                                       FormBuilderValidators.email(
                                           errorText: 'Email is not valid'),
-                                      AppEmailValidator.validate,
                                     ]),
                                   ),
                                   const SizedBox(height: 20),
@@ -300,7 +296,15 @@ class SignupScreen extends HookConsumerWidget {
                                     ],
                                   ),
                                   const SizedBox(height: 30),
-                                  GestureDetector(
+                                  Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                    borderRadius: const BorderRadius.all(
+                                        Radius.circular(5)),
+                                    splashColor:
+                                        Colors.white.withOpacity(0.28),
+                                    highlightColor:
+                                        Colors.white.withOpacity(0.12),
                                     onTap: () async {
                                       if (agree.value) {
                                         if (formKey.currentState?.validate() ??
@@ -460,7 +464,7 @@ class SignupScreen extends HookConsumerWidget {
                                             'You have to agree our Terms and Condition, and Privacy and Policy.');
                                       }
                                     },
-                                    child: Container(
+                                    child: Ink(
                                         width: 200,
                                         height: screenWidth > 450 ? 70 : 40,
                                         decoration: BoxDecoration(
@@ -505,6 +509,7 @@ class SignupScreen extends HookConsumerWidget {
                                                             .darkModePrimaryWhite(
                                                                 context)),
                                                   ))),
+                                    ),
                                   ),
                                   const SizedBox(height: 30),
                                   const SocialAuthWidget(),
