@@ -244,9 +244,7 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
   @override
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width > 450;
-    final isDark =
-        Provider.of<ThemeProvider>(context, listen: false).themeMode ==
-            ThemeMode.dark;
+    const isDark = false;
 
     final Color accentColor = isDark ? const Color(0xFFC9A227) : _softGold;
     final Color textColor = isDark ? Colors.white : _warmTan;

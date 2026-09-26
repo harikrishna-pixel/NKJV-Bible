@@ -92,6 +92,8 @@ class _SplashScreenState extends State<SplashScreen>
   bool _hasNavigated = false;
   bool _isLeavingSplash = false;
   Completer<void>? _splashOpenAdCompleter;
+  Completer<bool>? _splashOpenAdPreloadCompleter;
+  bool _splashOpenAdPreloadStarted = false;
 
   // Platform messages are asynchronous, so we initialize in an async method.
 
@@ -111,7 +113,7 @@ class _SplashScreenState extends State<SplashScreen>
     super.initState();
     _splashProgressController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3500),
+      duration: const Duration(milliseconds: 4000),
     );
     final splashProgressAnim = CurvedAnimation(
       parent: _splashProgressController,
@@ -146,7 +148,7 @@ class _SplashScreenState extends State<SplashScreen>
     setState(() {
       _progress = 1.0;
     });
-    // Ad already had 3.5s to appear. If it did not, enter immediately.
+    // Ad already had the 4s splash. If it failed, go Home now.
     if (openAdShown) {
       await Future.delayed(const Duration(milliseconds: 300));
     }
@@ -172,27 +174,16 @@ class _SplashScreenState extends State<SplashScreen>
   /// cannot show it either.
   /// Returns true only if the open ad was actually shown.
   Future<bool> _runSplashOpenAdIfNeeded() async {
-    final pendingStreakRating = await SharPreferences.getInt(
-            SharPreferences.pendingStreakCompleteCelebration) ??
-        0;
-    if (pendingStreakRating >= 1) return false;
-
     final prefs = await SharedPreferences.getInstance();
     final onboardingDone =
         await SharPreferences.getBoolean(SharPreferences.onboarding);
     if (onboardingDone != true) return false;
 
-    final data = prefs.getString('showopenad');
-    if (data != "true") return false;
-
+    // Ads off only for an active premium purchase.
     if (!await _shouldShowSplashOpenAd()) {
       await prefs.setString("showopenad", "false");
       return false;
     }
-
-    try {
-      await MobileAds.instance.initialize().timeout(const Duration(seconds: 5));
-    } catch (_) {}
 
     await SharPreferences.setString('test', 'test');
     final shown = await loadOpenAd();
@@ -200,20 +191,77 @@ class _SplashScreenState extends State<SplashScreen>
     return shown;
   }
 
+  void _finishSplashOpenAdPreload(bool loaded) {
+    final completer = _splashOpenAdPreloadCompleter;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete(loaded);
+    }
+  }
+
+  /// Load the open ad during Bible init so splash can show it without
+  /// waiting another 3.5s after init.
+  Future<void> _preloadSplashOpenAd() async {
+    if (_splashOpenAdPreloadStarted) return;
+    _splashOpenAdPreloadStarted = true;
+    _splashOpenAdPreloadCompleter = Completer<bool>();
+    try {
+      final onboardingDone =
+          await SharPreferences.getBoolean(SharPreferences.onboarding);
+      if (onboardingDone != true) {
+        _finishSplashOpenAdPreload(false);
+        return;
+      }
+      if (!await _shouldShowSplashOpenAd()) {
+        _finishSplashOpenAdPreload(false);
+        return;
+      }
+      try {
+        await MobileAds.instance
+            .initialize()
+            .timeout(const Duration(seconds: 5));
+      } catch (_) {}
+      final openAdUnitId = await _resolveOpenAdUnitId();
+      if (openAdUnitId.isEmpty) {
+        debugPrint('AppOpenAd skipped: empty ad unit id');
+        _finishSplashOpenAdPreload(false);
+        return;
+      }
+      AppOpenAd.load(
+        adUnitId: openAdUnitId,
+        request: await AdConsentManager.getAdRequest(),
+        adLoadCallback: AppOpenAdLoadCallback(
+          onAdLoaded: (ad) {
+            _appOpenAd = ad;
+            _finishSplashOpenAdPreload(true);
+          },
+          onAdFailedToLoad: (error) {
+            debugPrint('AppOpenAd failed to load: $error');
+            _finishSplashOpenAdPreload(false);
+          },
+        ),
+      );
+    } catch (e) {
+      debugPrint('AppOpenAd preload failed: $e');
+      _finishSplashOpenAdPreload(false);
+    }
+  }
+
   Future<bool> _shouldShowSplashOpenAd() async {
-    final isAdEnabledFromApi =
-        await SharPreferences.getBoolean(SharPreferences.isAdsEnabledApi);
-    if (!(isAdEnabledFromApi ?? true)) return false;
+    final prefs = await SharedPreferences.getInstance();
+    final plan =
+        (prefs.getString('subscription_plan') ?? '').toLowerCase().trim();
+    final hasPlan =
+        plan == 'platinum' || plan == 'gold' || plan == 'silver';
+    // Leftover expiry without a plan (no Buy / no Restore) must not hide ads.
+    if (!hasPlan) return true;
 
     final rewardTime =
         await SharPreferences.getString(SharPreferences.isRewardAdViewTime);
-    if (rewardTime != null) {
-      final saveTime = DateTime.tryParse(rewardTime);
-      if (saveTime != null && DateTime.now().difference(saveTime).inDays.isNegative) {
-        return false;
-      }
-    }
-    return true;
+    if (rewardTime == null || rewardTime.isEmpty) return true;
+    final saveTime = DateTime.tryParse(rewardTime);
+    if (saveTime == null) return true;
+    // Has a plan and expiry is still in the future → no open ad.
+    return !DateTime.now().difference(saveTime).inDays.isNegative;
   }
 
   Future<String> _resolveOpenAdUnitId() async {
@@ -244,6 +292,9 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void dispose() {
     _completeSplashOpenAd();
+    _finishSplashOpenAdPreload(false);
+    _appOpenAd?.dispose();
+    _appOpenAd = null;
     _splashProgressController.dispose();
     super.dispose();
   }
@@ -255,88 +306,77 @@ class _SplashScreenState extends State<SplashScreen>
     });
   }
 
-  Future<bool> loadOpenAd() async {
-    final trackingAllowed = await isTrackingAllowed();
-    debugPrint('ad pop loadOpenAd -  ${!trackingAllowed}');
-    bool? isAdEnabledFromApi =
-    await SharPreferences.getBoolean(SharPreferences.isAdsEnabledApi);
-    if (!(isAdEnabledFromApi ?? true)) {
-      return false;
-    }
-
+  Future<void> _loadSplashOpenAdNow() async {
     final openAdUnitId = await _resolveOpenAdUnitId();
     if (openAdUnitId.isEmpty) {
       debugPrint('AppOpenAd skipped: empty ad unit id');
+      return;
+    }
+    try {
+      await MobileAds.instance.initialize().timeout(const Duration(seconds: 5));
+    } catch (_) {}
+    final loaded = Completer<bool>();
+    AppOpenAd.load(
+      adUnitId: openAdUnitId,
+      request: await AdConsentManager.getAdRequest(),
+      adLoadCallback: AppOpenAdLoadCallback(
+        onAdLoaded: (ad) {
+          _appOpenAd = ad;
+          if (!loaded.isCompleted) loaded.complete(true);
+        },
+        onAdFailedToLoad: (error) {
+          debugPrint('AppOpenAd failed to load: $error');
+          if (!loaded.isCompleted) loaded.complete(false);
+        },
+      ),
+    );
+    await loaded.future.timeout(
+      const Duration(milliseconds: 3500),
+      onTimeout: () => _appOpenAd != null,
+    );
+  }
+
+  Future<bool> loadOpenAd() async {
+    final trackingAllowed = await isTrackingAllowed();
+    debugPrint('ad pop loadOpenAd -  ${!trackingAllowed}');
+
+    // Splash is 4s. Use only the ad already preloaded. Do not wait again.
+    if (_appOpenAd == null) {
+      debugPrint('AppOpenAd not ready at splash leave');
+      return false;
+    }
+
+    final adToShow = _appOpenAd;
+    if (adToShow == null) {
+      debugPrint('AppOpenAd not ready at splash leave');
       return false;
     }
 
     var didShow = false;
-    final loadDone = Completer<bool>();
     _splashOpenAdCompleter = Completer<void>();
-
-    AppOpenAd.load(
-      adUnitId: openAdUnitId,
-      request: await AdConsentManager.getAdRequest(),
-      //orientation: 1,
-      adLoadCallback: AppOpenAdLoadCallback(
-        onAdLoaded: (ad) {
-          _appOpenAd = ad;
-
-          _appOpenAd!.fullScreenContentCallback = FullScreenContentCallback(
-            onAdShowedFullScreenContent: (ad) {
-              didShow = true;
-            },
-            onAdDismissedFullScreenContent: (ad) {
-              ad.dispose();
-              _appOpenAd = null;
-              _completeSplashOpenAd();
-            },
-            onAdFailedToShowFullScreenContent: (ad, error) {
-              ad.dispose();
-              _appOpenAd = null;
-              _completeSplashOpenAd();
-            },
-          );
-          if (!loadDone.isCompleted) loadDone.complete(true);
-          Future.delayed(const Duration(milliseconds: 500), () {
-            if (!mounted) {
-              _completeSplashOpenAd();
-              return;
-            }
-            final adToShow = _appOpenAd;
-            if (adToShow == null) {
-              _completeSplashOpenAd();
-              return;
-            }
-            try {
-              adToShow.show();
-            } catch (e) {
-              debugPrint('AppOpenAd show failed: $e');
-              _completeSplashOpenAd();
-            }
-          });
-        },
-        onAdFailedToLoad: (error) {
-          debugPrint('AppOpenAd failed to load: $error');
-          SharPreferences.setBoolean(SharPreferences.isAdsEnabled, false);
-          if (!loadDone.isCompleted) loadDone.complete(false);
-          _completeSplashOpenAd();
-        },
-      ),
-    );
-
-    final loaded = await loadDone.future.timeout(
-      const Duration(milliseconds: 3500),
-      onTimeout: () {
-        _appOpenAd?.dispose();
+    adToShow.fullScreenContentCallback = FullScreenContentCallback(
+      onAdShowedFullScreenContent: (ad) {
+        didShow = true;
+      },
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
         _appOpenAd = null;
         _completeSplashOpenAd();
-        return false;
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        ad.dispose();
+        _appOpenAd = null;
+        _completeSplashOpenAd();
       },
     );
-    if (loaded &&
-        _appOpenAd != null &&
-        _splashOpenAdCompleter != null &&
+    try {
+      await adToShow.show();
+    } catch (e) {
+      debugPrint('AppOpenAd show failed: $e');
+      _completeSplashOpenAd();
+      return false;
+    }
+    if (_splashOpenAdCompleter != null &&
         !_splashOpenAdCompleter!.isCompleted) {
       await _splashOpenAdCompleter!.future;
     }
@@ -397,6 +437,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _initialize() async {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      unawaited(_preloadSplashOpenAd());
       final password = dotenv.env[AssetsConstants.dbPasswordKey]!;
       try {
         // Only do essential initialization that's required before navigation

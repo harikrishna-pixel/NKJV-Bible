@@ -1966,6 +1966,9 @@ class _SettingScreenState extends State<SettingScreen>
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final oldPaperColor = themeProvider
         .backgroundColor; // Get old paper theme color (Color(0xFFF3E5C2))
+    final isDark = themeProvider.themeMode == ThemeMode.dark;
+    final dialogTitleColor = isDark ? Colors.white : Colors.black;
+    final dialogBodyColor = isDark ? Colors.white : Colors.black87;
 
     showDialog(
       context: context,
@@ -1988,7 +1991,7 @@ class _SettingScreenState extends State<SettingScreen>
                 Text(
                   'Premium Access Required',
                   style: TextStyle(
-                    color: Colors.black,
+                    color: dialogTitleColor,
                     fontSize: screenWidth > 450 ? 20 : 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -2001,7 +2004,7 @@ class _SettingScreenState extends State<SettingScreen>
                 Text(
                   'Upgrade to access all themes and personalise your Bible with a richer, distraction-free reading experience.',
                   style: TextStyle(
-                    color: Colors.black87,
+                    color: dialogBodyColor,
                     fontSize: screenWidth > 450 ? 16 : 14,
                     height: 1.4,
                   ),
@@ -2021,7 +2024,9 @@ class _SettingScreenState extends State<SettingScreen>
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                             side: BorderSide(
-                              color: Colors.grey.shade300,
+                              color: isDark
+                                  ? Colors.white.withOpacity(0.7)
+                                  : Colors.grey.shade300,
                               width: 1,
                             ),
                           ),
@@ -2029,7 +2034,7 @@ class _SettingScreenState extends State<SettingScreen>
                         child: Text(
                           'Maybe Later',
                           style: TextStyle(
-                            color: Colors.black,
+                            color: dialogTitleColor,
                             fontSize: screenWidth > 450 ? 15 : 14,
                             fontWeight: FontWeight.w600,
                           ),

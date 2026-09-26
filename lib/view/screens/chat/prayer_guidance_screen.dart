@@ -70,6 +70,8 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
   // AMEN toast overlay (shown slightly above bottom so it won't cover AMEN button)
   OverlayEntry? _amenToastEntry;
   Timer? _amenToastTimer;
+  Timer? _creatingStepTimer;
+  int _creatingStepsDone = 0;
 
   // Track which AI responses have already shown an AMEN toast using a content hash
   final Set<int> _amenShownForResponseHashes = {};
@@ -419,10 +421,55 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
     return null;
   }
 
+  void _startCreatingStepTicks() {
+    _creatingStepTimer?.cancel();
+    _creatingStepsDone = 0;
+    _creatingStepTimer = Timer.periodic(const Duration(milliseconds: 750), (t) {
+      if (!mounted || !_isLoading) {
+        t.cancel();
+        return;
+      }
+      if (_creatingStepsDone >= 3) {
+        t.cancel();
+        return;
+      }
+      setState(() => _creatingStepsDone++);
+    });
+  }
+
+  void _stopCreatingStepTicks() {
+    _creatingStepTimer?.cancel();
+    _creatingStepTimer = null;
+    _creatingStepsDone = 0;
+  }
+
+  Future<void> _revealPrayerAfterTicks({
+    required String responseText,
+    required int requestId,
+  }) async {
+    while (mounted &&
+        requestId == _prayerRequestGeneration &&
+        _isLoading &&
+        _creatingStepsDone < 3) {
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+    }
+    if (!mounted || requestId != _prayerRequestGeneration) return;
+    if (_creatingStepsDone >= 3) {
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+    }
+    if (!mounted || requestId != _prayerRequestGeneration) return;
+    _stopCreatingStepTicks();
+    setState(() {
+      _messages.add(_GuidanceMessage(text: responseText, isUser: false));
+      _isLoading = false;
+    });
+  }
+
   void _resetPrayerChatView() {
     _prayerRequestGeneration++;
     _responseHeaderTitle = null;
     _customPrayerController.clear();
+    _stopCreatingStepTicks();
     if (!mounted) {
       _messages.clear();
       _isLoading = false;
@@ -538,6 +585,7 @@ class _PrayerGuidanceScreenState extends State<PrayerGuidanceScreen>
       _messages.add(_GuidanceMessage(text: category.title, isUser: true));
       _isLoading = true;
     });
+    _startCreatingStepTicks();
 
     try {
       final url = Uri.parse(_baseUrl);
@@ -780,10 +828,10 @@ ${category.prompt}
       responseText = _sanitizePrayerResponseText(responseText);
 
       if (!mounted || requestId != _prayerRequestGeneration) return;
-      setState(() {
-        _messages.add(_GuidanceMessage(text: responseText, isUser: false));
-        _isLoading = false;
-      });
+      await _revealPrayerAfterTicks(
+        responseText: responseText,
+        requestId: requestId,
+      );
 
       // Deduct credits only if we got a non-error response (same behavior as chat)
       final isErrorResponse =
@@ -833,6 +881,7 @@ ${category.prompt}
       _scrollToTop();
     } catch (e) {
       if (!mounted || requestId != _prayerRequestGeneration) return;
+      _stopCreatingStepTicks();
       setState(() {
         _messages.add(_GuidanceMessage(
             text: 'Error: Something went wrong. Please try again.',
@@ -971,6 +1020,7 @@ ${category.prompt}
       _messages.add(_GuidanceMessage(text: customRequest, isUser: true));
       _isLoading = true;
     });
+    _startCreatingStepTicks();
     // Clear input only after credits check passes (same as Chat screen).
     _customPrayerController.clear();
 
@@ -1214,10 +1264,10 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
       responseText = _sanitizePrayerResponseText(responseText);
 
       if (!mounted || requestId != _prayerRequestGeneration) return;
-      setState(() {
-        _messages.add(_GuidanceMessage(text: responseText, isUser: false));
-        _isLoading = false;
-      });
+      await _revealPrayerAfterTicks(
+        responseText: responseText,
+        requestId: requestId,
+      );
 
       // Deduct credits only if we got a non-error response (same behavior as chat)
       final isErrorResponse =
@@ -1267,6 +1317,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
       _scrollToTop();
     } catch (e) {
       if (!mounted || requestId != _prayerRequestGeneration) return;
+      _stopCreatingStepTicks();
       setState(() {
         _messages.add(_GuidanceMessage(
             text: 'Error: Something went wrong. Please try again.',
@@ -2332,6 +2383,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     routeObserver.unsubscribe(this);
     _creditsTimer?.cancel();
     _amenToastTimer?.cancel();
+    _creatingStepTimer?.cancel();
     _amenToastEntry?.remove();
     _amenToastEntry = null;
     _musicSpinController.dispose();
@@ -2961,6 +3013,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
     required bool showSpinner,
     required bool showConnector,
     bool compact = false,
+    bool completed = false,
   }) {
     final iconSize = compact ? 36.0 : 40.0;
     return IntrinsicHeight(
@@ -3005,26 +3058,32 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
           ),
           Padding(
             padding: const EdgeInsets.only(top: 9),
-            child: showSpinner
-                ? SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.2,
-                      color: _kPrayerGuidanceGold,
-                    ),
+            child: completed
+                ? Icon(
+                    Icons.check_circle,
+                    size: 22,
+                    color: _kPrayerGuidanceGold,
                   )
-                : Container(
-                    width: 22,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: _kPrayerGuidanceInk.withOpacity(0.16),
-                        width: 1.5,
+                : showSpinner
+                    ? SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          color: _kPrayerGuidanceGold,
+                        ),
+                      )
+                    : Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: _kPrayerGuidanceInk.withOpacity(0.16),
+                            width: 1.5,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
           ),
         ],
       ),
@@ -3238,7 +3297,8 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                       _prayerLoadingStepRow(
                         icon: Icons.search,
                         label: 'Finding the right Scriptures',
-                        showSpinner: true,
+                        showSpinner: _creatingStepsDone == 0,
+                        completed: _creatingStepsDone > 0,
                         showConnector: true,
                         compact: isCompact,
                       ),
@@ -3246,7 +3306,8 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                       _prayerLoadingStepRow(
                         icon: Icons.menu_book_outlined,
                         label: 'Understanding your need',
-                        showSpinner: true,
+                        showSpinner: _creatingStepsDone == 1,
+                        completed: _creatingStepsDone > 1,
                         showConnector: true,
                         compact: isCompact,
                       ),
@@ -3254,7 +3315,8 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
                       _prayerLoadingStepRow(
                         icon: Icons.favorite_border,
                         label: 'Preparing your prayer',
-                        showSpinner: true,
+                        showSpinner: _creatingStepsDone == 2,
+                        completed: _creatingStepsDone > 2,
                         showConnector: false,
                         compact: isCompact,
                       ),

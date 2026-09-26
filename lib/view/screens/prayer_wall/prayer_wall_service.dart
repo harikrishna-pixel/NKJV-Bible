@@ -214,8 +214,26 @@ class PrayerWallService {
     );
   }
 
+  static Future<bool> _hasLoginForBlockFilter() async {
+    try {
+      final email = (await CacheNotifier().readCache(key: 'user') ?? '')
+          .toString()
+          .trim();
+      final token = (await CacheNotifier().readCache(key: 'authtoken') ?? '')
+          .toString()
+          .trim();
+      final userid = (await CacheNotifier().readCache(key: 'userid') ?? '')
+          .toString()
+          .trim();
+      return email.isNotEmpty || token.isNotEmpty || userid.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Viewer resolve id for two-way `excludeBlockedForUserId`.
   /// Guest / no login → null (plain GET, no block filter).
+  /// Logged in: resolve if cache is empty so B's wall always sends the param.
   static Future<String?> _excludeBlockedViewerId() async {
     var uid = (await PrayerWallLocalStore.loadIdentityUserId() ?? '').trim();
     if (uid.isNotEmpty) return uid;
@@ -231,6 +249,10 @@ class PrayerWallService {
           .trim();
       if (email.isEmpty && token.isEmpty && userid.isEmpty) return null;
       uid = (await ensureIdentityUserId() ?? '').trim();
+      if (uid.isEmpty) {
+        await Future<void>.delayed(const Duration(milliseconds: 450));
+        uid = (await ensureIdentityUserId() ?? '').trim();
+      }
     } catch (e) {
       print('PrayerWallService._excludeBlockedViewerId: $e');
     }
@@ -240,27 +262,19 @@ class PrayerWallService {
   /// Additive: `GET /api/prayer-queue` — full rotating wait list.
   static Future<PrayerQueueListResult> fetchPrayerQueue() async {
     final uid = await _excludeBlockedViewerId();
+    if ((uid == null || uid.isEmpty) && await _hasLoginForBlockFilter()) {
+      throw Exception('Prayer queue skipped: resolve user_id missing');
+    }
     final url = (uid != null && uid.isNotEmpty)
         ? PrayerWallApiConstant.prayerQueueExcludingBlockedForUser(uid)
         : PrayerWallApiConstant.prayerQueue;
     print('========== GET /api/prayer-queue ==========');
     print('URL → $url');
     print('==========================================');
-    var res = await http.get(Uri.parse(url), headers: _jsonHeaders);
+    final res = await http.get(Uri.parse(url), headers: _jsonHeaders);
     print(
       'GET /api/prayer-queue response → ${res.statusCode} ${res.body}',
     );
-    if (uid != null &&
-        uid.isNotEmpty &&
-        (res.statusCode < 200 || res.statusCode >= 300)) {
-      res = await http.get(
-        Uri.parse(PrayerWallApiConstant.prayerQueue),
-        headers: _jsonHeaders,
-      );
-      print(
-        'GET /api/prayer-queue fallback → ${res.statusCode} ${res.body}',
-      );
-    }
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception('Prayer queue failed (${res.statusCode}): ${res.body}');
     }
@@ -274,27 +288,19 @@ class PrayerWallService {
   /// Additive: `GET /api/prayer-queue/current` — active hotspot slot.
   static Future<PrayerQueueCurrentResult> fetchPrayerQueueCurrent() async {
     final uid = await _excludeBlockedViewerId();
+    if ((uid == null || uid.isEmpty) && await _hasLoginForBlockFilter()) {
+      throw Exception('Prayer queue current skipped: resolve user_id missing');
+    }
     final url = (uid != null && uid.isNotEmpty)
         ? PrayerWallApiConstant.prayerQueueCurrentExcludingBlockedForUser(uid)
         : PrayerWallApiConstant.prayerQueueCurrent;
     print('========== GET /api/prayer-queue/current ==========');
     print('URL → $url');
     print('==================================================');
-    var res = await http.get(Uri.parse(url), headers: _jsonHeaders);
+    final res = await http.get(Uri.parse(url), headers: _jsonHeaders);
     print(
       'GET /api/prayer-queue/current response → ${res.statusCode} ${res.body}',
     );
-    if (uid != null &&
-        uid.isNotEmpty &&
-        (res.statusCode < 200 || res.statusCode >= 300)) {
-      res = await http.get(
-        Uri.parse(PrayerWallApiConstant.prayerQueueCurrent),
-        headers: _jsonHeaders,
-      );
-      print(
-        'GET /api/prayer-queue/current fallback → ${res.statusCode} ${res.body}',
-      );
-    }
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception(
         'Prayer queue current failed (${res.statusCode}): ${res.body}',
@@ -313,6 +319,10 @@ class PrayerWallService {
     // Do not fall back to plain GET — that shows everyone, including the other side.
     // Guest / no resolve id = plain GET.
     final uid = await _excludeBlockedViewerId();
+    if ((uid == null || uid.isEmpty) && await _hasLoginForBlockFilter()) {
+      print('GET /api/prayers skipped: logged in but resolve user_id missing');
+      return [];
+    }
     final url = (uid != null && uid.isNotEmpty)
         ? PrayerWallApiConstant.prayersExcludingBlockedForUser(uid)
         : PrayerWallApiConstant.prayers;

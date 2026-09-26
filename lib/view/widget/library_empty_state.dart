@@ -44,6 +44,10 @@ class LibraryEmptyState extends StatelessWidget {
     final titleColor = ink;
     final subtitleColor = ink.withOpacity(lightCanvas ? 0.72 : 0.88);
     final iconColor = lightCanvas ? primary : Colors.white;
+    final buttonFill =
+        lightCanvas ? primary : const Color(0xFFF5F0E6);
+    final buttonInk =
+        lightCanvas ? Colors.white : const Color(0xFF3D2914);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 28),
@@ -95,9 +99,9 @@ class LibraryEmptyState extends StatelessWidget {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: onButtonPressed ?? _continueReading,
-                icon: const Icon(
+                icon: Icon(
                   Icons.menu_book_rounded,
-                  color: Colors.white,
+                  color: buttonInk,
                   size: 20,
                 ),
                 label: Text(
@@ -106,11 +110,11 @@ class LibraryEmptyState extends StatelessWidget {
                     fontFamily: 'Georgia',
                     fontSize: BibleInfo.fontSizeScale * 16,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                    color: buttonInk,
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: primary,
+                  backgroundColor: buttonFill,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),

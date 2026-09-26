@@ -181,7 +181,7 @@ class LoginScreen extends HookConsumerWidget {
                         controller: loginState.emailCon,
                         hintText: 'Email',
                         inputType: TextInputType.emailAddress,
-                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        autovalidateMode: AutovalidateMode.onUnfocus,
                         validator: FormBuilderValidators.compose([
                           FormBuilderValidators.required(
                               errorText: 'Please enter your email address'),

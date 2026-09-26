@@ -750,6 +750,7 @@ class _OnboardingThemeSelectionScreenState
 extends State<OnboardingThemeSelectionScreen> {
 late AppCustomTheme _selectedTheme;
 String? _selectedThemeName;
+bool _selectedDarkMode = false;
 
 // Additive: Bible preview from current installed bible language (not hardcoded EN).
 static const String _kFallbackPreviewRef = 'Genesis 1:1–2';
@@ -766,6 +767,7 @@ super.initState();
 final provider = Provider.of<ThemeProvider>(context, listen: false);
 _selectedTheme = provider.currentCustomTheme;
 _selectedThemeName = _selectedTheme.name;
+_selectedDarkMode = provider.isDarkMode;
 _loadBibleLanguagePreview();
 }
 
@@ -895,15 +897,16 @@ return 'Warm Cream';
 
 Widget _themeOption(AppCustomTheme theme, bool isTablet) {
 final color = getColor(theme);
-final selected = _selectedTheme == theme;
+final selected = !_selectedDarkMode && _selectedTheme == theme;
 const outerRadius = 10.0;
 const borderWidth = 3.0;
 const innerRadius = outerRadius - borderWidth;
-final boxSize = isTablet ? 78.0 : 70.0;
+final boxSize = isTablet ? 70.0 : 56.0;
 
 return GestureDetector(
 onTap: () {
 setState(() {
+_selectedDarkMode = false;
 _selectedTheme = theme;
 _selectedThemeName = theme.name;
 Provider.of<ThemeProvider>(context, listen: false)
@@ -911,7 +914,7 @@ Provider.of<ThemeProvider>(context, listen: false)
 });
 },
 child: SizedBox(
-width: isTablet ? 108 : 96,
+width: isTablet ? 90 : 72,
 child: Column(
 mainAxisSize: MainAxisSize.min,
 children: [
@@ -980,6 +983,87 @@ height: 1.2,
 );
 }
 
+Widget _darkThemeOption(bool isTablet) {
+final selected = _selectedDarkMode;
+const outerRadius = 10.0;
+const borderWidth = 3.0;
+const innerRadius = outerRadius - borderWidth;
+final boxSize = isTablet ? 70.0 : 56.0;
+
+return GestureDetector(
+onTap: () {
+setState(() {
+_selectedDarkMode = true;
+});
+},
+child: SizedBox(
+width: isTablet ? 90 : 72,
+child: Column(
+mainAxisSize: MainAxisSize.min,
+children: [
+Stack(
+clipBehavior: Clip.none,
+children: [
+Container(
+width: boxSize,
+height: boxSize,
+decoration: BoxDecoration(
+borderRadius: BorderRadius.circular(outerRadius),
+border: Border.all(
+color: selected
+? const Color(0xFF7A5435)
+    : const Color.fromARGB(255, 144, 144, 144),
+width: borderWidth,
+),
+),
+child: ClipRRect(
+borderRadius: BorderRadius.circular(innerRadius),
+child: const DecoratedBox(
+decoration: BoxDecoration(
+color: CommanColor.darkPrimaryColor,
+image: DecorationImage(
+image: AssetImage('assets/nightMode/night_mode.png'),
+fit: BoxFit.cover,
+),
+),
+child: SizedBox.expand(),
+),
+),
+),
+if (selected)
+Positioned(
+top: -6,
+right: -6,
+child: Container(
+width: 22,
+height: 22,
+decoration: const BoxDecoration(
+color: Color(0xFF7A5435),
+shape: BoxShape.circle,
+),
+child: const Icon(Icons.check,
+color: Colors.white, size: 14),
+),
+),
+],
+),
+const SizedBox(height: 8),
+Text(
+'Dark Mode',
+textAlign: TextAlign.center,
+style: TextStyle(
+fontSize: isTablet ? 14 : 12,
+fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+color: const Color(0xFF2E2C2B),
+height: 1.2,
+),
+),
+],
+),
+),
+);
+}
+
 Widget _buildThemeSelectionCard(bool isTablet, List<AppCustomTheme> themes) {
 return Container(
 width: double.infinity,
@@ -994,18 +1078,23 @@ color: const Color(0xFFB08D6E).withValues(alpha: 0.75),
 child: Row(
 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
 crossAxisAlignment: CrossAxisAlignment.start,
-children: themes.map((theme) => _themeOption(theme, isTablet)).toList(),
+children: [
+...themes.map((theme) => _themeOption(theme, isTablet)),
+_darkThemeOption(isTablet),
+],
 ),
 );
 }
 
 Widget _buildThemePreviewCard(BuildContext context, {required bool compact}) {
+final previewInk =
+_selectedDarkMode ? Colors.white : const Color(0xFF2E2C2B);
 final previewText = Text(
 _previewBody,
-style: const TextStyle(
+style: TextStyle(
 height: 1.4,
 fontSize: 15.5,
-color: Color(0xFF2E2C2B),
+color: previewInk,
 fontWeight: FontWeight.w500,
 ),
 );
@@ -1020,7 +1109,15 @@ color: const Color(0xFFB08D6E).withValues(alpha: 0.7),
 child: ClipRRect(
 borderRadius: BorderRadius.circular(12),
 child: DecoratedBox(
-decoration: Provider.of<ThemeProvider>(context).currentCustomTheme ==
+decoration: _selectedDarkMode
+? const BoxDecoration(
+color: CommanColor.darkPrimaryColor,
+image: DecorationImage(
+image: AssetImage('assets/nightMode/night_mode.png'),
+fit: BoxFit.cover,
+),
+)
+    : Provider.of<ThemeProvider>(context).currentCustomTheme ==
 AppCustomTheme.vintage
 ? BoxDecoration(
 image: DecorationImage(
@@ -1056,10 +1153,10 @@ const SizedBox(width: 8),
 Flexible(
 child: Text(
 _previewRef,
-style: const TextStyle(
+style: TextStyle(
 fontSize: 15,
 fontWeight: FontWeight.w700,
-color: Color(0xFF2E2C2B),
+color: previewInk,
 ),
 ),
 ),
@@ -1220,6 +1317,10 @@ borderRadius: BorderRadius.circular(14),
 ),
 child: ElevatedButton(
 onPressed: () {
+if (_selectedDarkMode) {
+Provider.of<ThemeProvider>(context, listen: false)
+    .toggleTheme(true);
+}
 widget.onThemeSelected();
 },
 style: ElevatedButton.styleFrom(

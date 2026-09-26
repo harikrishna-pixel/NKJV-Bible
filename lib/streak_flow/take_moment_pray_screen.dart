@@ -173,9 +173,7 @@ class _TakeMomentPrayScreenState extends State<TakeMomentPrayScreen> {
   @override
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width > 450;
-    final isDark =
-        Provider.of<ThemeProvider>(context, listen: false).themeMode ==
-            ThemeMode.dark;
+    const isDark = false;
     final Color textColor = isDark ? Colors.white : _brown;
     final Color softText = isDark ? Colors.white70 : _warmTan;
 
@@ -321,9 +319,7 @@ class _TakeMomentPrayScreenState extends State<TakeMomentPrayScreen> {
     required String label,
     required VoidCallback onPressed,
   }) {
-    final isDark =
-        Provider.of<ThemeProvider>(context, listen: false).themeMode ==
-            ThemeMode.dark;
+    const isDark = false;
     final lightBtnColor =
         CommanColor.lightDarkPrimary(context).withOpacity(0.92);
     return Padding(

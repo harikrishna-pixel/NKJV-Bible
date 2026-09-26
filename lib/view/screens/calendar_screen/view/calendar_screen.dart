@@ -278,7 +278,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                                 child: Icon(
                                   Icons.calendar_month_outlined,
                                   size: 24,
-                                  color: brown,
+                                  color: CommanColor.isDarkTheme(context)
+                                      ? Colors.white
+                                      : brown,
                                 ),
                               ),
                             ],

@@ -107,6 +107,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
         themeProvider.currentCustomTheme == AppCustomTheme.vintage;
     final isDark = themeProvider.themeMode == ThemeMode.dark;
     const paperInk = Color(0xFF3E2A1F);
+    final ink = isDark ? Colors.white : paperInk;
     // White/yellow themes always use their light surface (even in Dark Mode).
     final scaffoldBg = isVintage
         ? (isDark ? CommanColor.black : const Color(0xFFF5F0E6))
@@ -134,7 +135,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                       child: Text(
                         'No chapters available',
                         style: CommanStyle.bw16500(context)
-                            .copyWith(color: paperInk),
+                            .copyWith(color: ink),
                       ),
                     )
                   : ListView(
@@ -156,7 +157,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                             child: Icon(
                               Icons.arrow_back_ios,
                               size: 20,
-                              color: paperInk,
+                              color: ink,
                             ),
                           ),
                         ),
@@ -164,7 +165,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                           padding: const EdgeInsets.only(right: 20.0),
                           child: Text("Chapter",
                               style: CommanStyle.appBarStyle(context)
-                                  .copyWith(color: paperInk)),
+                                  .copyWith(color: ink)),
                         ),
                         const SizedBox()
                       ],
@@ -245,15 +246,10 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                                 debugPrint(
                                     'chapter select book metadata sync: $e');
                               }
-                              c.selectedBookContent.clear();
-                              c.selectedVersesContent.clear();
                             }
                             setState(() {
                               selectedChapter = index;
                               selectedChangeChapter = index;
-                              // Hide chapter grid before route fade so Reading
-                              // UI cannot composite over the grid (flicker).
-                              loader = false;
                             });
                             Get.offAll(
                                   () => HomeScreen(
@@ -284,7 +280,7 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                                         ? CommanColor
                                             .inDarkWhiteAndInLightPrimary(
                                                 context)
-                                        : paperInk),
+                                        : ink),
                               ),
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -292,9 +288,9 @@ class _ChapterListScreenState extends State<ChapterListScreen> {
                               child: Text(
                                 "${index + 1}",
                                 style: TextStyle(
-                                  color: isChapterRead
+                                  color: isChapterRead && !isDark
                                       ? progressColor
-                                      : paperInk,
+                                      : ink,
                                   fontWeight: isSelected || isChapterRead
                                       ? FontWeight.w700
                                       : FontWeight.w600,

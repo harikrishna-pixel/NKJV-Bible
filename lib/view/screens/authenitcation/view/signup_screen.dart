@@ -160,6 +160,8 @@ class SignupScreen extends HookConsumerWidget {
                                   CustomTextFormField(
                                     controller: signupState.emailCon,
                                     hintText: 'Email',
+                                    autovalidateMode:
+                                        AutovalidateMode.onUnfocus,
                                     validator: FormBuilderValidators.compose([
                                       FormBuilderValidators.required(
                                           errorText:

@@ -93,6 +93,7 @@ class ForgetPasswordScreen extends HookConsumerWidget {
                         CustomTextFormField(
                           controller: forgetPasswordState.emailCon,
                           hintText: 'Email',
+                          autovalidateMode: AutovalidateMode.onUnfocus,
                           validator: FormBuilderValidators.compose([
                             FormBuilderValidators.required(
                                 errorText: 'Please enter your email address'),

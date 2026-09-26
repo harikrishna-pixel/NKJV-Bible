@@ -578,6 +578,17 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                           onSelected: (_) => setState(() => _category = c),
                           selectedColor: brown,
                           checkmarkColor: Colors.white,
+                          surfaceTintColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          selectedShadowColor: Colors.transparent,
+                          color: WidgetStateProperty.resolveWith((states) {
+                            if (states.contains(WidgetState.selected)) {
+                              return brown;
+                            }
+                            return isDark
+                                ? Colors.white.withOpacity(0.1)
+                                : Colors.white;
+                          }),
                           labelStyle: TextStyle(
                             color: sel
                                 ? Colors.white

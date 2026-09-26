@@ -257,10 +257,10 @@ class ReferralCodeProfileSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final code = referralCode.trim();
-    final titleColor = CommanColor.isDarkTheme(context)
-        ? const Color(0xFF2C1810)
-        : CommanColor.whiteBlack(context);
-    final subtitleColor = titleColor.withOpacity(0.62);
+    final titleColor = CommanColor.whiteBlack(context);
+    final subtitleColor = CommanColor.isDarkTheme(context)
+        ? Colors.white
+        : titleColor.withOpacity(0.62);
     final showEnter = _canEnterReferral && onEnterReferralTap != null;
     final showOwn = code.isNotEmpty;
     final cardFill =

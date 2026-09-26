@@ -41,7 +41,7 @@ class _PourOutWorriesScreenState extends State<PourOutWorriesScreen> {
   @override
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width > 450;
-    final isDark = Provider.of<ThemeProvider>(context, listen: false).themeMode == ThemeMode.dark;
+    const isDark = false;
     final Color textColor = isDark ? Colors.white : _brown;
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),

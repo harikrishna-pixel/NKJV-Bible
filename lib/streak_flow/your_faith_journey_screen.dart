@@ -291,7 +291,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
     final isTablet = MediaQuery.sizeOf(context).width > 450;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
       decoration: BoxDecoration(
         color: panelColor,
         borderRadius: BorderRadius.circular(16),
@@ -305,6 +305,9 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
             children: [
               IconButton(
                 icon: Icon(Icons.chevron_left, color: textColor),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 onPressed: () {
                   setState(() {
                     _viewMonth = DateTime(_viewMonth.year, _viewMonth.month - 1);
@@ -322,6 +325,9 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
               ),
               IconButton(
                 icon: Icon(Icons.chevron_right, color: textColor),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 onPressed: () {
                   setState(() {
                     _viewMonth = DateTime(_viewMonth.year, _viewMonth.month + 1);
@@ -359,7 +365,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
           LayoutBuilder(
             builder: (context, constraints) {
               final cellW = constraints.maxWidth / 7;
-              const double cellH = 46;
+              const double cellH = 36;
               final rows = <Widget>[];
               int day = 1;
               for (int i = 0; i < 6; i++) {
@@ -389,7 +395,8 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
                     SizedBox(
                       width: cellW,
                       height: cellH,
-                      child: Center(
+                      child: Align(
+                        alignment: Alignment.topCenter,
                         child: _dayCell(
                           day: day,
                           isToday: isToday,
@@ -405,6 +412,10 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
                   );
                   day++;
                 }
+                final rowHasDay = rowChildren.any((w) {
+                  return w is SizedBox && w.child != null;
+                });
+                if (!rowHasDay) continue;
                 rows.add(
                   SizedBox(
                     width: constraints.maxWidth,
@@ -418,9 +429,9 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
               );
             },
           ),
-          const SizedBox(height: 16),
-          _legendRow(textColor),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          _legendRow(textColor, isDark: isDark),
+          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -430,7 +441,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
-                    color: textColor.withOpacity(0.9),
+                    color: isDark ? Colors.white : textColor.withOpacity(0.9),
                     fontFamily: 'Georgia',
                   ),
                 ),
@@ -550,10 +561,10 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
   }) {
     return SizedBox(
       width: double.infinity,
-      height: 40,
+      height: 32,
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
@@ -581,7 +592,8 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
     );
   }
 
-  Widget _legendRow(Color textColor) {
+  Widget _legendRow(Color textColor, {bool isDark = false}) {
+    final labelColor = isDark ? Colors.white : textColor;
     return Wrap(
       spacing: 16,
       runSpacing: 8,
@@ -600,7 +612,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
             ),
             const SizedBox(width: 6),
             Text('Completed Journey',
-                style: TextStyle(fontSize: 11, color: textColor, fontFamily: 'Georgia')),
+                style: TextStyle(fontSize: 11, color: labelColor, fontFamily: 'Georgia')),
           ],
         ),
         Row(
@@ -616,7 +628,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
             ),
             const SizedBox(width: 6),
             Text('Started but not finished',
-                style: TextStyle(fontSize: 11, color: textColor, fontFamily: 'Georgia')),
+                style: TextStyle(fontSize: 11, color: labelColor, fontFamily: 'Georgia')),
           ],
         ),
         Row(
@@ -632,7 +644,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
             ),
             const SizedBox(width: 6),
             Text('Upcoming',
-                style: TextStyle(fontSize: 11, color: textColor, fontFamily: 'Georgia')),
+                style: TextStyle(fontSize: 11, color: labelColor, fontFamily: 'Georgia')),
           ],
         ),
         Row(
@@ -648,7 +660,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
             ),
             const SizedBox(width: 6),
             Text('Today',
-                style: TextStyle(fontSize: 11, color: textColor, fontFamily: 'Georgia')),
+                style: TextStyle(fontSize: 11, color: labelColor, fontFamily: 'Georgia')),
           ],
         ),
         Row(
@@ -664,7 +676,7 @@ class _YourFaithJourneyScreenState extends State<YourFaithJourneyScreen> {
             ),
             const SizedBox(width: 6),
             Text('Missed',
-                style: TextStyle(fontSize: 11, color: textColor, fontFamily: 'Georgia')),
+                style: TextStyle(fontSize: 11, color: labelColor, fontFamily: 'Georgia')),
           ],
         ),
       ],

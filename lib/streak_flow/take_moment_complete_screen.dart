@@ -36,9 +36,7 @@ class TakeMomentCompleteScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width > 450;
-    final isDark =
-        Provider.of<ThemeProvider>(context, listen: false).themeMode ==
-            ThemeMode.dark;
+    const isDark = false;
     final Color textColor = isDark ? Colors.white : _brown;
     final Color softText = isDark ? Colors.white70 : _warmTan;
     final lightBtnColor =

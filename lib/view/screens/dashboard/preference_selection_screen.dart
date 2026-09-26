@@ -1490,18 +1490,10 @@ class FaithJourneyDialog {
       builder: (ctx) {
         final mq = MediaQuery.of(ctx).size;
         final isTablet = mq.width > 600;
-        final isDark =
-            Provider.of<ThemeProvider>(ctx, listen: false).themeMode ==
-                ThemeMode.dark;
-        final titleColor =
-            isDark ? Colors.white : const Color(0xFF2C2118);
-        final bodyColor = isDark
-            ? Colors.white.withValues(alpha: 0.88)
-            : const Color(0xFF5C4033);
-        final topicsColor =
-            isDark ? const Color(0xFFF3E4C0) : const Color(0xFF3D2914);
-        final crossColor =
-            isDark ? const Color(0xFFF3E4C0) : const Color(0xFF2C2118);
+        const titleColor = Color(0xFF2C2118);
+        const bodyColor = Color(0xFF5C4033);
+        const topicsColor = Color(0xFF3D2914);
+        const crossColor = Color(0xFF2C2118);
         return Dialog(
           backgroundColor: Colors.transparent,
           insetPadding: EdgeInsets.zero,
@@ -1511,8 +1503,8 @@ class FaithJourneyDialog {
               width: double.infinity,
               height: double.infinity,
               decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage(Images.bgImage(ctx)),
+                image: const DecorationImage(
+                  image: AssetImage('assets/lightMode/day_bg.png'),
                   fit: BoxFit.fill,
                 ),
               ),
