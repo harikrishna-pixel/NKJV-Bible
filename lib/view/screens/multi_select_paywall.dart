@@ -98,16 +98,16 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   String get _resolvedSixMonth => BibleInfo.isAutoRenewablePaywallMode
       ? BibleInfo.arOneMonthPlanid
       : AppApiConstant.resolveSubscriptionProductId(
-          widget.sixMonthPlan,
-          BibleInfo.sixMonthPlanid,
-        );
+        widget.sixMonthPlan,
+        BibleInfo.sixMonthPlanid,
+      );
 
   String get _resolvedOneYear => BibleInfo.isAutoRenewablePaywallMode
       ? BibleInfo.arOneYearPlanid
       : AppApiConstant.resolveSubscriptionProductId(
-          widget.oneYearPlan,
-          BibleInfo.oneYearPlanid,
-        );
+        widget.oneYearPlan,
+        BibleInfo.oneYearPlanid,
+      );
 
   String get _resolvedLifetime => AppApiConstant.resolveSubscriptionProductId(
         widget.lifeTimePlan,
@@ -256,7 +256,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
     void assignFrom(Iterable<ProductDetails> list) {
       for (final p in list) {
-        final id = p.id.toLowerCase();
+      final id = p.id.toLowerCase();
 
         // Paywall shows AR 1-month in the short slot (not AR 6-month).
 
@@ -896,7 +896,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       ),
     );
 
-    if (!mounted) return;
+      if (!mounted) return;
     if (ok == true) {
       await _onInvisibleHostFinished(true, wasPurchase: true);
       return;
@@ -931,7 +931,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
           sixMonthPlan: _resolvedSixMonth,
           oneYearPlan: _resolvedOneYear,
           lifeTimePlan: _resolvedLifetime,
-          checkad: widget.checkad,
+      checkad: widget.checkad,
           invisiblePurchaseHost: true,
           autoStartRestore: true,
         ),
@@ -961,36 +961,36 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
         await _navigateAwayFromPaywall();
       },
       child: Scaffold(
-        backgroundColor: _cream,
-        body: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
-                  children: [
-                    _buildHero(isTablet),
-                    Padding(
+      backgroundColor: _cream,
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                children: [
+                  _buildHero(isTablet),
+                  Padding(
                       // UI only: a little space between benefits → AI Premium.
 
-                      padding: EdgeInsets.fromLTRB(
+                    padding: EdgeInsets.fromLTRB(
                           hPad, isTablet ? 12 : 10, hPad, 0),
 
-                      child: Column(
-                        children: [
-                          _buildAiCard(isTablet),
+                    child: Column(
+                      children: [
+                        _buildAiCard(isTablet),
                           SizedBox(height: isTablet ? 12 : 9),
-                          _buildLifetimeCard(isTablet),
-                        ],
-                      ),
+                        _buildLifetimeCard(isTablet),
+                      ],
                     ),
+                  ),
                     SizedBox(height: isTablet ? 6 : 4),
-                  ],
-                ),
+                ],
               ),
             ),
-            _buildFooter(isTablet, w),
-          ],
+          ),
+          _buildFooter(isTablet, w),
+        ],
         ),
       ),
     );
@@ -1058,7 +1058,7 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
               clipBehavior: Clip.none,
               fit: StackFit.expand,
               children: [
-                Positioned.fill(
+          Positioned.fill(
                   child: ColoredBox(
                     color: paywallCream,
                     child: isTablet
@@ -1078,23 +1078,23 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                               Colors.white.withValues(alpha: 0.14),
                               BlendMode.lighten,
                             ),
-                            child: Image.asset(
+            child: Image.asset(
                               'assets/img.png',
-                              fit: BoxFit.cover,
-                              alignment: Alignment.topCenter,
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
                               filterQuality: FilterQuality.high,
-                              gaplessPlayback: true,
+              gaplessPlayback: true,
                               errorBuilder: (_, __, ___) => Container(
                                 color: const Color(0xFFE8D5C4),
                               ),
                             ),
                           ),
-                  ),
-                ),
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
+            ),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: isTablet
@@ -1111,21 +1111,21 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                                 paywallCream,
                               ],
                         stops: const [0.0, 0.30, 0.64, 1.0],
-                      ),
-                    ),
-                  ),
                 ),
-                Positioned(
+              ),
+            ),
+          ),
+          Positioned(
                   top: topPadding + 40,
-                  left: 0,
-                  right: 0,
+            left: 0,
+            right: 0,
                   child: Container(
                     height: isTablet ? 100 : 180,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
                         begin: Alignment.centerLeft,
                         end: Alignment.centerRight,
-                        colors: [
+                  colors: [
                           paywallCream.withValues(
                               alpha: isTablet ? 0.10 : 0.26),
                           paywallCream.withValues(
@@ -1134,15 +1134,15 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                           paywallCream.withValues(alpha: 0.0),
                         ],
                         stops: const [0.0, 0.35, 0.70, 1.0],
-                      ),
-                    ),
-                  ),
                 ),
-                SafeArea(
-                  bottom: false,
+              ),
+            ),
+          ),
+          SafeArea(
+            bottom: false,
                   child: Align(
                     alignment: Alignment.topLeft,
-                    child: Padding(
+            child: Padding(
                       padding: EdgeInsets.only(
                           left: heroSidePad, top: isTablet ? 8 : 6),
                       child: Row(
@@ -1215,10 +1215,10 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
                       alignment: Alignment.centerLeft,
 
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
-                        children: [
+                children: [
                           Image.asset(
                             'assets/paywall_icons/premium.png',
                             height: 60,
@@ -1244,16 +1244,16 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                                 const TextSpan(text: 'to '),
                                 TextSpan(
                                   text: 'God',
-                                  style: TextStyle(
+                          style: TextStyle(
                                     fontFamily: 'Georgia',
                                     color: paywallTitleGold,
-                                    fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w800,
                                     shadows: heroShadows,
                                   ),
                                 ),
                                 TextSpan(
                                   text: ' Daily',
-                                  style: TextStyle(
+                                style: TextStyle(
                                     fontFamily: 'Georgia',
                                     color: paywallTitleGold,
                                     fontWeight: FontWeight.w800,
@@ -1273,10 +1273,10 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                               color: paywallSubtitle,
                               fontWeight: FontWeight.w500,
                               shadows: heroShadows,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
+                    ],
+                  ),
                     ),
                   )
                 else
@@ -1302,40 +1302,40 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                             children: [
                               const TextSpan(text: 'Grow Closer\n'),
                               const TextSpan(text: 'to '),
-                              TextSpan(
+                    TextSpan(
                                 text: 'God',
-                                style: TextStyle(
+                      style: TextStyle(
                                   color: paywallTitleGold,
                                   fontWeight: FontWeight.w800,
                                   shadows: heroShadows,
                                 ),
                               ),
-                              TextSpan(
+                        TextSpan(
                                 text: ' Daily',
                                 style: TextStyle(
                                   color: paywallTitleGold,
                                   fontWeight: FontWeight.w800,
                                   shadows: heroShadows,
                                 ),
-                              ),
-                            ],
-                          ),
                         ),
+                      ],
+                    ),
+                  ),
                         const SizedBox(height: 8),
-                        Text(
+                  Text(
                           'Guidance, prayer, and encouragement\n whenever you need it.',
                           textAlign: TextAlign.left,
-                          style: TextStyle(
+                    style: TextStyle(
                             fontSize: 14,
                             height: 1.4,
                             color: paywallSubtitle,
                             fontWeight: FontWeight.w500,
                             shadows: heroShadows,
-                          ),
-                        ),
-                      ],
                     ),
                   ),
+                ],
+              ),
+            ),
               ],
             ),
           ),
@@ -1396,30 +1396,30 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       margin: EdgeInsets.symmetric(horizontal: side),
       padding: EdgeInsets.symmetric(
           vertical: isTablet ? 14 : 12, horizontal: isTablet ? 6 : 4),
-      decoration: BoxDecoration(
+        decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(isTablet ? 18 : 16),
-        boxShadow: [
-          BoxShadow(
+          boxShadow: [
+            BoxShadow(
             color: const Color(0xFF5A3C14).withValues(alpha: 0.08),
             blurRadius: 16,
             offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            cell(
+            ),
+          ],
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              cell(
               icon: Icons.volunteer_activism_rounded,
               bg: const Color(0xFFFBF0DA),
               iconColor: const Color(0xFFB07A1E),
-              title: 'Pray With\nConfidence',
-            ),
+                title: 'Pray With\nConfidence',
+              ),
             const VerticalDivider(
                 width: 1, thickness: 1, color: Color(0xFFEFE7DA)),
-            cell(
+              cell(
               icon: Icons.menu_book_rounded,
               bg: const Color(0xFFEDF4E2),
               iconColor: const Color(0xFF5C8A2B),
@@ -1427,13 +1427,13 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
             ),
             const VerticalDivider(
                 width: 1, thickness: 1, color: Color(0xFFEFE7DA)),
-            cell(
+              cell(
               icon: Icons.favorite_rounded,
               bg: const Color(0xFFFCE9EA),
               iconColor: const Color(0xFFD9636B),
-              title: 'Find Peace\nEvery Day',
-            ),
-          ],
+                title: 'Find Peace\nEvery Day',
+              ),
+            ],
         ),
       ),
     );
@@ -1538,25 +1538,25 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
               Opacity(
                 opacity: priceMuted ? 0.45 : 1,
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      _aiPrice,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    _aiPrice,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
                         fontSize: isTablet ? 34 : 30,
                         letterSpacing: -0.6,
                         height: 1.1,
-                        color: _ink,
-                      ),
+                      color: _ink,
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4, left: 2),
-                      child: Text(
-                        _aiPer,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4, left: 2),
+                    child: Text(
+                      _aiPer,
                         style: TextStyle(
                           fontSize: isTablet ? 16 : 15,
-                          fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w600,
                           color: const Color(0xFF5C5240),
                         ),
                       ),
@@ -1573,9 +1573,9 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                             color: const Color(0xFFA2937B),
                             decoration: TextDecoration.lineThrough,
                             decorationColor: const Color(0xFFA2937B),
-                          ),
-                        ),
                       ),
+                    ),
+                  ),
                     ],
                   ],
                 ),
@@ -1584,11 +1584,11 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
             Opacity(
               opacity: priceMuted ? 0.45 : 1,
               child: Text(
-                _aiNote,
+              _aiNote,
                 style: TextStyle(
                     fontSize: isTablet ? 12.5 : 11.5,
                     color: const Color(0xFF6E6353)),
-              ),
+            ),
             ),
             SizedBox(height: isTablet ? 12 : 11),
             _inclRow(
@@ -1729,31 +1729,31 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
             Opacity(
               opacity: priceMuted ? 0.45 : 1,
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    _lifetimePrice,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  _lifetimePrice,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
                       fontSize: isTablet ? 34 : 30,
                       letterSpacing: -0.6,
                       height: 1.1,
-                      color: _ink,
-                    ),
+                    color: _ink,
                   ),
+                ),
                   Padding(
                     padding: const EdgeInsets.only(bottom: 4, left: 4),
-                    child: Text(
+                  child: Text(
                       'once',
-                      style: TextStyle(
+                    style: TextStyle(
                         fontSize: isTablet ? 16 : 15,
-                        fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w600,
                         color: const Color(0xFF5C5240),
-                      ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
+            ),
             ),
             SizedBox(height: isTablet ? 12 : 11),
             _inclRow(
@@ -1803,14 +1803,14 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '✓',
-          style: TextStyle(
+            '✓',
+            style: TextStyle(
             fontSize: isTablet ? 13 : 12,
-            fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w800,
             color: checkColor,
             height: 1.35,
+            ),
           ),
-        ),
         SizedBox(width: isTablet ? 8 : 8),
         Expanded(
           child: rich
@@ -2078,12 +2078,12 @@ class _DurChip extends StatelessWidget {
               ),
             ),
             child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
                 fontSize: isTablet ? 16 : 15,
                 fontWeight: FontWeight.w700,
-                color: selected
+                    color: selected
                     ? const Color(0xFF4A2F9E)
                     : const Color(0xFF101B2B),
               ),

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
@@ -137,10 +138,13 @@ class _PrayerWallUserProfileScreenState
     if (profileId.isEmpty || _isOwnProfile || _followBusy) return;
     setState(() => _followBusy = true);
     try {
+      final loginName =
+          (await CacheNotifier().readCache(key: 'name') ?? '').toString().trim();
       if (_isFollowing) {
         await PrayerWallService.unfollowUser(
           userId: viewerId,
           followingUserId: profileId,
+          userName: loginName.isEmpty ? null : loginName,
         );
         if (!mounted) return;
         setState(() {
@@ -151,6 +155,7 @@ class _PrayerWallUserProfileScreenState
         await PrayerWallService.followUser(
           userId: viewerId,
           followingUserId: profileId,
+          userName: loginName.isEmpty ? null : loginName,
         );
         if (!mounted) return;
         setState(() {

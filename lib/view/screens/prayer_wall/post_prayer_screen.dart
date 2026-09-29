@@ -8,6 +8,7 @@ import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_local_store.da
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_models.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_service.dart';
+import 'package:biblebookapp/view/screens/prayer_wall/prayer_added_success_screen.dart';
 import 'package:biblebookapp/view/screens/prayer_wall/prayer_wall_verify_dialogs.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -92,11 +93,17 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
   final _titleCtrl = TextEditingController();
   final _detailsCtrl = TextEditingController();
   final _titleFocus = FocusNode();
+  final _requestFocus = FocusNode();
+  final _englishReviewCtrl = TextEditingController();
+  final _englishReviewFocus = FocusNode();
   String _category = 'Others';
   int _durationDays = 30;
   // Anonymous posting UI disabled for now; posts use author name when provided.
   bool _isAnonymous = false;
   bool _submitting = false;
+  /// 0 = Share Your Prayer, 1 = Review Your Prayer.
+  int _step = 0;
+  bool _creatingAi = false;
   /// Raw words from the Type Your Prayer step (any language).
   String _rawPrayerWords = '';
   /// Encoded original+AI payload for POST; the details field stays tag-free.
@@ -231,6 +238,16 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
   }
 
   Future<void> _submit() async {
+    final reviewEnglish = _englishReviewCtrl.text.trim();
+    if (reviewEnglish.isNotEmpty && _rawPrayerWords.trim().isNotEmpty) {
+      _encodedDetails = PrayerDualDescription.encode(
+        originalWords: _rawPrayerWords.trim(),
+        englishPrayer: reviewEnglish,
+      );
+      if (_titleCtrl.text.trim().isEmpty) {
+        _titleCtrl.text = _titleFromWords(reviewEnglish);
+      }
+    }
     final title = _titleCtrl.text.trim();
     final details = _encodedDetails.trim().isNotEmpty
         ? _encodedDetails.trim()
@@ -256,8 +273,6 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
     }
 
     setState(() => _submitting = true);
-    final progress = PrayerVerifyProgressController();
-    var verifyingOpen = false;
     try {
       // NOTE: Prayer Wall posting should not deduct wallet credits.
       // final currentCredits = await WalletService.getCredits();
@@ -272,24 +287,12 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
       //   return;
       // }
 
-      // Show verifying UI while AI reviews (replaces toast-only feedback).
-      verifyingOpen = true;
-      // ignore: unawaited_futures
-      PrayerWallVerifyDialogs.showVerifying(context, controller: progress);
-
-      // Animate early steps while AI runs.
-      final validationFuture = PrayerWallService.validatePrayerContent(
+      final validation = await PrayerWallService.validatePrayerContent(
         prayerTitle: title,
         prayerDescription: details,
       );
-      await progress.advanceTo(2);
-      final validation = await validationFuture;
 
       if (!validation.isValid) {
-        if (mounted && verifyingOpen) {
-          Navigator.of(context, rootNavigator: true).pop();
-          verifyingOpen = false;
-        }
         if (!mounted) return;
         final action = await PrayerWallVerifyDialogs.showInappropriate(context);
         if (!mounted) return;
@@ -299,8 +302,6 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         // 'edit' / dismiss → stay on form so user can revise.
         return;
       }
-
-      await progress.advanceTo(3);
 
       // Author name always from Bible Profile (cache `name`), not a form field.
       final loginName =
@@ -317,8 +318,11 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
           (await CacheNotifier().readCache(key: 'profile_image') ?? '')
               .toString()
               .trim();
-      final profileImageUrl =
-          cachedImage.isNotEmpty ? cachedImage : null;
+      final profileImageUrl = (!_isAnonymous &&
+              (cachedImage.startsWith('http://') ||
+                  cachedImage.startsWith('https://')))
+          ? cachedImage
+          : null;
       print(
           'Post prayer profile_image URL → ${profileImageUrl ?? "none"}');
 
@@ -337,13 +341,12 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         prayerCategory: _category,
         isAnonymous: _isAnonymous,
         prayerDuration: _durationDays,
-        userName: effectiveName.isNotEmpty ? effectiveName : null,
+        userName: (!_isAnonymous && effectiveName.isNotEmpty)
+            ? effectiveName
+            : null,
         profileImage: profileImageUrl,
         email: email,
       );
-      await progress.advanceTo(4);
-      // UI only: let step 4 finish visibly before the success confirmation.
-      await Future<void>.delayed(const Duration(milliseconds: 2500));
       if (!mounted) return;
       // await WalletService.deductCredits(_totalCredits);
       if (effectiveName.isNotEmpty) {
@@ -381,17 +384,17 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
           );
         }
       }
-      if (mounted && verifyingOpen) {
-        Navigator.of(context, rootNavigator: true).pop();
-        verifyingOpen = false;
-      }
       if (!mounted) return;
       setState(() => _submitting = false);
-      final result = await PrayerWallVerifyDialogs.showVerified(context);
+      final shared = await Navigator.of(context).push<String>(
+        MaterialPageRoute(
+          builder: (_) => PrayerAddedSuccessScreen(
+            durationDays: _durationDays,
+          ),
+        ),
+      );
       if (!mounted) return;
-      if (result == true) {
-        // UI destination only: "View Prayer Wall" must land on Prayer Wall,
-        // not fall through to Reading when the stack was popped too far.
+      if (shared == 'wall' || shared == 'mine') {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const PrayerWallScreen()),
           (route) => route.isFirst,
@@ -400,10 +403,6 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         _closePostAPrayer(context);
       }
     } catch (e) {
-      if (mounted && verifyingOpen) {
-        Navigator.of(context, rootNavigator: true).pop();
-        verifyingOpen = false;
-      }
       if (!mounted) return;
       final s = e.toString();
       final isOffline = s.contains('SocketException') ||
@@ -417,9 +416,68 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                 : 'Could not post. Please try again.')),
       );
     } finally {
-      progress.dispose();
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  String _titleFromWords(String raw) {
+    final t = raw.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (t.isEmpty) return 'Prayer';
+    return t.length <= 80 ? t : t.substring(0, 80).trim();
+  }
+
+  Future<void> _onContinueToReview() async {
+    if (_submitting || _creatingAi) return;
+    final words = _detailsCtrl.text.trim();
+    if (words.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your prayer request.')),
+      );
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    setState(() => _creatingAi = true);
+    final progress = PrayerVerifyProgressController();
+    var verifyingOpen = false;
+    String? english;
+    try {
+      verifyingOpen = true;
+      // ignore: unawaited_futures
+      PrayerWallVerifyDialogs.showVerifying(context, controller: progress);
+      final englishFuture = PrayerWallService.formatPrayerInEnglish(
+        userWords: words,
+      );
+      await progress.advanceTo(2);
+      english = await englishFuture;
+      await progress.advanceTo(4);
+    } finally {
+      if (mounted && verifyingOpen) {
+        Navigator.of(context, rootNavigator: true).pop();
+        verifyingOpen = false;
+      }
+      progress.dispose();
+      if (mounted) setState(() => _creatingAi = false);
+    }
+    if (!mounted) return;
+    final prayer = (english ?? '').trim();
+    if (prayer.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not create prayer. Please try again.'),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _rawPrayerWords = words;
+      _englishReviewCtrl.text = prayer;
+      _encodedDetails = PrayerDualDescription.encode(
+        originalWords: words,
+        englishPrayer: prayer,
+      );
+      _titleCtrl.text = _titleFromWords(prayer);
+      _step = 1;
+    });
   }
 
   @override
@@ -427,6 +485,9 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
     _titleCtrl.dispose();
     _detailsCtrl.dispose();
     _titleFocus.dispose();
+    _requestFocus.dispose();
+    _englishReviewCtrl.dispose();
+    _englishReviewFocus.dispose();
     super.dispose();
   }
 
@@ -452,6 +513,10 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
+        if (_step == 1) {
+          setState(() => _step = 0);
+          return;
+        }
         _closePostAPrayer(context);
       },
       child: FocusScope(
@@ -490,13 +555,24 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: () => _closePostAPrayer(context),
+                    icon: Icon(
+                      _step == 1 ? Icons.arrow_back : Icons.close,
+                      color: Colors.white,
+                    ),
+                    onPressed: () {
+                      if (_step == 1) {
+                        setState(() => _step = 0);
+                      } else {
+                        _closePostAPrayer(context);
+                      }
+                    },
                   ),
                   Expanded(
                     child: Center(
                       child: Text(
-                        'Post a Prayer',
+                        _step == 1
+                            ? 'Review Your Prayer'
+                            : 'Share Your Prayer',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           fontFamily: 'Georgia',
@@ -513,7 +589,91 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
               ),
             ),
             Expanded(
-              child: SingleChildScrollView(
+              child: _step == 1
+                  ? Column(
+                      children: [
+                        Expanded(
+                          child: SingleChildScrollView(
+                            keyboardDismissBehavior:
+                                ScrollViewKeyboardDismissBehavior.onDrag,
+                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: _reviewStepChildren(brown, isDark),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            20,
+                            8,
+                            20,
+                            16 + MediaQuery.of(context).viewInsets.bottom,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    Icons.info_outline,
+                                    size: 18,
+                                    color: brown.withOpacity(0.75),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Both your original request and this enhanced version will be shared.',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        height: 1.35,
+                                        color: brown.withOpacity(0.75),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 18),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: _submitting ? null : _submit,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: brown,
+                                    foregroundColor: Colors.white,
+                                    disabledBackgroundColor: brown,
+                                    disabledForegroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 16),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(28),
+                                    ),
+                                  ),
+                                  child: _submitting
+                                      ? const SizedBox(
+                                          height: 22,
+                                          width: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Text(
+                                          'Post Prayer Request',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    )
+                  : SingleChildScrollView(
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: EdgeInsets.fromLTRB(
@@ -525,8 +685,9 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (_step == 0) ...[
                     Text(
-                      'Share your prayer request with others.',
+                      'We would be honored to pray with you.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
@@ -534,33 +695,19 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    _label('Prayer Title', brown, isDark),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _titleCtrl,
-                      focusNode: _titleFocus,
-                      maxLength: 120,
-                      onTap: () => _keepOnlyTextFocus(_titleFocus),
-                      style: TextStyle(color: isDark ? Colors.white : brown),
-                      decoration: _fieldDecoration(
-                        'Enter your prayer title',
-                        isDark,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _label('Prayer Details', brown, isDark),
+                    _label('Your Prayer Request', brown, isDark),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _detailsCtrl,
+                      focusNode: _requestFocus,
                       maxLines: 5,
-                      maxLength: 1500,
-                      readOnly: true,
-                      showCursor: false,
-                      enableInteractiveSelection: false,
-                      onTap: _submitting ? null : _openDetailsComposer,
+                      maxLength: 500,
+                      enabled: !_creatingAi && !_submitting,
+                      textCapitalization: TextCapitalization.sentences,
+                      onTap: () => _keepOnlyTextFocus(_requestFocus),
                       style: TextStyle(color: isDark ? Colors.white : brown),
                       decoration: _fieldDecoration(
-                        'Tap to write your prayer request...',
+                        'Share what is on your heart...',
                         isDark,
                       ),
                     ),
@@ -649,6 +796,27 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                     //   ),
                     // ),
                     const SizedBox(height: 12),
+                    _label('Post as', brown, isDark),
+                    const SizedBox(height: 8),
+                    _postAsTile(
+                      brown: brown,
+                      isDark: isDark,
+                      selected: !_isAnonymous,
+                      title: 'My Profile',
+                      subtitle:
+                          'Show your name and profile to the community.',
+                      onTap: () => setState(() => _isAnonymous = false),
+                    ),
+                    const SizedBox(height: 8),
+                    _postAsTile(
+                      brown: brown,
+                      isDark: isDark,
+                      selected: _isAnonymous,
+                      title: 'Anonymous',
+                      subtitle: 'Share without showing your name.',
+                      onTap: () => setState(() => _isAnonymous = true),
+                    ),
+                    const SizedBox(height: 12),
                     // CMD: Post-as-anonymous option disabled for now.
                     // SwitchListTile(
                     //   contentPadding: EdgeInsets.zero,
@@ -683,46 +851,30 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                       isDark: isDark,
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _submitting
-                                ? null
-                                : () => _closePostAPrayer(context),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor:
-                                  isDark ? Colors.white70 : brown,
-                              side: BorderSide(
-                                  color: isDark ? Colors.white24 : brown),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                            ),
-                            child: const Text('Cancel'),
-                          ),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: (_submitting || _creatingAi)
+                            ? null
+                            : _onContinueToReview,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: brown,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: _submitting ? null : _submit,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: brown,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                            ),
-                            child: _submitting
-                                ? const SizedBox(
-                                    height: 22,
-                                    width: 22,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Text('Done'),
-                          ),
-                        ),
-                      ],
+                        child: _creatingAi
+                            ? const SizedBox(
+                                height: 22,
+                                width: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('Continue'),
+                      ),
                     ),
+                    ],
                   ],
                 ),
               ),
@@ -732,6 +884,210 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
       ),
     ),
   ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _reviewStepChildren(Color brown, bool isDark) {
+    final cardColor = Colors.white.withOpacity(0.94);
+    final cardBorder = brown.withOpacity(0.18);
+    final ink = brown.withOpacity(0.92);
+    return [
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: cardBorder),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Your Original Request',
+              style: TextStyle(
+                fontFamily: 'Georgia',
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: brown,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '“',
+                  style: TextStyle(
+                    fontFamily: 'Georgia',
+                    fontSize: 30,
+                    height: 0.9,
+                    color: brown.withOpacity(0.45),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    _rawPrayerWords,
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      fontStyle: FontStyle.italic,
+                      fontSize: 15,
+                      height: 1.5,
+                      color: ink,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => setState(() => _step = 0),
+                icon: Icon(Icons.edit_outlined, size: 16, color: brown),
+                label: Text('Edit', style: TextStyle(color: brown)),
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 16),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: cardBorder),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.auto_awesome,
+                  size: 18,
+                  color: brown.withOpacity(0.75),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'AI-Enhanced Version',
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: brown,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _englishReviewCtrl,
+              focusNode: _englishReviewFocus,
+              maxLines: null,
+              minLines: 3,
+              onTap: () => _keepOnlyTextFocus(_englishReviewFocus),
+              onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+              style: TextStyle(
+                fontFamily: 'Georgia',
+                fontSize: 15.5,
+                height: 1.5,
+                color: brown.withOpacity(0.95),
+              ),
+              decoration: InputDecoration(
+                isDense: true,
+                filled: true,
+                fillColor: const Color(0xFFF8F3EA),
+                hintText: 'Edit your prayer…',
+                hintStyle: TextStyle(
+                  color: brown.withOpacity(0.4),
+                  fontSize: 15,
+                ),
+                contentPadding: const EdgeInsets.all(12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: brown.withOpacity(0.15)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: brown, width: 1.2),
+                ),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => _keepOnlyTextFocus(_englishReviewFocus),
+                icon: Icon(Icons.edit_outlined, size: 16, color: brown),
+                label: Text('Edit', style: TextStyle(color: brown)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  Widget _postAsTile({
+    required Color brown,
+    required bool isDark,
+    required bool selected,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: isDark ? Colors.white.withOpacity(0.06) : Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+          child: Row(
+            children: [
+              Icon(
+                selected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_off,
+                color: selected
+                    ? brown
+                    : (isDark ? Colors.white54 : Colors.grey),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : brown,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark
+                            ? Colors.white70
+                            : const Color(0xFF6D6D6D),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,3 +1,4 @@
+import 'package:biblebookapp/core/notifiers/cache.notifier.dart';
 import 'package:biblebookapp/utils/network_error_message.dart';
 import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
@@ -16,6 +17,8 @@ class PrayerWallCommentsSheet extends StatefulWidget {
     required this.prayerId,
     required this.titlePreview,
     this.embedded = false,
+    this.largeSheet = false,
+    this.scrollController,
     this.onChanged,
     this.onEnsureCanPost,
   });
@@ -24,6 +27,9 @@ class PrayerWallCommentsSheet extends StatefulWidget {
   final String titlePreview;
   /// When true, render compact inline UI (no dialog chrome).
   final bool embedded;
+  /// Full comments sheet: scrolling list and a composer fixed at the bottom.
+  final bool largeSheet;
+  final ScrollController? scrollController;
   /// Called after comments list changes (post/edit/delete).
   final VoidCallback? onChanged;
   /// UI gate only: login check before posting. Viewing remains open.
@@ -53,11 +59,13 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
     await _reload();
   }
 
-  Future<void> _reload() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _reload({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final list =
           await PrayerWallService.fetchCommentsForPrayer(widget.prayerId);
@@ -86,6 +94,12 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
     return (row['comment_text'] ?? row['text'] ?? '').toString();
   }
 
+  String _commentUserName(Map<String, dynamic> row) {
+    return (row['user_name'] ?? row['userName'] ?? row['name'] ?? '')
+        .toString()
+        .trim();
+  }
+
   Future<void> _send() async {
     final text = _input.text.trim();
     if (text.isEmpty) return;
@@ -100,19 +114,36 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
     }
     setState(() => _posting = true);
     try {
+      final loginName =
+          (await CacheNotifier().readCache(key: 'name') ?? '').toString().trim();
       final id = await PrayerWallService.postComment(
         prayerId: widget.prayerId,
         commentText: text,
-        isAnonymous: true,
+        isAnonymous: loginName.isEmpty,
+        userName: loginName.isEmpty ? null : loginName,
       );
       await PrayerWallLocalStore.addMyCommentId(id);
       _input.clear();
       if (!mounted) return;
+      final posted = <String, dynamic>{
+        '_id': id,
+        'comment_text': text,
+        'user_name': loginName.isEmpty ? 'You' : loginName,
+        'createdAt': DateTime.now().toUtc().toIso8601String(),
+      };
       setState(() {
         _myIds = {..._myIds, id};
+        _rows = [..._rows, posted];
+        _loading = false;
+        _error = null;
       });
-      await _reload();
-      if (mounted) Constants.showToast('Comment posted.');
+      await _reload(silent: true);
+      if (!mounted) return;
+      final saved = _rows.any((row) => _commentId(row) == id);
+      if (!saved) {
+        setState(() => _rows = [..._rows, posted]);
+      }
+      Constants.showToast('Comment posted.');
     } catch (e) {
       if (!mounted) return;
       Constants.showToast('Could not post. Please try again.');
@@ -458,6 +489,9 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
         themeProvider.themeMode == ThemeMode.dark && !usesLightCustom;
     final brown = const Color(0xFF5C4033);
 
+    if (widget.largeSheet) {
+      return _buildLargeSheet(context, isDark: isDark, brown: brown);
+    }
     if (widget.embedded) {
       return _buildEmbedded(context, isDark: isDark, brown: brown);
     }
@@ -710,6 +744,7 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                                   final id = _commentId(row);
                                   final mine =
                                       id != null && _myIds.contains(id);
+                                  final commentName = _commentUserName(row);
                                   return Container(
                                     margin: const EdgeInsets.only(bottom: 12),
                                     decoration: BoxDecoration(
@@ -785,6 +820,18 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                                                     ),
                                                   ),
                                                 if (mine) const SizedBox(height: 6),
+                                                if (commentName.isNotEmpty)
+                                                  Padding(
+                                                    padding: const EdgeInsets.only(bottom: 4),
+                                                    child: Text(
+                                                      commentName,
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                        fontWeight: FontWeight.w700,
+                                                        color: isDark ? Colors.white : brown,
+                                                      ),
+                                                    ),
+                                                  ),
                                                 Text(
                                                   _commentText(row),
                                                   style: TextStyle(
@@ -954,6 +1001,7 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
           ..._rows.map((row) {
             final id = _commentId(row);
             final mine = id != null && _myIds.contains(id);
+            final commentName = _commentUserName(row);
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Row(
@@ -975,6 +1023,18 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (commentName.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 2),
+                            child: Text(
+                              commentName,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: ink,
+                              ),
+                            ),
+                          ),
                         Text(
                           _commentText(row),
                           style: TextStyle(
@@ -1116,6 +1176,282 @@ class _PrayerWallCommentsSheetState extends State<PrayerWallCommentsSheet> {
                     ),
                   ),
           ],
+        ),
+      ],
+    );
+  }
+
+  String _commentTimeLabel(Map<String, dynamic> row) {
+    final raw = row['createdAt'] ??
+        row['created_at'] ??
+        row['created'] ??
+        row['timestamp'];
+    DateTime? when;
+    if (raw is DateTime) {
+      when = raw;
+    } else if (raw != null) {
+      when = DateTime.tryParse(raw.toString());
+    }
+    if (when == null) {
+      final id = _commentId(row);
+      if (id != null && _myIds.contains(id)) return 'Just now';
+      return '';
+    }
+    final diff = DateTime.now().difference(when.toLocal());
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+    if (diff.inDays < 1) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+
+  String? _commentPhoto(Map<String, dynamic> row) {
+    final raw = (row['profile_image'] ??
+            row['profileImage'] ??
+            row['user_image'] ??
+            '')
+        .toString()
+        .trim();
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+    return null;
+  }
+
+  Widget _buildLargeSheet(
+    BuildContext context, {
+    required bool isDark,
+    required Color brown,
+  }) {
+    final ink = isDark ? Colors.white : const Color(0xFF3D2914);
+    final muted = isDark ? Colors.white70 : const Color(0xFF8A7768);
+    final line = isDark ? Colors.white24 : const Color(0xFFE6D9CC);
+
+    Widget commentTile(Map<String, dynamic> row) {
+      final id = _commentId(row);
+      final mine = id != null && _myIds.contains(id);
+      final storedName = _commentUserName(row);
+      final displayName =
+          mine ? 'You' : (storedName.isEmpty ? 'User' : storedName);
+      final letterSource = storedName.isEmpty ? displayName : storedName;
+      final letter = letterSource.trim().isEmpty
+          ? '?'
+          : letterSource.trim()[0].toUpperCase();
+      final photo = _commentPhoto(row);
+      final time = _commentTimeLabel(row);
+      return Container(
+        color: mine
+            ? (isDark ? const Color(0xFF3A2C22) : const Color(0xFFFFF3E6))
+            : Colors.transparent,
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor:
+                  isDark ? const Color(0xFF4A382C) : const Color(0xFFE7D3C4),
+              backgroundImage: photo != null ? NetworkImage(photo) : null,
+              onBackgroundImageError: photo != null ? (_, __) {} : null,
+              child: photo != null
+                  ? null
+                  : Text(
+                      letter,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : brown,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
+                    ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    displayName,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: ink,
+                    ),
+                  ),
+                  if (time.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      time,
+                      style: TextStyle(fontSize: 12, color: muted),
+                    ),
+                  ],
+                  const SizedBox(height: 6),
+                  Text(
+                    _commentText(row),
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      height: 1.4,
+                      color: ink,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        const SizedBox(height: 10),
+        Container(
+          width: 40,
+          height: 4,
+          decoration: BoxDecoration(
+            color: isDark ? Colors.white24 : const Color(0xFFD0C4B4),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+          child: Row(
+            children: [
+              Text(
+                'Comments',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: ink,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.12)
+                      : const Color(0xFFF3EBE0),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${_rows.length}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: ink,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            child: Text(_error!, style: const TextStyle(color: Colors.redAccent)),
+          ),
+        Expanded(
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : ListView.separated(
+                  controller: widget.scrollController,
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.only(bottom: 8),
+                  itemCount: _rows.isEmpty ? 1 : _rows.length,
+                  separatorBuilder: (_, __) =>
+                      Divider(height: 1, thickness: 1, color: line),
+                  itemBuilder: (_, i) {
+                    if (_rows.isEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 36, 24, 24),
+                        child: Text(
+                          'Be the first to encourage this person.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 14, color: muted),
+                        ),
+                      );
+                    }
+                    return commentTile(_rows[i]);
+                  },
+                ),
+        ),
+        Divider(height: 1, thickness: 1, color: line),
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _input,
+                    maxLines: 4,
+                    minLines: 1,
+                    maxLength: 1000,
+                    onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black87,
+                      fontSize: 15,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Write an encouraging comment...',
+                      counterText: '',
+                      filled: true,
+                      fillColor: isDark
+                          ? Colors.white.withValues(alpha: 0.06)
+                          : Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide(color: line),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide(color: line),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide(
+                          color: isDark ? Colors.white : brown,
+                          width: 1.4,
+                        ),
+                      ),
+                      hintStyle: TextStyle(color: muted, fontSize: 14),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                _posting
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : Material(
+                        color: brown,
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: _send,
+                          child: const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: Icon(
+                              Icons.send_rounded,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ),
+              ],
+            ),
+          ),
         ),
       ],
     );

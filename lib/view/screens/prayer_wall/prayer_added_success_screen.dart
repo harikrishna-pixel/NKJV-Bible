@@ -2,7 +2,6 @@ import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/view/constants/images.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 class PrayerAddedSuccessScreen extends StatelessWidget {
@@ -11,6 +10,7 @@ class PrayerAddedSuccessScreen extends StatelessWidget {
     required this.durationDays,
   });
 
+  // Kept so the existing post call is unchanged. Not shown on this screen.
   final int durationDays;
 
   @override
@@ -30,11 +30,9 @@ class PrayerAddedSuccessScreen extends StatelessWidget {
             ? const Color(0xFFF5F0E6)
             : themeProvider.backgroundColor);
 
-    final start = DateTime.now();
-    final end = start.add(Duration(days: (durationDays <= 0 ? 1 : durationDays) - 1));
-    final fmt = DateFormat('MMM d, yyyy');
-
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -50,179 +48,102 @@ class PrayerAddedSuccessScreen extends StatelessWidget {
           backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
+          padding: const EdgeInsets.fromLTRB(28, 16, 28, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  icon: Icon(Icons.close, color: isDark ? Colors.white : brown),
-                  onPressed: () => Navigator.of(context).pop(true),
-                ),
+              const Spacer(),
+              Image.asset(
+                'assets/prayer_wall/prayer_shared_hands.png',
+                height: 210,
+                fit: BoxFit.contain,
               ),
-              const SizedBox(height: 8),
-              Container(
-                width: 110,
-                height: 110,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isDark ? Colors.white.withValues(alpha: 0.10) : Colors.white,
-                  border: Border.all(color: const Color(0xFFC9A227), width: 3),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFC9A227).withValues(alpha: 0.25),
-                      blurRadius: 18,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.check_circle,
-                  size: 56,
-                  color: const Color(0xFF2E7D32),
-                ),
-              ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 6),
               Text(
-                'Your prayer was added',
+                'Your Prayer Is Shared',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontFamily: 'Georgia',
-                  fontSize: 22,
+                  fontSize: 24,
                   fontWeight: FontWeight.w800,
+                  height: 1.2,
                   color: isDark ? Colors.white : brown,
                 ),
               ),
               const SizedBox(height: 10),
               Text(
-                'Thank you for sharing. Your prayer will stay active for $durationDays days.',
+                'Thank you for trusting our community with your prayer. Your prayer has been added to the Prayer Wall.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 15,
                   height: 1.4,
-                  color: isDark ? Colors.white70 : Colors.grey.shade800,
+                  color: isDark ? Colors.white70 : const Color(0xFF6B5E52),
                 ),
               ),
               const SizedBox(height: 22),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: brown.withValues(alpha: 0.25),
-                    width: 1.5,
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.calendar_today, size: 18, color: brown),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Active period',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? Colors.white : brown,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _pill(
-                            context,
-                            label: 'Start',
-                            value: fmt.format(start),
-                            brown: brown,
-                            isDark: isDark,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _pill(
-                            context,
-                            label: 'End',
-                            value: fmt.format(end),
-                            brown: brown,
-                            isDark: isDark,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
               ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(true),
+                onPressed: () => Navigator.of(context).pop('mine'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: brown,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 15),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(28),
                   ),
                 ),
                 child: const Text(
-                  'Done',
+                  'View My Prayer',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
               ),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: () => Navigator.of(context).pop('wall'),
+                style: OutlinedButton.styleFrom(
+                  backgroundColor:
+                      isDark ? Colors.transparent : const Color(0xFFF8F3EA),
+                  foregroundColor: isDark ? Colors.white : brown,
+                  side: BorderSide(color: brown, width: 1.4),
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(28),
+                  ),
+                ),
+                child: const Text(
+                  'Back to Prayer Wall',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(height: 22),
+              Text(
+                '“Cast all your anxiety on Him because He cares for you.”',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'Georgia',
+                  fontStyle: FontStyle.italic,
+                  fontSize: 15,
+                  height: 1.35,
+                  color: isDark ? Colors.white70 : brown,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '1 Peter 5:7',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: isDark ? Colors.white54 : const Color(0xFF6B5E52),
+                ),
+              ),
+              const Spacer(),
             ],
           ),
         ),
       ),
         ),
       ),
-    );
-  }
-
-  static Widget _pill(
-    BuildContext context, {
-    required String label,
-    required String value,
-    required Color brown,
-    required bool isDark,
-  }) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF5F0E6),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: brown.withValues(alpha: 0.22),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white70 : Colors.grey.shade700,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: isDark ? Colors.white : brown,
-            ),
-          ),
-        ],
-      ),
+    ),
     );
   }
 }
-

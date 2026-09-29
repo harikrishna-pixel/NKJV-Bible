@@ -841,15 +841,21 @@ class PrayerWallService {
     required String prayerId,
     required String commentText,
     bool isAnonymous = true,
+    String? userName,
   }) async {
+    final body = <String, dynamic>{
+      'prayerId': prayerId,
+      'comment_text': commentText,
+      'isAnonymous': isAnonymous,
+    };
+    final name = userName?.trim() ?? '';
+    if (name.isNotEmpty) {
+      body['user_name'] = name;
+    }
     final res = await http.post(
       Uri.parse(PrayerWallApiConstant.comments),
       headers: _jsonHeaders,
-      body: _encodeBody({
-        'prayerId': prayerId,
-        'comment_text': commentText,
-        'isAnonymous': isAnonymous,
-      }),
+      body: _encodeBody(body),
     );
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception('Post comment failed (${res.statusCode}): ${res.body}');
@@ -1191,16 +1197,22 @@ class PrayerWallService {
   static Future<void> followUser({
     required String userId,
     required String followingUserId,
+    String? userName,
   }) async {
     final uid = userId.trim();
     final following = followingUserId.trim();
     if (uid.isEmpty || following.isEmpty) {
       throw Exception('followUser: user_id and following_user_id required');
     }
-    final body = jsonEncode({
+    final bodyMap = <String, dynamic>{
       'user_id': uid,
       'following_user_id': following,
-    });
+    };
+    final name = userName?.trim() ?? '';
+    if (name.isNotEmpty) {
+      bodyMap['user_name'] = name;
+    }
+    final body = jsonEncode(bodyMap);
     final res = await http.post(
       Uri.parse(PrayerWallApiConstant.follows),
       headers: _jsonHeaders,
@@ -1220,16 +1232,22 @@ class PrayerWallService {
   static Future<void> unfollowUser({
     required String userId,
     required String followingUserId,
+    String? userName,
   }) async {
     final uid = userId.trim();
     final following = followingUserId.trim();
     if (uid.isEmpty || following.isEmpty) {
       throw Exception('unfollowUser: user_id and following_user_id required');
     }
-    final body = jsonEncode({
+    final bodyMap = <String, dynamic>{
       'user_id': uid,
       'following_user_id': following,
-    });
+    };
+    final name = userName?.trim() ?? '';
+    if (name.isNotEmpty) {
+      bodyMap['user_name'] = name;
+    }
+    final body = jsonEncode(bodyMap);
     final res = await http.delete(
       Uri.parse(PrayerWallApiConstant.follows),
       headers: _jsonHeaders,

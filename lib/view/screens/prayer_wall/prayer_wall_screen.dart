@@ -62,6 +62,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   List<PrayerWallItem> _all = [];
   Map<String, int> _likeCounts = {};
   Map<String, int> _commentCounts = {};
+  final Map<String, GlobalKey<_PrayHandsFloaterState>> _prayFloatKeys = {};
   Map<String, String> _prayerAuthorMap = {};
   Map<String, String> _prayerAuthorUserIdMap = {};
   Set<String> _myPrayerIds = {};
@@ -2970,25 +2971,32 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
+        final isDark =
+            Provider.of<ThemeProvider>(ctx, listen: false).themeMode ==
+                ThemeMode.dark;
+        final sheetColor =
+            isDark ? const Color(0xFF2C2118) : const Color(0xFFFFF9F3);
         return Padding(
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(ctx).viewInsets.bottom,
           ),
           child: DraggableScrollableSheet(
             expand: false,
-            initialChildSize: 0.72,
-            minChildSize: 0.4,
+            initialChildSize: 0.78,
+            minChildSize: 0.45,
             maxChildSize: 0.95,
-            builder: (_, __) {
+            builder: (_, scrollController) {
               return Material(
-                color: Theme.of(ctx).scaffoldBackgroundColor,
+                color: sheetColor,
                 borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(18)),
+                    const BorderRadius.vertical(top: Radius.circular(22)),
+                clipBehavior: Clip.antiAlias,
                 child: PrayerWallCommentsSheet(
                   prayerId: item.id,
                   titlePreview:
                       item.title.isNotEmpty ? item.title : item.description,
-                  embedded: true,
+                  largeSheet: true,
+                  scrollController: scrollController,
                   onEnsureCanPost: _ensureCanPostComment,
                   onChanged: () {
                     unawaited(_refreshCommentCountsOnly());
@@ -3287,6 +3295,13 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     );
   }
 
+  GlobalKey<_PrayHandsFloaterState> _prayFloatKey(String id) {
+    return _prayFloatKeys.putIfAbsent(
+      id,
+      () => GlobalKey<_PrayHandsFloaterState>(),
+    );
+  }
+
   Widget _buildHotspotCard({
     required PrayerWallItem item,
     required Color brown,
@@ -3357,7 +3372,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                         children: [
                           const Expanded(
                             child: Text(
-                              'HOTSPOT PRAYER',
+                              'PRAYER TO LIFT UP NOW',
                               style: TextStyle(
                                 color: ink,
                                 fontFamily: 'Georgia',
@@ -3436,12 +3451,22 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                                       fontSize: 14,
                                     ),
                                   ),
-                                  Text(
-                                    time,
-                                    style: const TextStyle(
-                                      color: mutedInk,
-                                      fontSize: 11,
+                                  Text.rich(
+                                    TextSpan(
+                                      style: const TextStyle(
+                                        color: mutedInk,
+                                        fontSize: 11,
+                                      ),
+                                      children: [
+                                        TextSpan(text: time),
+                                        if (item.category.trim().isNotEmpty)
+                                          TextSpan(
+                                            text: ' • ${item.category.trim()}',
+                                          ),
+                                      ],
                                     ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
@@ -3474,31 +3499,18 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                           ),
                         ),
                       ],
-                      if (item.category.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: creamPill,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            item.category,
-                            style: const TextStyle(
-                              color: ink,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
                       const Spacer(),
                       Row(
                         children: [
                           ElevatedButton.icon(
-                            onPressed:
-                                likeBusy ? null : () => _toggleLike(item),
+                            onPressed: likeBusy
+                                ? null
+                                : () {
+                                    _prayFloatKey(item.id)
+                                        .currentState
+                                        ?.play();
+                                    _toggleLike(item);
+                                  },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: ctaBrown,
                               foregroundColor: Colors.white,
@@ -3510,11 +3522,11 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             ),
-                            icon: Icon(
-                              liked
-                                  ? Icons.favorite
-                                  : Icons.volunteer_activism,
-                              size: 14,
+                            icon: _PrayHandsFloater(
+                              key: _prayFloatKey(item.id),
+                              filled: liked,
+                              size: 22,
+                              emptyColor: Colors.white,
                             ),
                             label: Text(
                               liked ? 'Prayed for $name' : 'Pray for $name',
@@ -3666,9 +3678,19 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                             ],
                           ],
                         ),
-                        Text(
-                          time,
-                          style: TextStyle(fontSize: 11, color: muted),
+                        Text.rich(
+                          TextSpan(
+                            style: TextStyle(fontSize: 11, color: muted),
+                            children: [
+                              TextSpan(text: time),
+                              if (item.category.trim().isNotEmpty)
+                                TextSpan(
+                                  text: ' • ${item.category.trim()}',
+                                ),
+                            ],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -3724,15 +3746,17 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
               Row(
                 children: [
                   InkWell(
-                    onTap: likeBusy ? null : () => _toggleLike(item),
-                    child: Icon(
-                      liked
-                          ? Icons.favorite
-                          : Icons.volunteer_activism_outlined,
-                      size: 18,
-                      color: liked
-                          ? const Color(0xFFC45C3A)
-                          : (isDark ? Colors.white70 : brown),
+                    onTap: likeBusy
+                        ? null
+                        : () {
+                            _prayFloatKey(item.id).currentState?.play();
+                            _toggleLike(item);
+                          },
+                    child: _PrayHandsFloater(
+                      key: _prayFloatKey(item.id),
+                      filled: liked,
+                      size: 28,
+                      emptyColor: isDark ? Colors.white : brown,
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -5659,11 +5683,33 @@ class _QueuePrayerDetailScreen extends StatefulWidget {
       _QueuePrayerDetailScreenState();
 }
 
-class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
+class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen>
+    with SingleTickerProviderStateMixin {
   static const _brown = Color(0xFF5C4033);
   static const _ink = Color(0xFF3D2914);
   static const _muted = Color(0xFF6B5344);
   static const _cream = Color(0xFFF5EFE4);
+
+  late final AnimationController _prayFloat;
+
+  @override
+  void initState() {
+    super.initState();
+    _prayFloat = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 650),
+    );
+  }
+
+  @override
+  void dispose() {
+    _prayFloat.dispose();
+    super.dispose();
+  }
+
+  Widget _prayIconImage({required bool filled}) {
+    return _PrayHandsMark(filled: filled, size: 40);
+  }
 
   String get _chosenTitle {
     final t = widget.item.title.trim();
@@ -5694,7 +5740,8 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
   }
 
   Widget _bottomAction({
-    required IconData icon,
+    IconData? icon,
+    Widget? iconChild,
     required String label,
     String? count,
     required VoidCallback? onTap,
@@ -5708,7 +5755,13 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: _brown, size: 22),
+              SizedBox(
+                height: 40,
+                child: Center(
+                  child: iconChild ??
+                      Icon(icon ?? Icons.circle, color: _brown, size: 22),
+                ),
+              ),
               const SizedBox(height: 4),
               Text(
                 label,
@@ -5808,7 +5861,7 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
+                padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
                 child: Row(
                   children: [
                     IconButton(
@@ -5816,32 +5869,41 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                     Expanded(
-                                child: Text(
-                        widget.fromHotspot ? 'Hotspot Prayer' : 'Prayer',
+                      child: Text(
+                        'Prayer Detail',
                         textAlign: TextAlign.center,
-                                  style: TextStyle(
+                        style: TextStyle(
                           fontFamily: 'Georgia',
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
-                          color: onBgBrown,
+                          color: onBg,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 48),
+                    IconButton(
+                      icon: Icon(Icons.more_horiz, color: onBgBrown),
+                      onPressed: () async {
+                        await widget.onMore();
+                        if (mounted) setState(() {});
+                      },
+                    ),
                   ],
                 ),
               ),
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                   children: [
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         GestureDetector(
                           onTap: widget.onProfileTap,
                           child: CircleAvatar(
-                            radius: 28,
-                            backgroundColor: onBgBrown.withValues(alpha: 0.22),
+                            radius: 22,
+                            backgroundColor: isDark
+                                ? const Color(0xFF4A382C)
+                                : const Color(0xFFE7D3C4),
                             backgroundImage:
                                 photo.isNotEmpty ? NetworkImage(photo) : null,
                             onBackgroundImageError:
@@ -5849,18 +5911,18 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
                             child: photo.isNotEmpty
                                 ? null
                                 : Text(
-                                    name.isEmpty
+                                    name.trim().isEmpty
                                         ? '?'
                                         : name.trim()[0].toUpperCase(),
                                     style: TextStyle(
                                       color: onBgBrown,
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 20,
+                                      fontSize: 18,
                                     ),
                                   ),
                           ),
                         ),
-                        const SizedBox(width: 14),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: GestureDetector(
                             onTap: widget.onProfileTap,
@@ -5868,29 +5930,59 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  name,
+                                  widget.isMine ? 'You' : name,
                                   style: TextStyle(
                                     fontFamily: 'Georgia',
-                                    fontSize: 20,
+                                    fontSize: 16,
                                     fontWeight: FontWeight.w700,
                                     color: onBg,
                                   ),
                                 ),
-                                if (widget.isMine) ...[
-                                  const SizedBox(height: 4),
-                                  _metaChip(
-                                    label: 'You',
-                                    brown: onBgBrown,
-                                    isDark: isDark,
-                                  ),
-                                ],
                                 const SizedBox(height: 2),
-                                Text(
-                                  widget.timeLabel,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: onBgMuted,
-                                  ),
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        widget.timeLabel,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: onBgMuted,
+                                        ),
+                                      ),
+                                    ),
+                                    if (category.isNotEmpty) ...[
+                                      Text(
+                                        '  •  ',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: onBgMuted,
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 3,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: isDark
+                                              ? const Color(0xFF4A382C)
+                                              : const Color(0xFFF3EBE0),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          category,
+                                          style: TextStyle(
+                                            color: onBgBrown,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ],
                             ),
@@ -5898,107 +5990,143 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 18),
                     Text(
                       _chosenTitle,
                       style: TextStyle(
                         fontFamily: 'Georgia',
-                        fontSize: 18,
+                        fontSize: 20,
                         fontWeight: FontWeight.w700,
+                        height: 1.25,
                         color: onBg,
                       ),
                     ),
-                    if (category.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Text(
-                            'Category',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: onBg,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? const Color(0xFF4A382C)
-                                  : const Color(0xFFE8D9C4),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              category,
-                              style: TextStyle(
-                                color: isDark
-                                    ? const Color(0xFFF5EFE4)
-                                    : _ink,
-                                    fontWeight: FontWeight.w600,
-                                fontSize: 13,
+                    const SizedBox(height: 16),
+                    if ((myWords != null && myWords.isNotEmpty) ||
+                        (ai != null && ai.isNotEmpty) ||
+                        plain.isNotEmpty)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF2C2118)
+                              : Colors.white.withValues(alpha: 0.72),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (myWords != null && myWords.isNotEmpty) ...[
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.description_outlined,
+                                    size: 16,
+                                    color: onBgMuted,
                                   ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Original Request',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: onBg,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '(Your words)',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: onBgMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
+                              Text(
+                                '"$myWords"',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  height: 1.55,
+                                  fontStyle: FontStyle.italic,
+                                  color: onBg,
                                 ),
                               ),
                             ],
-                          ),
-                    ],
-                    const SizedBox(height: 18),
-                    if (myWords != null && myWords.isNotEmpty) ...[
-                      _sectionCard(
-                        heading: 'My Words',
-                        body: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              myWords,
-                              style: const TextStyle(
-                                fontFamily: 'Georgia',
-                                fontSize: 15,
-                                height: 1.45,
-                                color: _ink,
+                            if (myWords != null &&
+                                myWords.isNotEmpty &&
+                                ((ai != null && ai.isNotEmpty) ||
+                                    plain.isNotEmpty)) ...[
+                              const SizedBox(height: 20),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Divider(
+                                      color: onBgBrown.withValues(alpha: 0.35),
+                                      thickness: 1,
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10),
+                                    child: Icon(
+                                      Icons.menu_book_outlined,
+                                      size: 18,
+                                      color: onBgBrown,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Divider(
+                                      color: onBgBrown.withValues(alpha: 0.35),
+                                      thickness: 1,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                            const SizedBox(height: 10),
-                            const Text(
-                              '(This is what I expressed)',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: _muted,
-                    ),
-                  ),
-                ],
-              ),
-                      ),
-                      const SizedBox(height: 14),
-                    ],
-                    if (ai != null && ai.isNotEmpty)
-                      _sectionCard(
-                        heading: 'Prayer Created for You',
-                        leading: const Icon(Icons.auto_awesome,
-                            size: 18, color: _brown),
-                        body: Text(
-                          ai,
-                          style: const TextStyle(
-                            fontFamily: 'Georgia',
-                            fontSize: 15,
-                            height: 1.5,
-                            color: _ink,
-                          ),
-                        ),
-                      )
-                    else if (plain.isNotEmpty)
-                      _sectionCard(
-                        heading: 'Prayer',
-                        body: Text(
-                          plain,
-                          style: const TextStyle(
-                            fontFamily: 'Georgia',
-                            fontSize: 15,
-                            height: 1.5,
-                            color: _ink,
-                          ),
+                              const SizedBox(height: 18),
+                            ],
+                            if ((ai != null && ai.isNotEmpty) ||
+                                (plain.isNotEmpty &&
+                                    (myWords == null || myWords.isEmpty ||
+                                        ai == null ||
+                                        ai.isEmpty))) ...[
+                              Row(
+                                children: [
+                                  Text(
+                                    'Prayer',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: onBg,
+                                    ),
+                                  ),
+                                  if (ai != null && ai.isNotEmpty) ...[
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '(Enhanced with AI)',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: onBgMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                (ai != null && ai.isNotEmpty) ? ai : plain,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  height: 1.65,
+                                  color: isDark
+                                      ? const Color(0xFFD5CBE0)
+                                      : const Color(0xFF5C5670),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                   ],
@@ -6012,18 +6140,48 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
                   ),
                 ),
                 padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                clipBehavior: Clip.none,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _bottomAction(
-                      icon: liked
-                          ? Icons.volunteer_activism
-                          : Icons.volunteer_activism_outlined,
-                      label: 'Prayed',
+                      iconChild: SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          alignment: Alignment.center,
+                          children: [
+                            _prayIconImage(filled: liked),
+                            AnimatedBuilder(
+                              animation: _prayFloat,
+                              builder: (_, __) {
+                                final t = _prayFloat.value;
+                                if (t == 0) return const SizedBox.shrink();
+                                final travel = Curves.easeOut.transform(t);
+                                return IgnorePointer(
+                                  child: Transform.translate(
+                                    offset: Offset(0, -56 * travel),
+                                    child: Opacity(
+                                      opacity: (1 - travel).clamp(0.0, 1.0),
+                                      child: Transform.scale(
+                                        scale: 1 + (0.4 * travel),
+                                        child: _prayIconImage(filled: true),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      label: 'Pray',
                       count: _formatCount(likeCount),
                       onTap: likeBusy
                           ? null
                           : () async {
+                              _prayFloat.forward(from: 0);
                               await widget.onToggleLike();
                               if (mounted) setState(() {});
                             },
@@ -6072,6 +6230,120 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen> {
         ),
       ),
         );
+  }
+}
+
+class _PrayHandsMark extends StatelessWidget {
+  const _PrayHandsMark({
+    required this.filled,
+    this.size = 22,
+    this.emptyColor = const Color(0xFF5C4033),
+  });
+
+  final bool filled;
+  final double size;
+  final Color emptyColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final image = Image.asset(
+      'assets/prayer_wall/prayer_shared_hands.png',
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+    );
+    if (filled) return image;
+    return Opacity(
+      opacity: 0.4,
+      child: ColorFiltered(
+        colorFilter: ColorFilter.mode(emptyColor, BlendMode.srcIn),
+        child: image,
+      ),
+    );
+  }
+}
+
+class _PrayHandsFloater extends StatefulWidget {
+  const _PrayHandsFloater({
+    super.key,
+    required this.filled,
+    required this.size,
+    required this.emptyColor,
+  });
+
+  final bool filled;
+  final double size;
+  final Color emptyColor;
+
+  @override
+  State<_PrayHandsFloater> createState() => _PrayHandsFloaterState();
+}
+
+class _PrayHandsFloaterState extends State<_PrayHandsFloater>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _float;
+
+  @override
+  void initState() {
+    super.initState();
+    _float = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 650),
+    );
+  }
+
+  @override
+  void dispose() {
+    _float.dispose();
+    super.dispose();
+  }
+
+  void play() {
+    if (!mounted) return;
+    _float.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: widget.size,
+      height: widget.size,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          _PrayHandsMark(
+            filled: widget.filled,
+            size: widget.size,
+            emptyColor: widget.emptyColor,
+          ),
+          AnimatedBuilder(
+            animation: _float,
+            builder: (_, __) {
+              final t = _float.value;
+              if (t == 0) return const SizedBox.shrink();
+              final travel = Curves.easeOut.transform(t);
+              return IgnorePointer(
+                child: Transform.translate(
+                  offset: Offset(0, -48 * travel),
+                  child: Opacity(
+                    opacity: (1 - travel).clamp(0.0, 1.0),
+                    child: Transform.scale(
+                      scale: 1 + (0.4 * travel),
+                      child: _PrayHandsMark(
+                        filled: true,
+                        size: widget.size,
+                        emptyColor: widget.emptyColor,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
   }
 }
 
