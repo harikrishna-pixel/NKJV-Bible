@@ -52,6 +52,7 @@ class _WalletScreenState extends State<WalletScreen> {
   bool _remainingAdsLoaded = false;
   Map<String, Timer> _purchaseTimeouts =
       {}; // Track timeout timers for each product
+  Timer? _purchaseSheetWatch;
   bool _isLowNetwork = false; // Track if network is low/2G
   Timer? _storeLoadFallbackTimer;
   bool _usingFallbackPacks = false;
@@ -411,6 +412,7 @@ class _WalletScreenState extends State<WalletScreen> {
     _subscription?.cancel();
     _creditsTimer?.cancel();
     _storeLoadFallbackTimer?.cancel();
+    _purchaseSheetWatch?.cancel();
     _rewardedAd?.dispose();
     // Cancel all pending purchase timeouts
     for (var timer in _purchaseTimeouts.values) {
@@ -817,6 +819,28 @@ class _WalletScreenState extends State<WalletScreen> {
     }
   }
 
+  void _hideCreditPurchaseLoading(String? productId) {
+    _purchaseSheetWatch?.cancel();
+    _purchaseSheetWatch = null;
+    final id = (productId ?? '').trim();
+    if (id.isNotEmpty) {
+      _purchaseTimeouts[id]?.cancel();
+      _purchaseTimeouts.remove(id);
+    }
+    EasyLoading.dismiss();
+    if (!mounted) return;
+    if (id.isEmpty || _loadingProductId == id || _selectedProductId == id) {
+      setState(() {
+        if (id.isEmpty || _loadingProductId == id) {
+          _loadingProductId = null;
+        }
+        if (id.isEmpty || _selectedProductId == id) {
+          _selectedProductId = null;
+        }
+      });
+    }
+  }
+
   void _listenToPurchaseUpdated(
       List<PurchaseDetails> purchaseDetailsList) async {
     for (final PurchaseDetails purchaseDetails in purchaseDetailsList) {
@@ -867,11 +891,26 @@ class _WalletScreenState extends State<WalletScreen> {
         Constants.showToast('Purchase failed. Please try again.');
         _clearWalletBuyIfMatch(productId);
       } else if (purchaseDetails.status == PurchaseStatus.pending) {
-        // UI only: same Processing...... text while store is pending.
-        if (_isUserStartedWalletBuy(productId)) {
+        // Only while this buy is still the one showing Processing.
+        // A cancel can leave a pending update that would otherwise
+        // turn the spinner back on with no way to stop it.
+        if (_isUserStartedWalletBuy(productId) &&
+            _loadingProductId == productId) {
           EasyLoading.show(status: 'Processing..');
         }
         debugPrint('Purchase pending...');
+      } else if (purchaseDetails.status == PurchaseStatus.canceled) {
+        if (purchaseDetails.pendingCompletePurchase) {
+          try {
+            await _inAppPurchase.completePurchase(purchaseDetails);
+          } catch (_) {}
+        }
+        _hideCreditPurchaseLoading(
+          productId.isEmpty ? _loadingProductId : productId,
+        );
+        _clearWalletBuyIfMatch(
+          productId.isEmpty ? (_walletBuyProductId ?? '') : productId,
+        );
       } else if (purchaseDetails.status == PurchaseStatus.restored) {
         if (!_isUserStartedWalletBuy(productId)) {
           await _finishLeftoverWalletPurchase(purchaseDetails);

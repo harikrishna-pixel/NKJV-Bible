@@ -51,6 +51,8 @@ class _PrayerWallUserProfileScreenState
   late bool _isBlocked;
   int _followersCount = 0;
   int _followingCount = 0;
+  /// Ids of this profile that the viewer actually follows.
+  List<String> _followedIds = const [];
   /// Additive: Recent Prayers — expanded cards show full text.
   final Set<String> _expandedRecentPrayerIds = {};
 
@@ -64,10 +66,27 @@ class _PrayerWallUserProfileScreenState
     }).toList();
   }
 
+  /// Resolve id plus any author id on the same person's prayers.
+  Set<String> _idsForPerson(String personId) {
+    final id = personId.trim();
+    final ids = <String>{};
+    if (id.isNotEmpty) ids.add(id);
+    for (final p in widget.wallPrayers) {
+      final a = (p.authorUserId ?? '').trim();
+      final i = (p.identityUserId ?? '').trim();
+      if (a == id || i == id) {
+        if (a.isNotEmpty) ids.add(a);
+        if (i.isNotEmpty) ids.add(i);
+      }
+    }
+    return ids;
+  }
+
   bool get _isOwnProfile {
     final v = (widget.viewerUserId ?? '').trim();
     final p = widget.profileUserId.trim();
-    return v.isNotEmpty && p.isNotEmpty && v == p;
+    if (v.isEmpty || p.isEmpty) return false;
+    return _idsForPerson(p).contains(v);
   }
 
   bool get _showBlockMenu =>
@@ -110,14 +129,19 @@ class _PrayerWallUserProfileScreenState
       final following =
           await PrayerWallService.fetchFollowing(userId: profileId);
       var isFollowing = false;
+      final followedIds = <String>[];
       if (viewerId.isNotEmpty && !_isOwnProfile) {
         final mine = await PrayerWallService.fetchFollowing(userId: viewerId);
-        isFollowing = mine.followingUserIds.contains(profileId);
+        for (final id in _idsForPerson(profileId)) {
+          if (mine.followingUserIds.contains(id)) followedIds.add(id);
+        }
+        isFollowing = followedIds.isNotEmpty;
       }
       if (!mounted) return;
       setState(() {
         _followersCount = followers.count;
         _followingCount = following.count;
+        _followedIds = followedIds;
         _isFollowing = isFollowing;
         _loading = false;
       });
@@ -141,16 +165,49 @@ class _PrayerWallUserProfileScreenState
       final loginName =
           (await CacheNotifier().readCache(key: 'name') ?? '').toString().trim();
       if (_isFollowing) {
-        await PrayerWallService.unfollowUser(
-          userId: viewerId,
-          followingUserId: profileId,
-          userName: loginName.isEmpty ? null : loginName,
-        );
+        final theirIds = _followedIds.isNotEmpty
+            ? List<String>.from(_followedIds)
+            : <String>[profileId];
+        for (final id in theirIds) {
+          await PrayerWallService.unfollowUser(
+            userId: viewerId,
+            followingUserId: id,
+            userName: loginName.isEmpty ? null : loginName,
+          );
+        }
+        final myIds = _idsForPerson(viewerId);
+        var removedReverse = false;
+        var reverseFailed = false;
+        for (final theirId in theirIds) {
+          final theirs =
+              await PrayerWallService.fetchFollowing(userId: theirId);
+          for (final myId in myIds) {
+            if (!theirs.followingUserIds.contains(myId)) continue;
+            try {
+              await PrayerWallService.unfollowUser(
+                userId: theirId,
+                followingUserId: myId,
+              );
+              removedReverse = true;
+            } catch (_) {
+              reverseFailed = true;
+            }
+          }
+        }
         if (!mounted) return;
         setState(() {
           _isFollowing = false;
+          _followedIds = const [];
           if (_followersCount > 0) _followersCount -= 1;
+          if (removedReverse && _followingCount > 0) _followingCount -= 1;
         });
+        if (reverseFailed) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not update follow. Try again.'),
+            ),
+          );
+        }
       } else {
         await PrayerWallService.followUser(
           userId: viewerId,
@@ -462,24 +519,15 @@ class _PrayerWallUserProfileScreenState
                           else
                             ...recent.take(20).map((p) {
                               final title = p.title.trim();
-                              final ai = (PrayerDualDescription.aiPrayer(
-                                          p.description) ??
-                                      '')
-                                  .trim();
-                              final my = (PrayerDualDescription.myWords(
-                                          p.description) ??
-                                      '')
-                                  .trim();
-                              final plain = PrayerDualDescription.isDual(
-                                      p.description)
-                                  ? ''
-                                  : p.description.trim();
-                              final subtitle = ai.isNotEmpty
-                                  ? ai
-                                  : (my.isNotEmpty ? my : plain);
-                              final showTitle = title.isNotEmpty;
+                              final subtitle =
+                                  PrayerDualDescription.visibleBody(
+                                      p.description);
+                              final repeats =
+                                  PrayerDualDescription.titleRepeatsPrayer(
+                                      title, p.description);
+                              final showTitle = title.isNotEmpty && !repeats;
                               final showSubtitle = subtitle.isNotEmpty &&
-                                  subtitle != title;
+                                  (repeats || subtitle != title);
                               final expanded =
                                   _expandedRecentPrayerIds.contains(p.id);
                               final fallback = showTitle

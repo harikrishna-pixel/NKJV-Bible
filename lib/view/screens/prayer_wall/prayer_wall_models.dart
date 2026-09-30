@@ -439,4 +439,21 @@ class PrayerDualDescription {
     final v = description.substring(start).trim();
     return v.isEmpty ? null : v;
   }
+
+  static String visibleBody(String description) {
+    final ai = (aiPrayer(description) ?? '').trim();
+    if (ai.isNotEmpty) return ai;
+    final my = (myWords(description) ?? '').trim();
+    if (my.isNotEmpty) return my;
+    if (isDual(description)) return '';
+    return description.trim();
+  }
+
+  /// True when `prayer_title` is the prayer text, or the start of it.
+  static bool titleRepeatsPrayer(String title, String description) {
+    final t = title.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final b = visibleBody(description).replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (t.isEmpty || b.isEmpty) return false;
+    return t == b || b.startsWith(t);
+  }
 }

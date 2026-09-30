@@ -3108,7 +3108,7 @@ Include 1-2 ${BibleInfo.bible_shortName} verse references that relate to the req
       color: Colors.transparent,
       child: InkWell(
         onTap: () {
-          Get.to(() => const PourOutWorriesScreen());
+          PourOutWorriesScreen.openIfLoggedIn();
         },
         borderRadius: BorderRadius.circular(18),
         child: Ink(

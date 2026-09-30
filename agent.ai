@@ -245,6 +245,29 @@ If a protected file was modified with permission, clearly state why it was requi
 
 ---
 
+## 12. NEW UI MUST SUPPORT EVERY THEME
+
+Use this prompt for every new UI screen, dialog, card, banner, or text the user asks to add.
+
+> Build this UI so it is readable in every existing theme. Do not add a new theme and do not change theme, payment, or navigation logic.
+>
+> Themes to support:
+> - Light Mode — Old Paper (vintage)
+> - Light Mode — White
+> - Light Mode — Yellow (light brown)
+> - Dark Mode
+>
+> Rules:
+> - Read colors from the existing `ThemeProvider` and `CommanColor` helpers already used on that screen.
+> - Text, icons, borders, badges, and buttons must stay visible on that screen’s real background in each theme.
+> - Do not use a dark color on a dark background, or a light color on a light background.
+> - In Dark Mode, use a light text and icon color when the background is dark.
+> - In Old Paper, White, and Yellow, keep the text dark enough to read on that light background.
+> - A selected border or badge must stay visible on the swatch or card behind it.
+> - Change only the requested UI. Do not restyle unrelated widgets.
+
+---
+
 # ABSOLUTE RULE
 
 CHANGE ONLY WHAT THE USER ASKED FOR.

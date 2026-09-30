@@ -100,8 +100,22 @@ class floatingButtonState extends State<floatingButton>
   // Additive: MP3 chapter-complete lives on State (not sheet), so auto-next
   // continues after the player sheet is dismissed.
   StreamSubscription<void>? _completeSubscription;
+  StreamSubscription<Duration>? _positionSubscription;
+  bool _handlingMp3Complete = false;
   bool _isAudioSheetOpen = false;
   void Function(void Function())? _audioSheetSetState;
+  void Function(void Function())? _fullPlayerSetState;
+  void Function(void Function())? _ttsSheetSetState;
+  bool _ttsVolumeRestarting = false;
+  double _playbackSpeed = 1.0;
+  Timer? _sleepTimer;
+  int? _sleepChoiceMinutes;
+  bool _sleepEndOfChapter = false;
+  bool _readerUseTts = false;
+  bool _mp3Chosen = false;
+  bool? _fullScreenTts;
+  bool _pausedForPhoneCall = false;
+  bool _audioPlayingBeforeInterrupt = false;
 
   checkTTS() async {
     final ttsStatus =
@@ -141,10 +155,18 @@ class floatingButtonState extends State<floatingButton>
     });
 
     _playerStateSubscription = audioPlayer.onPlayerStateChanged.listen((state) {
-      if (mounted) {
-        setState(() {
-          isAudioPlaying = state == PlayerState.playing;
-        });
+      if (!mounted) return;
+      final wasPlaying = isAudioPlaying;
+      setState(() {
+        isAudioPlaying = state == PlayerState.playing;
+      });
+      _fullPlayerSetState?.call(() {});
+      if (state == PlayerState.playing) {
+        _pausedForPhoneCall = false;
+      } else if (state == PlayerState.paused && wasPlaying) {
+        _markPausedIfPhoneCall();
+      } else if (state == PlayerState.completed) {
+        _handleMp3PlayerComplete();
       }
     });
 
@@ -155,6 +177,14 @@ class floatingButtonState extends State<floatingButton>
           duration = newDuration;
         });
       }
+      _fullPlayerSetState?.call(() {});
+    });
+
+    _positionSubscription = audioPlayer.onPositionChanged.listen((p) {
+      if (!mounted) return;
+      position = p;
+      setState(() {});
+      _fullPlayerSetState?.call(() {});
     });
 
     // Additive: keep auto-next alive while FAB State is alive (sheet dismiss safe).
@@ -162,6 +192,56 @@ class floatingButtonState extends State<floatingButton>
 
     // Store initial book name
     _storedBookName = widget.bookName;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _audioPlayingBeforeInterrupt = isAudioPlaying ||
+          audioPlayer.state == PlayerState.playing;
+      Future.delayed(const Duration(milliseconds: 400), () {
+        if (!mounted || !_audioPlayingBeforeInterrupt) return;
+        if (audioPlayer.state != PlayerState.playing) {
+          _pausedForPhoneCall = true;
+          if (mounted) {
+            setState(() => isAudioPlaying = false);
+          }
+          _fullPlayerSetState?.call(() {});
+        }
+      });
+    } else if (state == AppLifecycleState.resumed) {
+      _resumeAudioAfterPhoneCall();
+    }
+  }
+
+  void _markPausedIfPhoneCall() {
+    final life = WidgetsBinding.instance.lifecycleState;
+    if (life != null && life != AppLifecycleState.resumed) {
+      _pausedForPhoneCall = true;
+    }
+  }
+
+  Future<void> _resumeAudioAfterPhoneCall() async {
+    if (!_pausedForPhoneCall) {
+      _audioPlayingBeforeInterrupt = false;
+      return;
+    }
+    await Future.delayed(const Duration(milliseconds: 450));
+    if (!mounted || !_pausedForPhoneCall) return;
+    _pausedForPhoneCall = false;
+    _audioPlayingBeforeInterrupt = false;
+    try {
+      await audioPlayer.setPlaybackRate(_playbackSpeed);
+      await audioPlayer.setVolume(volume);
+      await audioPlayer.resume();
+      if (mounted) {
+        setState(() => isAudioPlaying = true);
+      }
+      _fullPlayerSetState?.call(() {});
+    } catch (_) {}
   }
 
   /// Rebuild FAB and open audio sheet (if any) from the same State fields.
@@ -173,6 +253,7 @@ class floatingButtonState extends State<floatingButton>
     if (sheetSet != null) {
       sheetSet(fn);
     }
+    _fullPlayerSetState?.call(fn);
   }
 
   void _ensureMp3CompletionListener() {
@@ -185,6 +266,33 @@ class floatingButtonState extends State<floatingButton>
   /// Same auto-next / repeat behavior as the former sheet-scoped listener.
   Future<void> _handleMp3PlayerComplete() async {
     if (!mounted) return;
+    if (_handlingMp3Complete) return;
+    _handlingMp3Complete = true;
+    try {
+      await _advanceMp3AfterComplete();
+    } finally {
+      _handlingMp3Complete = false;
+    }
+  }
+
+  /// Same auto-next / repeat behavior as the former sheet-scoped listener.
+  Future<void> _advanceMp3AfterComplete() async {
+    if (!mounted) return;
+
+    if (_sleepEndOfChapter) {
+      _sleepEndOfChapter = false;
+      _sleepChoiceMinutes = null;
+      _sleepTimer?.cancel();
+      try {
+        await audioPlayer.pause();
+      } catch (_) {}
+      if (mounted) {
+        _mp3UiSetState(() {
+          isAudioPlaying = false;
+        });
+      }
+      return;
+    }
 
     // Repeat mode - restart current chapter (unchanged behavior).
     if (repeat) {
@@ -246,9 +354,13 @@ class floatingButtonState extends State<floatingButton>
           currentBookChapterCount = fromController;
         }
       }
-      final effectiveLastChapter = currentBookChapterCount > lastChapter
+      var effectiveLastChapter = currentBookChapterCount > lastChapter
           ? currentBookChapterCount
           : lastChapter;
+      final totalChapters = _chapterTotal();
+      if (totalChapters > effectiveLastChapter) {
+        effectiveLastChapter = totalChapters;
+      }
 
       if (audioChapterNum < effectiveLastChapter) {
         // Reader first, then audio — prevents player showing N while header stays behind.
@@ -259,11 +371,13 @@ class floatingButtonState extends State<floatingButton>
           return;
         }
         audioChapterNum = nextChapter;
+        selectedChapter = nextChapter;
         audioBaseUrl =
-            "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$audioChapterNum.mp3";
+            "${_recordedAudioBase()}/$audioBookNum/$audioChapterNum.mp3";
         if (mounted) {
           _mp3UiSetState(() {});
         }
+        _fullPlayerSetState?.call(() {});
 
         // Stop TTS if it's playing
         if (isSpeech && _isTtsInitialized) {
@@ -296,6 +410,10 @@ class floatingButtonState extends State<floatingButton>
             await audioPlayer.setSourceUrl(audioBaseUrl);
             // ensure position and duration will update from streams
             await audioPlayer.seek(Duration.zero);
+            try {
+              await audioPlayer.setPlaybackRate(_playbackSpeed);
+              await audioPlayer.setVolume(volume);
+            } catch (_) {}
             await audioPlayer.resume();
             loadSuccess = true;
             if (mounted) {
@@ -351,7 +469,7 @@ class floatingButtonState extends State<floatingButton>
           currentBookChapterCount =
               nextBookChapterCount; // Update chapter count for new book
           audioBaseUrl =
-              "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$audioChapterNum.mp3";
+              "${_recordedAudioBase()}/$audioBookNum/$audioChapterNum.mp3";
           if (mounted) {
             _mp3UiSetState(() {});
           }
@@ -394,6 +512,10 @@ class floatingButtonState extends State<floatingButton>
               await audioPlayer.setSourceUrl(audioBaseUrl);
               // ensure position and duration will update from streams
               await audioPlayer.seek(Duration.zero);
+              try {
+                await audioPlayer.setPlaybackRate(_playbackSpeed);
+                await audioPlayer.setVolume(volume);
+              } catch (_) {}
               await audioPlayer.resume();
               loadSuccess = true;
               if (mounted) {
@@ -575,6 +697,61 @@ class floatingButtonState extends State<floatingButton>
     /// Listen to audio position
   }
 
+  String? _recordedAudioBase() {
+    return widget.audioData?.data?.bibleAudioInfo?.audioBasepath;
+  }
+
+  void _notifyTtsPlayer() {
+    _ttsSheetSetState?.call(() {});
+    _fullPlayerSetState?.call(() {});
+  }
+
+  void _attachTtsProgressHandler() {
+    flutterTts.setProgressHandler(
+        (String text, int startOffset, int endOffset, String word) {
+      allText = text;
+      final len = text.length;
+      start = startOffset.clamp(0, len);
+      end = endOffset.clamp(0, len);
+      if (end < start) end = start;
+      _notifyTtsPlayer();
+    });
+  }
+
+  void _applyOutputVolume(double value) {
+    volume = value;
+    if (_showTtsUi()) {
+      flutterTts.setVolume(value);
+    } else {
+      audioPlayer.setVolume(value);
+    }
+  }
+
+  Future<void> _applyTtsVolumeLive() async {
+    if (!_showTtsUi()) return;
+    final wasPlaying = isSpeech || ttsState == TtsState.playing;
+    try {
+      await flutterTts.setVolume(volume);
+    } catch (_) {}
+    if (!wasPlaying || !_isTtsInitialized) return;
+    _ttsVolumeRestarting = true;
+    try {
+      try {
+        await flutterTts.stop();
+      } catch (_) {}
+      isManuallyPaused = false;
+      shouldAutoAdvance = true;
+      isSpeech = true;
+      ttsState = TtsState.playing;
+      await _speak();
+      await Future.delayed(const Duration(milliseconds: 80));
+    } finally {
+      _ttsVolumeRestarting = false;
+      if (mounted) setState(() {});
+      _notifyTtsPlayer();
+    }
+  }
+
   Future setAudio({Duration seekTo = Duration.zero}) async {
     // Fresh chapter/file load still starts at zero; resume passes seekTo.
     if (seekTo == Duration.zero) {
@@ -592,7 +769,7 @@ class floatingButtonState extends State<floatingButton>
 
     // Set release mode based on repeat flag - default to release (no loop)
     String? audioBasePath =
-        widget.audioData?.data?.bibleAudioInfo?.audioBasepath;
+        _recordedAudioBase();
     audioBaseUrl = "$audioBasePath/$audioBookNum/$audioChapterNum.mp3";
     log('Audio Base Url:$audioBaseUrl');
 
@@ -605,6 +782,7 @@ class floatingButtonState extends State<floatingButton>
         await audioPlayer.stop();
       } catch (_) {}
       await audioPlayer.setSourceUrl(audioBaseUrl);
+      await audioPlayer.setVolume(volume);
       await audioPlayer.seek(seekTo);
     }
 
@@ -691,6 +869,7 @@ class floatingButtonState extends State<floatingButton>
     _isTtsInitialized = true;
 
     _setAwaitOptions();
+    _attachTtsProgressHandler();
     await Future.delayed(Duration(milliseconds: 2000));
 
     if (!mounted) return;
@@ -705,15 +884,18 @@ class floatingButtonState extends State<floatingButton>
           ttsState = TtsState.playing;
           isSpeech = true; // Sync isSpeech with TTS state
         });
+        _notifyTtsPlayer();
       }
     });
 
     flutterTts.setCancelHandler(() {
+      if (_ttsVolumeRestarting) return;
       if (mounted) {
         setState(() {
           ttsState = TtsState.stopped;
           isSpeech = false; // Sync isSpeech with TTS state
         });
+        _notifyTtsPlayer();
       }
     });
     flutterTts.setPauseHandler(() {
@@ -721,6 +903,7 @@ class floatingButtonState extends State<floatingButton>
         setState(() {
           ttsState = TtsState.paused;
         });
+        _notifyTtsPlayer();
       }
     });
     flutterTts.setContinueHandler(() {
@@ -729,9 +912,13 @@ class floatingButtonState extends State<floatingButton>
           ttsState = TtsState.playing;
           isSpeech = true;
         });
+        _notifyTtsPlayer();
       }
     });
     flutterTts.setCompletionHandler(() async {
+      if (_ttsVolumeRestarting) {
+        return;
+      }
       // Don't auto-advance if manually paused
       if (isManuallyPaused) {
         debugPrint(
@@ -782,8 +969,24 @@ class floatingButtonState extends State<floatingButton>
             setState(() {
               isSpeech = false;
             });
+            _notifyTtsPlayer();
           }
         } else {
+          if (_sleepEndOfChapter &&
+              selectedChapterContent.isNotEmpty &&
+              selectedChapterContent.length == curretNo + 1) {
+            _sleepEndOfChapter = false;
+            _sleepChoiceMinutes = null;
+            _sleepTimer?.cancel();
+            await _stop();
+            if (mounted) {
+              setState(() {
+                isSpeech = false;
+              });
+              _notifyTtsPlayer();
+            }
+            return;
+          }
           if (selectedChapter != int.parse(widget.chapterCount.toString()) &&
               selectedChapterContent.length == curretNo + 1) {
             // End of current chapter, move to next chapter
@@ -805,6 +1008,7 @@ class floatingButtonState extends State<floatingButton>
                     shouldAutoAdvance = true;
                   }
                 });
+                _notifyTtsPlayer();
                 // Wait for setState to complete
                 await Future.delayed(const Duration(milliseconds: 50));
                 // Load chapter content and wait for it to complete
@@ -848,6 +1052,7 @@ class floatingButtonState extends State<floatingButton>
                   _newVoiceText = selectedChapterContent[curretNo].content;
                 }
               });
+              _notifyTtsPlayer();
               // Wait for UI to update before speaking
               await Future.delayed(const Duration(milliseconds: 50));
               // Don't auto-speak if manually paused
@@ -871,6 +1076,7 @@ class floatingButtonState extends State<floatingButton>
         setState(() {
           ttsState = TtsState.stopped;
         });
+        _notifyTtsPlayer();
       }
     });
   }
@@ -959,26 +1165,41 @@ class floatingButtonState extends State<floatingButton>
       Constants.showToast('No internet connection');
       return;
     }
+    _mp3Chosen = true;
+    _readerUseTts = false;
     await setAudio();
     if (!mounted) return;
     setState(() {
       audioLoad = false;
     });
     await audioPlayerBottomSheet();
-    if (mounted) {
-      setState(() {});
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _startReaderMp3() async {
+    final hasInternet = await InternetConnection().hasInternetAccess;
+    if (!hasInternet) {
+      Constants.showToast('No internet connection');
+      return;
     }
+    _readerUseTts = false;
+    _mp3Chosen = true;
+    await setAudio();
+    if (!mounted) return;
+    try {
+      await audioPlayer.setPlaybackRate(_playbackSpeed);
+    } catch (_) {}
+    await audioPlayer.resume();
+    setState(() {
+      audioLoad = false;
+      isAudioPlaying = true;
+    });
   }
 
   Future<void> _showAudioTtsPopover() async {
-    setState(() {
-      isOpenAudio = true;
-      audioLoad = true;
-    });
-    await setAudio();
     if (!mounted) return;
     setState(() {
-      audioLoad = false;
+      isOpenAudio = true;
     });
     if (!mounted) return;
     await showPopover(
@@ -1025,9 +1246,9 @@ class floatingButtonState extends State<floatingButton>
                   thickness: 1.2,
                 ),
                 GestureDetector(
-                  onTap: () {
+                  onTap: () async {
                     Navigator.pop(popoverContext);
-                    textToSpeechBottomSheet();
+                    await _switchFromAudioToTts();
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
@@ -1139,6 +1360,7 @@ class floatingButtonState extends State<floatingButton>
         isManuallyPaused = true;
         shouldAutoAdvance = false;
       });
+      _notifyTtsPlayer();
     }
   }
 
@@ -1161,6 +1383,7 @@ class floatingButtonState extends State<floatingButton>
         ttsState = TtsState.stopped;
         isSpeech = false;
       });
+      _notifyTtsPlayer();
       debugPrint('_stop() - State updated: isSpeech=false, ttsState=stopped');
     }
 
@@ -1675,11 +1898,15 @@ class floatingButtonState extends State<floatingButton>
     // Cancel all stream subscriptions to prevent setState after dispose
     _playerStateSubscription?.cancel();
     _durationSubscription?.cancel();
+    _positionSubscription?.cancel();
     _completeSubscription?.cancel();
+    _sleepTimer?.cancel();
     _playerStateSubscription = null;
     _durationSubscription = null;
+    _positionSubscription = null;
     _completeSubscription = null;
     _audioSheetSetState = null;
+    _fullPlayerSetState = null;
 
     // Stop TTS if running - safely check if flutterTts is initialized
     // Note: TTS handlers already check 'mounted' before calling setState, so they're safe
@@ -1758,38 +1985,39 @@ class floatingButtonState extends State<floatingButton>
                           )),
             onTap: () async {
               log('On Tap');
-              // Check if TTS is playing - check both flag and actual state
+              if (isMp3Enabled &&
+                  isTTSEnabled &&
+                  !_isAudioSheetOpen &&
+                  !isOpenAudio &&
+                  !isSpeech &&
+                  !isPlaying &&
+                  ttsState != TtsState.playing &&
+                  !isAudioPlaying &&
+                  audioPlayer.state != PlayerState.playing) {
+                await _showAudioTtsPopover();
+                await checknetwork();
+                return;
+              }
               final isTTSActive =
                   isSpeech || isPlaying || ttsState == TtsState.playing;
 
               if (isTTSActive) {
-                // Stop TTS - ensure it's actually stopped
-                debugPrint(
-                    'Pausing TTS - isSpeech: $isSpeech, isPlaying: $isPlaying, ttsState: $ttsState');
-                // Set flag to prevent auto-restart from completion handler
                 isManuallyPaused = true;
-                shouldAutoAdvance =
-                    false; // Disable auto-advance when manually paused
-
+                shouldAutoAdvance = false;
                 if (_isTtsInitialized) {
                   try {
                     await flutterTts.stop();
-                    debugPrint('TTS stop called successfully');
                   } catch (e) {
                     debugPrint("TTS stop error: $e");
                   }
                 }
-                // Always update state regardless of stop result
                 if (mounted) {
                   setState(() {
                     ttsState = TtsState.stopped;
                     isSpeech = false;
                   });
-                  debugPrint(
-                      'TTS state updated - isSpeech: false, ttsState: stopped, isManuallyPaused: true');
                 }
               } else if (isAudioPlaying) {
-                // Additive: pause (not stop) so Play resumes from current position.
                 try {
                   _audioResumePosition =
                       await audioPlayer.getCurrentPosition() ?? position;
@@ -1801,7 +2029,6 @@ class floatingButtonState extends State<floatingButton>
                   isAudioPlaying = false;
                 });
               } else if (audioPlayer.state == PlayerState.paused) {
-                // Additive: resume from paused position — do not reload/seek zero.
                 await audioPlayer.resume();
                 _audioResumePosition = Duration.zero;
                 if (mounted) {
@@ -1809,7 +2036,6 @@ class floatingButtonState extends State<floatingButton>
                     isAudioPlaying = true;
                   });
                 }
-                // Additive: reopen player UI if it was dismissed while audio was active.
                 if (mounted && !_isAudioSheetOpen) {
                   audioPlayerBottomSheet().then((value) {
                     if (mounted) {
@@ -1817,13 +2043,13 @@ class floatingButtonState extends State<floatingButton>
                     }
                   });
                 }
-              } else if (!hasConnection &&
-                  (isMp3Enabled || isTTSEnabled || isPrevTTSEnabled)) {
-                await _showAudioTtsPopover();
-              } else if (isTTSEnabled && !isMp3Enabled) {
+              } else if (_readerUseTts) {
                 textToSpeechBottomSheet();
-              } else if (isMp3Enabled && !isTTSEnabled) {
+              } else if (_mp3Chosen || (isMp3Enabled && !isTTSEnabled)) {
+                _mp3Chosen = true;
+                _readerUseTts = false;
                 await setAudio();
+                if (!mounted) return;
                 setState(() {
                   audioLoad = false;
                 });
@@ -1832,14 +2058,14 @@ class floatingButtonState extends State<floatingButton>
                     setState(() {});
                   }
                 });
+              } else if (isTTSEnabled && !isMp3Enabled) {
+                _readerUseTts = true;
+                textToSpeechBottomSheet();
               } else {
                 await _showAudioTtsPopover();
               }
 
               await checknetwork();
-              // if (hasConnection == false) {
-              //   Constants.showToast("Check your Internet Connection");
-              // }
             },
           ),
         );
@@ -2048,7 +2274,7 @@ class floatingButtonState extends State<floatingButton>
 
           // Build UI
           return Container(
-            height: 130,
+            height: 148,
             decoration: const BoxDecoration(
               borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(20), topRight: Radius.circular(20)),
@@ -2061,8 +2287,25 @@ class floatingButtonState extends State<floatingButton>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const SizedBox(width: 60),
-                    Builder(
+                    SizedBox(
+                      width: 60,
+                      child: InkWell(
+                        onTap: () {
+                          _mp3Chosen = true;
+                          _readerUseTts = false;
+                          _fullScreenTts = false;
+                          Navigator.of(context).pop();
+                          _openReaderFullPlayer(tts: false);
+                        },
+                        child: Icon(
+                          Icons.keyboard_arrow_up,
+                          color: CommanColor.lightDarkPrimary(context),
+                          size: 28,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Builder(
                       builder: (context) {
                         print(
                             "=== AUDIO BUILDER: Building book name display ===");
@@ -2093,6 +2336,9 @@ class floatingButtonState extends State<floatingButton>
 
                         return Text(
                           "$bookName - $audioChapterNum",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
                           style: TextStyle(
                               color: CommanColor.lightDarkPrimary(context),
                               letterSpacing: BibleInfo.letterSpacing,
@@ -2101,8 +2347,17 @@ class floatingButtonState extends State<floatingButton>
                         );
                       },
                     ),
+                    ),
                     Row(
                       children: [
+                        InkWell(
+                          onTap: _showCombinedVoiceSettingsSheet,
+                          child: _voiceMicIcon(
+                            CommanColor.lightDarkPrimary(context),
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
                         InkWell(
                           onTap: () async {
                             setState(() => isAudioPlaying = false);
@@ -2233,7 +2488,7 @@ class floatingButtonState extends State<floatingButton>
                           await updateReadingScreenChapter(prevChapter);
                           if (!mounted || !context.mounted) return;
                           final nextUrl =
-                              "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$prevChapter.mp3";
+                              "${_recordedAudioBase()}/$audioBookNum/$prevChapter.mp3";
                           setState(() {
                             audioChapterNum = prevChapter;
                             audioBaseUrl = nextUrl;
@@ -2455,7 +2710,7 @@ class floatingButtonState extends State<floatingButton>
                           await updateReadingScreenChapter(nextChapter);
                           if (!mounted || !context.mounted) return;
                           final nextUrl =
-                              "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath}/$audioBookNum/$nextChapter.mp3";
+                              "${_recordedAudioBase()}/$audioBookNum/$nextChapter.mp3";
                           setState(() {
                             audioChapterNum = nextChapter;
                             audioBaseUrl = nextUrl;
@@ -2574,7 +2829,7 @@ class floatingButtonState extends State<floatingButton>
   //                         ? audioChapterNum = int.parse(widget.chapterCount)
   //                         : audioChapterNum++;
   //                     audioBaseUrl =
-  //                         "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath.toString()}/$audioBookNum/$audioChapterNum.mp3";
+  //                         "${_recordedAudioBase().toString()}/$audioBookNum/$audioChapterNum.mp3";
   //                   });
   //                 }
   //                 await audioPlayer.setSourceUrl(audioBaseUrl);
@@ -2756,7 +3011,7 @@ class floatingButtonState extends State<floatingButton>
   //                                   ? audioChapterNum--
   //                                   : audioChapterNum = 1;
   //                               audioBaseUrl =
-  //                                   "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath.toString()}/$audioBookNum/$audioChapterNum.mp3";
+  //                                   "${_recordedAudioBase().toString()}/$audioBookNum/$audioChapterNum.mp3";
   //                             });
   //                             await audioPlayer.setSourceUrl(audioBaseUrl);
   //                           }),
@@ -2846,7 +3101,7 @@ class floatingButtonState extends State<floatingButton>
 
   //                                         int.parse(widget.chapterCount);
   //                                 audioBaseUrl =
-  //                                     "${widget.audioData?.data?.bibleAudioInfo?.audioBasepath.toString()}/$audioBookNum/$audioChapterNum.mp3";
+  //                                     "${_recordedAudioBase().toString()}/$audioBookNum/$audioChapterNum.mp3";
   //                                 audioPlayer
   //                                     .setSourceUrl(audioBaseUrl)
   //                                     .then((_) {
@@ -2956,7 +3211,29 @@ class floatingButtonState extends State<floatingButton>
                   ),
                   const SizedBox(height: 10),
 
-                  // Voice Dropdown
+                  if (!_showTtsUi())
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 14),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: CommanColor.lightGrey,
+                          width: 1,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Default',
+                        style: TextStyle(
+                          color: CommanColor.lightDarkPrimary(context),
+                          letterSpacing: BibleInfo.letterSpacing,
+                          fontSize: BibleInfo.fontSizeScale * 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    )
+                  else
                   FutureBuilder<List<dynamic>>(
                     future: _getVoices(),
                     builder: (context, snapshot) {
@@ -3190,6 +3467,7 @@ class floatingButtonState extends State<floatingButton>
                       }
                     },
                   ),
+                  if (_showTtsUi()) ...[
                   const SizedBox(height: 30),
 
                   // Pitch Slider
@@ -3249,6 +3527,7 @@ class floatingButtonState extends State<floatingButton>
                       max: 2.0,
                     ),
                   ),
+                  ],
                   const SizedBox(height: 20),
 
                   // Speed Slider
@@ -3276,7 +3555,9 @@ class floatingButtonState extends State<floatingButton>
                         ],
                       ),
                       Text(
-                        "${(rate * 2).toStringAsFixed(1)}x",
+                        _showTtsUi()
+                            ? "${(rate * 2).toStringAsFixed(1)}x"
+                            : "${_playbackSpeed.toStringAsFixed(1)}x",
                         style: TextStyle(
                           color: CommanColor.lightDarkPrimary(context),
                           letterSpacing: BibleInfo.letterSpacing,
@@ -3296,16 +3577,24 @@ class floatingButtonState extends State<floatingButton>
                       activeColor: CommanColor.lightDarkPrimary(context),
                       inactiveColor: CommanColor.lightGrey,
                       thumbColor: CommanColor.lightDarkPrimary(context),
-                      value: rate,
+                      value: _showTtsUi()
+                          ? rate
+                          : _playbackSpeed.clamp(0.5, 2.0),
                       onChanged: (newRate) {
-                        setModalState(() {
-                          rate = newRate;
+                        if (_showTtsUi()) {
+                          setModalState(() {
+                            rate = newRate;
+                          });
                           flutterTts.setSpeechRate(newRate);
-                        });
-                        setState(() {});
+                        } else {
+                          setModalState(() {
+                            _playbackSpeed = newRate;
+                          });
+                          audioPlayer.setPlaybackRate(newRate);
+                        }
                       },
-                      min: 0.0,
-                      max: 1.0,
+                      min: _showTtsUi() ? 0.0 : 0.5,
+                      max: _showTtsUi() ? 1.0 : 2.0,
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -3350,9 +3639,14 @@ class floatingButtonState extends State<floatingButton>
                       onChanged: (newVolume) {
                         setModalState(() {
                           volume = newVolume;
-                          flutterTts.setVolume(newVolume);
                         });
-                        setState(() {});
+                        _applyOutputVolume(newVolume);
+                      },
+                      onChangeEnd: (newVolume) {
+                        volume = newVolume;
+                        if (_showTtsUi()) {
+                          _applyTtsVolumeLive();
+                        }
                       },
                       min: 0.0,
                       max: 1.0,
@@ -3366,13 +3660,20 @@ class floatingButtonState extends State<floatingButton>
                       changeRotation();
                       setModalState(() {
                         volume = 0.5;
-                        pitch = 1.25;
-                        rate = 0.5;
-                        flutterTts.setVolume(volume);
-                        flutterTts.setSpeechRate(rate);
-                        flutterTts.setPitch(pitch);
+                        if (_showTtsUi()) {
+                          pitch = 1.25;
+                          rate = 0.5;
+                          flutterTts.setSpeechRate(rate);
+                          flutterTts.setPitch(pitch);
+                        } else {
+                          _playbackSpeed = 1.0;
+                          _applyOutputVolume(volume);
+                          audioPlayer.setPlaybackRate(_playbackSpeed);
+                        }
                       });
-                      setState(() {});
+                      if (_showTtsUi()) {
+                        _applyTtsVolumeLive();
+                      }
                     },
                     child: Container(
                       width: double.infinity,
@@ -3521,23 +3822,7 @@ class floatingButtonState extends State<floatingButton>
         builder: (context) {
           return StatefulBuilder(
             builder: (BuildContext context, StateSetter setState) {
-              flutterTts.setProgressHandler(
-                  (String text, int startOffset, int endOffset, String word) {
-                Future.delayed(
-                  Duration.zero,
-                  () {
-                    if (mounted && context.mounted) {
-                      setState(() {
-                        allText = text;
-                        final len = text.length;
-                        start = startOffset.clamp(0, len);
-                        end = endOffset.clamp(0, len);
-                        if (end < start) end = start;
-                      });
-                    }
-                  },
-                );
-              });
+              _ttsSheetSetState = setState;
               return Container(
                   decoration: const BoxDecoration(
                       borderRadius: BorderRadius.only(
@@ -3552,10 +3837,33 @@ class floatingButtonState extends State<floatingButton>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const SizedBox(
+                          SizedBox(
                             width: 80,
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: InkWell(
+                                onTap: () {
+                                  _readerUseTts = true;
+                                  _mp3Chosen = false;
+                                  _fullScreenTts = true;
+                                  if (isSpeech ||
+                                      ttsState == TtsState.playing) {
+                                    isSpeech = true;
+                                    ttsState = TtsState.playing;
+                                  }
+                                  Navigator.of(context).pop();
+                                  _openReaderFullPlayer(tts: true);
+                                },
+                                child: Icon(
+                                  Icons.keyboard_arrow_up,
+                                  color: CommanColor.lightDarkPrimary(context),
+                                  size: 28,
+                                ),
+                              ),
+                            ),
                           ),
-                          Builder(
+                          Expanded(
+                            child: Builder(
                             builder: (context) {
                               String bookName = '';
                               if (widget.bookName.isNotEmpty) {
@@ -3573,6 +3881,9 @@ class floatingButtonState extends State<floatingButton>
                               }
                               return Text(
                                 "$bookName $selectedChapter - ${curretNo + 1}/${selectedChapterContent.length}",
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
                                 style: TextStyle(
                                     color:
                                         CommanColor.lightDarkPrimary(context),
@@ -3582,16 +3893,16 @@ class floatingButtonState extends State<floatingButton>
                               );
                             },
                           ),
+                          ),
                           Row(
                             children: [
                               InkWell(
                                   onTap: () {
                                     _showCombinedVoiceSettingsSheet();
                                   },
-                                  child: Icon(
-                                    Icons.settings,
-                                    color:
-                                        CommanColor.lightDarkPrimary(context),
+                                  child: _voiceMicIcon(
+                                    CommanColor.lightDarkPrimary(context),
+                                    size: 22,
                                   )),
                               const SizedBox(
                                 width: 10,
@@ -4089,6 +4400,7 @@ class floatingButtonState extends State<floatingButton>
           );
         },
       ).then((value) {
+        _ttsSheetSetState = null;
         if (mounted && context.mounted) {
           setState(() {});
         }
@@ -4096,6 +4408,1046 @@ class floatingButtonState extends State<floatingButton>
     } else {
       return Constants.showToast("Please wait");
     }
+  }
+
+  bool _mp3On() =>
+      widget.audioData?.data?.bibleAudioInfo?.isShowMp3Audio == "1";
+
+  bool _ttsOn() {
+    final info = widget.audioData?.data?.bibleAudioInfo;
+    if (info == null) return isPrevTTSEnabled;
+    if (Platform.isAndroid) {
+      return info.isTextToSpeechAvailableAndroid == "1";
+    }
+    return info.isTextToSpeechAvailableIos == "1";
+  }
+
+  bool _showTtsUi() {
+    if (_fullScreenTts != null) return _fullScreenTts!;
+    if (_readerUseTts) return true;
+    if (isAudioPlaying || audioPlayer.state == PlayerState.paused) {
+      return false;
+    }
+    if (isSpeech ||
+        ttsState == TtsState.playing ||
+        ttsState == TtsState.paused) {
+      return true;
+    }
+    return _ttsOn() && !_mp3On();
+  }
+
+  int _chapterTotal() =>
+      int.tryParse(widget.chapterCount) ?? currentBookChapterCount;
+
+  int _shownChapter(bool ttsUi) {
+    if (ttsUi) {
+      if (selectedChapter > 0) return selectedChapter;
+    }
+    return audioChapterNum;
+  }
+
+  String _readerTitle(bool ttsUi) {
+    var name = widget.bookName.trim();
+    if (name.isEmpty) name = (_storedBookName ?? '').trim();
+    final chapter = _shownChapter(ttsUi);
+    if (name.isEmpty) return 'Chapter $chapter';
+    return '$name - $chapter';
+  }
+
+  Color _playerInk(BuildContext context) =>
+      CommanColor.isDarkTheme(context) ? Colors.white : const Color(0xFF5C4033);
+
+  Color _playerCard(BuildContext context) => CommanColor.isDarkTheme(context)
+      ? const Color(0xFF2C2118)
+      : const Color(0xFFFFF9F3);
+
+  Future<void> _switchFromAudioToTts() async {
+    final wasPlaying =
+        isAudioPlaying || audioPlayer.state == PlayerState.playing;
+    try {
+      await audioPlayer.stop();
+    } catch (_) {}
+    _mp3Chosen = false;
+    _readerUseTts = true;
+    _fullScreenTts = null;
+    rate = (_playbackSpeed / 2).clamp(0.0, 1.0);
+    try {
+      await flutterTts.setSpeechRate(rate);
+    } catch (_) {}
+    try {
+      await flutterTts.setVolume(volume);
+    } catch (_) {}
+    curretNo = 0;
+    start = 0;
+    end = 0;
+    allText = '';
+    isInitialTime = true;
+    if (audioChapterNum > 0) {
+      selectedChapter = audioChapterNum;
+    }
+    try {
+      await setChapterContent(preferReaderChapter: true);
+    } catch (_) {}
+    if (selectedChapterContent.isNotEmpty) {
+      _newVoiceText = selectedChapterContent.first.content;
+    }
+    if (mounted) {
+      setState(() {
+        isAudioPlaying = false;
+        position = Duration.zero;
+        isSpeech = wasPlaying;
+      });
+    }
+    await textToSpeechBottomSheet();
+    if (!mounted) return;
+    if (wasPlaying &&
+        _newVoiceText != null &&
+        _newVoiceText!.isNotEmpty) {
+      isManuallyPaused = false;
+      shouldAutoAdvance = true;
+      isSpeech = true;
+      ttsState = TtsState.playing;
+      _notifyTtsPlayer();
+      await _speak();
+      _notifyTtsPlayer();
+    }
+  }
+
+  Future<void> _startReaderTts() async {
+    _readerUseTts = true;
+    _mp3Chosen = false;
+    if (isAudioPlaying || audioPlayer.state == PlayerState.playing) {
+      try {
+        await audioPlayer.pause();
+      } catch (_) {}
+      isAudioPlaying = false;
+    }
+    try {
+      await setChapterContent(preferReaderChapter: true);
+    } catch (_) {}
+    if (selectedChapterContent.isNotEmpty) {
+      if (curretNo < 0 || curretNo >= selectedChapterContent.length) {
+        curretNo = 0;
+      }
+      _newVoiceText = selectedChapterContent[curretNo].content;
+    }
+    isManuallyPaused = false;
+    shouldAutoAdvance = true;
+    isSpeech = true;
+    if (mounted) setState(() {});
+    _fullPlayerSetState?.call(() {});
+    await _speak();
+  }
+
+  Future<void> _onMiniPlay() async {
+    final ttsUi = _showTtsUi();
+    if (ttsUi && (isSpeech || ttsState == TtsState.playing)) {
+      await _pauseTts();
+      _fullPlayerSetState?.call(() {});
+      return;
+    }
+    if (ttsUi &&
+        (ttsState == TtsState.paused || _readerUseTts) &&
+        _newVoiceText != null &&
+        _newVoiceText!.isNotEmpty &&
+        !isSpeech) {
+      _readerUseTts = true;
+      isManuallyPaused = false;
+      shouldAutoAdvance = true;
+      isSpeech = true;
+      ttsState = TtsState.playing;
+      if (mounted) setState(() {});
+      _notifyTtsPlayer();
+      await _speak();
+      _notifyTtsPlayer();
+      return;
+    }
+    if (!ttsUi && isAudioPlaying) {
+      try {
+        _audioResumePosition =
+            await audioPlayer.getCurrentPosition() ?? position;
+      } catch (_) {
+        _audioResumePosition = position;
+      }
+      await audioPlayer.pause();
+      if (mounted) setState(() => isAudioPlaying = false);
+      _fullPlayerSetState?.call(() {});
+      return;
+    }
+    if (!ttsUi && audioPlayer.state == PlayerState.paused) {
+      _readerUseTts = false;
+      try {
+        await audioPlayer.setPlaybackRate(_playbackSpeed);
+      } catch (_) {}
+      await audioPlayer.resume();
+      _audioResumePosition = Duration.zero;
+      if (mounted) setState(() => isAudioPlaying = true);
+      _fullPlayerSetState?.call(() {});
+      return;
+    }
+    if (_showTtsUi()) {
+      await _startReaderTts();
+    } else {
+      await _startReaderMp3();
+    }
+  }
+
+  Future<void> _ttsSkipBySeconds(int seconds) async {
+    if (selectedChapterContent.isEmpty) {
+      try {
+        await setChapterContent(preferReaderChapter: true);
+      } catch (_) {}
+    }
+    if (selectedChapterContent.isEmpty) return;
+    final speed = _playbackSpeed <= 0 ? 1.0 : _playbackSpeed;
+    var wordsLeft = (2.5 * speed * seconds.abs()).round();
+    if (wordsLeft < 1) wordsLeft = 1;
+    var index = curretNo.clamp(0, selectedChapterContent.length - 1);
+    if (seconds >= 0) {
+      while (index < selectedChapterContent.length - 1 && wordsLeft > 0) {
+        final count = _spokenWordCount(selectedChapterContent[index].content);
+        wordsLeft -= count <= 0 ? 1 : count;
+        index += 1;
+      }
+    } else {
+      while (index > 0 && wordsLeft > 0) {
+        index -= 1;
+        final count = _spokenWordCount(selectedChapterContent[index].content);
+        wordsLeft -= count <= 0 ? 1 : count;
+      }
+    }
+    await _ttsGoToVerse(index);
+  }
+
+  int _spokenWordCount(String raw) {
+    final text = (parse(raw).body?.text ?? raw).trim();
+    if (text.isEmpty) return 0;
+    return text.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+  }
+
+  double _ttsSpeedFactor() {
+    final speed = rate * 2;
+    return speed <= 0 ? 1.0 : speed;
+  }
+
+  Duration _ttsEstimatedChapterDuration() {
+    var words = 0;
+    for (final verse in selectedChapterContent) {
+      words += _spokenWordCount(verse.content);
+    }
+    final secs = (words / (2.5 * _ttsSpeedFactor())).round();
+    return Duration(seconds: secs < 1 ? 1 : secs);
+  }
+
+  Duration _ttsEstimatedPosition() {
+    var words = 0;
+    for (var i = 0; i < curretNo && i < selectedChapterContent.length; i++) {
+      words += _spokenWordCount(selectedChapterContent[i].content);
+    }
+    if (curretNo >= 0 && curretNo < selectedChapterContent.length) {
+      final currentWords =
+          _spokenWordCount(selectedChapterContent[curretNo].content);
+      if (currentWords > 0 && allText.isNotEmpty) {
+        final frac = (end.clamp(0, allText.length)) / allText.length;
+        words += (currentWords * frac).round();
+      }
+    }
+    final secs = (words / (2.5 * _ttsSpeedFactor())).round();
+    return Duration(seconds: secs < 0 ? 0 : secs);
+  }
+
+  int _ttsVerseAtSeconds(int seconds) {
+    if (selectedChapterContent.isEmpty) return 0;
+    final targetWords = 2.5 * _ttsSpeedFactor() * seconds;
+    var words = 0.0;
+    var index = 0;
+    while (index < selectedChapterContent.length - 1) {
+      words += _spokenWordCount(selectedChapterContent[index].content);
+      if (words >= targetWords) break;
+      index += 1;
+    }
+    return index;
+  }
+
+  Future<void> _seekBy(int seconds) async {
+    var next = position + Duration(seconds: seconds);
+    if (next < Duration.zero) next = Duration.zero;
+    if (duration > Duration.zero && next > duration) next = duration;
+    await audioPlayer.seek(next);
+    position = next;
+    if (mounted) setState(() {});
+    _fullPlayerSetState?.call(() {});
+  }
+
+  Future<void> _ttsGoToVerse(int index) async {
+    if (selectedChapterContent.isEmpty) {
+      try {
+        await setChapterContent(preferReaderChapter: true);
+      } catch (_) {}
+    }
+    if (selectedChapterContent.isEmpty) return;
+    final was = isSpeech || ttsState == TtsState.playing;
+    if (was && _isTtsInitialized) {
+      try {
+        await flutterTts.stop();
+      } catch (_) {}
+    }
+    isManualNavigation = true;
+    if (index < 0) {
+      if (selectedChapter > 1) {
+        selectedChapter -= 1;
+        curretNo = 0;
+        await setChapterContent();
+        await updateReadingScreenChapter(selectedChapter);
+        if (selectedChapterContent.isNotEmpty) {
+          curretNo = selectedChapterContent.length - 1;
+        }
+      } else {
+        curretNo = 0;
+      }
+    } else if (index >= selectedChapterContent.length) {
+      final last = _chapterTotal();
+      if (selectedChapter < last) {
+        selectedChapter += 1;
+        curretNo = 0;
+        await setChapterContent();
+        await updateReadingScreenChapter(selectedChapter);
+      } else {
+        curretNo = selectedChapterContent.length - 1;
+      }
+    } else {
+      curretNo = index;
+    }
+    if (curretNo >= 0 && curretNo < selectedChapterContent.length) {
+      _newVoiceText = selectedChapterContent[curretNo].content;
+    }
+    if (was && _newVoiceText != null && _newVoiceText!.isNotEmpty) {
+      isSpeech = true;
+      isManuallyPaused = false;
+      shouldAutoAdvance = true;
+      await _speak();
+    }
+    if (mounted) setState(() {});
+    _fullPlayerSetState?.call(() {});
+  }
+
+  Future<void> _jumpToChapter(int chapter) async {
+    if (chapter < 1 || chapter > _chapterTotal()) return;
+    if (_showTtsUi()) {
+      final was = isSpeech || ttsState == TtsState.playing;
+      if (_isTtsInitialized) {
+        try {
+          await flutterTts.stop();
+        } catch (_) {}
+      }
+      isManualNavigation = true;
+      selectedChapter = chapter;
+      curretNo = 0;
+      await setChapterContent();
+      await updateReadingScreenChapter(chapter);
+      if (selectedChapterContent.isNotEmpty) {
+        _newVoiceText = selectedChapterContent.first.content;
+      }
+      if (was && _newVoiceText != null && _newVoiceText!.isNotEmpty) {
+        isSpeech = true;
+        isManuallyPaused = false;
+        shouldAutoAdvance = true;
+        await _speak();
+      }
+    } else {
+      final was = isAudioPlaying || audioPlayer.state == PlayerState.playing;
+      await updateReadingScreenChapter(chapter);
+      final nextUrl =
+          "${_recordedAudioBase()}/$audioBookNum/$chapter.mp3";
+      audioChapterNum = chapter;
+      audioBaseUrl = nextUrl;
+      if (was) {
+        try {
+          await audioPlayer.setSourceUrl(nextUrl);
+          await audioPlayer.seek(Duration.zero);
+          await audioPlayer.setPlaybackRate(_playbackSpeed);
+          await audioPlayer.setVolume(volume);
+          await audioPlayer.resume();
+          isAudioPlaying = true;
+          position = Duration.zero;
+        } catch (_) {}
+      }
+    }
+    if (mounted) setState(() {});
+    _fullPlayerSetState?.call(() {});
+  }
+
+  Future<void> _applySpeed(double speed) async {
+    _playbackSpeed = speed;
+    if (_showTtsUi()) {
+      rate = (speed / 2).clamp(0.0, 1.0);
+      try {
+        await flutterTts.setSpeechRate(rate);
+      } catch (_) {}
+    } else {
+      try {
+        await audioPlayer.setPlaybackRate(speed);
+      } catch (_) {}
+    }
+    if (mounted) setState(() {});
+    _fullPlayerSetState?.call(() {});
+  }
+
+  void _chooseSleep(int? minutes) {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    _sleepEndOfChapter = false;
+    _sleepChoiceMinutes = minutes;
+    if (minutes != null && minutes < 0) {
+      _sleepEndOfChapter = true;
+    } else if (minutes != null && minutes > 0) {
+      _sleepTimer = Timer(Duration(minutes: minutes), () async {
+        _sleepChoiceMinutes = null;
+        _sleepEndOfChapter = false;
+        if (_showTtsUi()) {
+          await _pauseTts();
+        } else {
+          try {
+            await audioPlayer.pause();
+          } catch (_) {}
+          if (mounted) setState(() => isAudioPlaying = false);
+        }
+        _fullPlayerSetState?.call(() {});
+      });
+    }
+    if (mounted) setState(() {});
+    _fullPlayerSetState?.call(() {});
+  }
+
+  bool _reopenOldSheet = false;
+
+  Future<void> _openReaderFullPlayer({required bool tts}) async {
+    if (!mounted) return;
+    _reopenOldSheet = false;
+    _fullScreenTts = tts;
+    _readerUseTts = tts;
+    if (tts) {
+      _attachTtsProgressHandler();
+    }
+    await Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        transitionDuration: const Duration(milliseconds: 320),
+        reverseTransitionDuration: const Duration(milliseconds: 280),
+        pageBuilder: (routeContext, animation, secondaryAnimation) {
+          return StatefulBuilder(
+            builder: (ctx, setModal) {
+              _fullPlayerSetState = setModal;
+              return _readerFullPlayer(ctx);
+            },
+          );
+        },
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          final slide = Tween<Offset>(
+            begin: const Offset(0, 1),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          ));
+          return SlideTransition(position: slide, child: child);
+        },
+      ),
+    );
+    _fullScreenTts = null;
+    _fullPlayerSetState = null;
+    if (!_reopenOldSheet || !mounted) return;
+    _reopenOldSheet = false;
+    if (tts) {
+      await textToSpeechBottomSheet();
+    } else {
+      await audioPlayerBottomSheet();
+    }
+  }
+
+  Widget _readerFullPlayer(BuildContext ctx) {
+    final ttsUi = _showTtsUi();
+    final ink = _playerInk(ctx);
+    final card = CommanColor.isDarkTheme(ctx)
+        ? _playerCard(ctx)
+        : const Color(0xFFFFF8F2);
+    final playing = ttsUi
+        ? (isSpeech || ttsState == TtsState.playing)
+        : isAudioPlaying;
+    final chapter = _shownChapter(ttsUi);
+    var book = widget.bookName.trim();
+    if (book.isEmpty) book = (_storedBookName ?? '').trim();
+    if (book.isEmpty) book = 'Bible';
+    final ttsDuration = ttsUi ? _ttsEstimatedChapterDuration() : duration;
+    final ttsPosition = ttsUi ? _ttsEstimatedPosition() : position;
+    final ttsMaxSeconds =
+        ttsDuration.inSeconds > 0 ? ttsDuration.inSeconds : 1;
+    final ttsPosSeconds =
+        ttsPosition.inSeconds.clamp(0, ttsMaxSeconds);
+    final maxSeconds = duration.inSeconds > 0 ? duration.inSeconds : 1;
+    return Scaffold(
+      backgroundColor: card,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 6, 18, 12),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () {
+                      _reopenOldSheet = true;
+                      Navigator.of(ctx).pop();
+                    },
+                    icon: Icon(Icons.keyboard_arrow_down, color: ink, size: 28),
+                  ),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Text(
+                          '$book - $chapter',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: ink,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          ttsUi ? 'Read Aloud' : 'NLT Audio',
+                          style: TextStyle(
+                            color: ink.withValues(alpha: 0.55),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    icon: Icon(Icons.close, color: ink, size: 22),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (ttsUi)
+                        Image.asset(
+                          'assets/reader_tts_cover.jpg',
+                          fit: BoxFit.cover,
+                          alignment: Alignment.center,
+                        )
+                      else
+                        Transform.scale(
+                          scale: 1.45,
+                          child: Image.asset(
+                            'assets/reader_player_cover.png',
+                            fit: BoxFit.cover,
+                            alignment: Alignment.center,
+                          ),
+                        ),
+                      Align(
+                        alignment: const Alignment(0, 0.82),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              book.toUpperCase(),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontFamily: 'Georgia',
+                                fontSize: 40,
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: 1.2,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black26,
+                                    blurRadius: 8,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Chapter $chapter',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontFamily: 'Georgia',
+                                fontSize: 28,
+                                fontWeight: FontWeight.w400,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black26,
+                                    blurRadius: 8,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  SizedBox(
+                    width: 44,
+                    child: Text(
+                      formatTime(ttsUi ? ttsPosition : position),
+                      style: TextStyle(color: ink.withValues(alpha: 0.7), fontSize: 12),
+                    ),
+                  ),
+                  Expanded(
+                    child: SliderTheme(
+                      data: SliderTheme.of(ctx).copyWith(
+                        trackHeight: 4,
+                        thumbShape:
+                            const RoundSliderThumbShape(enabledThumbRadius: 7),
+                        overlayShape: SliderComponentShape.noOverlay,
+                        activeTrackColor: ink,
+                        inactiveTrackColor: ink.withValues(alpha: 0.18),
+                        thumbColor: ink,
+                      ),
+                      child: Slider(
+                        min: 0,
+                        max: (ttsUi ? ttsMaxSeconds : maxSeconds).toDouble(),
+                        value: (ttsUi ? ttsPosSeconds : position.inSeconds.clamp(0, maxSeconds))
+                            .toDouble(),
+                        onChanged: (v) async {
+                          if (ttsUi) {
+                            await _ttsGoToVerse(_ttsVerseAtSeconds(v.round()));
+                          } else {
+                            await audioPlayer.seek(Duration(seconds: v.toInt()));
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 44,
+                    child: Text(
+                      formatTime(ttsUi ? ttsDuration : duration),
+                      textAlign: TextAlign.right,
+                      style: TextStyle(color: ink.withValues(alpha: 0.7), fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _secondJumpButton(
+                    ctx,
+                    seconds: 10,
+                    backward: true,
+                    onTap: () {
+                      if (ttsUi) {
+                        _ttsSkipBySeconds(-10);
+                      } else {
+                        _seekBy(-10);
+                      }
+                    },
+                  ),
+                  IconButton(
+                    onPressed: () => _jumpToChapter(chapter - 1),
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    icon: Icon(Icons.skip_previous, color: ink, size: 30),
+                  ),
+                  Material(
+                    color: ink,
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: _onMiniPlay,
+                      child: Padding(
+                        padding: const EdgeInsets.all(18),
+                        child: Icon(
+                          playing ? Icons.pause : Icons.play_arrow,
+                          color: card,
+                          size: 34,
+                        ),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => _jumpToChapter(chapter + 1),
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    icon: Icon(Icons.skip_next, color: ink, size: 30),
+                  ),
+                  _secondJumpButton(
+                    ctx,
+                    seconds: 10,
+                    backward: false,
+                    onTap: () {
+                      if (ttsUi) {
+                        _ttsSkipBySeconds(10);
+                      } else {
+                        _seekBy(10);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 28),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _playerAction(
+                        ctx,
+                        iconWidget: _voiceMicIcon(_playerInk(ctx), size: 32),
+                        label: 'Voice',
+                        onTap: _showCombinedVoiceSettingsSheet,
+                      ),
+                    ),
+                    Expanded(
+                      child: _playerAction(
+                        ctx,
+                        iconWidget: Icon(
+                          (_sleepChoiceMinutes != null)
+                              ? Icons.nightlight_round
+                              : Icons.nightlight_outlined,
+                          color: (_sleepChoiceMinutes != null)
+                              ? _playerInk(ctx)
+                              : _playerInk(ctx).withValues(alpha: 0.38),
+                          size: 24,
+                        ),
+                        label: 'Sleep\nTimer',
+                        onTap: _showSleepSheet,
+                      ),
+                    ),
+                    Expanded(
+                      child: _playerAction(
+                        ctx,
+                        icon: Icons.queue_music,
+                        label: 'Chapters',
+                        onTap: _showChaptersSheet,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _secondJumpButton(
+    BuildContext ctx, {
+    required int seconds,
+    required bool backward,
+    required VoidCallback onTap,
+  }) {
+    final ink = _playerInk(ctx);
+    return InkWell(
+      onTap: onTap,
+      customBorder: const CircleBorder(),
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Transform.flip(
+                flipX: !backward,
+                child: Icon(Icons.replay, color: ink, size: 40),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  '$seconds',
+                  style: TextStyle(
+                    color: ink,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    height: 1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+    );
+  }
+
+  Widget _voiceMicIcon(Color color, {double size = 22}) {
+    return Image.asset(
+      'assets/lightMode/icons/voice_mic.png',
+      height: size,
+      width: size,
+      color: color,
+      fit: BoxFit.contain,
+    );
+  }
+
+  Widget _playerAction(
+    BuildContext ctx, {
+    IconData? icon,
+    Widget? iconWidget,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    final ink = _playerInk(ctx);
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            iconWidget ?? Icon(icon!, color: ink, size: 24),
+            const SizedBox(height: 6),
+            SizedBox(
+              height: 30,
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: ink, fontSize: 12, height: 1.15),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _speedLabel(double speed) {
+    final text = speed.toStringAsFixed(2).replaceFirst(RegExp(r'0$'), '');
+    return '${text.endsWith('.') ? text.substring(0, text.length - 1) : text}x';
+  }
+
+  Future<void> _showSpeedSheet() {
+    const options = <(double, String)>[
+      (0.5, 'Slower'),
+      (0.75, 'Slower'),
+      (1.0, 'Normal'),
+      (1.25, 'A little faster'),
+      (1.5, 'Faster'),
+      (1.75, 'Faster'),
+      (2.0, 'Fastest'),
+    ];
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        final ink = _playerInk(ctx);
+        final card = _playerCard(ctx);
+        return Material(
+          color: card,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+          child: SafeArea(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(ctx).height * 0.85,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _sheetHeader(ctx, 'Playback Speed'),
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: [
+                        for (final option in options)
+                          ListTile(
+                            title: Text(
+                              '${_speedLabel(option.$1)}   ${option.$2}',
+                              style: TextStyle(
+                                color: ink,
+                                fontWeight: _playbackSpeed == option.$1
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
+                            ),
+                            trailing: _playbackSpeed == option.$1
+                                ? Icon(Icons.check, color: ink)
+                                : null,
+                            selected: _playbackSpeed == option.$1,
+                            selectedTileColor: ink.withValues(alpha: 0.12),
+                            onTap: () async {
+                              await _applySpeed(option.$1);
+                              if (ctx.mounted) Navigator.of(ctx).pop();
+                            },
+                          ),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showSleepSheet() {
+    const options = <(int?, String)>[
+      (5, '5 minutes'),
+      (10, '10 minutes'),
+      (15, '15 minutes'),
+      (30, '30 minutes'),
+      (45, '45 minutes'),
+      (60, '60 minutes'),
+      (-1, 'End of chapter'),
+      (null, 'Off'),
+    ];
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        final ink = _playerInk(ctx);
+        final card = _playerCard(ctx);
+        return Material(
+          color: card,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+          child: SafeArea(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(ctx).height * 0.85,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _sheetHeader(ctx, 'Sleep Timer'),
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: [
+                        for (final option in options)
+                          ListTile(
+                            title: Text(
+                              option.$2,
+                              style: TextStyle(
+                                color: ink,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            trailing: _sleepChoiceMinutes == option.$1
+                                ? Icon(Icons.check, color: ink)
+                                : null,
+                            selected: _sleepChoiceMinutes == option.$1,
+                            selectedTileColor: ink.withValues(alpha: 0.12),
+                            onTap: () {
+                              _chooseSleep(option.$1);
+                              Navigator.of(ctx).pop();
+                            },
+                          ),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showChaptersSheet() {
+    final total = _chapterTotal();
+    final current = _shownChapter(_showTtsUi());
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        final ink = _playerInk(ctx);
+        final card = _playerCard(ctx);
+        return Material(
+          color: card,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+          child: SafeArea(
+            child: SizedBox(
+              height: MediaQuery.of(ctx).size.height * 0.55,
+              child: Column(
+                children: [
+                  _sheetHeader(ctx, 'Chapters'),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: total < 1 ? 0 : total,
+                      itemBuilder: (_, index) {
+                        final chapter = index + 1;
+                        final selected = chapter == current;
+                        return ListTile(
+                          title: Text(
+                            'Chapter $chapter',
+                            style: TextStyle(
+                              color: ink,
+                              fontWeight:
+                                  selected ? FontWeight.w700 : FontWeight.w500,
+                            ),
+                          ),
+                          trailing: selected
+                              ? Icon(Icons.check, color: ink)
+                              : null,
+                          selected: selected,
+                          selectedTileColor: ink.withValues(alpha: 0.12),
+                          onTap: () async {
+                            Navigator.of(ctx).pop();
+                            await _jumpToChapter(chapter);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _sheetHeader(BuildContext ctx, String title) {
+    final ink = _playerInk(ctx);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+      child: Row(
+        children: [
+          const SizedBox(width: 40),
+          Expanded(
+            child: Text(
+              title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: ink,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          IconButton(
+            icon: Icon(Icons.close, color: ink),
+            onPressed: () => Navigator.of(ctx).pop(),
+          ),
+        ],
+      ),
+    );
   }
 }
 

@@ -244,9 +244,6 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         originalWords: _rawPrayerWords.trim(),
         englishPrayer: reviewEnglish,
       );
-      if (_titleCtrl.text.trim().isEmpty) {
-        _titleCtrl.text = _titleFromWords(reviewEnglish);
-      }
     }
     final title = _titleCtrl.text.trim();
     final details = _encodedDetails.trim().isNotEmpty
@@ -353,6 +350,7 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         await PrayerWallLocalStore.saveLastDisplayName(effectiveName);
       }
       final prayerId = (_extractPrayerId(created) ?? '').trim();
+      PrayerWallItem? postedItem;
       if (prayerId.isNotEmpty) {
         // Always track prayers created by this device so Edit/Delete works even
         // for anonymous/community posts.
@@ -383,6 +381,21 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
             authorUserId: posterUserId.trim(),
           );
         }
+        postedItem = PrayerWallItem(
+          id: prayerId,
+          title: title,
+          description: details,
+          category: _category,
+          isAnonymous: _isAnonymous,
+          authorName: _isAnonymous || effectiveName.isEmpty
+              ? null
+              : effectiveName,
+          authorUserId: posterUserId?.trim(),
+          email: email,
+          profileImage: profileImageUrl,
+          createdAt: postedAt,
+          prayerDuration: _durationDays,
+        );
       }
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -394,7 +407,14 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         ),
       );
       if (!mounted) return;
-      if (shared == 'wall' || shared == 'mine') {
+      if (shared == 'mine' && postedItem != null) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => PrayerWallScreen(openPostedPrayer: postedItem),
+          ),
+          (route) => route.isFirst,
+        );
+      } else if (shared == 'wall' || shared == 'mine') {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const PrayerWallScreen()),
           (route) => route.isFirst,
@@ -420,14 +440,14 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
     }
   }
 
-  String _titleFromWords(String raw) {
-    final t = raw.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (t.isEmpty) return 'Prayer';
-    return t.length <= 80 ? t : t.substring(0, 80).trim();
-  }
-
   Future<void> _onContinueToReview() async {
     if (_submitting || _creatingAi) return;
+    if (_titleCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a prayer title.')),
+      );
+      return;
+    }
     final words = _detailsCtrl.text.trim();
     if (words.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -475,7 +495,6 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
         originalWords: words,
         englishPrayer: prayer,
       );
-      _titleCtrl.text = _titleFromWords(prayer);
       _step = 1;
     });
   }
@@ -619,7 +638,9 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                                   Icon(
                                     Icons.info_outline,
                                     size: 18,
-                                    color: brown.withOpacity(0.75),
+                                    color: isDark
+                                        ? const Color(0xFFF6F1E9)
+                                        : brown.withOpacity(0.75),
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
@@ -628,7 +649,9 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                                       style: TextStyle(
                                         fontSize: 13,
                                         height: 1.35,
-                                        color: brown.withOpacity(0.75),
+                                        color: isDark
+                                            ? const Color(0xFFF6F1E9)
+                                            : brown.withOpacity(0.75),
                                       ),
                                     ),
                                   ),
@@ -695,6 +718,22 @@ class _PostPrayerScreenState extends State<PostPrayerScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
+                    _label('Prayer Title', brown, isDark),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _titleCtrl,
+                      focusNode: _titleFocus,
+                      maxLength: 120,
+                      enabled: !_creatingAi && !_submitting,
+                      textCapitalization: TextCapitalization.sentences,
+                      onTap: () => _keepOnlyTextFocus(_titleFocus),
+                      style: TextStyle(color: isDark ? Colors.white : brown),
+                      decoration: _fieldDecoration(
+                        'Give your prayer a short title',
+                        isDark,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     _label('Your Prayer Request', brown, isDark),
                     const SizedBox(height: 8),
                     TextField(

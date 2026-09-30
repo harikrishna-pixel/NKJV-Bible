@@ -166,7 +166,8 @@ class SubscriptionScreen extends StatefulWidget {
   State<SubscriptionScreen> createState() => _SubscriptionScreenState();
 }
 
-class _SubscriptionScreenState extends State<SubscriptionScreen> {
+class _SubscriptionScreenState extends State<SubscriptionScreen>
+    with WidgetsBindingObserver {
   bool isPurchaseLoading = false;
 //  bool isRestoreLoading = false;
   bool userTap = false;
@@ -1295,15 +1296,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         // Start 6-second timeout timer for loading
         _loadingTimeoutTimer?.cancel(); // Cancel any existing timer
         _loadingTimeoutTimer = Timer(const Duration(seconds: 6), () {
-          if (mounted) {
-            // UI only: allow another tap; do NOT dismiss Processing...... —
-            // Apple sheet often outlives 6s; stream will dismiss the loader.
-            debugPrint(
-                'IAP Loading timeout - keep Processing...... until stream result');
-            setState(() {
-              userTap = false;
-            });
-          }
+          if (!mounted || _buyDaysApplied) return;
+          // UI only: iOS cancel often sends no stream event.
+          _clearAbandonedBuyUi();
         });
 
         await SharPreferences.setString('OpenAd', '1');
@@ -2764,6 +2759,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         } else if (purchaseDetails.pendingCompletePurchase) {
           await InAppPurchase.instance.completePurchase(purchaseDetails);
           EasyLoading.dismiss();
+          if (purchaseDetails.status == PurchaseStatus.canceled) {
+            if (mounted) {
+              setState(() {
+                userTap = false;
+              });
+            }
+            _popInvisiblePurchaseHost(false);
+          }
         } else if (purchaseDetails.status == PurchaseStatus.canceled) {
           EasyLoading.dismiss();
           if (widget.invisiblePurchaseHost) {
@@ -3249,7 +3252,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           _productIdForPlanSlot(widget.initialSelectedPlanIndex ?? 1);
     }
     _initialize();
-    // WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addObserver(this);
     debugPrint("iap ad - WidgetsBinding");
 
     _purchaseUpdatedStream = InAppPurchase.instance.purchaseStream;
@@ -3345,11 +3348,40 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      _dismissProcessingIfBuyAbandoned();
+    }
+  }
+
+  /// UI only: Apple payment sheet cancel often sends no purchase stream event.
+  Future<void> _dismissProcessingIfBuyAbandoned() async {
+    if (!_buySheetStarted || _buyDaysApplied) return;
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (!mounted || _buyDaysApplied) return;
+    _clearAbandonedBuyUi();
+  }
+
+  /// UI only: drop Processing and the invisible buy host after cancel.
+  void _clearAbandonedBuyUi() {
+    if (!mounted || _buyDaysApplied) return;
+    _buySheetStarted = false;
+    _loadingTimeoutTimer?.cancel();
+    EasyLoading.dismiss();
+    if (mounted) {
+      setState(() {
+        userTap = false;
+      });
+    }
+    _popInvisiblePurchaseHost(false);
+  }
+
+  @override
   void dispose() {
     debugPrint("iap ad - dispose");
-    if (widget.invisiblePurchaseHost) {
-      EasyLoading.dismiss();
-    }
+    WidgetsBinding.instance.removeObserver(this);
+    EasyLoading.dismiss();
     _subscription?.cancel();
     _loadingTimeoutTimer?.cancel(); // Cancel loading timeout timer
     // Reset exit offer flag on dispose

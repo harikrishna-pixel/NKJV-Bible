@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:ui' as ui;
-import 'package:biblebookapp/core/notifiers/download.notifier.dart';
 import 'package:biblebookapp/view/constants/constant.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:biblebookapp/streak_flow/streak_saved_list_screen.dart';
@@ -1887,213 +1886,7 @@ class _SettingScreenState extends State<SettingScreen>
       builder: (_) => ThemeDialog(
         selected: Provider.of<ThemeProvider>(context, listen: false)
             .savedCustomTheme,
-        onPremiumRequired: () => _showPremiumThemeDialog(context),
       ),
-    );
-  }
-
-  Future<void> _showPremiumThemeDialog(BuildContext context) async {
-    // Check subscription status before showing premium dialog
-    // Only show for unsubscribed users
-    bool isSubscribed = false;
-
-    // First check subscription plan - getSubscriptionPlan() reads directly from SharedPreferences
-    final downloadProvider =
-        Provider.of<DownloadProvider>(context, listen: false);
-    final subscriptionPlan = await downloadProvider.getSubscriptionPlan();
-    final hasSubscriptionPlan = subscriptionPlan != null &&
-        subscriptionPlan.isNotEmpty &&
-        ['platinum', 'gold', 'silver'].contains(subscriptionPlan.toLowerCase());
-
-    // Check expiry date (this is set by disableAd() during subscription/restore)
-    String? expiryDateString;
-    try {
-      expiryDateString =
-          await SharPreferences.getString(SharPreferences.isRewardAdViewTime);
-    } catch (e) {
-      debugPrint("Error getting expiry date in premium dialog: $e");
-    }
-
-    // Must have subscription plan AND valid expiry date, OR just valid expiry date as fallback
-    if (hasSubscriptionPlan &&
-        expiryDateString != null &&
-        expiryDateString.isNotEmpty) {
-      try {
-        final expiryDate = DateTime.parse(expiryDateString);
-        final currentTime = DateTime.now();
-        final diffDays = expiryDate.difference(currentTime).inDays;
-        // Subscription is valid if expiry date is today or in the future (>= 0)
-        // This includes lifetime subscriptions (>365 days)
-        isSubscribed = diffDays >= 0;
-        debugPrint(
-            "_showPremiumThemeDialog: Subscription check - plan: $subscriptionPlan, expiry: $expiryDateString, diffDays: $diffDays, isSubscribed: $isSubscribed");
-      } catch (e) {
-        debugPrint("Error parsing subscription expiry in premium dialog: $e");
-        isSubscribed = false;
-      }
-    } else if (expiryDateString != null && expiryDateString.isNotEmpty) {
-      // Fallback: If subscription plan is not found but expiry date exists and is valid,
-      // consider user subscribed (handles cases where plan wasn't saved but expiry was set)
-      try {
-        final expiryDate = DateTime.parse(expiryDateString);
-        final currentTime = DateTime.now();
-        final diffDays = expiryDate.difference(currentTime).inDays;
-        if (diffDays >= 0) {
-          isSubscribed = true;
-          debugPrint(
-              "_showPremiumThemeDialog: Fallback check - No plan found but valid expiry date exists: $expiryDateString, diffDays: $diffDays, isSubscribed: $isSubscribed");
-        } else {
-          debugPrint(
-              "_showPremiumThemeDialog: Fallback check - Expiry date found but expired: $expiryDateString, diffDays: $diffDays");
-        }
-      } catch (e) {
-        debugPrint("Error parsing expiry date in fallback premium dialog: $e");
-        isSubscribed = false;
-      }
-    } else {
-      debugPrint(
-          "_showPremiumThemeDialog: No subscription plan found and no expiry date found, user not subscribed");
-    }
-
-    // Don't show premium dialog if user is subscribed
-    if (isSubscribed) {
-      debugPrint(
-          "_showPremiumThemeDialog: User is subscribed, not showing premium dialog");
-      return;
-    }
-
-    final screenWidth = MediaQuery.of(context).size.width;
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    final oldPaperColor = themeProvider
-        .backgroundColor; // Get old paper theme color (Color(0xFFF3E5C2))
-    final isDark = themeProvider.themeMode == ThemeMode.dark;
-    final dialogTitleColor = isDark ? Colors.white : Colors.black;
-    final dialogBodyColor = isDark ? Colors.white : Colors.black87;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          backgroundColor: oldPaperColor, // Use old paper theme color
-          child: Container(
-            width: screenWidth > 450
-                ? screenWidth * 0.5
-                : screenWidth * 0.85, // Make dialog wider
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Title - Single line
-                Text(
-                  'Premium Access Required',
-                  style: TextStyle(
-                    color: dialogTitleColor,
-                    fontSize: screenWidth > 450 ? 20 : 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 20),
-                // Body text
-                Text(
-                  'Upgrade to access all themes and personalise your Bible with a richer, distraction-free reading experience.',
-                  style: TextStyle(
-                    color: dialogBodyColor,
-                    fontSize: screenWidth > 450 ? 16 : 14,
-                    height: 1.4,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                // Buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              oldPaperColor, // Use old paper theme color
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(
-                              color: isDark
-                                  ? Colors.white.withOpacity(0.7)
-                                  : Colors.grey.shade300,
-                              width: 1,
-                            ),
-                          ),
-                        ),
-                        child: Text(
-                          'Maybe Later',
-                          style: TextStyle(
-                            color: dialogTitleColor,
-                            fontSize: screenWidth > 450 ? 15 : 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          // Don't check connectivity before navigating - similar to Rate Us
-                          // The subscription screen will handle any connectivity issues if needed
-                          Navigator.pop(context);
-                          // Use constants as fallback when SharedPreferences are empty (first time loading)
-                          final sixMonthPlan =
-                              await SharPreferences.getString('sixMonthPlan') ??
-                                  BibleInfo.sixMonthPlanid;
-                          final oneYearPlan =
-                              await SharPreferences.getString('oneYearPlan') ??
-                                  BibleInfo.oneYearPlanid;
-                          final lifeTimePlan =
-                              await SharPreferences.getString('lifeTimePlan') ??
-                                  BibleInfo.lifeTimePlanid;
-                          Get.to(
-                            () => PaywallNavigation.buildVisiblePaywall(
-                              sixMonthPlan: sixMonthPlan,
-                              oneYearPlan: oneYearPlan,
-                              lifeTimePlan: lifeTimePlan,
-                              checkad: 'theme',
-                            ),
-                            transition: SubscriptionScreen.paywallRouteTransition,
-                            duration: SubscriptionScreen.paywallRouteDuration,
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              const Color(0xFF8B5E3C), // Dark brown
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Text(
-                          'Upgrade Now',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: screenWidth > 450 ? 15 : 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 
@@ -2307,12 +2100,10 @@ class NotifyMeDialog extends StatelessWidget {
 
 class ThemeDialog extends StatefulWidget {
   final AppCustomTheme selected;
-  final VoidCallback onPremiumRequired;
 
   const ThemeDialog({
     super.key,
     required this.selected,
-    required this.onPremiumRequired,
   });
 
   @override
@@ -2334,7 +2125,6 @@ class _ThemeDialogState extends State<ThemeDialog> {
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<ThemeProvider>(context);
-    final themes = AppCustomTheme.values;
 
     Color getColor(AppCustomTheme theme) {
       switch (theme) {
@@ -2357,26 +2147,31 @@ class _ThemeDialogState extends State<ThemeDialog> {
             _selectedTheme = theme;
           });
         },
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: color,
-            image: theme == AppCustomTheme.vintage
-                ? const DecorationImage(
-                    image: AssetImage('assets/lightMode/day_bg.png'),
-                    fit: BoxFit.cover,
-                  )
-                : null,
-            border: Border.all(
-              color: !_selectedDarkMode && _selectedTheme == theme
-                  ? Colors.brown
-                  : const Color.fromARGB(255, 230, 230, 230),
-              width: 2,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: color,
+                image: theme == AppCustomTheme.vintage
+                    ? const DecorationImage(
+                        image: AssetImage('assets/lightMode/day_bg.png'),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+                border: Border.all(
+                  color: !_selectedDarkMode && _selectedTheme == theme
+                      ? Colors.brown
+                      : const Color.fromARGB(255, 230, 230, 230),
+                  width: 2,
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-            borderRadius: BorderRadius.circular(8),
-          ),
+          ],
         ),
       );
     }
@@ -2400,9 +2195,9 @@ class _ThemeDialogState extends State<ThemeDialog> {
             ),
             border: Border.all(
               color: _selectedDarkMode
-                  ? Colors.white
+                  ? Colors.black
                   : const Color.fromARGB(255, 230, 230, 230),
-              width: 2,
+              width: _selectedDarkMode ? 3 : 2,
             ),
             borderRadius: BorderRadius.circular(8),
           ),
@@ -2434,8 +2229,10 @@ class _ThemeDialogState extends State<ThemeDialog> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              ...themes.map(themeBox),
+              themeBox(AppCustomTheme.vintage),
               darkThemeBox(),
+              themeBox(AppCustomTheme.white),
+              themeBox(AppCustomTheme.lightbrown),
             ],
           ),
           const SizedBox(height: 20),
@@ -2470,87 +2267,11 @@ class _ThemeDialogState extends State<ThemeDialog> {
                     return;
                   }
 
-                  // Check subscription before setting theme - same logic as intro subscription screen
-                  // When user subscribes or restores, disableAd() is called which sets expiry date in isRewardAdViewTime
-                  bool isSubscribed = false;
-
-                  // First check subscription plan
-                  final downloadProvider =
-                      Provider.of<DownloadProvider>(context, listen: false);
-                  final subscriptionPlan =
-                      await downloadProvider.getSubscriptionPlan();
-                  final hasSubscriptionPlan = subscriptionPlan != null &&
-                      subscriptionPlan.isNotEmpty &&
-                      ['platinum', 'gold', 'silver']
-                          .contains(subscriptionPlan.toLowerCase());
-
-                  // Check expiry date (this is set by disableAd() during subscription/restore)
-                  String? expiryDateString;
-                  try {
-                    expiryDateString = await SharPreferences.getString(
-                        SharPreferences.isRewardAdViewTime);
-                  } catch (e) {
-                    debugPrint("Error getting expiry date: $e");
+                  if (provider.isDarkMode) {
+                    provider.toggleTheme(false);
                   }
-
-                  // Must have subscription plan AND valid expiry date, OR just valid expiry date as fallback
-                  if (hasSubscriptionPlan &&
-                      expiryDateString != null &&
-                      expiryDateString.isNotEmpty) {
-                    try {
-                      final expiryDate = DateTime.parse(expiryDateString);
-                      final currentTime = DateTime.now();
-                      final diffDays =
-                          expiryDate.difference(currentTime).inDays;
-                      // Subscription is valid if expiry date is today or in the future (>= 0)
-                      // This includes lifetime subscriptions (>365 days)
-                      isSubscribed = diffDays >= 0;
-                      debugPrint(
-                          "ThemeDialog: Subscription check - plan: $subscriptionPlan, expiry: $expiryDateString, diffDays: $diffDays, isSubscribed: $isSubscribed");
-                    } catch (e) {
-                      debugPrint("Error parsing subscription expiry: $e");
-                      isSubscribed = false;
-                    }
-                  } else if (expiryDateString != null &&
-                      expiryDateString.isNotEmpty) {
-                    // Fallback: If subscription plan is not found but expiry date exists and is valid,
-                    // consider user subscribed (handles cases where plan wasn't saved but expiry was set)
-                    try {
-                      final expiryDate = DateTime.parse(expiryDateString);
-                      final currentTime = DateTime.now();
-                      final diffDays =
-                          expiryDate.difference(currentTime).inDays;
-                      if (diffDays >= 0) {
-                        isSubscribed = true;
-                        debugPrint(
-                            "ThemeDialog: Fallback check - No plan found but valid expiry date exists: $expiryDateString, diffDays: $diffDays, isSubscribed: $isSubscribed");
-                      } else {
-                        debugPrint(
-                            "ThemeDialog: Fallback check - Expiry date found but expired: $expiryDateString, diffDays: $diffDays");
-                      }
-                    } catch (e) {
-                      debugPrint("Error parsing expiry date in fallback: $e");
-                      isSubscribed = false;
-                    }
-                  } else {
-                    debugPrint(
-                        "ThemeDialog: No subscription plan found and no expiry date found, user not subscribed");
-                  }
-
-                  if (!isSubscribed) {
-                    // Close theme dialog and show premium dialog
-                    Navigator.pop(context);
-                    widget.onPremiumRequired();
-                  } else {
-                    // User is subscribed, set theme directly without showing premium dialog
-                    debugPrint(
-                        "ThemeDialog: User is subscribed, setting theme directly");
-                    if (provider.isDarkMode) {
-                      provider.toggleTheme(false);
-                    }
-                    provider.setCustomTheme(_selectedTheme);
-                    Navigator.pop(context);
-                  }
+                  provider.setCustomTheme(_selectedTheme);
+                  Navigator.pop(context);
                 },
                 child: const Text("Set", style: TextStyle(color: Colors.white)),
               ),
@@ -2562,3 +2283,4 @@ class _ThemeDialogState extends State<ThemeDialog> {
     );
   }
 }
+

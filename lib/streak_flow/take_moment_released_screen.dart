@@ -1,14 +1,13 @@
-import 'dart:async';
-
 import 'package:biblebookapp/streak_flow/take_moment_complete_screen.dart';
 import 'package:biblebookapp/streak_flow/take_moment_rest_screen.dart';
+import 'package:biblebookapp/view/constants/colors.dart';
 import 'package:biblebookapp/view/constants/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 
 /// After Amen: confirmation first, then scripture — one route, no stacked overlap.
-/// Tap or 10s advances to the next step only once.
+/// Continues only when Continue is pressed.
 class TakeMomentReleasedScreen extends StatefulWidget {
   const TakeMomentReleasedScreen({super.key});
 
@@ -21,45 +20,21 @@ class _TakeMomentReleasedScreenState extends State<TakeMomentReleasedScreen> {
   static const Color _brown = Color(0xFF3D2914);
   static const Color _gold = Color(0xFFC9A227);
   static const Color _warmTan = Color(0xFF8B7355);
-  static const Duration _autoAdvance = Duration(seconds: 10);
+  static const Color _cream = Color(0xFFF5F0E6);
 
   /// 0 = placed confirmation, 1 = scripture
   int _step = 0;
-  Timer? _timer;
   bool _advancing = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _startAutoAdvance();
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  void _startAutoAdvance() {
-    _timer?.cancel();
-    _timer = Timer(_autoAdvance, () {
-      if (!mounted || _advancing) return;
-      _goNext();
-    });
-  }
 
   void _goNext() {
     if (_advancing || !mounted) return;
     _advancing = true;
-    _timer?.cancel();
-    _timer = null;
 
     if (_step == 0) {
       setState(() {
         _step = 1;
         _advancing = false;
       });
-      _startAutoAdvance();
       return;
     }
 
@@ -79,26 +54,18 @@ class _TakeMomentReleasedScreenState extends State<TakeMomentReleasedScreen> {
         showBird: _step == 0,
         birdWidthFactor: 0.55,
         child: SafeArea(
-          child: Stack(
-            children: [
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: _goNext,
-                child: _step == 0
-                    ? _buildPlacedStep(
-                        isTablet: isTablet,
-                        textColor: textColor,
-                        softText: softText,
-                      )
-                    : _buildScriptureStep(
-                        isTablet: isTablet,
-                        isDark: isDark,
-                        textColor: textColor,
-                        softText: softText,
-                      ),
-              ),
-            ],
-          ),
+          child: _step == 0
+              ? _buildPlacedStep(
+                  isTablet: isTablet,
+                  textColor: textColor,
+                  softText: softText,
+                )
+              : _buildScriptureStep(
+                  isTablet: isTablet,
+                  isDark: isDark,
+                  textColor: textColor,
+                  softText: softText,
+                ),
         ),
       ),
     );
@@ -178,6 +145,7 @@ class _TakeMomentReleasedScreenState extends State<TakeMomentReleasedScreen> {
           ),
         ),
         const Spacer(flex: 3),
+        _continueButton(context),
         const SizedBox(height: 20),
       ],
     );
@@ -261,7 +229,55 @@ class _TakeMomentReleasedScreenState extends State<TakeMomentReleasedScreen> {
           ),
         ),
         const SizedBox(height: 28),
+        _continueButton(context),
+        const SizedBox(height: 20),
       ],
+    );
+  }
+
+  Widget _continueButton(BuildContext context) {
+    const isDark = false;
+    final lightBtnColor =
+        CommanColor.lightDarkPrimary(context).withOpacity(0.92);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _advancing ? null : _goNext,
+          borderRadius: BorderRadius.circular(28),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.black.withOpacity(0.35) : lightBtnColor,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(
+                color: (isDark ? _gold : _cream).withOpacity(0.75),
+                width: 2,
+              ),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Center(
+              child: Text(
+                'Continue',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: _cream,
+                  fontFamily: 'Georgia',
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

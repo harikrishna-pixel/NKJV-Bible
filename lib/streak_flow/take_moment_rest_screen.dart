@@ -171,6 +171,19 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
     _scheduleNextPhase();
   }
 
+  void _stopHold() {
+    if (!_isHolding || _allCyclesDone) return;
+    _timer?.cancel();
+    _orbController.stop();
+    _orbController.value = 0;
+    if (!mounted) return;
+    setState(() {
+      _isHolding = false;
+      _breathNumber = 1;
+      _phase = _BreathPhase.inhale;
+    });
+  }
+
   void _goToPray() {
     Get.off(
       () => TakeMomentPrayScreen(worryText: widget.worryText),
@@ -372,8 +385,8 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
               const SizedBox(height: 20),
               Expanded(
                 child: Center(
-                  child: Listener(
-                    onPointerDown: (_) {
+                  child: GestureDetector(
+                    onPanDown: (_) {
                       if (_allCyclesDone) return;
                       if (!_isHolding && mounted) {
                         HapticFeedback.heavyImpact();
@@ -385,8 +398,8 @@ class _TakeMomentRestScreenState extends State<TakeMomentRestScreen>
                         _startCountdown();
                       }
                     },
-                    // Additive: do not reset mid-cycle. Pointer up/cancel used
-                    // to send the 5-breath session back to breath 1.
+                    onPanEnd: (_) => _stopHold(),
+                    onPanCancel: () => _stopHold(),
                     child: AnimatedBuilder(
                       animation: Listenable.merge([
                         _glowAnimation,

@@ -30,10 +30,14 @@ class PrayerWallScreen extends StatefulWidget {
   const PrayerWallScreen({
     super.key,
     this.openMyProfile = false,
+    this.openPostedPrayer,
   });
 
   /// Additive: open Prayer Profile (My Profile) after login check.
   final bool openMyProfile;
+
+  /// Open this prayer's detail after the wall home is shown.
+  final PrayerWallItem? openPostedPrayer;
 
   @override
   State<PrayerWallScreen> createState() => _PrayerWallScreenState();
@@ -95,6 +99,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
   int _ownFollowingCount = 0;
   final Set<String> _expandedOwnRecentPrayerIds = {};
   bool _didAutoOpenMyProfile = false;
+  bool _didAutoOpenPostedPrayer = false;
   final CacheNotifier _cacheNotifier = CacheNotifier();
 
   /// Logged-in name if any, otherwise last locally saved post name.
@@ -225,6 +230,24 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     // Load queue immediately so Hotspot UI is not blocked on wall GET.
     unawaited(_refreshQueue());
     _refresh();
+    final posted = widget.openPostedPrayer;
+    if (posted != null && posted.id.trim().isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_openPostedPrayerDetail());
+      });
+    }
+  }
+
+  Future<void> _openPostedPrayerDetail() async {
+    final item = widget.openPostedPrayer;
+    if (item == null || _didAutoOpenPostedPrayer || !mounted) return;
+    _didAutoOpenPostedPrayer = true;
+    if (!_myPrayerIds.contains(item.id)) {
+      setState(() {
+        _myPrayerIds = {..._myPrayerIds, item.id};
+      });
+    }
+    await _openQueuePrayerDetail(item);
   }
 
   @override
@@ -2420,12 +2443,12 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
       Constants.showToast('This prayer was posted anonymously.');
       return;
     }
-    final profileId =
-        ((item.authorUserId ?? '').trim().isNotEmpty
-                ? item.authorUserId
-                : item.identityUserId)
-            ?.trim() ??
-        '';
+    final identity = (item.identityUserId ?? '').trim();
+    final author = (item.authorUserId ?? '').trim();
+    final mapped = (_prayerAuthorUserIdMap[item.id] ?? '').trim();
+    final profileId = identity.isNotEmpty
+        ? identity
+        : (mapped.isNotEmpty ? mapped : author);
     if (profileId.isEmpty) {
       Constants.showToast('Profile is not available for this user.');
       return;
@@ -2790,20 +2813,18 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
 
   String _ownRecentPrayerTitle(PrayerWallItem p) {
     final t = p.title.trim();
-    if (t.isNotEmpty) return t;
-    return (PrayerDualDescription.aiPrayer(p.description) ?? p.description)
-        .trim();
+    if (t.isEmpty) return '';
+    if (PrayerDualDescription.titleRepeatsPrayer(t, p.description)) return '';
+    return t;
   }
 
   String _ownRecentPrayerSubtitle(PrayerWallItem p) {
-    final title = p.title.trim();
-    final ai = (PrayerDualDescription.aiPrayer(p.description) ?? '').trim();
-    final my = (PrayerDualDescription.myWords(p.description) ?? '').trim();
-    final plain = PrayerDualDescription.isDual(p.description)
-        ? ''
-        : p.description.trim();
-    final body = ai.isNotEmpty ? ai : (my.isNotEmpty ? my : plain);
-    if (body.isNotEmpty && body != title) return body;
+    final body = PrayerDualDescription.visibleBody(p.description);
+    if (body.isEmpty) return '';
+    if (PrayerDualDescription.titleRepeatsPrayer(p.title, p.description)) {
+      return body;
+    }
+    if (body != p.title.trim()) return body;
     return '';
   }
 
@@ -3475,17 +3496,18 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                         ],
                       ),
                       const SizedBox(height: 14),
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: ink,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          height: 1.2,
+                      if (title.isNotEmpty)
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: ink,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            height: 1.2,
+                          ),
                         ),
-                      ),
                       if (subtitle.isNotEmpty) ...[
                         const SizedBox(height: 2),
                         Text(
@@ -3525,7 +3547,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                             icon: _PrayHandsFloater(
                               key: _prayFloatKey(item.id),
                               filled: liked,
-                              size: 22,
+                              size: 28,
                               emptyColor: Colors.white,
                             ),
                             label: Text(
@@ -3718,17 +3740,18 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                 ],
               ),
               const SizedBox(height: 10),
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: ink,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  height: 1.3,
+              if (title.isNotEmpty)
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: ink,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    height: 1.3,
+                  ),
                 ),
-              ),
               if (subtitle.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 Text(
@@ -3755,7 +3778,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
                     child: _PrayHandsFloater(
                       key: _prayFloatKey(item.id),
                       filled: liked,
-                      size: 28,
+                      size: 34,
                       emptyColor: isDark ? Colors.white : brown,
                     ),
                   ),
@@ -6212,16 +6235,7 @@ class _QueuePrayerDetailScreenState extends State<_QueuePrayerDetailScreen>
                                   Navigator.of(context).pop();
                                 }
                               },
-                      )
-                    else
-                      _bottomAction(
-                      icon: Icons.more_horiz,
-                      label: 'More',
-                      onTap: () async {
-                        await widget.onMore();
-                        if (mounted) setState(() {});
-                      },
-                    ),
+                      ),
                   ],
                 ),
               ),

@@ -2382,7 +2382,9 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                 _messageFocusNode.unfocus();
               },
               behavior: HitTestBehavior.opaque,
-              child: Column(
+              child: Stack(
+                children: [
+                  Column(
                 children: [
                   // Top bar with back button and actions
                   Padding(
@@ -2956,15 +2958,24 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                                     _buildRecentConversations(
                                         screenWidth, isDark),
                                   ],
-                                  // Add extra bottom padding for better scrolling
-                                  const SizedBox(height: 20),
+                                  // Room for the overlaid composer. Kept stable while
+                                  // the keyboard opens so the page does not jump.
+                                  SizedBox(
+                                    height: MediaQuery.viewPaddingOf(context)
+                                            .bottom +
+                                        96,
+                                  ),
                                 ],
                               ),
                             )
                           : ListView.builder(
                               controller: _scrollController,
-                              padding:
-                                  EdgeInsets.all(screenWidth > 450 ? 20 : 16),
+                              padding: EdgeInsets.fromLTRB(
+                                screenWidth > 450 ? 20 : 16,
+                                screenWidth > 450 ? 20 : 16,
+                                screenWidth > 450 ? 20 : 16,
+                                MediaQuery.viewPaddingOf(context).bottom + 96,
+                              ),
                               itemCount: _messages.length +
                                   (_isLoading ? 1 : 0) +
                                   1, // +1 for suggestions footer so it scrolls with content
@@ -2989,10 +3000,12 @@ Remember: You are assisting users with the ${BibleInfo.bible_shortName}, so prov
                             ),
                     ),
                   ),
-                  Padding(
-                    padding: EdgeInsets.only(
-                      bottom: MediaQuery.viewInsetsOf(context).bottom,
-                    ),
+                ],
+              ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: MediaQuery.viewInsetsOf(context).bottom,
                     child: _buildInputArea(screenWidth, isDark),
                   ),
                 ],
@@ -5101,6 +5114,7 @@ Your 3 questions (exactly 3 lines):''';
                     child: TextField(
                       controller: _messageController,
                       focusNode: _messageFocusNode,
+                      scrollPadding: EdgeInsets.zero,
                       maxLines: null,
                       minLines: 1,
                       textInputAction: TextInputAction.send,

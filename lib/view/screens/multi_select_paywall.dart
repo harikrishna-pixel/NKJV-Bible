@@ -348,46 +348,6 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
     return _dur == _AiDur.oneYear ? '\$59.99' : '\$34.99';
   }
 
-  String get _aiPer => _dur == _AiDur.oneYear ? '/year' : '/month';
-
-  /// UI only: strikethrough “was” price for yearly (SAVE 50% visual).
-
-  String? get _aiWasPrice {
-    if (_dur != _AiDur.oneYear) return null;
-
-    final p = _oneYear;
-
-    if (p == null || p.rawPrice <= 0) return null;
-
-    final sym = p.currencySymbol.isNotEmpty ? p.currencySymbol : '\$';
-
-    final was = p.rawPrice * 2;
-
-    final text = was == was.roundToDouble()
-        ? was.toStringAsFixed(0)
-        : was.toStringAsFixed(2);
-
-    return '$sym$text';
-  }
-
-  String get _aiNote {
-    if (_dur == _AiDur.oneYear) {
-      final p = _oneYear;
-
-      if (p != null && p.rawPrice > 0) {
-        final sym = p.currencySymbol.isNotEmpty ? p.currencySymbol : '\$';
-
-        final mo = (p.rawPrice / 12).round();
-
-        return 'Works out to $sym$mo a month';
-      }
-
-      return 'Works out to a lower monthly cost';
-    }
-
-    return 'Billed every month';
-  }
-
   String get _lifetimePrice {
     final p = _lifetime;
 
@@ -1442,8 +1402,6 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
   Widget _buildAiCard(bool isTablet) {
     final selected = _sel == _PwCard.ai;
 
-    final priceMuted = !selected;
-
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
@@ -1451,7 +1409,11 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
         setState(() => _sel = _PwCard.ai);
       },
-      child: AnimatedContainer(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(17),
+        child: Stack(
+          children: [
+            AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         curve: Curves.easeOutCubic,
         padding: EdgeInsets.fromLTRB(
@@ -1482,8 +1444,6 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
           children: [
             Row(
               children: [
-                _RadioDot(selected: selected, color: _purple),
-                SizedBox(width: isTablet ? 10 : 8),
                 Icon(
                   Icons.auto_awesome_rounded,
                   size: isTablet ? 20 : 19,
@@ -1501,31 +1461,14 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                     ),
                   ),
                 ),
-                Container(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: isTablet ? 11 : 10,
-                      vertical: isTablet ? 6 : 5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE7DEFA),
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: Text(
-                    'Subscription',
-                    style: TextStyle(
-                      fontSize: isTablet ? 11 : 10,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF4A2F9E),
-                    ),
-                  ),
-                ),
+                if (_sel == _PwCard.ai && _dur == _AiDur.oneYear)
+                  _SaveFiftyBadge(isTablet: isTablet),
               ],
             ),
-            SizedBox(height: isTablet ? 14 : 11),
-            _buildDurationRow(isTablet),
-            SizedBox(height: isTablet ? 14 : 11),
+            SizedBox(height: isTablet ? 18 : 16),
             if (_loading)
-              const SizedBox(
-                height: 28,
+              const Padding(
+                padding: EdgeInsets.only(bottom: 10),
                 child: Center(
                   child: SizedBox(
                     width: 18,
@@ -1533,64 +1476,9 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                 ),
-              )
-            else
-              Opacity(
-                opacity: priceMuted ? 0.45 : 1,
-                child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    _aiPrice,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                        fontSize: isTablet ? 34 : 30,
-                        letterSpacing: -0.6,
-                        height: 1.1,
-                      color: _ink,
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4, left: 2),
-                    child: Text(
-                      _aiPer,
-                        style: TextStyle(
-                          fontSize: isTablet ? 16 : 15,
-                        fontWeight: FontWeight.w600,
-                          color: const Color(0xFF5C5240),
-                        ),
-                      ),
-                    ),
-                    if (_aiWasPrice != null) ...[
-                      const SizedBox(width: 5),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 5),
-                        child: Text(
-                          _aiWasPrice!,
-                          style: TextStyle(
-                            fontSize: isTablet ? 15 : 14,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFFA2937B),
-                            decoration: TextDecoration.lineThrough,
-                            decorationColor: const Color(0xFFA2937B),
-                      ),
-                    ),
-                  ),
-                    ],
-                  ],
-                ),
               ),
-            SizedBox(height: isTablet ? 4 : 2),
-            Opacity(
-              opacity: priceMuted ? 0.45 : 1,
-              child: Text(
-              _aiNote,
-                style: TextStyle(
-                    fontSize: isTablet ? 12.5 : 11.5,
-                    color: const Color(0xFF6E6353)),
-            ),
-            ),
-            SizedBox(height: isTablet ? 12 : 11),
+            _buildDurationRow(isTablet),
+            SizedBox(height: isTablet ? 12 : 10),
             _inclRow(
               rich: true,
               bold: 'Unlimited AI',
@@ -1606,32 +1494,85 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
             ),
           ],
         ),
+            ),
+            if (selected)
+              const Positioned.fill(
+                child: IgnorePointer(
+                  child: _BestValueCardShine(),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
 
+  String _planPrice(ProductDetails? product, String fallback) {
+    if (product != null && product.price.isNotEmpty) return product.price;
+    return fallback;
+  }
+
+  String _yearPerMonthCaption() {
+    final product = _oneYear;
+    if (product != null && product.rawPrice > 0) {
+      final sym =
+          product.currencySymbol.isNotEmpty ? product.currencySymbol : '\$';
+      final perMonth = product.rawPrice / 12;
+      return '$sym${perMonth.toStringAsFixed(2)} per month';
+    }
+    return 'per month';
+  }
+
   Widget _buildDurationRow(bool isTablet) {
-    final items = <(_AiDur, String, String?)>[
-      if (_sixMonth != null || _loading) (_AiDur.sixMonth, '1 Month', null),
-      if (_oneYear != null || _loading) (_AiDur.oneYear, '1 Year', 'SAVE 50%'),
+    final items = <(_AiDur, String, String, String, Color)>[
+      if (_sixMonth != null || _loading)
+        (
+          _AiDur.sixMonth,
+          '1 Month',
+          _planPrice(_sixMonth, '\$34.99'),
+          'per month',
+          const Color(0xFF8A8498),
+        ),
+      if (_oneYear != null || _loading)
+        (
+          _AiDur.oneYear,
+          '1 Year',
+          _planPrice(_oneYear, '\$59.99'),
+          _yearPerMonthCaption(),
+          const Color(0xFF8B5E3C),
+        ),
     ];
 
     if (items.isEmpty) {
-      items.addAll(const [
-        (_AiDur.sixMonth, '1 Month', null),
-        (_AiDur.oneYear, '1 Year', 'SAVE 50%'),
+      items.addAll([
+        (
+          _AiDur.sixMonth,
+          '1 Month',
+          _planPrice(_sixMonth, '\$34.99'),
+          'per month',
+          const Color(0xFF8A8498),
+        ),
+        (
+          _AiDur.oneYear,
+          '1 Year',
+          _planPrice(_oneYear, '\$59.99'),
+          _yearPerMonthCaption(),
+          const Color(0xFF8B5E3C),
+        ),
       ]);
     }
 
     return Row(
       children: [
         for (var i = 0; i < items.length; i++) ...[
-          if (i > 0) SizedBox(width: isTablet ? 12 : 9),
+          if (i > 0) SizedBox(width: isTablet ? 16 : 14),
           Expanded(
             child: _DurChip(
               selected: _dur == items[i].$1 && _sel == _PwCard.ai,
               label: items[i].$2,
-              badge: items[i].$3,
+              price: items[i].$3,
+              caption: items[i].$4,
+              captionColor: items[i].$5,
               onTap: () => setState(() {
                 _sel = _PwCard.ai;
 
@@ -1656,7 +1597,11 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
 
         setState(() => _sel = _PwCard.lifetime);
       },
-      child: AnimatedContainer(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(17),
+        child: Stack(
+          children: [
+            AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         curve: Curves.easeOutCubic,
         padding: EdgeInsets.fromLTRB(
@@ -1708,18 +1653,21 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
                 ),
                 Container(
                   padding: EdgeInsets.symmetric(
-                      horizontal: isTablet ? 11 : 10,
-                      vertical: isTablet ? 6 : 5),
+                    horizontal: isTablet ? 16 : 14,
+                    vertical: isTablet ? 8 : 7,
+                  ),
                   decoration: BoxDecoration(
-                    color: _greenSoft,
-                    borderRadius: BorderRadius.circular(9),
+                    color: selected
+                        ? _green
+                        : const Color(0xFFBDBDBD),
+                    borderRadius: BorderRadius.circular(24),
                   ),
                   child: Text(
-                    'One-time · Never renews',
+                    'Best Value',
                     style: TextStyle(
-                      fontSize: isTablet ? 11 : 10,
+                      fontSize: isTablet ? 14 : 13,
                       fontWeight: FontWeight.w600,
-                      color: const Color(0xFF136135),
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -1779,6 +1727,15 @@ class _MultiSelectPaywallState extends State<MultiSelectPaywall> {
               isTablet: isTablet,
               accentGreen: true,
             ),
+          ],
+        ),
+            ),
+            if (selected)
+              const Positioned.fill(
+                child: IgnorePointer(
+                  child: _BestValueCardShine(),
+                ),
+              ),
           ],
         ),
       ),
@@ -2032,19 +1989,93 @@ class _RadioDot extends StatelessWidget {
   }
 }
 
+class _SaveFiftyBadge extends StatefulWidget {
+  const _SaveFiftyBadge({required this.isTablet});
+
+  final bool isTablet;
+
+  @override
+  State<_SaveFiftyBadge> createState() => _SaveFiftyBadgeState();
+}
+
+class _SaveFiftyBadgeState extends State<_SaveFiftyBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _scale = Tween<double>(begin: 1, end: 1.08).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isTablet = widget.isTablet;
+    return ScaleTransition(
+      scale: _scale,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: isTablet ? 12 : 10,
+          vertical: isTablet ? 7 : 6,
+        ),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFFB703), Color(0xFFFF5A1F)],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFFF6A00).withValues(alpha: 0.35),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Text(
+          'Save 50%',
+          style: TextStyle(
+            fontSize: isTablet ? 13 : 12,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _DurChip extends StatelessWidget {
   const _DurChip({
     required this.selected,
     required this.label,
+    required this.price,
+    required this.caption,
     required this.onTap,
-    this.badge,
+    required this.captionColor,
   });
 
   final bool selected;
 
   final String label;
 
-  final String? badge;
+  final String price;
+
+  final String caption;
+
+  final Color captionColor;
 
   final VoidCallback onTap;
 
@@ -2054,69 +2085,153 @@ class _DurChip extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.symmetric(
-              horizontal: isTablet ? 10 : 6,
-              vertical: isTablet ? 14 : 12,
-            ),
-            decoration: BoxDecoration(
-              color: selected
-                  ? const Color(0xFFF1EAFE)
-                  : (badge != null ? const Color(0xFFF7F3FD) : Colors.white),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: selected
-                    ? const Color(0xFF5B3FBF)
-                    : (badge != null
-                        ? const Color(0xFFC6B8E0)
-                        : const Color(0xFFDCD2E8)),
-                width: selected ? 2 : 1.5,
-              ),
-            ),
-            child: Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                fontSize: isTablet ? 16 : 15,
-                fontWeight: FontWeight.w700,
-                    color: selected
-                    ? const Color(0xFF4A2F9E)
-                    : const Color(0xFF101B2B),
-              ),
-            ),
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.fromLTRB(
+          isTablet ? 14 : 12,
+          isTablet ? 18 : 16,
+          isTablet ? 12 : 10,
+          isTablet ? 18 : 16,
+        ),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFF4F0FF) : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected
+                ? const Color(0xFF6D4AFF)
+                : const Color(0xFFE6E1F2),
+            width: selected ? 1.6 : 1.2,
           ),
-          if (badge != null)
-            Positioned(
-              top: -9,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Container(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: isTablet ? 9 : 9,
-                      vertical: isTablet ? 3.5 : 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF9A7113),
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: Text(
-                    badge!,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: selected
+                  ? Container(
+                      width: isTablet ? 24 : 22,
+                      height: isTablet ? 24 : 22,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF5B3FBF),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.check,
+                        color: Colors.white,
+                        size: isTablet ? 16 : 14,
+                      ),
+                    )
+                  : Container(
+                      width: isTablet ? 24 : 22,
+                      height: isTablet ? 24 : 22,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFFD5D3DE),
+                          width: 1.6,
+                        ),
+                      ),
+                    ),
+            ),
+            SizedBox(width: isTablet ? 10 : 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
                     style: TextStyle(
-                      color: Colors.white,
-                      fontSize: isTablet ? 9 : 8.5,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.4,
+                      fontSize: isTablet ? 16 : 15,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF1B1440),
                     ),
                   ),
+                  const SizedBox(height: 2),
+                  Text(
+                    price,
+                    style: TextStyle(
+                      fontSize: isTablet ? 22 : 20,
+                      fontWeight: FontWeight.w800,
+                      height: 1.1,
+                      color: const Color(0xFF1B1440),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    caption,
+                    style: TextStyle(
+                      fontSize: isTablet ? 12 : 11,
+                      fontWeight: FontWeight.w500,
+                      color: captionColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BestValueCardShine extends StatefulWidget {
+  const _BestValueCardShine();
+
+  @override
+  State<_BestValueCardShine> createState() => _BestValueCardShineState();
+}
+
+class _BestValueCardShineState extends State<_BestValueCardShine>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2800),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final t = Curves.easeInOut.transform(
+          ((_controller.value - 0.12) / 0.38).clamp(0.0, 1.0),
+        );
+        return Align(
+          alignment: Alignment(-1.4 + (t * 2.8), 0),
+          child: Transform.rotate(
+            angle: -0.55,
+            child: Container(
+              width: 56,
+              height: 220,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Colors.white.withValues(alpha: 0),
+                    Colors.white.withValues(alpha: 0.34),
+                    Colors.white.withValues(alpha: 0),
+                  ],
                 ),
               ),
             ),
-        ],
-      ),
+          ),
+        );
+      },
     );
   }
 }
