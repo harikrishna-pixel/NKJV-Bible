@@ -275,6 +275,7 @@ class BibleInfo {
   static String audioBasePath =
       "https://bibleoffice.com/BibleReplications/dev/v1/uploads/bible_audio/Portuguese/";
   static String audioBasePathType = "3";
+  
   static String isShowMp3Audio = "1";
   // Sample English chapter. Shown in MP3 Audio Settings only when this file loads.
   static const String englishBibleAudio =
