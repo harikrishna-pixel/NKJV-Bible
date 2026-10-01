@@ -2420,16 +2420,17 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     return 'Just now';
   }
 
-  /// Display name on a card. Own posts use the name saved with the prayer
-  /// (API / local map), not a forced login-cache override.
+  /// Own prayers (same email) show the current profile name.
+  /// Other people still see the name saved on the prayer.
   String _cardDisplayName(PrayerWallItem item) {
     final fromApi = (item.authorName ?? '').trim();
     final fromMap = (_prayerAuthorMap[item.id] ?? '').trim();
 
     if (_isMyPrayer(item)) {
+      if (item.isAnonymous) return 'Anonymous';
+      if (_viewerDisplayName.isNotEmpty) return _viewerDisplayName;
       if (fromApi.isNotEmpty) return fromApi;
       if (fromMap.isNotEmpty) return fromMap;
-      if (_viewerDisplayName.isNotEmpty) return _viewerDisplayName;
       return 'You';
     }
 
@@ -2448,17 +2449,10 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
     return 'Community member';
   }
 
-  /// You label only when this prayer's saved name is the current username.
-  /// An older post keeps the name it was saved with.
+  /// You chip on every prayer that belongs to this email.
   bool _showsYouForCurrentName(PrayerWallItem item) {
-    if (!_isMyPrayer(item)) return false;
-    final fromApi = (item.authorName ?? '').trim().toLowerCase();
-    final fromMap = (_prayerAuthorMap[item.id] ?? '').trim().toLowerCase();
-    final saved = fromApi.isNotEmpty ? fromApi : fromMap;
-    if (saved.isEmpty) return true;
-    final current = _viewerDisplayName.trim().toLowerCase();
-    if (current.isEmpty) return false;
-    return saved == current;
+    if (!_isMyPrayer(item) || item.isAnonymous) return false;
+    return _viewerDisplayName.trim().isNotEmpty;
   }
 
   /// Additive: open Prayer Wall profile for this prayer's author.
@@ -2904,9 +2898,7 @@ class _PrayerWallScreenState extends State<PrayerWallScreen>
           builder: (_) => _QueuePrayerDetailScreen(
             item: item,
             fromHotspot: fromHotspot,
-            displayName: _showsYouForCurrentName(item)
-                ? 'You'
-                : _cardDisplayName(item),
+            displayName: _cardDisplayName(item),
             timeLabel: _timeLabel(item),
             profileImageUrl: () {
               final fromApi = item.profileImage?.trim() ?? '';

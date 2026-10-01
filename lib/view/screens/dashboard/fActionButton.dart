@@ -2288,10 +2288,25 @@ class floatingButtonState extends State<floatingButton>
     if (text.isEmpty) return const SizedBox.shrink();
 
     final len = text.length;
-    final safeStart = start.clamp(0, len);
+    var safeStart = start.clamp(0, len);
     var safeEnd = end.clamp(0, len);
     if (safeEnd < safeStart) {
       safeEnd = safeStart;
+    }
+    // Display only: an empty range still paints the word at this position.
+    if (safeStart >= safeEnd && len > 0) {
+      var wordStart = safeStart >= len ? len - 1 : safeStart;
+      while (wordStart > 0 && text[wordStart - 1].trim().isNotEmpty) {
+        wordStart--;
+      }
+      var wordEnd = wordStart;
+      while (wordEnd < len && text[wordEnd].trim().isNotEmpty) {
+        wordEnd++;
+      }
+      if (wordEnd > wordStart) {
+        safeStart = wordStart;
+        safeEnd = wordEnd;
+      }
     }
 
     final baseStyle = TextStyle(
